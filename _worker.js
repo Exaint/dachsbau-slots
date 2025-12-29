@@ -568,19 +568,12 @@ async function handleSlot(username, amountParam, url, env) {
       return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
     }
     
-    // Batch load initial data
-    let [currentBalance, hasHappyHour, hasLuckyCharm, hasStarMagnet, hasDachsLocator, hasRageMode, hasProfitDoubler, hasGuaranteedPairToken, hasWildCardToken, hasDiamondRush] = await Promise.all([
-      getBalance(username, env),
-      isBuffActive(username, 'happy_hour', env),
-      isBuffActive(username, 'lucky_charm', env),
-      isBuffActive(username, 'star_magnet', env),
-      getBuffWithUses(username, 'dachs_locator', env),
-      getBuffWithStack(username, 'rage_mode', env),
-      isBuffActive(username, 'profit_doubler', env),
-      hasGuaranteedPair(username, env),
-      hasWildCard(username, env),
-      isBuffActive(username, 'diamond_rush', env)
-    ]);
+// OPTIMIZED: Load only essential data first
+let [currentBalance, hasGuaranteedPairToken, hasWildCardToken] = await Promise.all([
+  getBalance(username, env),
+  hasGuaranteedPair(username, env),
+  hasWildCard(username, env)
+]);
     
     // Check for Free Spins
     let isFreeSpinUsed = false;
@@ -651,20 +644,32 @@ async function handleSlot(username, amountParam, url, env) {
       }
     }
     
-    // Happy Hour
-    if (!isFreeSpinUsed && hasHappyHour && spinCost < 1000) {
-      spinCost = Math.floor(spinCost / 2);
-    }
+// OPTIMIZED: Only check Happy Hour if not using free spin
+if (!isFreeSpinUsed && spinCost < 1000) {
+  const hasHappyHour = await isBuffActive(username, 'happy_hour', env);
+  if (hasHappyHour) {
+    spinCost = Math.floor(spinCost / 2);
+  }
+}
     
     // Balance check
     if (!isFreeSpinUsed && currentBalance < spinCost) {
       return new Response(`@${username} ❌ Nicht genug DachsTaler! Du brauchst ${spinCost} (Aktuell: ${currentBalance}) 🦡`, { headers: RESPONSE_HEADERS });
     }
     
-    // Generate spin with modified probabilities
-    let dachsChance = 1 / 150;
-    if (hasLuckyCharm) dachsChance = 1 / 75;
-    if (hasDachsLocator.active) dachsChance = dachsChance * 3; // 3x Dachs chance
+// OPTIMIZED: Load buffs lazily only when needed for spin generation
+const [hasLuckyCharm, hasDachsLocator, hasRageMode, hasStarMagnet, hasDiamondRush] = await Promise.all([
+  isBuffActive(username, 'lucky_charm', env),
+  getBuffWithUses(username, 'dachs_locator', env),
+  getBuffWithStack(username, 'rage_mode', env),
+  isBuffActive(username, 'star_magnet', env),
+  isBuffActive(username, 'diamond_rush', env)
+]);
+
+// Generate spin with modified probabilities
+let dachsChance = 1 / 150;
+if (hasLuckyCharm) dachsChance = 1 / 75;
+if (hasDachsLocator.active) dachsChance = dachsChance * 3; // 3x Dachs chance
     
     // Rage Mode: Apply stack bonus to win chance (simulated by adjusting dachs chance)
     // Each stack gives +5% win chance, max 50%
@@ -809,17 +814,23 @@ async function handleSlot(username, amountParam, url, env) {
       }
     }
     
-    // Golden Hour
-    if (await isBuffActive(username, 'golden_hour', env)) {
-      result.points = Math.floor(result.points * 1.3);
-      result.message += ' (+30%)';
-    }
-    
-    // Profit Doubler (only for wins over 100 DT)
-    if (hasProfitDoubler && result.points > 100) {
-      result.points *= 2;
-      result.message += ' (📈 Profit x2!)';
-    }
+// OPTIMIZED: Only check Golden Hour and Profit Doubler if we have points
+if (result.points > 0) {
+  const [hasGoldenHour, hasProfitDoubler] = await Promise.all([
+    isBuffActive(username, 'golden_hour', env),
+    isBuffActive(username, 'profit_doubler', env)
+  ]);
+  
+  if (hasGoldenHour) {
+    result.points = Math.floor(result.points * 1.3);
+    result.message += ' (+30%)';
+  }
+  
+  if (hasProfitDoubler && result.points > 100) {
+    result.points *= 2;
+    result.message += ' (📈 Profit x2!)';
+  }
+}
     
     // Streak Multiplier: Increases with consecutive wins
     const currentStreakMulti = await getStreakMultiplier(username, env);

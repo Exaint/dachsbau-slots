@@ -440,7 +440,7 @@ async function handleLeaderboard(env) {
     const usernames = [];
     
     for (const key of listResult.keys) {
-      const username = key.name.replace('user:', ''');
+      const username = key.name.replace('user:', '');
       if (isLeaderboardBlocked(username)) continue;
       
       usernames.push(username);

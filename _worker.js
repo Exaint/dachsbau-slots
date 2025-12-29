@@ -20,8 +20,6 @@ const COOLDOWN_SECONDS = 30; // Spin cooldown in seconds
 // Leaderboard cache duration (5 minutes)
 const LEADERBOARD_CACHE_TTL = 300;
 
-// Anti-Duplicate Message Decorations (rotates randomly to prevent Twitch duplicate filter)
-
 // DEBUG MODE - Set to true for testing (exaint_ only)
 const DEBUG_MODE = false; // Change to true to enable
 
@@ -173,9 +171,7 @@ async function handleBalance(username, env) {
     ]);
     
     const totalCount = freeSpins.reduce((sum, fs) => sum + fs.count, 0);
-    
-    // Anti-Duplicate decoration
-    // Decoration removed - using static     
+      
     
     if (totalCount === 0) {
       return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰     `, { headers: RESPONSE_HEADERS });
@@ -258,9 +254,7 @@ async function handleDaily(username, env) {
     if (isNewMilestone) {
       milestoneText = ` | 🎉 ${newMonthlyLogin.days.length} Tage Milestone: +${milestoneBonus} DT!`;
     }
-    
-    // Anti-Duplicate decoration
-    // Decoration removed - using static     
+      
     
     return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/Monat 📅 | Kontostand: ${newBalance}     `, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -405,9 +399,7 @@ async function handleTransfer(username, target, amount, env) {
       setBalance(username, newSenderBalance, env),
       setBalance(cleanTarget, newReceiverBalance, env)
     ]);
-    
-    // Anti-Duplicate decoration
-    // Decoration removed - using static     
+     
     
     return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸     `, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -1039,11 +1031,7 @@ if (result.points > 0) {
     if (lossWarningMessage) {
       message += lossWarningMessage;
     }
-    
-    // Anti-Duplicate: Add random decoration to prevent Twitch duplicate message filter
-    // Decoration removed - using static     
-    message += `     `;
-    
+        
     return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleSlot Error:', error);

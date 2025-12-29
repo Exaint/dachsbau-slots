@@ -523,7 +523,7 @@ async function handleSlot(username, amountParam, url, env) {
     const selfBanData = await isSelfBanned(username, env);
     if (selfBanData) {
       const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-      return new Response(`@${username} 🚫 Du hast dich selbst vom Spielen ausgeschlossen (seit ${selfBanData.date}). Kontaktiere einen Admin für eine Freischaltung. Hilfe: https://git.new/DachsbauSlotInfos | Shop: https://git.new/DachsbauSlotsShop ${decoration}`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} 🚫 Du hast dich selbst vom Spielen ausgeschlossen (seit ${selfBanData.date}). Kontaktiere einen Admin für eine Freischaltung. Hilfe: https://git.new/DachsbauSlotInfos ${decoration}`, { headers: RESPONSE_HEADERS });
     }
     
     // First-Time Disclaimer Check
@@ -531,7 +531,7 @@ async function handleSlot(username, amountParam, url, env) {
     if (!hasAccepted) {
       await setDisclaimerAccepted(username, env);
       const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-      return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - kein Echtgeld! Verstanden? Schreib nochmal !slots zum Spielen! Weitere Infos: https://git.new/DachsbauSlotInfos 🎰 ${decoration}`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - kein Echtgeld! Verstanden? Schreib nochmal !slots zum Spielen! Weitere Infos: https://git.new/DachsbauSlotInfos | Shop: https://git.new/DachsbauSlotsShop 🎰 ${decoration}`, { headers: RESPONSE_HEADERS });
     }
     
     // Cooldown Check (before processing actual spin)

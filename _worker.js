@@ -1318,8 +1318,13 @@ async function buyShopItem(username, itemId, env) {
         return new Response(`@${username} 🎡 [ ${wheel.result} ] ${wheel.message} ${netResult >= 0 ? '+' : ''}${netResult} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
       }
       
-      if (itemId === 16) { // Mystery Box
-        const mysteryItems = [2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 20, 24]; // Removed 18 (Stats Tracker) to avoid already-owned issues
+if (itemId === 16) { // Mystery Box
+        const mysteryItems = [
+          2, 3, 4, 5, 6, 7, 8,    // Symbol-Boosts (7)
+          9, 10,                   // Utility Items (2)
+          14, 20, 24,              // Timed Buffs Classic (3)
+          32, 33, 34, 35, 39       // Timed Buffs Premium (5)
+        ]; // Total: 17 Items (Stats Tracker, Unlocks, Prestige, Instants excluded)
         const mysteryItemId = mysteryItems[Math.floor(Math.random() * mysteryItems.length)];
         const mysteryResult = SHOP_ITEMS[mysteryItemId];
         

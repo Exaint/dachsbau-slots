@@ -3,13 +3,13 @@ main = "worker.js"
 compatibility_date = "2024-12-29"
 
 # Account ID (optional, aber empfohlen)
-# account_id = "DEINE_ACCOUNT_ID"
+account_id = "a532928aecc69ee43a6aafa158d4d788"
 
 # KV Namespace Binding
 # WICHTIG: Ersetze die ID mit deiner tatsächlichen KV Namespace ID
 # Diese findest du unter: Workers & Pages → KV → Dein Namespace → "Namespace ID"
 kv_namespaces = [
-  { binding = "SLOTS_KV", id = "DEINE_KV_NAMESPACE_ID_HIER_EINFÜGEN" }
+  { binding = "SLOTS_KV", id = "69477a8fb2aa400d9da5496bf6d52ef7" }
 ]
 
 # Optional: Custom Domain

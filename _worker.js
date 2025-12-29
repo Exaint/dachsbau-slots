@@ -17,8 +17,10 @@ const MAX_TRANSFER = 100000;
 const HOURLY_JACKPOT_AMOUNT = 100;
 const COOLDOWN_SECONDS = 30; // Spin cooldown in seconds
 
+// Leaderboard cache duration (5 minutes)
+const LEADERBOARD_CACHE_TTL = 300;
+
 // Anti-Duplicate Message Decorations (rotates randomly to prevent Twitch duplicate filter)
-const DECORATIONS = ['🦡', '🎰', '💎', '⭐', '🍀', '🎲', '🎯', '💰'];
 
 // DEBUG MODE - Set to true for testing (exaint_ only)
 const DEBUG_MODE = false; // Change to true to enable
@@ -173,15 +175,15 @@ async function handleBalance(username, env) {
     const totalCount = freeSpins.reduce((sum, fs) => sum + fs.count, 0);
     
     // Anti-Duplicate decoration
-    const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
+    // Decoration removed - using static     
     
     if (totalCount === 0) {
-      return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰 ${decoration}`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰     `, { headers: RESPONSE_HEADERS });
     }
     
     const details = freeSpins.map(fs => `${fs.count}x ${fs.multiplier * 10}DT`).join(', ');
     
-    return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰 | 🎰 ${totalCount} Free Spins | Details: ${details} ${decoration}`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰 | 🎰 ${totalCount} Free Spins | Details: ${details}     `, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleBalance Error:', error);
     return new Response(`@${username} ❌ Fehler beim Abrufen des Kontostands.`, { headers: RESPONSE_HEADERS });
@@ -258,9 +260,9 @@ async function handleDaily(username, env) {
     }
     
     // Anti-Duplicate decoration
-    const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
+    // Decoration removed - using static     
     
-    return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/Monat 📅 | Kontostand: ${newBalance} ${decoration}`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/Monat 📅 | Kontostand: ${newBalance}     `, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleDaily Error:', error);
     return new Response(`@${username} ❌ Fehler beim Daily Bonus.`, { headers: RESPONSE_HEADERS });
@@ -405,9 +407,9 @@ async function handleTransfer(username, target, amount, env) {
     ]);
     
     // Anti-Duplicate decoration
-    const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
+    // Decoration removed - using static     
     
-    return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸 ${decoration}`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸     `, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleTransfer Error:', error);
     return new Response(`@${username} ❌ Fehler beim Transfer.`, { headers: RESPONSE_HEADERS });
@@ -416,6 +418,17 @@ async function handleTransfer(username, target, amount, env) {
 
 async function handleLeaderboard(env) {
   try {
+    // Try to get cached leaderboard
+    const cached = await env.SLOTS_KV.get('leaderboard:cache');
+    if (cached) {
+      const cachedData = JSON.parse(cached);
+      // Check if cache is still valid (less than 5 minutes old)
+      if (Date.now() - cachedData.timestamp < LEADERBOARD_CACHE_TTL * 1000) {
+        return new Response(cachedData.message, { headers: RESPONSE_HEADERS });
+      }
+    }
+    
+    // Cache miss or expired - rebuild leaderboard
     const listResult = await env.SLOTS_KV.list({ prefix: 'user:' });
     
     if (!listResult.keys || listResult.keys.length === 0) {
@@ -427,7 +440,7 @@ async function handleLeaderboard(env) {
     const usernames = [];
     
     for (const key of listResult.keys) {
-      const username = key.name.replace('user:', '');
+      const username = key.name.replace('user:', ''');
       if (isLeaderboardBlocked(username)) continue;
       
       usernames.push(username);
@@ -448,12 +461,21 @@ async function handleLeaderboard(env) {
     const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
     const leaderboardText = top5.map((user, index) => `${medals[index]} ${user.username}: ${user.balance} DachsTaler`).join(' ║ ');
     
-    return new Response(`🏆 Top 5 Leaderboard: ${leaderboardText}`, { headers: RESPONSE_HEADERS });
+    const message = `🏆 Top 5 Leaderboard: ${leaderboardText}`;
+    
+    // Cache the leaderboard
+    await env.SLOTS_KV.put('leaderboard:cache', JSON.stringify({
+      message,
+      timestamp: Date.now()
+    }), { expirationTtl: LEADERBOARD_CACHE_TTL + 60 });
+    
+    return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleLeaderboard Error:', error);
     return new Response(`🏆 Leaderboard: Fehler beim Laden.`, { headers: RESPONSE_HEADERS });
   }
 }
+
 
 async function handleSlot(username, amountParam, url, env) {
   try {
@@ -514,24 +536,24 @@ async function handleSlot(username, amountParam, url, env) {
       }
       if (lower === 'selfban') {
         await setSelfBan(username, env);
-        const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-        return new Response(`@${username} ✅ Du wurdest vom Slots spielen ausgeschlossen. Nur Admins (exaint_, frechhdachs) können dich wieder freischalten. Wenn du Hilfe brauchst: https://git.new/DachsbauSlotInfos 🦡 ${decoration}`, { headers: RESPONSE_HEADERS });
+        // Decoration removed - using static     
+        return new Response(`@${username} ✅ Du wurdest vom Slots spielen ausgeschlossen. Nur Admins (exaint_, frechhdachs) können dich wieder freischalten. Wenn du Hilfe brauchst: https://git.new/DachsbauSlotInfos 🦡     `, { headers: RESPONSE_HEADERS });
       }
     }
     
     // Selfban Check
     const selfBanData = await isSelfBanned(username, env);
     if (selfBanData) {
-      const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-      return new Response(`@${username} 🚫 Du hast dich selbst vom Spielen ausgeschlossen (seit ${selfBanData.date}). Kontaktiere einen Admin für eine Freischaltung. Hilfe: https://git.new/DachsbauSlotInfos ${decoration}`, { headers: RESPONSE_HEADERS });
+      // Decoration removed - using static     
+      return new Response(`@${username} 🚫 Du hast dich selbst vom Spielen ausgeschlossen (seit ${selfBanData.date}). Kontaktiere einen Admin für eine Freischaltung. Hilfe: https://git.new/DachsbauSlotInfos     `, { headers: RESPONSE_HEADERS });
     }
     
     // First-Time Disclaimer Check
     const hasAccepted = await hasAcceptedDisclaimer(username, env);
     if (!hasAccepted) {
       await setDisclaimerAccepted(username, env);
-      const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-      return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - kein Echtgeld! Verstanden? Schreib nochmal !slots zum Spielen! Weitere Infos: https://git.new/DachsbauSlotInfos | Shop: https://git.new/DachsbauSlotsShop 🎰 ${decoration}`, { headers: RESPONSE_HEADERS });
+      // Decoration removed - using static     
+      return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - kein Echtgeld! Verstanden? Schreib nochmal !slots zum Spielen! Weitere Infos: https://git.new/DachsbauSlotInfos | Shop: https://git.new/DachsbauSlotsShop 🎰     `, { headers: RESPONSE_HEADERS });
     }
     
     // Cooldown Check (before processing actual spin)
@@ -542,8 +564,8 @@ async function handleSlot(username, amountParam, url, env) {
     if (lastSpin && (now - lastSpin) < cooldownMs) {
       const remainingMs = cooldownMs - (now - lastSpin);
       const remainingSec = Math.ceil(remainingMs / 1000);
-      const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-      return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden! ${decoration}`, { headers: RESPONSE_HEADERS });
+      // Decoration removed - using static     
+      return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
     }
     
     // Batch load initial data
@@ -600,14 +622,14 @@ async function handleSlot(username, amountParam, url, env) {
           
           // Check if amount is too low
           if (customAmount < 10) {
-            const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-            return new Response(`@${username} ❌ Minimum ist !slots 10! Verfügbar: 10, 20, 30, 50, 100, all 💡 ${decoration}`, { headers: RESPONSE_HEADERS });
+            // Decoration removed - using static     
+            return new Response(`@${username} ❌ Minimum ist !slots 10! Verfügbar: 10, 20, 30, 50, 100, all 💡     `, { headers: RESPONSE_HEADERS });
           }
           
           // Check if amount is too high
           if (customAmount > 100) {
-            const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-            return new Response(`@${username} ❌ Maximum ist !slots 100! Verfügbar: 10, 20, 30, 50, 100, all 💡 ${decoration}`, { headers: RESPONSE_HEADERS });
+            // Decoration removed - using static     
+            return new Response(`@${username} ❌ Maximum ist !slots 100! Verfügbar: 10, 20, 30, 50, 100, all 💡     `, { headers: RESPONSE_HEADERS });
           }
           
           if (customAmount === 10) {
@@ -622,8 +644,8 @@ async function handleSlot(username, amountParam, url, env) {
             }
           } else {
             // Numbers like 15, 25, 35, 45, 69, etc.
-            const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-            return new Response(`@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all | Info: https://dub.sh/SlotUnlock ${decoration}`, { headers: RESPONSE_HEADERS });
+            // Decoration removed - using static     
+            return new Response(`@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all | Info: https://dub.sh/SlotUnlock     `, { headers: RESPONSE_HEADERS });
           }
         }
       }
@@ -1008,8 +1030,8 @@ async function handleSlot(username, amountParam, url, env) {
     }
     
     // Anti-Duplicate: Add random decoration to prevent Twitch duplicate message filter
-    const decoration = DECORATIONS[Math.floor(Math.random() * DECORATIONS.length)];
-    message += ` ${decoration}`;
+    // Decoration removed - using static     
+    message += `     `;
     
     return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {

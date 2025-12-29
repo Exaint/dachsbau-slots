@@ -528,7 +528,7 @@ async function handleSlot(username, amountParam, url, env) {
       }
       if (lower === 'selfban') {
         await setSelfBan(username, env);
-        // Decoration removed - using static     
+         
         return new Response(`@${username} ✅ Du wurdest vom Slots spielen ausgeschlossen. Nur Admins (exaint_, frechhdachs) können dich wieder freischalten. Wenn du Hilfe brauchst: https://git.new/DachsbauSlotInfos 🦡     `, { headers: RESPONSE_HEADERS });
       }
     }
@@ -536,7 +536,7 @@ async function handleSlot(username, amountParam, url, env) {
     // Selfban Check
     const selfBanData = await isSelfBanned(username, env);
     if (selfBanData) {
-      // Decoration removed - using static     
+       
       return new Response(`@${username} 🚫 Du hast dich selbst vom Spielen ausgeschlossen (seit ${selfBanData.date}). Kontaktiere einen Admin für eine Freischaltung. Hilfe: https://git.new/DachsbauSlotInfos     `, { headers: RESPONSE_HEADERS });
     }
     
@@ -544,7 +544,7 @@ async function handleSlot(username, amountParam, url, env) {
     const hasAccepted = await hasAcceptedDisclaimer(username, env);
     if (!hasAccepted) {
       await setDisclaimerAccepted(username, env);
-      // Decoration removed - using static     
+       
       return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - kein Echtgeld! Verstanden? Schreib nochmal !slots zum Spielen! Weitere Infos: https://git.new/DachsbauSlotInfos | Shop: https://git.new/DachsbauSlotsShop 🎰     `, { headers: RESPONSE_HEADERS });
     }
     
@@ -556,7 +556,7 @@ async function handleSlot(username, amountParam, url, env) {
     if (lastSpin && (now - lastSpin) < cooldownMs) {
       const remainingMs = cooldownMs - (now - lastSpin);
       const remainingSec = Math.ceil(remainingMs / 1000);
-      // Decoration removed - using static     
+       
       return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
     }
     
@@ -607,13 +607,13 @@ let [currentBalance, hasGuaranteedPairToken, hasWildCardToken] = await Promise.a
           
           // Check if amount is too low
           if (customAmount < 10) {
-            // Decoration removed - using static     
+             
             return new Response(`@${username} ❌ Minimum ist !slots 10! Verfügbar: 10, 20, 30, 50, 100, all 💡     `, { headers: RESPONSE_HEADERS });
           }
           
           // Check if amount is too high
           if (customAmount > 100) {
-            // Decoration removed - using static     
+             
             return new Response(`@${username} ❌ Maximum ist !slots 100! Verfügbar: 10, 20, 30, 50, 100, all 💡     `, { headers: RESPONSE_HEADERS });
           }
           
@@ -629,7 +629,7 @@ let [currentBalance, hasGuaranteedPairToken, hasWildCardToken] = await Promise.a
             }
           } else {
             // Numbers like 15, 25, 35, 45, 69, etc.
-            // Decoration removed - using static     
+             
             return new Response(`@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all | Info: https://dub.sh/SlotUnlock     `, { headers: RESPONSE_HEADERS });
           }
         }

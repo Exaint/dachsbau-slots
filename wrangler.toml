@@ -1,0 +1,24 @@
+name = "dachsbau-slots"
+main = "worker.js"
+compatibility_date = "2024-12-29"
+
+# Account ID (optional, aber empfohlen)
+# account_id = "DEINE_ACCOUNT_ID"
+
+# KV Namespace Binding
+# WICHTIG: Ersetze die ID mit deiner tatsächlichen KV Namespace ID
+# Diese findest du unter: Workers & Pages → KV → Dein Namespace → "Namespace ID"
+kv_namespaces = [
+  { binding = "SLOTS_KV", id = "DEINE_KV_NAMESPACE_ID_HIER_EINFÜGEN" }
+]
+
+# Optional: Custom Domain
+# routes = [
+#   { pattern = "dachsbau-slots.exaint.workers.dev", zone_name = "exaint.workers.dev" }
+# ]
+
+# Optional: Compatibility Flags
+# compatibility_flags = []
+
+# Optional: Custom Limits (meistens nicht nötig)
+# limits = { cpu_ms = 50 }

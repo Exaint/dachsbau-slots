@@ -263,6 +263,128 @@ async function handleDaily(username, env) {
   }
 }
 
+async function handleBuffs(username, env) {
+  try {
+    const buffs = [];
+    
+    // Timed Buffs (with expiry)
+    const timedBuffKeys = [
+      { key: 'happy_hour', name: 'Happy Hour', emoji: '⚡' },
+      { key: 'lucky_charm', name: 'Lucky Charm', emoji: '🍀' },
+      { key: 'golden_hour', name: 'Golden Hour', emoji: '✨' },
+      { key: 'profit_doubler', name: 'Profit Doubler', emoji: '📈' },
+      { key: 'star_magnet', name: 'Star Magnet', emoji: '⭐' },
+      { key: 'diamond_rush', name: 'Diamond Rush', emoji: '💎' }
+    ];
+    
+    // Check all timed buffs
+    const timedBuffPromises = timedBuffKeys.map(async buff => {
+      const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buff.key}`);
+      if (!value) return null;
+      
+      try {
+        const expireAt = parseInt(value);
+        const remaining = expireAt - Date.now();
+        
+        if (remaining > 0) {
+          const hours = Math.floor(remaining / MS_PER_HOUR);
+          const minutes = Math.floor((remaining % MS_PER_HOUR) / MS_PER_MINUTE);
+          
+          let timeStr;
+          if (hours > 0) {
+            timeStr = `${hours}h ${minutes}m`;
+          } else {
+            timeStr = `${minutes}m`;
+          }
+          
+          return `${buff.emoji} ${buff.name} (${timeStr})`;
+        }
+      } catch (e) {
+        // Might be JSON (buffs with uses/stack)
+      }
+      
+      return null;
+    });
+    
+    const timedResults = await Promise.all(timedBuffPromises);
+    buffs.push(...timedResults.filter(b => b !== null));
+    
+    // Buffs with Uses (Dachs Locator)
+    const dachsLocator = await getBuffWithUses(username, 'dachs_locator', env);
+    if (dachsLocator.active) {
+      buffs.push(`🦡 Dachs Locator (${dachsLocator.uses} Spins)`);
+    }
+    
+    // Buffs with Stack (Rage Mode)
+    const rageMode = await getBuffWithStack(username, 'rage_mode', env);
+    if (rageMode.active) {
+      const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:rage_mode`);
+      const data = JSON.parse(value);
+      const remaining = data.expireAt - Date.now();
+      const minutes = Math.floor(remaining / MS_PER_MINUTE);
+      buffs.push(`🔥 Rage Mode (${minutes}m, Stack: ${rageMode.stack}%)`);
+    }
+    
+    // Symbol Boosts (check all symbols)
+    const symbols = [
+      { symbol: '🍒', name: 'Kirschen' },
+      { symbol: '🍋', name: 'Zitronen' },
+      { symbol: '🍊', name: 'Orangen' },
+      { symbol: '🍇', name: 'Trauben' },
+      { symbol: '🍉', name: 'Wassermelonen' },
+      { symbol: '⭐', name: 'Stern' },
+      { symbol: '🦡', name: 'Dachs' }
+    ];
+    
+    const boostPromises = symbols.map(async s => {
+      const value = await env.SLOTS_KV.get(`boost:${username.toLowerCase()}:${s.symbol}`);
+      if (value === 'active') {
+        return `${s.symbol} ${s.name}-Boost (1x)`;
+      }
+      return null;
+    });
+    
+    const boostResults = await Promise.all(boostPromises);
+    buffs.push(...boostResults.filter(b => b !== null));
+    
+    // Win Multiplier
+    const winMulti = await env.SLOTS_KV.get(`winmulti:${username.toLowerCase()}`);
+    if (winMulti === 'active') {
+      buffs.push('⚡ Win Multiplier (1x)');
+    }
+    
+    // Insurance Pack
+    const insurance = await getInsuranceCount(username, env);
+    if (insurance > 0) {
+      buffs.push(`🛡️ Insurance Pack (${insurance}x)`);
+    }
+    
+    // Guaranteed Pair
+    const guaranteedPair = await hasGuaranteedPair(username, env);
+    if (guaranteedPair) {
+      buffs.push('🎯 Guaranteed Pair (1x)');
+    }
+    
+    // Wild Card
+    const wildCard = await hasWildCard(username, env);
+    if (wildCard) {
+      buffs.push('🃏 Wild Card (1x)');
+    }
+    
+    // Build response (ONE LINE with ||)
+    if (buffs.length === 0) {
+      return new Response(`@${username} ❌ Keine aktiven Buffs! Schau im Shop vorbei: https://git.new/DachsbauSlotsShop`, { headers: RESPONSE_HEADERS });
+    }
+    
+    const buffList = buffs.join(' || ');
+    return new Response(`@${username} 🔥 Deine aktiven Buffs: ${buffList}`, { headers: RESPONSE_HEADERS });
+    
+  } catch (error) {
+    console.error('handleBuffs Error:', error);
+    return new Response(`@${username} ❌ Fehler beim Abrufen der Buffs.`, { headers: RESPONSE_HEADERS });
+  }
+}
+
 async function handleGive(username, target, amount, env) {
   try {
     const allowedUsers = ['exaint_', 'frechhdachs'];
@@ -499,6 +621,7 @@ async function handleSlot(username, amountParam, url, env) {
       if (lower === 'daily') return await handleDaily(username, env);
       if (lower === 'info') return new Response(`@${username} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS });
       if (lower === 'stats') return await handleStats(username, env);
+      if (lower === 'buffs') return await handleBuffs(username, env);
       if (lower === 'give') {
         const targetParam = url.searchParams.get('target');
         const giveAmount = url.searchParams.get('giveamount');

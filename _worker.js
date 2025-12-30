@@ -649,14 +649,25 @@ if (!isFreeSpinUsed && spinCost < 1000) {
       return new Response(`@${username} ❌ Nicht genug DachsTaler! Du brauchst ${spinCost} (Aktuell: ${currentBalance}) 🦡`, { headers: RESPONSE_HEADERS });
     }
     
-// OPTIMIZED: Load buffs lazily only when needed for spin generation
-const [hasLuckyCharm, hasDachsLocator, hasRageMode, hasStarMagnet, hasDiamondRush] = await Promise.all([
-  isBuffActive(username, 'lucky_charm', env),
-  getBuffWithUses(username, 'dachs_locator', env),
-  getBuffWithStack(username, 'rage_mode', env),
+// OPTIMIZED: Load buffs in two stages
+// Stage 1: Always needed (for grid generation)
+const [hasStarMagnet, hasDiamondRush] = await Promise.all([
   isBuffActive(username, 'star_magnet', env),
   isBuffActive(username, 'diamond_rush', env)
 ]);
+
+// Stage 2: Only for normal spins (for dachs chance calculation)
+let hasLuckyCharm = false;
+let hasDachsLocator = { active: false, uses: 0 };
+let hasRageMode = { active: false, stack: 0 };
+
+if (!isFreeSpinUsed) {
+  [hasLuckyCharm, hasDachsLocator, hasRageMode] = await Promise.all([
+    isBuffActive(username, 'lucky_charm', env),
+    getBuffWithUses(username, 'dachs_locator', env),
+    getBuffWithStack(username, 'rage_mode', env)
+  ]);
+}
 
 // Generate spin with modified probabilities
 let dachsChance = 1 / 150;

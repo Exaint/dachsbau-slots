@@ -13,7 +13,11 @@ kv_namespaces = [
 ]
 
 [observability]
+[observability.logs]
 enabled = false
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
 
 # Optional: Custom Domain
 # routes = [

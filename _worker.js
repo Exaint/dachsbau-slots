@@ -16,6 +16,8 @@ const MIN_TRANSFER = 1;
 const MAX_TRANSFER = 100000;
 const HOURLY_JACKPOT_AMOUNT = 100;
 const COOLDOWN_SECONDS = 30; // Spin cooldown in seconds
+const BANK_USERNAME = 'dachsbank';
+const BANK_START_BALANCE = 444444;
 
 // Leaderboard cache duration (5 minutes)
 const LEADERBOARD_CACHE_TTL = 300;
@@ -70,8 +72,8 @@ const SHOP_ITEMS = {
   34: { name: '🔥 Rage Mode', price: 4000, type: 'timed', buffKey: 'rage_mode', duration: 1800 },
   35: { name: '📈 Profit Doubler', price: 5000, type: 'timed', buffKey: 'profit_doubler', duration: 86400 },
   36: { name: '💎 Diamond Mine', price: 2500, type: 'instant' },
-  37: { name: '🎯 Guaranteed Pair', price: 180, type: 'guaranteedpair' },
-  38: { name: '🃏 Wild Card', price: 250, type: 'wildcard' },
+  37: { name: '🎯 Guaranteed Pair', price: 180, type: 'instant' },
+  38: { name: '🃏 Wild Card', price: 250, type: 'instant' },
   39: { name: '💎 Diamond Rush', price: 2000, type: 'timed', buffKey: 'diamond_rush', duration: 3600 },
 };
 
@@ -385,6 +387,22 @@ async function handleBuffs(username, env) {
   }
 }
 
+async function handleBank(username, env) {
+  try {
+    const balance = await getBankBalance(env);
+    
+    if (balance >= 0) {
+      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DT | Die Bank ist im Plus! 💰`, { headers: RESPONSE_HEADERS });
+    } else {
+      const deficit = Math.abs(balance);
+      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DT | Die Community hat die Bank um ${deficit.toLocaleString('de-DE')} DT geplündert! 🦡💸`, { headers: RESPONSE_HEADERS });
+    }
+  } catch (error) {
+    console.error('handleBank Error:', error);
+    return new Response(`@${username} ❌ Fehler beim Abrufen der DachsBank.`, { headers: RESPONSE_HEADERS });
+  }
+}
+
 async function handleGive(username, target, amount, env) {
   try {
     const allowedUsers = ['exaint_', 'frechhdachs'];
@@ -504,6 +522,22 @@ async function handleTransfer(username, target, amount, env) {
     if (username.toLowerCase() === cleanTarget) {
       return new Response(`@${username} ❌ Du kannst dir nicht selbst DachsTaler senden!`, { headers: RESPONSE_HEADERS });
     }
+
+    // Allow transfer to DachsBank
+if (cleanTarget === BANK_USERNAME) {
+  const senderBalance = await getBalance(username, env);
+  
+  if (senderBalance < parsedAmount) {
+    return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderBalance}.`, { headers: RESPONSE_HEADERS });
+  }
+  
+  const newSenderBalance = senderBalance - parsedAmount;
+  const newBankBalance = await updateBankBalance(parsedAmount, env);
+  
+  await setBalance(username, newSenderBalance, env);
+  
+  return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DT 🏦`, { headers: RESPONSE_HEADERS });
+}
     
     const [senderBalance, receiverBalance] = await Promise.all([
       getBalance(username, env),
@@ -622,6 +656,7 @@ async function handleSlot(username, amountParam, url, env) {
       if (lower === 'info') return new Response(`@${username} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS });
       if (lower === 'stats') return await handleStats(username, env);
       if (lower === 'buffs') return await handleBuffs(username, env);
+      if (lower === 'bank') return await handleBank(username, env);
       if (lower === 'give') {
         const targetParam = url.searchParams.get('target');
         const giveAmount = url.searchParams.get('giveamount');
@@ -1082,6 +1117,17 @@ if (result.points > 0) {
       updateStats(username, result.points > 0, result.points, spinCost, env),
       setLastSpin(username, now, env) // Update cooldown timestamp
     ]);
+
+    // Update DachsBank balance
+    if (!isFreeSpinUsed) {
+      // Bank receives the spin cost
+      await updateBankBalance(spinCost, env);
+      
+      // Bank pays out winnings (if any)
+      if (result.points > 0 || totalBonuses > 0) {
+        await updateBankBalance(-(result.points + totalBonuses), env);
+      }
+    }
     
     const rank = await getPrestigeRank(username, env);
     const rankSymbol = rank ? `${rank} ` : '';
@@ -1316,6 +1362,7 @@ async function buyShopItem(username, itemId, env) {
         setPrestigeRank(username, item.rank, env),
         setBalance(username, balance - item.price, env)
       ]);
+      await updateBankBalance(item.price, env);
       
       return new Response(`@${username} ✅ ${item.name} gekauft! Dein Rang: ${item.rank} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
     }
@@ -1326,14 +1373,17 @@ async function buyShopItem(username, itemId, env) {
       }
       await Promise.all([
         setUnlock(username, item.unlockKey, env),
-        setBalance(username, balance - item.price, env)
+        setBalance(username, balance - item.price, env),
+        updateBankBalance(item.price, env)
       ]);
+
       return new Response(`@${username} ✅ ${item.name} freigeschaltet! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
     }
-    
+
     if (item.type === 'timed') {
       await Promise.all([
-        setBalance(username, balance - item.price, env)
+        setBalance(username, balance - item.price, env),
+        updateBankBalance(item.price, env)
       ]);
       
       // Special handling for buffs with uses
@@ -1368,10 +1418,11 @@ async function buyShopItem(username, itemId, env) {
           return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal 1 Dachs-Boost pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
         }
         
-        await Promise.all([
+await Promise.all([
           setBalance(username, balance - item.price, env),
           addBoost(username, item.symbol, env),
-          incrementDachsBoostPurchases(username, env)
+          incrementDachsBoostPurchases(username, env),
+          updateBankBalance(item.price, env)
         ]);
         
         return new Response(`@${username} ✅ ${item.name} aktiviert! Dein nächster Gewinn mit ${item.symbol} wird verdoppelt! | Kontostand: ${balance - item.price} 🦡 | Du kannst diese Woche keinen weiteren Dachs-Boost kaufen`, { headers: RESPONSE_HEADERS });
@@ -1379,7 +1430,8 @@ async function buyShopItem(username, itemId, env) {
       
       await Promise.all([
         setBalance(username, balance - item.price, env),
-        addBoost(username, item.symbol, env)
+        addBoost(username, item.symbol, env),
+        updateBankBalance(item.price, env)
       ]);
       return new Response(`@${username} ✅ ${item.name} aktiviert! Dein nächster Gewinn mit ${item.symbol} wird verdoppelt! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
     }
@@ -1387,7 +1439,8 @@ async function buyShopItem(username, itemId, env) {
     if (item.type === 'insurance') {
       await Promise.all([
         setBalance(username, balance - item.price, env),
-        addInsurance(username, 5, env)
+        addInsurance(username, 5, env),
+        updateBankBalance(item.price, env)
       ]);
       return new Response(`@${username} ✅ Insurance Pack erhalten! Die nächsten 5 Verluste geben 50% des Einsatzes zurück! 🛡️ | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
     }
@@ -1395,7 +1448,8 @@ async function buyShopItem(username, itemId, env) {
     if (item.type === 'winmulti') {
       await Promise.all([
         setBalance(username, balance - item.price, env),
-        addWinMultiplier(username, env)
+        addWinMultiplier(username, env),
+        updateBankBalance(item.price, env)
       ]);
       return new Response(`@${username} ✅ Win Multiplier aktiviert! Dein nächster Gewinn wird x2! ⚡ | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
     }
@@ -1409,7 +1463,8 @@ async function buyShopItem(username, itemId, env) {
       await Promise.all([
         setBalance(username, balance - item.price, env),
         addFreeSpinsWithMultiplier(username, 10, 1, env),
-        incrementSpinBundlePurchases(username, env)
+        incrementSpinBundlePurchases(username, env),
+        updateBankBalance(item.price, env)
       ]);
       
       const remainingPurchases = 3 - (purchases.count + 1);
@@ -1418,6 +1473,7 @@ async function buyShopItem(username, itemId, env) {
     
     if (item.type === 'peek') {
       await setBalance(username, balance - item.price, env);
+      await updateBankBalance(item.price, env);
       const hasLuckyCharm = await isBuffActive(username, 'lucky_charm', env);
       const testDachsChance = hasLuckyCharm ? 1 / 75 : 1 / 150;
       const testGrid = [];
@@ -1436,6 +1492,7 @@ async function buyShopItem(username, itemId, env) {
     
     if (item.type === 'instant') {
       await setBalance(username, balance - item.price, env);
+      await updateBankBalance(item.price, env);
       
       if (itemId === 11) { // Chaos Spin
         const result = Math.floor(Math.random() * 701) - 300;
@@ -2293,7 +2350,46 @@ async function isBlacklisted(username, env) {
   }
 }
 
+// DachsBank Helper Functions
+async function updateBankBalance(amount, env) {
+  try {
+    let bankBalance = await env.SLOTS_KV.get(`user:${BANK_USERNAME}`);
+    
+    // Initialize bank if doesn't exist
+    if (bankBalance === null) {
+      bankBalance = BANK_START_BALANCE;
+    } else {
+      bankBalance = parseInt(bankBalance);
+    }
+    
+    // Update balance (can go negative)
+    const newBalance = bankBalance + amount;
+    await env.SLOTS_KV.put(`user:${BANK_USERNAME}`, newBalance.toString());
+    
+    return newBalance;
+  } catch (error) {
+    console.error('updateBankBalance Error:', error);
+  }
+}
+
+async function getBankBalance(env) {
+  try {
+    let bankBalance = await env.SLOTS_KV.get(`user:${BANK_USERNAME}`);
+    
+    if (bankBalance === null) {
+      // Initialize bank
+      await env.SLOTS_KV.put(`user:${BANK_USERNAME}`, BANK_START_BALANCE.toString());
+      return BANK_START_BALANCE;
+    }
+    
+    return parseInt(bankBalance);
+  } catch (error) {
+    console.error('getBankBalance Error:', error);
+    return BANK_START_BALANCE;
+  }
+}
+
 function isLeaderboardBlocked(username) {
-  const leaderboardBlocklist = [];
+  const leaderboardBlocklist = [BANK_USERNAME];
   return leaderboardBlocklist.includes(username.toLowerCase());
 }

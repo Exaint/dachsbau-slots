@@ -1,10 +1,3 @@
-// Cloudflare Worker (ES Module Format) - Dachsbau Slots Bot - Extended Features
-// 
-// Commands via Fossabot:
-// !slots: $(customapi https://dachsbau-slots.exaint.workers.dev?action=slot&user=$(sender)&amount=$(1)&target=$(2)&giveamount=$(3))
-// !transfer: $(customapi https://dachsbau-slots.exaint.workers.dev?action=transfer&user=$(sender)&target=$(touser)&amount=$(2))
-// !shop: $(customapi https://dachsbau-slots.exaint.workers.dev?action=shop&user=$(sender)&item=$(query))
-
 // Constants
 const RESPONSE_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8' };
 const MS_PER_HOUR = 3600000;

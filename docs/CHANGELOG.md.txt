@@ -1,0 +1,586 @@
+# 🦡 DACHSBAU SLOTS - CHANGELOG 📋
+
+> **Aktuelle Version:** 1.4.4 - "DachsBank System"  
+> **Letztes Update:** 30. Dezember 2025
+
+---
+
+## 🔗 QUICK LINKS
+
+| Link | Beschreibung |
+|------|--------------|
+| 📖 [Info & Commands](https://git.new/DachsbauSlotInfos) | Alle Commands, Gewinnchancen & FAQ |
+| 🛒 [Shop](https://git.new/DachsbauSlotsShop) | Alle Items, Preise & Kategorien |
+| 🔓 [Unlock Info](https://dub.sh/SlotUnlock) | Multiplier-Unlocks Übersicht |
+| 📺 [Twitch](https://www.twitch.tv/frechhdachs) | frechhdachs Live-Streams |
+| 💬 [Discord](https://discord.gg/dachsbau) | Dachsbau Community |
+
+---
+
+## ⚠️ NUR ZUR UNTERHALTUNG
+
+> **WICHTIG:** Dachsbau Slots ist ein reines **Unterhaltungsspiel** für die Community von frechhdachs. Es werden keine echten Geldbeträge verwendet. **Die Streamerin frechhdachs distanziert sich ausdrücklich von echtem Glücksspiel** und übernimmt keine Haftung für Glücksspielsucht.
+> 
+> ➡️ **Spiel lieber hier im Dachsbau** - hier kannst du nicht ins Minus rutschen und hast einfach nur Spaß! 🦡
+
+### 🚫 SELBSTAUSSCHLUSS
+
+Du kannst dich jederzeit selbst vom Spielen ausschließen:
+
+```
+!slots selfban
+```
+
+**Nur Admins** (exaint_, frechhdachs) können den Selfban wieder aufheben.
+
+### 📞 HILFE BEI GLÜCKSSPIELPROBLEMEN
+
+| Land | Hotline | Organisation | Weitere Infos |
+|------|---------|--------------|---------------|
+| 🇩🇪 Deutschland | **0800 - 1 37 27 00** | BZgA (kostenlos & anonym) | [check-dein-spiel.de](https://check-dein-spiel.de) |
+| 🇦🇹 Österreich | **0800 - 20 20 11** | Spielsuchthilfe (kostenlos) | [spielsuchthilfe.at](https://spielsuchthilfe.at) |
+| 🇨🇭 Schweiz | **0800 - 040 080** | SOS Spielsucht (kostenlos) | [sos-spielsucht.ch](https://sos-spielsucht.ch) |
+
+---
+
+## 📋 VOLLSTÄNDIGE VERSIONSHISTORIE
+
+---
+
+## 🆕 Version 1.4.4 - "DachsBank System"
+**Veröffentlicht:** 30. Dezember 2025
+
+### 🏦 Neue Features
+
+**DachsBank - Virtuelle Casino-Bank**
+
+Die DachsBank ist ein virtuelles Bank-Konto, das die gesamte Spiel-Ökonomie in Echtzeit trackt!
+
+**Was macht die Bank?**
+- ✅ Kassiert bei jedem Spin (10-100 DT Einsatz)
+- ✅ Kassiert bei jedem Shop-Kauf (75-44,444 DT)
+- ✅ Zahlt bei jedem Gewinn (Spin-Gewinne + Boni)
+- ✅ Kann ins Minus gehen (Community plündert die Bank!)
+
+**Neuer Command:**
+```
+!slots bank
+```
+
+**Zeigt:**
+- Aktuellen Bank-Kontostand mit deutscher Formatierung
+- **Positiv:** "Die Bank ist im Plus! 💰"
+- **Negativ:** "Die Community hat die Bank um X DT geplündert! 🦡💸"
+
+**Spenden an die Bank:**
+```
+!transfer @dachsbank [Betrag]
+```
+
+User können freiwillig DachsTaler an die Bank spenden!
+
+**Beispiel-Szenario:**
+```
+User spielt !slots 50       → Bank +50 DT
+User gewinnt 150 DT         → Bank -150 DT
+User kauft Item (1,000 DT)  → Bank +1,000 DT
+User spendet 500 DT         → Bank +500 DT
+
+Ergebnis: Bank hat +1,400 DT verdient
+```
+
+**Mathematische Erwartung:**
+- 27% Gewinnrate bedeutet Bank profitiert langfristig
+- Jackpots und High-Roller können temporäre Defizite verursachen
+- Realistisch: +50k bis +200k DT im Plus, -100k bei Lucky Streaks
+
+**Technische Details:**
+- Startguthaben: 444,444 DachsTaler
+- Negativer Kontostand möglich
+- Bank taucht NICHT im Leaderboard auf
+- Admin-Give Commands beeinflussen die Bank NICHT
+
+### 🔧 Code-Optimierungen
+
+**Performance-Verbesserungen**
+- Buff-Loading optimiert (2-stufig: Grid-Generation vs. Dachs-Chance)
+- Reduzierte KV-Calls bei Free Spins (~50% weniger)
+- Intelligentes Lazy-Loading von Buffs
+- Bessere Separation zwischen Essential Buffs und Optional Buffs
+
+---
+
+## Version 1.4.3 - "Performance & Buffs"
+**Veröffentlicht:** 30. Dezember 2025
+
+### ✨ Neue Features
+
+**!slots buffs Command**
+
+Neuer Command zeigt alle aktiven Buffs & Items auf einen Blick!
+
+```
+!slots buffs
+```
+
+**Was wird angezeigt?**
+- ⏰ Timed Buffs mit Restlaufzeit (z.B. "Profit Doubler (23h 15m)")
+- 🔢 Buffs mit Uses (z.B. "Dachs Locator (7 Spins)")
+- 📊 Rage Mode mit Stack (z.B. "Rage Mode (25m, Stack: 35%)")
+- 🔥 Symbol-Boosts (z.B. "🍒 Kirschen-Boost (1x)")
+- 🛡️ Utility Items (z.B. "Insurance Pack (3x)")
+- 🎯 Instant Items (z.B. "Guaranteed Pair (1x)", "Wild Card (1x)")
+
+**Format:**
+```
+@username 🔥 Deine aktiven Buffs: ⚡ Happy Hour (45m) || 🦡 Dachs Locator (5 Spins) || 🔥 Rage Mode (18m, Stack: 20%) || 🍒 Kirschen-Boost (1x) || 🛡️ Insurance Pack (2x)
+```
+
+Übersichtlich in einer Zeile mit `||` Trennung!
+
+### 🔧 Verbesserungen
+
+**Performance-Optimierungen**
+- Buff-Loading in 2 Stages:
+  - **Stage 1:** Essential Buffs (Grid-Generation) - Immer geladen
+  - **Stage 2:** Optional Buffs (Dachs-Chance) - Nur für normale Spins
+- Free Spins nutzen keine Dachs-Chance-Buffs mehr
+- Reduzierte KV-Calls bei Free Spins um ~50%
+- Schnellere Spin-Verarbeitung
+
+**Code-Struktur**
+- Bessere Kommentare für Buff-Loading-Logik
+- Klare Trennung zwischen Grid-Buffs und Dachs-Buffs
+- Optimierte Batch-KV-Reads
+
+---
+
+## Version 1.4.2 - "Mystery Box Expansion"
+**Veröffentlicht:** 29. Dezember 2025
+
+### 🎁 Shop Verbesserungen
+
+**📦 Mystery Box erweitert (Item #16)**
+
+Die Mystery Box wurde von 12 auf 17 mögliche Items erweitert!
+
+**5 neue Premium Buffs hinzugefügt:**
+- 🌟 **Star Magnet** (1,200 DT Wert) - ⭐ erscheinen 3x häufiger
+- 🦡 **Dachs Locator** (1,500 DT Wert) - 3x Dachs-Chance für 10 Spins
+- 🔥 **Rage Mode** (4,000 DT Wert) - +5% Dachs-Chance pro Verlust
+- 📈 **Profit Doubler** (5,000 DT Wert) - Jackpot! Gewinne 100+ DT verdoppelt
+- 💎 **Diamond Rush** (2,000 DT Wert) - 💎 erscheinen 3x häufiger
+
+**Statistiken:**
+- Durchschnittswert erhöht: ~1,100 DT → ~1,650 DT (+50%)
+- Möglicher Jackpot-Pull: 5,000 DT Item für nur 1,000 DT!
+- Weiterhin ausgeschlossen: Unlocks, Prestige Ränge, Instant Items
+
+**Enthaltene Items (17 total):**
+- **Symbol-Boosts (7):** Alle Standard-Boosts + Dachs-Boost
+- **Utility (2):** Insurance Pack, Win Multiplier
+- **Timed Buffs (8):** Happy Hour, Lucky Charm, Golden Hour, Star Magnet, Dachs Locator, Rage Mode, Profit Doubler, Diamond Rush
+
+### 🔧 Code-Optimierungen
+
+- Items nach Kategorien gruppiert (Boosts, Utility, Buffs)
+- Bessere Kommentare für Wartbarkeit
+- Klare Ausschluss-Liste dokumentiert
+
+---
+
+## Version 1.4.1 - "Selfban Feature"
+**Veröffentlicht:** 29. Dezember 2025
+
+### ✨ Neue Features
+
+**🚫 Selfban Command**
+
+Neuer Command für verantwortungsvolles Spielen:
+
+```
+!slots selfban
+```
+
+**Was passiert?**
+- ❌ Du kannst nicht mehr spielen
+- ⏰ Zeitpunkt des Selfbans wird gespeichert (z.B. "29.12.2024, 23:15")
+- 🔒 **Nur Admins** (exaint_, frechhdachs) können den Selfban aufheben
+- 💬 Du kannst dich jederzeit an die Admins wenden
+
+**Warum gibt es diese Funktion?**
+
+Auch bei virtuellen Spielen ist es wichtig, auf die eigene Spielzeit zu achten. Der Selfban gibt dir die Kontrolle zurück und ermöglicht eine bewusste Pause!
+
+**🔓 Admin Unban erweitert**
+
+```
+!slots unban @user
+```
+
+- Entfernt jetzt sowohl Blacklist als auch Selfban gleichzeitig
+- Einheitliches Unban-System für Admins
+
+### 📝 Dokumentation
+
+- Selfban Command in Warnhinweisen prominent platziert
+- Erklärung der Funktion und Vorteile
+- Integration in Command-Übersicht
+
+### 🎮 UX Verbesserungen
+
+**First-Time User Message erweitert**
+
+Neue Spieler sehen jetzt Link zum Info-Gist in der Willkommensnachricht:
+
+```
+@username 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - kein Echtgeld! 
+Verstanden? Schreib nochmal !slots zum Spielen! 
+Weitere Infos: https://git.new/DachsbauSlotInfos | Shop: https://git.new/DachsbauSlotsShop 🎰
+```
+
+Bessere Onboarding-Erfahrung für neue User!
+
+---
+
+## Version 1.4.0 - "Winter Update"
+**Veröffentlicht:** 27. Dezember 2025
+
+### ✨ Neue Features
+
+**🔥 Streak Multiplier System (KOSTENLOS!)**
+
+Automatisches System für alle Spieler ohne Shop-Kauf!
+
+**Wie funktioniert es?**
+- Jeder Gewinn in Folge erhöht den Multiplier um +0.1x
+- Maximum: 3.0x Multiplier bei 20+ Gewinnen in Folge
+- Reset auf 1.0x bei Verlust
+- Anzeige in Message: `(🔥 2.5x Streak!)`
+- Kombinierbar mit allen anderen Buffs und Multipliers
+
+| Wins in Folge | Multiplier | Boost |
+|---------------|------------|-------|
+| 1 | 1.0x | - |
+| 2 | 1.1x | +10% |
+| 5 | 1.4x | +40% |
+| 10 | 2.0x | +100% 🔥 |
+| 15 | 2.5x | +150% 🔥🔥 |
+| 20+ | 3.0x | +200% ✨ |
+
+**🃏 Wild Card System (Item #38)**
+
+Neues Instant-Item für 250 DT!
+
+**Was macht es?**
+- Fügt ein 🃏 Wild Symbol im nächsten Spin hinzu
+- Wild ersetzt jedes andere Symbol für besten Outcome
+- **Beispiele:**
+  - `🃏 🍒 🍒` → Triple Kirsche (50 DT)
+  - `🦡 🃏 🦡` → Triple Dachs (15,000 DT)
+- **Wichtig:** Wilds zählen NICHT für 💎 Free Spins
+
+**🎯 Guaranteed Pair (Item #37)**
+
+Neues Instant-Item für 180 DT!
+
+**Was macht es?**
+- Garantiert mindestens ein Pair im nächsten Spin
+- Perfekt für sichere Gewinne mit hohen Multipliers
+- Kombinierbar mit Symbol-Boosts
+
+**💎 Diamond Rush (Item #39)**
+
+Neuer Timed Buff für 2,000 DT!
+
+**Was macht es?**
+- Dauer: 1 Stunde
+- Diamanten erscheinen 3x häufiger
+- Mehr 💎 = Mehr Free Spins!
+- Funktioniert wie Star Magnet, aber für Diamonds
+
+### 🔧 Verbesserungen
+
+**📋 Shop Command Spalte**
+- Alle 39 Shop Items haben jetzt direkte `!shop buy X` Commands in Tabellen
+- Einfach copy-pastebar für PC & Handy
+- Bessere Übersichtlichkeit im Shop-Gist
+
+**🔗 Unlock Error Messages**
+- Alle Unlock-Fehlermeldungen enthalten jetzt Link: https://dub.sh/SlotUnlock
+- Betrifft: !slots 20, 30, 50, 100, all
+- Direkter Zugang zu Unlock-Informationen
+
+**🛡️ !slots buy Detection**
+- Neue Fehlerprävention: `!slots buy X` wird erkannt
+- Bot fragt: "Meintest du !shop buy X?"
+- Verhindert versehentliche Spins durch Tippfehler
+
+**😔 Loss Limit Warning**
+- Nach 10 Losses in Folge erscheint Hinweis zur Pause
+- Beispiel: "😔 10 Losses in Folge - Möchtest du vielleicht eine Pause einlegen?"
+- Responsible Gaming Feature
+- Lustige Nachrichten ab 11+ Losses
+
+**⚠️ Low Balance Warning (Smart)**
+- Bei Balance unter 100 DT wird Hinweis auf Daily angezeigt
+- Nur wenn Daily tatsächlich verfügbar ist (smart check)
+- Zeigt korrekten Betrag (50 DT oder 250 DT mit Boost)
+- Verhindert Spam wenn Daily bereits abgeholt
+
+**⏰ Daily Tagesreset (UTC 00:00)**
+- Daily nutzt jetzt Tagesreset statt feste 24h
+- Kann direkt nach UTC Mitternacht (01:00 CET / 02:00 CEST) abgeholt werden
+- Konsistent für alle User weltweit
+- Cooldown zeigt Zeit bis nächste Mitternacht
+
+**⚙️ Code-Optimierungen**
+- calculateWin Funktion komplett überarbeitet für Wild-Support
+- Bessere Grid-Generation für neue Items
+- Optimierte Message-Ausgabe (kürzer)
+- Verbesserte Error Handling in Daily und Balance Checks
+
+---
+
+## Version 1.3.0 - "Monthly Login Update"
+**Veröffentlicht:** 26. Dezember 2025
+
+### ✨ Neue Features
+
+**📅 Monthly Login System**
+
+Sammle Login-Tage innerhalb eines Monats und erhalte Milestone-Boni!
+
+**Wie funktioniert es?**
+- Jeden Tag `!slots daily` nutzen = 1 Login-Tag
+- Mehrmals am Tag zählt nur als 1 Tag
+- Am Monatsende wird alles zurückgesetzt
+- **Keine Streak** - Tage verpassen ist ok!
+
+**Milestone-Boni:**
+
+| Login-Tage | Milestone-Bonus | Gesamt (mit Daily) |
+|------------|-----------------|-------------------|
+| 1 Tag | +50 DT | 100 DT |
+| 5 Tage | +150 DT | 400 DT |
+| 10 Tage | +400 DT | 950 DT |
+| 15 Tage | +750 DT | 1,700 DT |
+| 20 Tage | +1,500 DT | **3,250 DT** 🎉 |
+
+**Gesamtbelohnung bei 20 Tagen:**
+- Ohne Daily Boost: 3,250 DT
+- Mit Daily Boost: 6,250 DT
+
+### 🔧 Fixes & Verbesserungen
+
+**Mystery Box Fix**
+- Stats Tracker aus dem Pool entfernt
+- Verhindert doppelte Unlocks
+
+**Spin Bundle Conversion**
+- Spin Bundle gibt jetzt 10 Free Spins (statt Mulligan-System)
+- Einfacher und verständlicher
+
+**!slots disclaimer erweitert**
+- Neuer optionaler Parameter: `!slots disclaimer @user`
+- Zeigt Disclaimer für anderen User an
+- Nützlich für Mods
+
+---
+
+## Version 1.2.0 - "Premium Buffs"
+**Veröffentlicht:** 24. Dezember 2025
+
+### ✨ Neue Shop Items
+
+**🦡 Dachs Locator (Item #33)**
+- **Preis:** 1,500 DT
+- **Effekt:** x3 Dachs-Chance für 10 nutzbare Spins
+- **Kombinierbar:** Mit Lucky Charm für x6 Chance!
+- **Strategie:** Perfekt mit hohen Einsätzen (!slots 100)
+
+**🔥 Rage Mode (Item #34)**
+- **Preis:** 4,000 DT
+- **Dauer:** 30 Minuten
+- **Effekt:** +5% Dachs-Chance pro Verlust (max 50%)
+- **Reset:** Stack wird bei Gewinn zurückgesetzt
+- **Strategie:** Mit niedrigen Einsätzen stacken, dann high-roll
+
+**📈 Profit Doubler (Item #35)**
+- **Preis:** 5,000 DT
+- **Dauer:** 24 Stunden!
+- **Effekt:** Alle Gewinne über 100 DT werden verdoppelt
+- **Beispiel:** 250 DT Gewinn → 500 DT
+- **Kombo:** Funktioniert mit Multipliers (!slots 100 + Profit Doubler = massiv!)
+
+**💎 Diamond Mine (Item #36)**
+- **Preis:** 2,500 DT
+- **Effekt:** Garantiert 3-5 Free Spins beim Kauf
+- **Multiplier:** Free Spins haben 1x Multiplier (10 DT)
+- **Sofort-Item:** Kauf → Instant Free Spins
+
+**🎲 Reverse Chaos (Item #31)**
+- **Preis:** 150 DT
+- **Effekt:** Garantiert +50 bis +200 DT
+- **Kein Risiko:** Immer positiv!
+- **Sicher:** Keine Negativ-Results wie bei Chaos Spin
+
+**🌟 Star Magnet (Item #32)**
+- **Preis:** 1,200 DT
+- **Dauer:** 1 Stunde
+- **Effekt:** ⭐ Symbol erscheint 3x häufiger
+- **Chance:** 66% auf extra Stern-Rolls bei jedem Spin
+- **Ziel:** Massiv erhöhte Chance auf Stern-Pairs und Triples
+
+### 🔧 Fixes & Verbesserungen
+
+**Hourly Jackpot System**
+- Jede Stunde gibt es eine zufällige "Lucky Second" (0-59 Sekunden)
+- Wer genau in dieser Sekunde spinnt bekommt +100 DT Bonus! ⏰
+- Komplett zufällig und nicht vorhersagbar
+
+**Free Spin System überarbeitet**
+- Free Spins behalten jetzt den Multiplier vom auslösenden Spin
+- Beispiel: 💎💎💎 bei !slots 100 = 5 Free Spins mit 10x Multiplier!
+- Bessere Fehlerbehandlung bei Free Spins
+
+---
+
+## Version 1.1.0 - "Community Features"
+**Veröffentlicht:** 23. Dezember 2025
+
+### ✨ Neue Features
+
+**🎯 Combo Bonus System**
+
+Gewinne hintereinander stapeln sich zu Extra-Boni!
+
+| Combo | Bonus | Gesamt |
+|-------|-------|--------|
+| 2 Wins | +10 DT | 10 DT |
+| 3 Wins | +30 DT | 40 DT |
+| 4 Wins | +100 DT | 140 DT |
+| 5 Wins | +500 DT | 640 DT 🔥 |
+
+**🔥 Hot Streak Bonus**
+- 5 Wins in Folge: +500 DT
+- Reset nach Erhalt
+
+**👑 Comeback King Bonus**
+- 5+ Losses → 1 Win: +150 DT
+- Belohnung für Durchhaltevermögen!
+
+**📊 Stats Tracker System**
+
+Neues Unlock im Shop (Item #18) für 1,250 DT!
+
+**Was zeigt es?**
+```
+!slots stats
+```
+
+- Total Spins
+- Wins & Win Rate
+- Biggest Win
+- Total Won/Lost
+
+**Beispiel:**
+```
+@username 📊 Stats: 1,247 Spins | 342 Wins (27.4%) | 
+Größter Gewinn: 15,000 | Total: +12,450
+```
+
+### 🔧 Balance-Änderungen
+
+**Symbol-Wahrscheinlichkeiten optimiert**
+
+Neue Symbol-Verteilung auf der Walze (120 Symbole total):
+
+| Symbol | Anzahl | Beschreibung |
+|--------|--------|--------------|
+| 🍒 | 24 | Häufigstes Symbol |
+| 🍋 | 20 | Sehr häufig |
+| 💎 | 21 | Häufig (Free Spins!) |
+| 🍊 | 19 | Mittel-häufig |
+| 🍇 | 15 | Seltener |
+| 🍉 | 11 | Selten |
+| ⭐ | 10 | Seltenste Symbol |
+
+**Auswirkung:**
+- Gesamtgewinnrate von ~40% auf ~25-29% reduziert
+- Faireres Spiel
+- Höhere Spannung
+
+---
+
+## Version 1.0.0 - "Initial Release"
+**Veröffentlicht:** 21. Dezember 2025
+
+### 🎉 Erste Version
+
+**Grundsystem:**
+- Slot Machine mit 3x3 Grid
+- Middle Row als Gewinnlinie
+- DachsTaler (DT) als Währung
+- Startguthaben: 100 DT
+
+**Basis-Commands:**
+- `!slots` - Spielen (10 DT)
+- `!slots daily` - Daily Bonus (50 DT)
+- `!transfer` - DT an andere senden
+- `!slots balance` - Kontostand anzeigen
+- `!slots leaderboard` - Top 5 Rangliste
+
+**Gewinn-Symbole:**
+
+**🦡 Dachs (Jackpot-Symbol)**
+- 3x: 15,000 DT
+- 2x: 2,500 DT
+- 1x: 100 DT
+
+**💎 Diamanten (Free Spins)**
+- 3x: 5 Free Spins
+- 2x: 1 Free Spin
+
+**Standard-Symbole (🍒🍋🍊🍇🍉⭐)**
+- Triples: 50-500 DT
+- Pairs: 5-50 DT
+
+**Shop-System:**
+- 30+ Items verfügbar
+- Kategorien: Boosts, Unlocks, Buffs, Prestige Ränge
+- Multiplier-Unlocks (20, 30, 50, 100, all)
+
+**Prestige-Ränge:**
+- 🥉 Bronze → 🥈 Silber → 🥇 Gold → 💎 Platin → 👑 Legendary
+
+**Admin-Features:**
+- `!slots give` - DT vergeben
+- `!slots ban/unban` - User sperren/entsperren
+
+---
+
+## 🔗 SOCIAL MEDIA & COMMUNITY
+
+<div align="center">
+
+### 🎮 Folge frechhdachs
+
+[![Twitch](https://img.shields.io/badge/Twitch-frechhdachs-9146FF?style=for-the-badge&logo=twitch&logoColor=white)](https://www.twitch.tv/frechhdachs)
+[![Instagram](https://img.shields.io/badge/Instagram-frechhdachs__-E4405F?style=for-the-badge&logo=instagram&logoColor=white)](https://www.instagram.com/frechhdachs_/)
+[![TikTok](https://img.shields.io/badge/TikTok-@frechhdachs-000000?style=for-the-badge&logo=tiktok&logoColor=white)](https://www.tiktok.com/@frechhdachs)
+[![YouTube](https://img.shields.io/badge/YouTube-frechhdachs-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@frechhdachs)
+
+[![Linktree](https://img.shields.io/badge/🔗_Alle_Links-Linktree-39E09B?style=for-the-badge)](https://linktr.ee/frechhdachs)
+
+---
+
+### 💬 Fragen? Bugs? Feedback?
+
+[![Discord](https://img.shields.io/badge/Discord-Dachsbau_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/dachsbau)
+
+---
+
+**💚 Viel Spaß und möge der Dachs mit dir sein! 🦡**
+
+</div>

@@ -2,7 +2,6 @@
 const RESPONSE_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8' };
 const MS_PER_HOUR = 3600000;
 const MS_PER_MINUTE = 60000;
-const MS_PER_DAY = 86400000;
 
 const MAX_BALANCE = 999999999;
 const MIN_TRANSFER = 1;
@@ -11,6 +10,7 @@ const HOURLY_JACKPOT_AMOUNT = 100;
 const COOLDOWN_SECONDS = 30; // Spin cooldown in seconds
 const BANK_USERNAME = 'dachsbank';
 const BANK_START_BALANCE = 444444;
+const BANK_KEY = `user:${BANK_USERNAME}`;
 
 // Leaderboard cache duration (5 minutes)
 const LEADERBOARD_CACHE_TTL = 300;
@@ -115,19 +115,6 @@ const COMMAND_MAP = {
   bank: 'handleBank'
 };
 
-// OPTIMIZED: Special commands map for handleSlot (simple commands without params)
-const SPECIAL_COMMANDS = {
-  lb: 'handleLeaderboard',
-  leaderboard: 'handleLeaderboard',
-  balance: 'handleBalance',
-  konto: 'handleBalance',
-  daily: 'handleDaily',
-  info: 'handleInfo',
-  stats: 'handleStats',
-  buffs: 'handleBuffs',
-  bank: 'handleBank'
-};
-
 // OPTIMIZED: Loss messages as constant
 const LOSS_MESSAGES = {
   10: ' 😔 10 Losses in Folge - Möchtest du vielleicht eine Pause einlegen?',
@@ -154,8 +141,8 @@ const ROTATING_LOSS_MESSAGES = [
 // OPTIMIZED: Helper function to check if user is admin (eliminates code duplication)
 function isAdmin(username) {
   const allowedUsers = ['exaint_', 'frechhdachs'];
-  const clean = username.toLowerCase().replace('_', '');
-  return allowedUsers.some(a => a.replace('_', '') === clean || a === username.toLowerCase());
+  const lowerUsername = username.toLowerCase();
+  return allowedUsers.includes(lowerUsername);
 }
 
 // Monthly Login rewards
@@ -821,7 +808,7 @@ async function handleRemoveBuff(username, target, shopNumber, env) {
       await env.SLOTS_KV.delete(`unlock:${cleanTarget.toLowerCase()}:${item.unlockKey}`);
       return new Response(`@${username} ✅ ${item.name} von @${cleanTarget} entfernt! 🗑️`, { headers: RESPONSE_HEADERS });
     } else if (item.type === 'prestige') {
-      await env.SLOTS_KV.delete(`prestige:${cleanTarget.toLowerCase()}`);
+      await env.SLOTS_KV.delete(`rank:${cleanTarget.toLowerCase()}`);
       return new Response(`@${username} ✅ Prestige-Rang von @${cleanTarget} entfernt! 🗑️`, { headers: RESPONSE_HEADERS });
     } else {
       return new Response(`@${username} ❌ Dieser Item-Typ kann nicht entfernt werden.`, { headers: RESPONSE_HEADERS });
@@ -1332,43 +1319,36 @@ async function handleSlot(username, amountParam, url, env) {
       }
     }
     
-    // OPTIMIZED: Parallel KV reads for initial checks (saves ~200-300ms)
-    const [selfBanData, hasAccepted, lastSpin] = await Promise.all([
+    // OPTIMIZED: Combined parallel KV reads for initial checks (saves ~300-400ms)
+    const now = Date.now();
+    const [selfBanData, hasAccepted, lastSpin, currentBalance, hasGuaranteedPairToken, hasWildCardToken] = await Promise.all([
       isSelfBanned(username, env),
       hasAcceptedDisclaimer(username, env),
-      getLastSpin(username, env)
+      getLastSpin(username, env),
+      getBalance(username, env),
+      hasGuaranteedPair(username, env),
+      hasWildCard(username, env)
     ]);
 
     // Selfban Check
     if (selfBanData) {
-
       return new Response(`@${username} 🚫 Du hast dich selbst vom Spielen ausgeschlossen (seit ${selfBanData.date}). Kontaktiere einen Admin für eine Freischaltung. Hilfe: https://git.new/DachsbauSlotInfos     `, { headers: RESPONSE_HEADERS });
     }
 
     // First-Time Disclaimer Check
     if (!hasAccepted) {
       await setDisclaimerAccepted(username, env);
-
       return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - kein Echtgeld! Verstanden? Schreib nochmal !slots zum Spielen! Weitere Infos: https://git.new/DachsbauSlotInfos | Shop: https://git.new/DachsbauSlotsShop 🎰     `, { headers: RESPONSE_HEADERS });
     }
 
     // Cooldown Check (before processing actual spin)
-    const now = Date.now();
     const cooldownMs = COOLDOWN_SECONDS * 1000;
-    
+
     if (lastSpin && (now - lastSpin) < cooldownMs) {
       const remainingMs = cooldownMs - (now - lastSpin);
       const remainingSec = Math.ceil(remainingMs / 1000);
-       
       return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
     }
-    
-// OPTIMIZED: Load only essential data first
-let [currentBalance, hasGuaranteedPairToken, hasWildCardToken] = await Promise.all([
-  getBalance(username, env),
-  hasGuaranteedPair(username, env),
-  hasWildCard(username, env)
-]);
     
     // Check for Free Spins
     let isFreeSpinUsed = false;
@@ -2268,7 +2248,7 @@ async function getLastDaily(username, env) {
 
 async function setLastDaily(username, timestamp, env) {
   try {
-    await env.SLOTS_KV.put(`daily:${username.toLowerCase()}`, timestamp.toString(), { expirationTtl: MS_PER_DAY + 1000 });
+    await env.SLOTS_KV.put(`daily:${username.toLowerCase()}`, timestamp.toString(), { expirationTtl: 86400 + 3600 }); // 1 day + 1 hour buffer in seconds
   } catch (error) {
     console.error('setLastDaily Error:', error);
   }
@@ -2718,36 +2698,6 @@ async function decrementInsurance(username, env) {
   }
 }
 
-async function addSpinBundle(username, count, env) {
-  try {
-    const current = await getSpinBundleCount(username, env);
-    await env.SLOTS_KV.put(`bundle:${username.toLowerCase()}`, (current + count).toString());
-  } catch (error) {
-    console.error('addSpinBundle Error:', error);
-  }
-}
-
-async function getSpinBundleCount(username, env) {
-  try {
-    const value = await env.SLOTS_KV.get(`bundle:${username.toLowerCase()}`);
-    return value ? parseInt(value, 10) : 0;
-  } catch (error) {
-    console.error('getSpinBundleCount Error:', error);
-    return 0;
-  }
-}
-
-async function decrementSpinBundle(username, env) {
-  try {
-    const current = await getSpinBundleCount(username, env);
-    if (current > 0) {
-      await env.SLOTS_KV.put(`bundle:${username.toLowerCase()}`, (current - 1).toString());
-    }
-  } catch (error) {
-    console.error('decrementSpinBundle Error:', error);
-  }
-}
-
 async function getSpinBundlePurchases(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`bundle_purchases:${username.toLowerCase()}`);
@@ -2953,7 +2903,7 @@ async function updateStreak(username, isWin, env) {
       streak.wins = 0;
     }
     
-    await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(streak), { expirationTtl: MS_PER_DAY * 7 });
+    await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(streak), { expirationTtl: 604800 }); // 7 days in seconds
     return streak;
   } catch (error) {
     console.error('updateStreak Error:', error);

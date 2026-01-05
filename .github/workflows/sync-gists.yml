@@ -17,26 +17,23 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       - name: Sync INFO.md to Gist
-        uses: popsiclestick/gist-sync-action@v1.2.0
+        uses: exuanbo/actions-deploy-gist@v1
         with:
-          auth: ${{ secrets.GIST_TOKEN }}
-          gist_url: https://gist.github.com/Exaint/07fc57925e624dfc31a08976bc7cc457
-          gist_title: INFO.md
-          gist_description: "🦡 Dachsbau Slots - Info & Commands (Auto-synced)"
-          github_file: docs/INFO.md
+          token: ${{ secrets.GIST_TOKEN }}
+          gist_id: 07fc57925e624dfc31a08976bc7cc457
+          file_path: docs/INFO.md
+          file_name: INFO.md
       - name: Sync SHOP.md to Gist
-        uses: popsiclestick/gist-sync-action@v1.2.0
+        uses: exuanbo/actions-deploy-gist@v1
         with:
-          auth: ${{ secrets.GIST_TOKEN }}
-          gist_url: https://gist.github.com/Exaint/1facc246a6b8d7a4e3b8aace74993e3d
-          gist_title: SHOP.md
-          gist_description: "🦡 Dachsbau Slots - Shop Items (Auto-synced)"
-          github_file: docs/SHOP.md
+          token: ${{ secrets.GIST_TOKEN }}
+          gist_id: 1facc246a6b8d7a4e3b8aace74993e3d
+          file_path: docs/SHOP.md
+          file_name: SHOP.md
       - name: Sync CHANGELOG.md to Gist
-        uses: popsiclestick/gist-sync-action@v1.2.0
+        uses: exuanbo/actions-deploy-gist@v1
         with:
-          auth: ${{ secrets.GIST_TOKEN }}
-          gist_url: https://gist.github.com/Exaint/288b8a2707aa41b01d440ee4f207a831
-          gist_title: CHANGELOG.md
-          gist_description: "🦡 Dachsbau Slots - Changelog (Auto-synced)"
-          github_file: docs/CHANGELOG.md
+          token: ${{ secrets.GIST_TOKEN }}
+          gist_id: 288b8a2707aa41b01d440ee4f207a831
+          file_path: docs/CHANGELOG.md
+          file_name: CHANGELOG.md

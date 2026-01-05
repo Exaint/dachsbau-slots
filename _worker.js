@@ -1222,10 +1222,14 @@ async function handleSlot(username, amountParam, url, env) {
       const specialCommands = {
         lb: () => handleLeaderboard(env),
         leaderboard: () => handleLeaderboard(env),
+        rank: () => handleLeaderboard(env),
+        ranking: () => handleLeaderboard(env),
         balance: () => handleBalance(username, env),
         konto: () => handleBalance(username, env),
         daily: () => handleDaily(username, env),
         info: () => new Response(`@${username} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS }),
+        help: () => new Response(`@${username} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS }),
+        commands: () => new Response(`@${username} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS }),
         stats: () => handleStats(username, env),
         buffs: () => handleBuffs(username, env),
         bank: () => handleBank(username, env)

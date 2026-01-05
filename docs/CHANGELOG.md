@@ -102,6 +102,14 @@ Du kannst dich jederzeit selbst vom Spielen ausschließen:
 - Anti-Exploit System für Hourly Jackpot
 - Atomare Transaktionen für Geld-Transfers
 
+### 📝 Command Enhancements
+
+**Neue Command-Aliase hinzugefügt**
+- **Leaderboard:** `!slots rank` und `!slots ranking` (zusätzlich zu `lb` und `leaderboard`)
+- **Info:** `!slots help` und `!slots commands` (zusätzlich zu `info`)
+- **Auswirkung:** Verbesserte Benutzerfreundlichkeit durch kürzere und intuitivere Commands
+- **Implementierung:** O(1)-Lookup-Map für schnellere Command-Verarbeitung
+
 ---
 
 ## Version 1.4.4 - "DachsBank System"

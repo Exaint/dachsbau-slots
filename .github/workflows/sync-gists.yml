@@ -21,7 +21,7 @@ jobs:
         with:
           token: ${{ secrets.GIST_TOKEN }}
           gist_id: 07fc57925e624dfc31a08976bc7cc457
-          gist_description: "Dachsbau Slots - Commands & Rules"
+          gist_description: "Dachsbau Slots - Commands & Regeln"
           file_path: docs/INFO.md
           file_name: INFO.md
       - name: Sync SHOP.md to Gist
@@ -29,7 +29,7 @@ jobs:
         with:
           token: ${{ secrets.GIST_TOKEN }}
           gist_id: 1facc246a6b8d7a4e3b8aace74993e3d
-          gist_description: "Dachsbau Slots - Shop Items & Prices"
+          gist_description: "Dachsbau Slots - Shop Items & Preise"
           file_path: docs/SHOP.md
           file_name: SHOP.md
       - name: Sync CHANGELOG.md to Gist
@@ -37,6 +37,6 @@ jobs:
         with:
           token: ${{ secrets.GIST_TOKEN }}
           gist_id: 288b8a2707aa41b01d440ee4f207a831
-          gist_description: "Dachsbau Slots - Version History & Updates"
+          gist_description: "Dachsbau Slots - Versionshistorie & Updates"
           file_path: docs/CHANGELOG.md
           file_name: CHANGELOG.md

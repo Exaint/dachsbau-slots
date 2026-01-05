@@ -41,16 +41,6 @@ function getWeightedSymbol() {
   return '⭐'; // Fallback
 }
 
-// Keep for backward compatibility (uses new function)
-const WEIGHTED_SYMBOLS = Array.from({ length: 120 }, (_, i) => {
-  let cumulative = 0;
-  for (const { symbol, weight } of SYMBOL_WEIGHTS) {
-    cumulative += weight;
-    if (i < cumulative) return symbol;
-  }
-  return '⭐';
-});
-
 const SHOP_ITEMS = {
   1: { name: 'Peek Token', price: 75, type: 'peek' },
   2: { name: '🍒 Kirschen-Boost', price: 50, type: 'boost', symbol: '🍒' },
@@ -123,6 +113,19 @@ const COMMAND_MAP = {
   stats: 'handleStats',
   buffs: 'handleBuffs',
   bank: 'handleBank'
+};
+
+// OPTIMIZED: Special commands map for handleSlot (simple commands without params)
+const SPECIAL_COMMANDS = {
+  lb: () => handleLeaderboard(env),
+  leaderboard: () => handleLeaderboard(env),
+  balance: () => handleBalance(username, env),
+  konto: () => handleBalance(username, env),
+  daily: () => handleDaily(username, env),
+  info: () => new Response(`@${username} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS }),
+  stats: () => handleStats(username, env),
+  buffs: () => handleBuffs(username, env),
+  bank: () => handleBank(username, env)
 };
 
 // OPTIMIZED: Loss messages as constant
@@ -1215,13 +1218,8 @@ async function handleSlot(username, amountParam, url, env) {
         return new Response(`@${username} ❓ Meintest du !shop buy [Nummer]? (z.B. !shop buy 1)`, { headers: RESPONSE_HEADERS });
       }
       
-      if (lower === 'lb' || lower === 'leaderboard') return await handleLeaderboard(env);
-      if (lower === 'balance' || lower === 'konto') return await handleBalance(username, env);
-      if (lower === 'daily') return await handleDaily(username, env);
-      if (lower === 'info') return new Response(`@${username} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS });
-      if (lower === 'stats') return await handleStats(username, env);
-      if (lower === 'buffs') return await handleBuffs(username, env);
-      if (lower === 'bank') return await handleBank(username, env);
+      // OPTIMIZED: Use SPECIAL_COMMANDS map for O(1) lookup
+      if (SPECIAL_COMMANDS[lower]) return await SPECIAL_COMMANDS[lower]();
       if (lower === 'give') {
         const targetParam = url.searchParams.get('target');
         const giveAmount = url.searchParams.get('giveamount');

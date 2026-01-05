@@ -289,9 +289,17 @@ async function handleSlot(username, amountParam, url, env) {
       }
     }
 
-    // Decrement Dachs Locator uses
+    // OPTIMIZED: Decrement Dachs Locator uses inline (avoids redundant KV read)
     if (hasDachsLocator.active) {
-      await decrementBuffUses(username, 'dachs_locator', env);
+      const data = hasDachsLocator.data;
+      data.uses--;
+
+      if (data.uses <= 0) {
+        await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:dachs_locator`);
+      } else {
+        const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
+        await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:dachs_locator`, JSON.stringify(data), { expirationTtl: ttl + 60 });
+      }
     }
 
     // Guaranteed Pair: Ensure at least a pair in middle row
@@ -342,12 +350,22 @@ async function handleSlot(username, amountParam, url, env) {
       result.message += ' (⚡ 2x Win Boost!)';
     }
 
-    // Symbol Boost
+    // OPTIMIZED: Symbol Boost - only check symbols present in middle row (parallel)
     const middle = [grid[3], grid[4], grid[5]];
     if (result.points > 0) {
-      const symbols = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐', '🦡'];
-      for (const symbol of symbols) {
-        if (middle.includes(symbol) && await consumeBoost(username, symbol, env)) {
+      // Only check unique symbols that actually appear in middle row
+      const uniqueMiddleSymbols = [...new Set(middle)];
+
+      // Check all boosts in parallel
+      const boostChecks = await Promise.all(
+        uniqueMiddleSymbols.map(symbol =>
+          consumeBoost(username, symbol, env).then(hasBoost => ({ symbol, hasBoost }))
+        )
+      );
+
+      // Find first active boost
+      for (const { symbol, hasBoost } of boostChecks) {
+        if (hasBoost) {
           const hasMatch = (middle[0] === symbol && middle[1] === symbol) ||
             (middle[1] === symbol && middle[2] === symbol) ||
             (middle[0] === symbol && middle[2] === symbol) ||
@@ -387,10 +405,20 @@ async function handleSlot(username, amountParam, url, env) {
       result.message += ` (🔥 ${currentStreakMulti.toFixed(1)}x Streak!)`;
     }
 
-    // Update streak and check for bonuses
+    // OPTIMIZED: Update streak and check for bonuses (combined read/write)
     const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
     const previousStreak = await getStreak(username, env);
-    const newStreak = await updateStreak(username, isWin, env);
+
+    // Inline update logic to avoid redundant read
+    const newStreak = { ...previousStreak };
+    if (isWin) {
+      newStreak.wins++;
+      newStreak.losses = 0;
+    } else {
+      newStreak.losses++;
+      newStreak.wins = 0;
+    }
+    await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(newStreak), { expirationTtl: 604800 });
 
     let streakBonus = 0;
     let streakMessage = '';
@@ -419,13 +447,25 @@ async function handleSlot(username, amountParam, url, env) {
       }
     }
 
-    // Rage Mode: Increase chance after losses
+    // OPTIMIZED: Rage Mode inline updates (avoids redundant KV reads)
     if (!isWin && hasRageMode.active) {
-      await incrementRageModeStack(username, env);
-      await resetStreakMultiplier(username, env); // Reset streak multiplier on loss
+      // Inline increment logic
+      const data = hasRageMode.data;
+      data.stack = Math.min((data.stack || 0) + 5, 50);
+      const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
+      await Promise.all([
+        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl + 60 }),
+        resetStreakMultiplier(username, env)
+      ]);
     } else if (isWin && hasRageMode.active) {
-      await resetRageModeStack(username, env);
-      await incrementStreakMultiplier(username, env); // Increment streak multiplier on win
+      // Inline reset logic
+      const data = hasRageMode.data;
+      data.stack = 0;
+      const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
+      await Promise.all([
+        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl + 60 }),
+        incrementStreakMultiplier(username, env)
+      ]);
     } else if (isWin) {
       await incrementStreakMultiplier(username, env); // Increment even without Rage Mode
     } else {
@@ -476,24 +516,22 @@ async function handleSlot(username, amountParam, url, env) {
     const totalBonuses = streakBonus + comboBonus;
     const newBalance = Math.min(currentBalance - spinCost + result.points + totalBonuses, MAX_BALANCE);
 
-    await Promise.all([
+    // OPTIMIZED: Parallelize all final updates including rank fetch
+    const finalUpdates = [
       setBalance(username, newBalance, env),
       updateStats(username, result.points > 0, result.points, spinCost, env),
-      setLastSpin(username, now, env) // Update cooldown timestamp
-    ]);
+      setLastSpin(username, now, env),
+      getPrestigeRank(username, env) // Fetch rank in parallel
+    ];
 
-    // Update DachsBank balance
+    // Add bank update if not free spin
     if (!isFreeSpinUsed) {
-      // Bank receives the spin cost
-      await updateBankBalance(spinCost, env);
-
-      // Bank pays out winnings (if any)
-      if (result.points > 0 || totalBonuses > 0) {
-        await updateBankBalance(-(result.points + totalBonuses), env);
-      }
+      const netBankChange = spinCost - (result.points + totalBonuses);
+      finalUpdates.push(updateBankBalance(netBankChange, env));
     }
 
-    const rank = await getPrestigeRank(username, env);
+    const results = await Promise.all(finalUpdates);
+    const rank = results[3]; // Rank is 4th promise
     const rankSymbol = rank ? `${rank} ` : '';
 
     let remainingCount = 0;

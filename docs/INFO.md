@@ -6,7 +6,7 @@
 
 [![Shop](https://img.shields.io/badge/🛒_Shop-Items_&_Preise-00D9FF?style=flat-square)](https://git.new/DachsbauSlotsShop) [![Changelog](https://img.shields.io/badge/📜_Changelog-Updates-8B5CF6?style=flat-square)](https://gist.github.com/Exaint/288b8a2707aa41b01d440ee4f207a831) [![Discord](https://img.shields.io/badge/💬_Discord-Dachsbau-5865F2?style=flat-square)](https://discord.gg/dachsbau)
 
-**Version 1.4.4** • Letztes Update: 30. Dezember 2025
+**Version 1.4.5** • Letztes Update: 5. Januar 2026
 
 </div>
 

@@ -112,8 +112,8 @@ Du kannst dich jederzeit selbst vom Spielen ausschließen:
 
 </details>
 
-## Version 1.4.4 - "DachsBank System"
-**Veröffentlicht:** 30. Dezember 2025
+<details>
+<summary>Version 1.4.4 - "DachsBank System" (30. Dezember 2025)</summary>
 
 ### 🏦 Neue Features
 

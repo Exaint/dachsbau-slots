@@ -117,15 +117,15 @@ const COMMAND_MAP = {
 
 // OPTIMIZED: Special commands map for handleSlot (simple commands without params)
 const SPECIAL_COMMANDS = {
-  lb: () => handleLeaderboard(env),
-  leaderboard: () => handleLeaderboard(env),
-  balance: () => handleBalance(username, env),
-  konto: () => handleBalance(username, env),
-  daily: () => handleDaily(username, env),
-  info: () => new Response(`@${username} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS }),
-  stats: () => handleStats(username, env),
-  buffs: () => handleBuffs(username, env),
-  bank: () => handleBank(username, env)
+  lb: 'handleLeaderboard',
+  leaderboard: 'handleLeaderboard',
+  balance: 'handleBalance',
+  konto: 'handleBalance',
+  daily: 'handleDaily',
+  info: 'handleInfo',
+  stats: 'handleStats',
+  buffs: 'handleBuffs',
+  bank: 'handleBank'
 };
 
 // OPTIMIZED: Loss messages as constant
@@ -1218,8 +1218,20 @@ async function handleSlot(username, amountParam, url, env) {
         return new Response(`@${username} ❓ Meintest du !shop buy [Nummer]? (z.B. !shop buy 1)`, { headers: RESPONSE_HEADERS });
       }
       
-      // OPTIMIZED: Use SPECIAL_COMMANDS map for O(1) lookup
-      if (SPECIAL_COMMANDS[lower]) return await SPECIAL_COMMANDS[lower]();
+      // OPTIMIZED: Special commands map for O(1) lookup
+      const specialCommands = {
+        lb: () => handleLeaderboard(env),
+        leaderboard: () => handleLeaderboard(env),
+        balance: () => handleBalance(username, env),
+        konto: () => handleBalance(username, env),
+        daily: () => handleDaily(username, env),
+        info: () => new Response(`@${username} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS }),
+        stats: () => handleStats(username, env),
+        buffs: () => handleBuffs(username, env),
+        bank: () => handleBank(username, env)
+      };
+      
+      if (specialCommands[lower]) return await specialCommands[lower]();
       if (lower === 'give') {
         const targetParam = url.searchParams.get('target');
         const giveAmount = url.searchParams.get('giveamount');

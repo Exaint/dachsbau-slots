@@ -1,0 +1,175 @@
+// Constants
+const RESPONSE_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8' };
+const MS_PER_HOUR = 3600000;
+const MS_PER_MINUTE = 60000;
+
+const MAX_BALANCE = 999999999;
+const MIN_TRANSFER = 1;
+const MAX_TRANSFER = 100000;
+const HOURLY_JACKPOT_AMOUNT = 100;
+const COOLDOWN_SECONDS = 30; // Spin cooldown in seconds
+const BANK_USERNAME = 'dachsbank';
+const BANK_START_BALANCE = 444444;
+const BANK_KEY = `user:${BANK_USERNAME}`;
+
+// Leaderboard cache duration (5 minutes)
+const LEADERBOARD_CACHE_TTL = 300;
+
+// DEBUG MODE - Set to true for testing (exaint_ only)
+const DEBUG_MODE = false; // Change to true to enable
+
+// OPTIMIZED: Symbol weights for weighted random selection (replaces 120-element array)
+const SYMBOL_WEIGHTS = [
+  { symbol: '🍒', weight: 24 },
+  { symbol: '🍋', weight: 20 },
+  { symbol: '🍊', weight: 19 },
+  { symbol: '💎', weight: 21 },
+  { symbol: '🍇', weight: 15 },
+  { symbol: '🍉', weight: 11 },
+  { symbol: '⭐', weight: 10 }
+];
+const TOTAL_WEIGHT = 120;
+
+const SHOP_ITEMS = {
+  1: { name: 'Peek Token', price: 75, type: 'peek' },
+  2: { name: '🍒 Kirschen-Boost', price: 50, type: 'boost', symbol: '🍒' },
+  3: { name: '🍋 Zitronen-Boost', price: 50, type: 'boost', symbol: '🍋' },
+  4: { name: '🍊 Orangen-Boost', price: 50, type: 'boost', symbol: '🍊' },
+  5: { name: '🍇 Trauben-Boost', price: 50, type: 'boost', symbol: '🍇' },
+  6: { name: '🍉 Wassermelonen-Boost', price: 50, type: 'boost', symbol: '🍉' },
+  7: { name: '⭐ Stern-Boost', price: 50, type: 'boost', symbol: '⭐' },
+  8: { name: '🦡 Dachs-Boost', price: 150, type: 'boost', symbol: '🦡', weeklyLimit: true },
+  9: { name: 'Insurance Pack', price: 250, type: 'insurance' },
+  10: { name: 'Win Multiplier', price: 250, type: 'winmulti' },
+  11: { name: 'Chaos Spin', price: 250, type: 'instant' },
+  12: { name: 'Glücksrad Spin', price: 300, type: 'instant' },
+  13: { name: '!slots 20 Unlock', price: 500, type: 'unlock', unlockKey: 'slots_20' },
+  14: { name: 'Happy Hour', price: 800, type: 'timed', buffKey: 'happy_hour', duration: 3600 },
+  15: { name: 'Spin Bundle', price: 90, type: 'bundle' },
+  16: { name: 'Mystery Box', price: 1000, type: 'instant' },
+  17: { name: 'Bronze Dachs Rang 🥉', price: 1200, type: 'prestige', rank: '🥉' },
+  18: { name: 'Stats Tracker', price: 1250, type: 'unlock', unlockKey: 'stats_tracker' },
+  19: { name: '!slots 30 Unlock', price: 2000, type: 'unlock', unlockKey: 'slots_30', requires: 'slots_20' },
+  20: { name: 'Lucky Charm', price: 2000, type: 'timed', buffKey: 'lucky_charm', duration: 3600 },
+  21: { name: '!slots 50 Unlock', price: 2500, type: 'unlock', unlockKey: 'slots_50', requires: 'slots_30' },
+  22: { name: 'Silber Dachs Rang 🥈', price: 3000, type: 'prestige', rank: '🥈', requiresRank: '🥉' },
+  23: { name: '!slots 100 Unlock', price: 3250, type: 'unlock', unlockKey: 'slots_100', requires: 'slots_50' },
+  24: { name: 'Golden Hour', price: 3500, type: 'timed', buffKey: 'golden_hour', duration: 3600 },
+  25: { name: '!slots all Unlock', price: 4444, type: 'unlock', unlockKey: 'slots_all', requires: 'slots_100' },
+  26: { name: 'Gold Dachs Rang 🥇', price: 8000, type: 'prestige', rank: '🥇', requiresRank: '🥈' },
+  27: { name: 'Daily Interest Boost', price: 10000, type: 'unlock', unlockKey: 'daily_boost' },
+  28: { name: 'Custom Win Message', price: 10000, type: 'unlock', unlockKey: 'custom_message' },
+  29: { name: 'Platin Dachs Rang 💎', price: 25000, type: 'prestige', rank: '💎', requiresRank: '🥇' },
+  30: { name: 'Legendary Dachs Rang 👑', price: 44444, type: 'prestige', rank: '👑', requiresRank: '💎' },
+  31: { name: 'Reverse Chaos', price: 150, type: 'instant' },
+  32: { name: '🌟 Star Magnet', price: 1200, type: 'timed', buffKey: 'star_magnet', duration: 3600 },
+  33: { name: '🦡 Dachs Locator', price: 1500, type: 'timed', buffKey: 'dachs_locator', duration: 600, uses: 10 },
+  34: { name: '🔥 Rage Mode', price: 4000, type: 'timed', buffKey: 'rage_mode', duration: 1800 },
+  35: { name: '📈 Profit Doubler', price: 5000, type: 'timed', buffKey: 'profit_doubler', duration: 86400 },
+  36: { name: '💎 Diamond Mine', price: 2500, type: 'instant' },
+  37: { name: '🎯 Guaranteed Pair', price: 180, type: 'instant' },
+  38: { name: '🃏 Wild Card', price: 250, type: 'instant' },
+  39: { name: '💎 Diamond Rush', price: 2000, type: 'timed', buffKey: 'diamond_rush', duration: 3600 }
+};
+
+const PREREQUISITE_NAMES = {
+  'slots_20': '!slots 20',
+  'slots_30': '!slots 30',
+  'slots_50': '!slots 50',
+  'slots_100': '!slots 100'
+};
+
+const PRESTIGE_RANKS = ['🥉', '🥈', '🥇', '💎', '👑'];
+
+const TRIPLE_PAYOUTS = {'⭐': 500, '🍉': 250, '🍇': 150, '🍊': 100, '🍋': 75, '🍒': 50};
+const PAIR_PAYOUTS = {'⭐': 50, '🍉': 25, '🍇': 15, '🍊': 10, '🍋': 8, '🍒': 5};
+
+// OPTIMIZED: Module-level constants for better performance
+const UNLOCK_MAP = { 20: 'slots_20', 30: 'slots_30', 50: 'slots_50', 100: 'slots_100' };
+const MULTIPLIER_MAP = { 10: 1, 20: 2, 30: 3, 50: 5, 100: 10 };
+const BASE_SPIN_COST = 10;
+const DACHS_BASE_CHANCE = 1 / 150;
+const SECONDS_PER_MINUTE = 60;
+
+// OPTIMIZED: Command map for O(1) lookup instead of sequential if-else chain
+const COMMAND_MAP = {
+  lb: 'handleLeaderboard',
+  leaderboard: 'handleLeaderboard',
+  balance: 'handleBalance',
+  konto: 'handleBalance',
+  daily: 'handleDaily',
+  info: 'handleInfo',
+  stats: 'handleStats',
+  buffs: 'handleBuffs',
+  bank: 'handleBank'
+};
+
+// OPTIMIZED: Loss messages as constant
+const LOSS_MESSAGES = {
+  10: ' 😔 10 Losses in Folge - Möchtest du vielleicht eine Pause einlegen?',
+  11: ' 🦡 11 Losses - Der Dachs versteckt sich noch... vielleicht eine kurze Pause?',
+  12: ' 🦡💤 12 Losses - Der Dachs macht ein Nickerchen... Pause könnte helfen!',
+  13: ' 🦡🌙 13 Losses - Der Dachs träumt vom Gewinn... Morgen vielleicht?',
+  14: ' 🦡🍂 14 Losses - Der Dachs sammelt Wintervorräte... Zeit für eine Pause!',
+  15: ' 🦡❄️ 15 Losses - Der Dachs überwintert... Komm später wieder!',
+  16: ' 🦡🏔️ 16 Losses - Der Dachs ist tief im Bau... Vielleicht morgen mehr Glück?',
+  17: ' 🦡🌌 17 Losses - Der Dachs philosophiert über das Leben... Pause empfohlen!',
+  18: ' 🦡📚 18 Losses - Der Dachs liest ein Buch... Du auch? Pause! 📖',
+  19: ' 🦡🎮 19 Losses - Der Dachs zockt was anderes... Du auch? 🎮',
+  20: ' 🦡☕ 20 Losses - Der Dachs trinkt Kaffee und entspannt... Pause seriously! ☕'
+};
+
+const ROTATING_LOSS_MESSAGES = [
+  ' 🦡🛌 Der Dachs schläft fest... Lass ihn ruhen! 😴',
+  ' 🦡🧘 Der Dachs meditiert... Innere Ruhe finden! 🧘‍♂️',
+  ' 🦡🎨 Der Dachs malt ein Bild... Kreative Pause! 🎨',
+  ' 🦡🏃 Der Dachs macht Sport... Beweg dich auch! 🏃',
+  ' 🦡🌳 Der Dachs genießt die Natur... Geh raus! 🌳'
+];
+
+// Monthly Login rewards
+const MONTHLY_LOGIN_REWARDS = {
+  1: 50,
+  5: 150,
+  10: 400,
+  15: 750,
+  20: 1500
+};
+
+// Combo bonus system
+const COMBO_BONUSES = {
+  2: 10, 3: 30, 4: 100, 5: 500
+};
+
+export {
+  RESPONSE_HEADERS,
+  MS_PER_HOUR,
+  MS_PER_MINUTE,
+  MAX_BALANCE,
+  MIN_TRANSFER,
+  MAX_TRANSFER,
+  HOURLY_JACKPOT_AMOUNT,
+  COOLDOWN_SECONDS,
+  BANK_USERNAME,
+  BANK_START_BALANCE,
+  BANK_KEY,
+  LEADERBOARD_CACHE_TTL,
+  DEBUG_MODE,
+  SYMBOL_WEIGHTS,
+  TOTAL_WEIGHT,
+  SHOP_ITEMS,
+  PREREQUISITE_NAMES,
+  PRESTIGE_RANKS,
+  TRIPLE_PAYOUTS,
+  PAIR_PAYOUTS,
+  UNLOCK_MAP,
+  MULTIPLIER_MAP,
+  BASE_SPIN_COST,
+  DACHS_BASE_CHANCE,
+  SECONDS_PER_MINUTE,
+  COMMAND_MAP,
+  LOSS_MESSAGES,
+  ROTATING_LOSS_MESSAGES,
+  MONTHLY_LOGIN_REWARDS,
+  COMBO_BONUSES
+};

@@ -90,7 +90,7 @@ const SHOP_ITEMS = {
   36: { name: '💎 Diamond Mine', price: 2500, type: 'instant' },
   37: { name: '🎯 Guaranteed Pair', price: 180, type: 'instant' },
   38: { name: '🃏 Wild Card', price: 250, type: 'instant' },
-  39: { name: '💎 Diamond Rush', price: 2000, type: 'timed', buffKey: 'diamond_rush', duration: 3600 },
+  39: { name: '💎 Diamond Rush', price: 2000, type: 'timed', buffKey: 'diamond_rush', duration: 3600 }
 };
 
 const PREREQUISITE_NAMES = {
@@ -227,12 +227,12 @@ function sanitizeUsername(username) {
 }
 
 function validateAmount(amount, min = MIN_TRANSFER, max = MAX_TRANSFER) {
-  const parsed = parseInt(amount);
+  const parsed = parseInt(amount, 10);
   if (isNaN(parsed) || parsed < min || parsed > max) return null;
   return parsed;
 }
 
-function checkHourlyJackpot() {
+async function checkAndClaimHourlyJackpot(env) {
   const now = new Date();
   const currentSecond = now.getUTCSeconds();
   const currentHour = now.getUTCHours();
@@ -240,7 +240,17 @@ function checkHourlyJackpot() {
   const currentMonth = now.getUTCMonth();
   const seed = currentDay * 100 + currentMonth * 10 + currentHour;
   const luckySecond = seed % 60;
-  return currentSecond === luckySecond;
+
+  if (currentSecond !== luckySecond) return false;
+
+  // Check if already claimed this hour
+  const key = `jackpot:${currentDay}-${currentMonth}-${currentHour}`;
+  const claimed = await env.SLOTS_KV.get(key);
+  if (claimed) return false;
+
+  // Claim jackpot (expires after 1 hour)
+  await env.SLOTS_KV.put(key, 'claimed', { expirationTtl: 3600 });
+  return true;
 }
 
 async function handleBalance(username, env) {
@@ -290,18 +300,18 @@ async function handleDaily(username, env) {
       getBalance(username, env),
       getMonthlyLogin(username, env)
     ]);
-    
+
     const dailyAmount = hasBoost ? 250 : 50;
     const now = Date.now();
-    
+
     // Check if daily was already claimed today (UTC day reset)
     const nowDate = new Date(now);
     const todayUTC = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
-    
+
     if (lastDaily) {
       const lastDailyDate = new Date(lastDaily);
       const lastDailyUTC = Date.UTC(lastDailyDate.getUTCFullYear(), lastDailyDate.getUTCMonth(), lastDailyDate.getUTCDate());
-      
+
       if (todayUTC === lastDailyUTC) {
         // Already claimed today, calculate time until next UTC midnight
         const tomorrow = new Date(todayUTC);
@@ -309,33 +319,33 @@ async function handleDaily(username, env) {
         const remainingMs = tomorrow.getTime() - now;
         const remainingHours = Math.floor(remainingMs / MS_PER_HOUR);
         const remainingMinutes = Math.floor((remainingMs % MS_PER_HOUR) / MS_PER_MINUTE);
-        
+
         return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${remainingHours}h ${remainingMinutes}m | Login-Tage diesen Monat: ${monthlyLogin.days.length} 📅`, { headers: RESPONSE_HEADERS });
       }
     }
-    
+
     // Update monthly login
     const newMonthlyLogin = await updateMonthlyLogin(username, env);
     const milestoneBonus = MONTHLY_LOGIN_REWARDS[newMonthlyLogin.days.length] || 0;
     const isNewMilestone = milestoneBonus > 0 && !newMonthlyLogin.claimedMilestones.includes(newMonthlyLogin.days.length);
-    
+
     const totalBonus = dailyAmount + (isNewMilestone ? milestoneBonus : 0);
     const newBalance = Math.min(currentBalance + totalBonus, MAX_BALANCE);
-    
+
     await Promise.all([
       setBalance(username, newBalance, env),
       setLastDaily(username, now, env),
       isNewMilestone ? markMilestoneClaimed(username, newMonthlyLogin.days.length, env) : Promise.resolve()
     ]);
-    
+
     const boostText = hasBoost ? ' (💎 Boosted!)' : '';
     let milestoneText = '';
-    
+
     if (isNewMilestone) {
       milestoneText = ` | 🎉 ${newMonthlyLogin.days.length} Tage Milestone: +${milestoneBonus} DT!`;
     }
-      
-    
+
+
     return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/Monat 📅 | Kontostand: ${newBalance}     `, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleDaily Error:', error);
@@ -363,7 +373,7 @@ async function handleBuffs(username, env) {
       if (!value) return null;
       
       try {
-        const expireAt = parseInt(value);
+        const expireAt = parseInt(value, 10);
         const remaining = expireAt - Date.now();
         
         if (remaining > 0) {
@@ -496,7 +506,7 @@ async function handleGive(username, target, amount, env) {
       return new Response(`@${username} ❌ Nutze: !slots give @user [Betrag]`, { headers: RESPONSE_HEADERS });
     }
     
-    const parsedAmount = parseInt(amount);
+    const parsedAmount = parseInt(amount, 10);
     if (isNaN(parsedAmount) || parsedAmount < 1 || parsedAmount > MAX_BALANCE) {
       return new Response(`@${username} ❌ Ungültiger Betrag! (1-${MAX_BALANCE})`, { headers: RESPONSE_HEADERS });
     }
@@ -665,7 +675,7 @@ async function handleSetBalance(username, target, amount, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    const parsedAmount = parseInt(amount);
+    const parsedAmount = parseInt(amount, 10);
     if (isNaN(parsedAmount) || parsedAmount < 0) {
       return new Response(`@${username} ❌ Ungültiger Betrag!`, { headers: RESPONSE_HEADERS });
     }
@@ -690,7 +700,7 @@ async function handleBankSet(username, amount, env) {
       return new Response(`@${username} ❌ Nutze: !slots bankset [Betrag]`, { headers: RESPONSE_HEADERS });
     }
 
-    const parsedAmount = parseInt(amount);
+    const parsedAmount = parseInt(amount, 10);
     if (isNaN(parsedAmount)) {
       return new Response(`@${username} ❌ Ungültiger Betrag!`, { headers: RESPONSE_HEADERS });
     }
@@ -734,7 +744,7 @@ async function handleGiveBuff(username, target, shopNumber, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    const itemId = parseInt(shopNumber);
+    const itemId = parseInt(shopNumber, 10);
     const item = SHOP_ITEMS[itemId];
 
     if (!item) {
@@ -790,7 +800,7 @@ async function handleRemoveBuff(username, target, shopNumber, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    const itemId = parseInt(shopNumber);
+    const itemId = parseInt(shopNumber, 10);
     const item = SHOP_ITEMS[itemId];
 
     if (!item) {
@@ -879,8 +889,8 @@ async function handleGetStats(username, target, env) {
       env.SLOTS_KV.get(`lossstreak:${cleanTarget.toLowerCase()}`)
     ]);
 
-    const currentStreak = streak ? parseInt(streak) : 0;
-    const currentLossStreak = lossStreak ? parseInt(lossStreak) : 0;
+    const currentStreak = streak ? parseInt(streak, 10) : 0;
+    const currentLossStreak = lossStreak ? parseInt(lossStreak, 10) : 0;
 
     return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} DT | Wins: ${stats.wins} | Losses: ${stats.losses} | Total: ${stats.totalSpins} | Streak: ${currentStreak}W ${currentLossStreak}L`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -910,7 +920,7 @@ async function handleGetDaily(username, target, env) {
       return new Response(`@${username} ℹ️ @${cleanTarget} hat noch nie Daily abgeholt.`, { headers: RESPONSE_HEADERS });
     }
 
-    const lastTime = parseInt(lastDaily);
+    const lastTime = parseInt(lastDaily, 10);
     const now = Date.now();
     const timeSince = now - lastTime;
     const hoursSince = Math.floor(timeSince / (1000 * 60 * 60));
@@ -1071,20 +1081,25 @@ async function handleTransfer(username, target, amount, env) {
     }
 
     // Allow transfer to DachsBank
-if (cleanTarget === BANK_USERNAME) {
-  const senderBalance = await getBalance(username, env);
-  
-  if (senderBalance < parsedAmount) {
-    return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderBalance}.`, { headers: RESPONSE_HEADERS });
-  }
-  
-  const newSenderBalance = senderBalance - parsedAmount;
-  const newBankBalance = await updateBankBalance(parsedAmount, env);
-  
-  await setBalance(username, newSenderBalance, env);
-  
-  return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DT 🏦`, { headers: RESPONSE_HEADERS });
-}
+    if (cleanTarget === BANK_USERNAME) {
+      const senderBalance = await getBalance(username, env);
+
+      if (senderBalance < parsedAmount) {
+        return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderBalance}.`, { headers: RESPONSE_HEADERS });
+      }
+
+      const newSenderBalance = senderBalance - parsedAmount;
+
+      // Update both atomically to prevent race condition
+      await Promise.all([
+        setBalance(username, newSenderBalance, env),
+        updateBankBalance(parsedAmount, env)
+      ]);
+
+      const newBankBalance = await getBalance(BANK_USERNAME, env);
+
+      return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DT 🏦`, { headers: RESPONSE_HEADERS });
+    }
     
     const [senderBalance, receiverBalance] = await Promise.all([
       getBalance(username, env),
@@ -1146,7 +1161,7 @@ async function handleLeaderboard(env) {
     
     for (let i = 0; i < usernames.length; i++) {
       if (balances[i]) {
-        users.push({ username: usernames[i], balance: parseInt(balances[i]) });
+        users.push({ username: usernames[i], balance: parseInt(balances[i], 10) });
       }
     }
     
@@ -1194,7 +1209,7 @@ async function handleSlot(username, amountParam, url, env) {
       // Detect !slots buy mistake
       if (lower === 'buy') {
         const itemNumber = url.searchParams.get('target'); // Fossabot passes $(2) as target
-        if (itemNumber && !isNaN(parseInt(itemNumber))) {
+        if (itemNumber && !isNaN(parseInt(itemNumber, 10))) {
           return new Response(`@${username} ❓ Meintest du !shop buy ${itemNumber}?`, { headers: RESPONSE_HEADERS });
         }
         return new Response(`@${username} ❓ Meintest du !shop buy [Nummer]? (z.B. !shop buy 1)`, { headers: RESPONSE_HEADERS });
@@ -1374,7 +1389,7 @@ let [currentBalance, hasGuaranteedPairToken, hasWildCardToken] = await Promise.a
         spinCost = currentBalance;
         multiplier = Math.floor(currentBalance / 10);
       } else {
-        const customAmount = parseInt(amountParam);
+        const customAmount = parseInt(amountParam, 10);
         if (!isNaN(customAmount)) {
           // OPTIMIZED: Use module-level constants UNLOCK_MAP and MULTIPLIER_MAP
           
@@ -1455,10 +1470,20 @@ if (hasDachsLocator.active) dachsChance = dachsChance * 3; // 3x Dachs chance
       dachsChance = dachsChance * rageBoost;
     }
     
-    const grid = [];
-    
-    // DEBUG MODE: exaint_ gets 75% chance for exactly 2 dachs (next to each other)
-    if (DEBUG_MODE && username.toLowerCase() === 'exaint_') {
+    // Check if user has a stored peek grid
+    const peekKey = `peek:${username.toLowerCase()}`;
+    const storedPeek = await env.SLOTS_KV.get(peekKey);
+    let grid = [];
+
+    if (storedPeek) {
+      // Use the stored peek grid
+      grid = JSON.parse(storedPeek);
+      // Delete the peek after use
+      await env.SLOTS_KV.delete(peekKey);
+    } else {
+      // Normal grid generation
+      // DEBUG MODE: exaint_ gets 75% chance for exactly 2 dachs (next to each other)
+      if (DEBUG_MODE && username.toLowerCase() === 'exaint_') {
       const roll = Math.random();
       if (roll < 0.75) {
         // 75% chance: Exactly 2 dachs next to each other on middle row
@@ -1516,7 +1541,8 @@ if (hasDachsLocator.active) dachsChance = dachsChance * 3; // 3x Dachs chance
         }
       }
     }
-    
+    }
+
     // Decrement Dachs Locator uses
     if (hasDachsLocator.active) {
       await decrementBuffUses(username, 'dachs_locator', env);
@@ -1546,9 +1572,9 @@ if (hasDachsLocator.active) dachsChance = dachsChance * 3; // 3x Dachs chance
     
     let result = calculateWin(grid);
     
-    // Check Hourly Jackpot
+    // Check Hourly Jackpot (with anti-duplicate claim)
     let hourlyJackpotWon = false;
-    if (checkHourlyJackpot()) {
+    if (await checkAndClaimHourlyJackpot(env)) {
       result.points += HOURLY_JACKPOT_AMOUNT;
       hourlyJackpotWon = true;
     }
@@ -1815,16 +1841,16 @@ if (result.points > 0) {
 
 function calculateWin(grid) {
   const middle = [grid[3], grid[4], grid[5]];
-  
+
   // Count Wild Cards
   const wildCount = middle.filter(s => s === '🃏').length;
-  
+
   // Process wilds: Replace with best matching symbol
   let processedMiddle = [...middle];
   if (wildCount > 0) {
     // Find non-wild symbols
     const nonWildSymbols = middle.filter(s => s !== '🃏');
-    
+
     if (nonWildSymbols.length === 0) {
       // All wilds → treat as best symbol (⭐)
       processedMiddle = ['⭐', '⭐', '⭐'];
@@ -1847,7 +1873,7 @@ function calculateWin(grid) {
       }
     }
   }
-  
+
   // Check Dachs (using processed middle)
   const dachsCount = processedMiddle.filter(s => s === '🦡').length;
   if (dachsCount === 3) {
@@ -1862,17 +1888,17 @@ function calculateWin(grid) {
     const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
     return { points: 100, message: '🦡 Dachs gesichtet! Nice!' + wildSuffix };
   }
-  
+
   // Check Diamonds (using ORIGINAL middle, not processed - wilds don't count for free spins)
   if (middle[0] === '💎' && middle[1] === '💎' && middle[2] === '💎') {
     return { points: 0, message: '💎💎💎 DIAMANTEN JACKPOT! +5 FREE SPINS!', freeSpins: 5 };
   }
-  
-  if ((middle[0] === '💎' && middle[1] === '💎' && middle[2] !== '💎' && middle[2] !== '🃏') || 
+
+  if ((middle[0] === '💎' && middle[1] === '💎' && middle[2] !== '💎' && middle[2] !== '🃏') ||
       (middle[1] === '💎' && middle[2] === '💎' && middle[0] !== '💎' && middle[0] !== '🃏')) {
     return { points: 0, message: '💎💎 Diamanten! +1 FREE SPIN!', freeSpins: 1 };
   }
-  
+
   // Check Triples (using processed middle)
   if (processedMiddle[0] === processedMiddle[1] && processedMiddle[1] === processedMiddle[2]) {
     const symbol = processedMiddle[0];
@@ -1880,16 +1906,16 @@ function calculateWin(grid) {
     const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
     return { points, message: `Dreifach ${symbol}!${wildSuffix}` };
   }
-  
-  // Check Pairs (using processed middle)
-  if ((processedMiddle[0] === processedMiddle[1] && processedMiddle[0] !== processedMiddle[2]) || 
+
+  // Check Pairs (using processed middle) - Only adjacent pairs count
+  if ((processedMiddle[0] === processedMiddle[1] && processedMiddle[0] !== processedMiddle[2]) ||
       (processedMiddle[1] === processedMiddle[2] && processedMiddle[0] !== processedMiddle[1])) {
     const symbol = processedMiddle[0] === processedMiddle[1] ? processedMiddle[0] : processedMiddle[1];
     const points = PAIR_PAYOUTS[symbol] || 5;
     const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
     return { points, message: `Doppel ${symbol}!${wildSuffix}` };
   }
-  
+
   const messages = ['Leider verloren! 😢', 'Nächstes Mal!', 'Fast! Versuch es nochmal!', 'Kein Glück diesmal...'];
   return { points: 0, message: messages[Math.floor(Math.random() * messages.length)] };
 }
@@ -1905,7 +1931,7 @@ async function handleShop(username, item, env) {
       return new Response(`@${username} ❌ Nutze: !shop buy [Nummer]`, { headers: RESPONSE_HEADERS });
     }
     
-    const itemNumber = parseInt(parts[1]);
+    const itemNumber = parseInt(parts[1], 10);
     if (isNaN(itemNumber) || itemNumber < 1 || itemNumber > 39) {
       return new Response(`@${username} ❌ Ungültige Item-Nummer! Nutze 1-39.`, { headers: RESPONSE_HEADERS });
     }
@@ -2066,42 +2092,63 @@ await Promise.all([
     }
     
     if (item.type === 'peek') {
-      await setBalance(username, balance - item.price, env);
-      await updateBankBalance(item.price, env);
+      // Generate and store the next spin for this user
+      await Promise.all([
+        setBalance(username, balance - item.price, env),
+        updateBankBalance(item.price, env)
+      ]);
+
       const hasLuckyCharm = await isBuffActive(username, 'lucky_charm', env);
-      const testDachsChance = hasLuckyCharm ? 1 / 75 : 1 / 150;
-      const testGrid = [];
+      const peekDachsChance = hasLuckyCharm ? 1 / 75 : 1 / 150;
+      const peekGrid = [];
+
+      // Generate the peek grid (this will be the actual next spin)
       for (let i = 0; i < 9; i++) {
-        if (Math.random() < testDachsChance) {
-          testGrid.push('🦡');
+        if (Math.random() < peekDachsChance) {
+          peekGrid.push('🦡');
         } else {
-          testGrid.push(getWeightedSymbol());
+          peekGrid.push(getWeightedSymbol());
         }
       }
-      const testResult = calculateWin(testGrid);
-      const willWin = testResult.points > 0 || (testResult.freeSpins && testResult.freeSpins > 0);
+
+      // Store the grid for the next spin
+      await env.SLOTS_KV.put(`peek:${username.toLowerCase()}`, JSON.stringify(peekGrid), { expirationTtl: 3600 });
+
+      // Calculate result to show prediction
+      const peekResult = calculateWin(peekGrid);
+      const willWin = peekResult.points > 0 || (peekResult.freeSpins && peekResult.freeSpins > 0);
       const charmText = hasLuckyCharm ? ' (🍀 Lucky Charm aktiv!)' : '';
+
       return new Response(`@${username} 🔮 Peek Token! Dein nächster Spin wird ${willWin ? '✅ GEWINNEN' : '❌ VERLIEREN'}! 🔮${charmText} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
     }
     
     if (item.type === 'instant') {
-      await setBalance(username, balance - item.price, env);
-      await updateBankBalance(item.price, env);
-      
       if (itemId === 11) { // Chaos Spin
         const result = Math.floor(Math.random() * 701) - 300;
         const newBalance = Math.min(balance - item.price + result, MAX_BALANCE);
-        await setBalance(username, Math.max(0, newBalance), env);
+        await Promise.all([
+          setBalance(username, Math.max(0, newBalance), env),
+          updateBankBalance(item.price, env)
+        ]);
         return new Response(`@${username} 🎲 Chaos Spin! ${result >= 0 ? '+' : ''}${result} DachsTaler! | Kontostand: ${Math.max(0, newBalance)}`, { headers: RESPONSE_HEADERS });
       }
-      
+
       if (itemId === 12) { // Glücksrad
         const wheel = spinWheel();
         const newBalance = Math.min(balance - item.price + wheel.prize, MAX_BALANCE);
-        await setBalance(username, newBalance, env);
+        await Promise.all([
+          setBalance(username, newBalance, env),
+          updateBankBalance(item.price, env)
+        ]);
         const netResult = wheel.prize - item.price;
         return new Response(`@${username} 🎡 [ ${wheel.result} ] ${wheel.message} ${netResult >= 0 ? '+' : ''}${netResult} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
       }
+
+      // For other instant items, deduct price first
+      await Promise.all([
+        setBalance(username, balance - item.price, env),
+        updateBankBalance(item.price, env)
+      ]);
       
 if (itemId === 16) { // Mystery Box
         const mysteryItems = [
@@ -2149,7 +2196,7 @@ if (itemId === 16) { // Mystery Box
         return new Response(`@${username} ✅ Wild Card aktiviert! Dein nächster Spin enthält ein 🃏 Wild Symbol! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
       }
     }
-    
+
     return new Response(`@${username} ✅ ${item.name} gekauft! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('buyShopItem Error:', error);
@@ -2178,7 +2225,7 @@ async function getBalance(username, env) {
       await setBalance(username, 100, env);
       return 100;
     }
-    const balance = parseInt(value);
+    const balance = parseInt(value, 10);
     return isNaN(balance) ? 100 : Math.min(balance, MAX_BALANCE);
   } catch (error) {
     console.error('getBalance Error:', error);
@@ -2198,7 +2245,7 @@ async function setBalance(username, balance, env) {
 async function getLastDaily(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`daily:${username.toLowerCase()}`);
-    return value ? parseInt(value) : null;
+    return value ? parseInt(value, 10) : null;
   } catch (error) {
     console.error('getLastDaily Error:', error);
     return null;
@@ -2217,7 +2264,7 @@ async function setLastDaily(username, timestamp, env) {
 async function getLastSpin(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`cooldown:${username.toLowerCase()}`);
-    return value ? parseInt(value) : null;
+    return value ? parseInt(value, 10) : null;
   } catch (error) {
     console.error('getLastSpin Error:', error);
     return null;
@@ -2464,7 +2511,7 @@ async function isBuffActive(username, buffKey, env) {
   try {
     const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buffKey}`);
     if (!value) return false;
-    return Date.now() < parseInt(value);
+    return Date.now() < parseInt(value, 10);
   } catch (error) {
     console.error('isBuffActive Error:', error);
     return false;
@@ -2609,7 +2656,7 @@ async function consumeBoost(username, symbol, env) {
 async function getMulliganCount(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`mulligan:${username.toLowerCase()}`);
-    return value ? parseInt(value) : 0;
+    return value ? parseInt(value, 10) : 0;
   } catch (error) {
     console.error('getMulliganCount Error:', error);
     return 0;
@@ -2639,7 +2686,7 @@ async function addInsurance(username, count, env) {
 async function getInsuranceCount(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`insurance:${username.toLowerCase()}`);
-    return value ? parseInt(value) : 0;
+    return value ? parseInt(value, 10) : 0;
   } catch (error) {
     console.error('getInsuranceCount Error:', error);
     return 0;
@@ -2669,7 +2716,7 @@ async function addSpinBundle(username, count, env) {
 async function getSpinBundleCount(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`bundle:${username.toLowerCase()}`);
-    return value ? parseInt(value) : 0;
+    return value ? parseInt(value, 10) : 0;
   } catch (error) {
     console.error('getSpinBundleCount Error:', error);
     return 0;
@@ -2955,7 +3002,7 @@ async function updateBankBalance(amount, env) {
     if (bankBalance === null) {
       bankBalance = BANK_START_BALANCE;
     } else {
-      bankBalance = parseInt(bankBalance);
+      bankBalance = parseInt(bankBalance, 10);
     }
     
     // Update balance (can go negative)
@@ -2978,7 +3025,7 @@ async function getBankBalance(env) {
       return BANK_START_BALANCE;
     }
     
-    return parseInt(bankBalance);
+    return parseInt(bankBalance, 10);
   } catch (error) {
     console.error('getBankBalance Error:', error);
     return BANK_START_BALANCE;

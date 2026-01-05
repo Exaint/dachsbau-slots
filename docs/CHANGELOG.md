@@ -1,7 +1,7 @@
 # 🦡 DACHSBAU SLOTS - CHANGELOG 📋
 
-> **Aktuelle Version:** 1.4.4 - "DachsBank System"  
-> **Letztes Update:** 30. Dezember 2025
+> **Aktuelle Version:** 1.4.5 - "Critical Bugfixes & Security Update"
+> **Letztes Update:** 5. Januar 2026
 
 ---
 
@@ -47,7 +47,64 @@ Du kannst dich jederzeit selbst vom Spielen ausschließen:
 
 ---
 
-## 🆕 Version 1.4.4 - "DachsBank System"
+## 🆕 Version 1.4.5 - "Critical Bugfixes & Security Update"
+**Veröffentlicht:** 5. Januar 2026
+
+### 🐛 Critical Bugfixes
+
+**🔒 Hourly Jackpot Exploit behoben**
+- **Problem:** Mehrere User konnten in derselben Sekunde alle den Jackpot gewinnen
+- **Fix:** Implementierung eines KV-basierten Claim-Systems
+- **Neue Funktion:** `checkAndClaimHourlyJackpot()` mit atomarem Lock
+- **Auswirkung:** Nur noch 1 Person pro Stunde kann den Jackpot beanspruchen (exploit-proof!)
+- **Expiry:** Claim wird nach 1 Stunde automatisch gelöscht
+
+**💸 Doppelter Abzug bei Shop Items gefixt**
+- **Problem:** Bei Chaos Spin & Glücksrad wurde der Item-Preis doppelt vom Kontostand abgezogen
+- **Betroffen:** Items #11 (Chaos Spin) und #12 (Glücksrad)
+- **Fix:** Balance-Updates sind jetzt atomar mit `Promise.all()`
+- **Auswirkung:** Spieler verlieren nicht mehr doppeltes Geld beim Kauf
+
+**🔄 Race Condition bei Bank-Transfers behoben**
+- **Problem:** Transfer zur DachsBank war nicht atomar - bei Crashes konnten DT verloren gehen
+- **Fix:** Sender-Balance und Bank-Balance werden jetzt gleichzeitig mit `Promise.all()` aktualisiert
+- **Auswirkung:** Kein Geld-Verlust mehr bei Verbindungsabbrüchen
+
+**🔢 parseInt Radix hinzugefügt (Sicherheit)**
+- **Problem:** 18+ Stellen im Code nutzten `parseInt()` ohne Radix-Parameter
+- **Risiko:** Oktal-Zahlen (z.B. "08", "09") könnten falsch geparst werden
+- **Fix:** Alle `parseInt()` auf `parseInt(value, 10)` geändert
+- **Auswirkung:** Schutz vor Edge-Cases bei falschen Eingaben
+
+### ✨ Feature Improvements
+
+**🔮 Peek Token funktioniert jetzt wirklich!**
+- **Vorher:** Zeigte zufälligen Test-Spin, NICHT den echten nächsten Spin (war faktisch nutzlos)
+- **Jetzt:** Generiert den echten nächsten Spin und speichert ihn in KV
+- **Wie es funktioniert:**
+  1. User kauft Peek Token für 75 DT
+  2. System generiert den kompletten nächsten Spin-Grid
+  3. Grid wird in KV gespeichert (`peek:username`, 1h Expiry)
+  4. User erhält Vorhersage (✅ GEWINNEN oder ❌ VERLIEREN)
+  5. Beim nächsten Spin wird der gespeicherte Grid verwendet
+  6. Nach Verwendung wird Grid automatisch gelöscht
+- **Auswirkung:** Peek Token ist jetzt ein **ehrliches** Prediction-Tool!
+
+### 🔧 Code-Qualität
+
+**Performance-Optimierungen**
+- Atomare Balance-Updates mit `Promise.all()` bei allen Shop-Items
+- Reduzierte Race Conditions durch bessere Parallelisierung
+- Konsistente Error Handling bei kritischen Operationen
+
+**Sicherheitsverbesserungen**
+- Alle parseInt-Calls mit explizitem Radix 10
+- Anti-Exploit System für Hourly Jackpot
+- Atomare Transaktionen für Geld-Transfers
+
+---
+
+## Version 1.4.4 - "DachsBank System"
 **Veröffentlicht:** 30. Dezember 2025
 
 ### 🏦 Neue Features

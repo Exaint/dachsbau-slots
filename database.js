@@ -1,5 +1,5 @@
 import { MAX_BALANCE, BANK_USERNAME, BANK_START_BALANCE } from './constants.js';
-import { getCurrentMonth, getWeekStart } from './utils.js';
+import { getCurrentMonth, getCurrentDate, getWeekStart } from './utils.js';
 
 // Balance Functions
 async function getBalance(username, env) {

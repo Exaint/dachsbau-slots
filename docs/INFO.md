@@ -74,7 +74,7 @@ Du wirst sofort vom Spielen ausgeschlossen. **Nur Admins** (exaint_, frechhdachs
 | `!slots daily` | Täglicher Bonus (+50 DachsTaler) | 24h |
 | `!slots balance` | Kontostand & Free Spins anzeigen | – |
 | `!slots buffs` | Alle aktiven Buffs anzeigen | – |
-| `!slots lb` | Top 5 Leaderboard | – |
+| `!slots lb / rank / ranking` | Top 5 Leaderboard | – |
 
 ### Shop & Transfer
 
@@ -91,7 +91,7 @@ Du wirst sofort vom Spielen ausgeschlossen. **Nur Admins** (exaint_, frechhdachs
 |:--------|:-------------|:--------------|
 | `!slots stats` | Persönliche Statistiken | Stats Tracker (#18) |
 | `!slots bank` | DachsBank Kontostand | – |
-| `!slots info` | Link zu diesem Dokument | – |
+| `!slots info / help / commands` | Link zu diesem Dokument | – |
 | `!slots disclaimer` | Glücksspiel-Warnung | – |
 | `!slots selfban` | Selbstausschluss | – |
 

@@ -47,8 +47,8 @@ Du kannst dich jederzeit selbst vom Spielen ausschließen:
 
 ---
 
-## 🆕 Version 1.4.5 - "Critical Bugfixes & Security Update"
-**Veröffentlicht:** 5. Januar 2026
+<details>
+<summary>🆕 Version 1.4.5 - "Critical Bugfixes & Security Update" (5. Januar 2026)</summary>
 
 ### 🐛 Critical Bugfixes
 
@@ -110,7 +110,7 @@ Du kannst dich jederzeit selbst vom Spielen ausschließen:
 - **Auswirkung:** Verbesserte Benutzerfreundlichkeit durch kürzere und intuitivere Commands
 - **Implementierung:** O(1)-Lookup-Map für schnellere Command-Verarbeitung
 
----
+</details>
 
 ## Version 1.4.4 - "DachsBank System"
 **Veröffentlicht:** 30. Dezember 2025
@@ -173,10 +173,10 @@ Ergebnis: Bank hat +1,400 DT verdient
 - Intelligentes Lazy-Loading von Buffs
 - Bessere Separation zwischen Essential Buffs und Optional Buffs
 
----
+</details>
 
-## Version 1.4.3 - "Performance & Buffs"
-**Veröffentlicht:** 30. Dezember 2025
+<details>
+<summary>Version 1.4.3 - "Performance & Buffs" (30. Dezember 2025)</summary>
 
 ### ✨ Neue Features
 
@@ -218,10 +218,10 @@ Neuer Command zeigt alle aktiven Buffs & Items auf einen Blick!
 - Klare Trennung zwischen Grid-Buffs und Dachs-Buffs
 - Optimierte Batch-KV-Reads
 
----
+</details>
 
-## Version 1.4.2 - "Mystery Box Expansion"
-**Veröffentlicht:** 29. Dezember 2025
+<details>
+<summary>Version 1.4.2 - "Mystery Box Expansion" (29. Dezember 2025)</summary>
 
 ### 🎁 Shop Verbesserungen
 
@@ -252,10 +252,10 @@ Die Mystery Box wurde von 12 auf 17 mögliche Items erweitert!
 - Bessere Kommentare für Wartbarkeit
 - Klare Ausschluss-Liste dokumentiert
 
----
+</details>
 
-## Version 1.4.1 - "Selfban Feature"
-**Veröffentlicht:** 29. Dezember 2025
+<details>
+<summary>Version 1.4.1 - "Selfban Feature" (29. Dezember 2025)</summary>
 
 ### ✨ Neue Features
 
@@ -306,10 +306,10 @@ Weitere Infos: https://git.new/DachsbauSlotInfos | Shop: https://git.new/Dachsba
 
 Bessere Onboarding-Erfahrung für neue User!
 
----
+</details>
 
-## Version 1.4.0 - "Winter Update"
-**Veröffentlicht:** 27. Dezember 2025
+<details>
+<summary>Version 1.4.0 - "Winter Update" (27. Dezember 2025)</summary>
 
 ### ✨ Neue Features
 
@@ -405,10 +405,10 @@ Neuer Timed Buff für 2,000 DT!
 - Optimierte Message-Ausgabe (kürzer)
 - Verbesserte Error Handling in Daily und Balance Checks
 
----
+</details>
 
-## Version 1.3.0 - "Monthly Login Update"
-**Veröffentlicht:** 26. Dezember 2025
+<details>
+<summary>Version 1.3.0 - "Monthly Login Update" (26. Dezember 2025)</summary>
 
 ### ✨ Neue Features
 
@@ -451,10 +451,10 @@ Sammle Login-Tage innerhalb eines Monats und erhalte Milestone-Boni!
 - Zeigt Disclaimer für anderen User an
 - Nützlich für Mods
 
----
+</details>
 
-## Version 1.2.0 - "Premium Buffs"
-**Veröffentlicht:** 24. Dezember 2025
+<details>
+<summary>Version 1.2.0 - "Premium Buffs" (24. Dezember 2025)</summary>
 
 ### ✨ Neue Shop Items
 
@@ -509,10 +509,10 @@ Sammle Login-Tage innerhalb eines Monats und erhalte Milestone-Boni!
 - Beispiel: 💎💎💎 bei !slots 100 = 5 Free Spins mit 10x Multiplier!
 - Bessere Fehlerbehandlung bei Free Spins
 
----
+</details>
 
-## Version 1.1.0 - "Community Features"
-**Veröffentlicht:** 23. Dezember 2025
+<details>
+<summary>Version 1.1.0 - "Community Features" (23. Dezember 2025)</summary>
 
 ### ✨ Neue Features
 
@@ -576,10 +576,10 @@ Neue Symbol-Verteilung auf der Walze (120 Symbole total):
 - Faireres Spiel
 - Höhere Spannung
 
----
+</details>
 
-## Version 1.0.0 - "Initial Release"
-**Veröffentlicht:** 21. Dezember 2025
+<details>
+<summary>Version 1.0.0 - "Initial Release" (21. Dezember 2025)</summary>
 
 ### 🎉 Erste Version
 
@@ -623,7 +623,7 @@ Neue Symbol-Verteilung auf der Walze (120 Symbole total):
 - `!slots give` - DT vergeben
 - `!slots ban/unban` - User sperren/entsperren
 
----
+</details>
 
 ## 🔗 SOCIAL MEDIA & COMMUNITY
 

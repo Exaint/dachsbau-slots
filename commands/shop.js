@@ -4,7 +4,15 @@ import {
   SHOP_ITEMS,
   PREREQUISITE_NAMES,
   PRESTIGE_RANKS,
-  DACHS_BASE_CHANCE
+  DACHS_BASE_CHANCE,
+  GRID_SIZE,
+  CHAOS_SPIN_MIN,
+  CHAOS_SPIN_MAX,
+  REVERSE_CHAOS_MIN,
+  REVERSE_CHAOS_MAX,
+  DIAMOND_MINE_MIN_SPINS,
+  DIAMOND_MINE_MAX_SPINS,
+  URLS
 } from '../constants.js';
 import { getWeightedSymbol } from '../utils.js';
 import {
@@ -35,7 +43,7 @@ import { calculateWin } from './slots.js';
 async function handleShop(username, item, env) {
   try {
     if (!item) {
-      return new Response(`@${username} Hier findest du den Slots Shop: https://git.new/DachsbauSlotsShop | Nutze: !shop buy [Nummer]`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} Hier findest du den Slots Shop: ${URLS.SHOP} | Nutze: !shop buy [Nummer]`, { headers: RESPONSE_HEADERS });
     }
 
     const parts = item.toLowerCase().split(' ');
@@ -215,7 +223,7 @@ async function buyShopItem(username, itemId, env) {
       const peekGrid = [];
 
       // Generate the peek grid (this will be the actual next spin)
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < GRID_SIZE; i++) {
         if (Math.random() < peekDachsChance) {
           peekGrid.push('🦡');
         } else {
@@ -236,7 +244,8 @@ async function buyShopItem(username, itemId, env) {
 
     if (item.type === 'instant') {
       if (itemId === 11) { // Chaos Spin
-        const result = Math.floor(Math.random() * 701) - 300;
+        const range = CHAOS_SPIN_MAX - CHAOS_SPIN_MIN + 1;
+        const result = Math.floor(Math.random() * range) + CHAOS_SPIN_MIN;
         const newBalance = Math.min(balance - item.price + result, MAX_BALANCE);
         await Promise.all([
           setBalance(username, Math.max(0, newBalance), env),
@@ -291,15 +300,17 @@ async function buyShopItem(username, itemId, env) {
         return new Response(`@${username} 📦 Mystery Box! Du hast gewonnen: ${mysteryResult.name} (Wert: ${mysteryResult.price})! Item wurde aktiviert! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
       }
 
-      if (itemId === 31) { // Reverse Chaos (NEW)
-        const result = Math.floor(Math.random() * 151) + 50; // 50-200 DT guaranteed positive
+      if (itemId === 31) { // Reverse Chaos
+        const range = REVERSE_CHAOS_MAX - REVERSE_CHAOS_MIN + 1;
+        const result = Math.floor(Math.random() * range) + REVERSE_CHAOS_MIN;
         const newBalance = Math.min(balance - item.price + result, MAX_BALANCE);
         await setBalance(username, newBalance, env);
         return new Response(`@${username} 🎲 Reverse Chaos! +${result} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
       }
 
-      if (itemId === 36) { // Diamond Mine (NEW)
-        const freeSpinsAmount = Math.floor(Math.random() * 3) + 3; // 3-5 free spins
+      if (itemId === 36) { // Diamond Mine
+        const range = DIAMOND_MINE_MAX_SPINS - DIAMOND_MINE_MIN_SPINS + 1;
+        const freeSpinsAmount = Math.floor(Math.random() * range) + DIAMOND_MINE_MIN_SPINS;
         await addFreeSpinsWithMultiplier(username, freeSpinsAmount, 1, env);
         return new Response(`@${username} 💎 Diamond Mine! Du hast ${freeSpinsAmount} Free Spins gefunden! 💎 | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
       }

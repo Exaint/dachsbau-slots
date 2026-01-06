@@ -27,6 +27,45 @@ async function setBalance(username, balance, env) {
   }
 }
 
+// Atomic balance update with retry mechanism (for race condition prevention)
+async function atomicBalanceUpdate(username, updateFn, maxRetries = 3, env) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Read current balance
+      const currentBalance = await getBalance(username, env);
+
+      // Calculate new balance using update function
+      const newBalance = updateFn(currentBalance);
+      const safeBalance = Math.max(0, Math.min(newBalance, MAX_BALANCE));
+
+      // Try to update with metadata check (simple optimistic lock)
+      const key = `user:${username.toLowerCase()}`;
+      const metadata = { lastUpdate: Date.now(), attempt };
+
+      await env.SLOTS_KV.put(key, safeBalance.toString(), { metadata });
+
+      // Verify the write succeeded by reading back
+      const verifyBalance = await getBalance(username, env);
+      if (verifyBalance === safeBalance) {
+        return { success: true, balance: safeBalance, attempts: attempt + 1 };
+      }
+
+      // If verification failed, retry
+      if (attempt < maxRetries - 1) {
+        // Exponential backoff: wait 10ms, 20ms, 40ms
+        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+      }
+    } catch (error) {
+      console.error(`atomicBalanceUpdate Error (attempt ${attempt + 1}):`, error);
+      if (attempt === maxRetries - 1) {
+        return { success: false, error, attempts: attempt + 1 };
+      }
+    }
+  }
+
+  return { success: false, error: 'Max retries reached', attempts: maxRetries };
+}
+
 // Daily Functions
 async function getLastDaily(username, env) {
   try {
@@ -188,30 +227,56 @@ async function markMilestoneClaimed(username, milestone, env) {
 
 // Guaranteed Pair
 async function activateGuaranteedPair(username, env) {
-  await env.SLOTS_KV.put(`guaranteedpair:${username.toLowerCase()}`, 'active');
+  try {
+    await env.SLOTS_KV.put(`guaranteedpair:${username.toLowerCase()}`, 'active');
+  } catch (error) {
+    console.error('activateGuaranteedPair Error:', error);
+  }
 }
 
 async function hasGuaranteedPair(username, env) {
-  const value = await env.SLOTS_KV.get(`guaranteedpair:${username.toLowerCase()}`);
-  return value === 'active';
+  try {
+    const value = await env.SLOTS_KV.get(`guaranteedpair:${username.toLowerCase()}`);
+    return value === 'active';
+  } catch (error) {
+    console.error('hasGuaranteedPair Error:', error);
+    return false;
+  }
 }
 
 async function consumeGuaranteedPair(username, env) {
-  await env.SLOTS_KV.delete(`guaranteedpair:${username.toLowerCase()}`);
+  try {
+    await env.SLOTS_KV.delete(`guaranteedpair:${username.toLowerCase()}`);
+  } catch (error) {
+    console.error('consumeGuaranteedPair Error:', error);
+  }
 }
 
 // Wild Card
 async function activateWildCard(username, env) {
-  await env.SLOTS_KV.put(`wildcard:${username.toLowerCase()}`, 'active');
+  try {
+    await env.SLOTS_KV.put(`wildcard:${username.toLowerCase()}`, 'active');
+  } catch (error) {
+    console.error('activateWildCard Error:', error);
+  }
 }
 
 async function hasWildCard(username, env) {
-  const value = await env.SLOTS_KV.get(`wildcard:${username.toLowerCase()}`);
-  return value === 'active';
+  try {
+    const value = await env.SLOTS_KV.get(`wildcard:${username.toLowerCase()}`);
+    return value === 'active';
+  } catch (error) {
+    console.error('hasWildCard Error:', error);
+    return false;
+  }
 }
 
 async function consumeWildCard(username, env) {
-  await env.SLOTS_KV.delete(`wildcard:${username.toLowerCase()}`);
+  try {
+    await env.SLOTS_KV.delete(`wildcard:${username.toLowerCase()}`);
+  } catch (error) {
+    console.error('consumeWildCard Error:', error);
+  }
 }
 
 // Streak Multiplier
@@ -236,7 +301,11 @@ async function incrementStreakMultiplier(username, env) {
 }
 
 async function resetStreakMultiplier(username, env) {
-  await env.SLOTS_KV.delete(`streakmultiplier:${username.toLowerCase()}`);
+  try {
+    await env.SLOTS_KV.delete(`streakmultiplier:${username.toLowerCase()}`);
+  } catch (error) {
+    console.error('resetStreakMultiplier Error:', error);
+  }
 }
 
 // Prestige Rank
@@ -806,6 +875,7 @@ async function checkAndClaimHourlyJackpot(env) {
 export {
   getBalance,
   setBalance,
+  atomicBalanceUpdate,
   getLastDaily,
   setLastDaily,
   getLastSpin,

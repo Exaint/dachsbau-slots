@@ -1,4 +1,4 @@
-import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY } from '../constants.js';
+import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY, ALL_BUFF_KEYS, ALL_SYMBOLS, ALL_UNLOCK_KEYS } from '../constants.js';
 import { isAdmin, sanitizeUsername } from '../utils.js';
 import {
   getBalance,
@@ -366,12 +366,10 @@ async function handleClearAllBuffs(username, target, env) {
     }
 
     // Delete all possible buffs (timed buffs)
-    const buffKeys = ['happy_hour', 'lucky_charm', 'golden_hour', 'dachs_locator', 'rage_mode', 'star_magnet', 'profit_doubler', 'diamond_rush'];
-    const deletePromises = buffKeys.map(key => env.SLOTS_KV.delete(`buff:${cleanTarget.toLowerCase()}:${key}`));
+    const deletePromises = ALL_BUFF_KEYS.map(key => env.SLOTS_KV.delete(`buff:${cleanTarget.toLowerCase()}:${key}`));
 
     // Delete all symbol boosts
-    const symbols = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐', '🦡', '💎'];
-    symbols.forEach(symbol => {
+    ALL_SYMBOLS.forEach(symbol => {
       deletePromises.push(env.SLOTS_KV.delete(`boost:${cleanTarget.toLowerCase()}:${symbol}`));
     });
 
@@ -532,16 +530,13 @@ async function handleWipe(username, target, env) {
     ];
 
     // Delete all timed buffs
-    const buffKeys = ['happy_hour', 'lucky_charm', 'golden_hour', 'dachs_locator', 'rage_mode', 'star_magnet', 'profit_doubler', 'diamond_rush'];
-    buffKeys.forEach(key => deletePromises.push(env.SLOTS_KV.delete(`buff:${cleanTarget.toLowerCase()}:${key}`)));
+    ALL_BUFF_KEYS.forEach(key => deletePromises.push(env.SLOTS_KV.delete(`buff:${cleanTarget.toLowerCase()}:${key}`)));
 
     // Delete all symbol boosts
-    const symbols = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐', '🦡', '💎'];
-    symbols.forEach(symbol => deletePromises.push(env.SLOTS_KV.delete(`boost:${cleanTarget.toLowerCase()}:${symbol}`)));
+    ALL_SYMBOLS.forEach(symbol => deletePromises.push(env.SLOTS_KV.delete(`boost:${cleanTarget.toLowerCase()}:${symbol}`)));
 
     // Delete all unlocks
-    const unlocks = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'stats_tracker', 'daily_boost', 'custom_message'];
-    unlocks.forEach(unlock => deletePromises.push(env.SLOTS_KV.delete(`unlock:${cleanTarget.toLowerCase()}:${unlock}`)));
+    ALL_UNLOCK_KEYS.forEach(unlock => deletePromises.push(env.SLOTS_KV.delete(`unlock:${cleanTarget.toLowerCase()}:${unlock}`)));
 
     await Promise.all(deletePromises);
 

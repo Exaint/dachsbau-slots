@@ -143,8 +143,45 @@ const MONTHLY_LOGIN_REWARDS = {
 
 // Combo bonus system
 const COMBO_BONUSES = {
-  2: 10, 3: 30, 4: 100, 5: 500
+  2: 10, 3: 30, 4: 100
 };
+
+// Grid configuration
+const GRID_SIZE = 9;
+const GRID_WIDTH = 3;
+const MIDDLE_ROW_START = 3;
+const MIDDLE_ROW_END = 5;
+
+// Debug mode configuration
+const DEBUG_DACHS_PAIR_CHANCE = 0.75; // 75% chance for 2 dachs in debug mode
+
+// Chaos Spin ranges
+const CHAOS_SPIN_MIN = -300;
+const CHAOS_SPIN_MAX = 700;
+const REVERSE_CHAOS_MIN = 50;
+const REVERSE_CHAOS_MAX = 200;
+
+// Diamond Mine free spins range
+const DIAMOND_MINE_MIN_SPINS = 3;
+const DIAMOND_MINE_MAX_SPINS = 5;
+
+// Star Magnet & Diamond Rush reroll chance
+const BUFF_REROLL_CHANCE = 0.66;
+
+// Symbol boost chance modification
+const SYMBOL_BOOST_CHANCE = 0.33;
+
+// URLs
+const URLS = {
+  INFO: 'https://git.new/DachsbauSlotInfos',
+  SHOP: 'https://git.new/DachsbauSlotsShop',
+  UNLOCK: 'https://dub.sh/SlotUnlock'
+};
+
+// Buff lists for admin operations
+const ALL_BUFF_KEYS = ['happy_hour', 'lucky_charm', 'golden_hour', 'dachs_locator', 'rage_mode', 'star_magnet', 'profit_doubler', 'diamond_rush'];
+const ALL_SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐', '🦡', '💎'];
+const ALL_UNLOCK_KEYS = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'stats_tracker', 'daily_boost', 'custom_message'];
 
 export {
   RESPONSE_HEADERS,
@@ -185,5 +222,22 @@ export {
   LOSS_MESSAGES,
   ROTATING_LOSS_MESSAGES,
   MONTHLY_LOGIN_REWARDS,
-  COMBO_BONUSES
+  COMBO_BONUSES,
+  GRID_SIZE,
+  GRID_WIDTH,
+  MIDDLE_ROW_START,
+  MIDDLE_ROW_END,
+  DEBUG_DACHS_PAIR_CHANCE,
+  CHAOS_SPIN_MIN,
+  CHAOS_SPIN_MAX,
+  REVERSE_CHAOS_MIN,
+  REVERSE_CHAOS_MAX,
+  DIAMOND_MINE_MIN_SPINS,
+  DIAMOND_MINE_MAX_SPINS,
+  BUFF_REROLL_CHANCE,
+  SYMBOL_BOOST_CHANCE,
+  URLS,
+  ALL_BUFF_KEYS,
+  ALL_SYMBOLS,
+  ALL_UNLOCK_KEYS
 };

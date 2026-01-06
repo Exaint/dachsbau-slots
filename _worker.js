@@ -1,4 +1,4 @@
-import { RESPONSE_HEADERS } from './constants.js';
+import { RESPONSE_HEADERS, URLS } from './constants.js';
 import { sanitizeUsername, isAdmin } from './utils.js';
 import { isBlacklisted, setSelfBan } from './database.js';
 
@@ -101,9 +101,9 @@ export default {
             balance: () => handleBalance(cleanUsername, env),
             konto: () => handleBalance(cleanUsername, env),
             daily: () => handleDaily(cleanUsername, env),
-            info: () => new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS }),
-            help: () => new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS }),
-            commands: () => new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: https://git.new/DachsbauSlotInfos`, { headers: RESPONSE_HEADERS }),
+            info: () => new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS }),
+            help: () => new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS }),
+            commands: () => new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS }),
             stats: () => handleStats(cleanUsername, env),
             buffs: () => handleBuffs(cleanUsername, env),
             bank: () => handleBank(cleanUsername, env)
@@ -140,11 +140,11 @@ export default {
               }
             }
 
-            return new Response(`@${finalTarget} ⚠️ Dachsbau Slots dient nur zur Unterhaltung! Es werden keine Echtgeld-Beträge eingesetzt oder gewonnen. Hilfsangebote bei Glücksspielproblemen: https://git.new/DachsbauSlotInfos 🦡`, { headers: RESPONSE_HEADERS });
+            return new Response(`@${finalTarget} ⚠️ Dachsbau Slots dient nur zur Unterhaltung! Es werden keine Echtgeld-Beträge eingesetzt oder gewonnen. Hilfsangebote bei Glücksspielproblemen: ${URLS.INFO} 🦡`, { headers: RESPONSE_HEADERS });
           }
           if (lower === 'selfban') {
             await setSelfBan(cleanUsername, env);
-            return new Response(`@${cleanUsername} ✅ Du wurdest vom Slots spielen ausgeschlossen. Nur Admins (exaint_, frechhdachs) können dich wieder freischalten. Wenn du Hilfe brauchst: https://git.new/DachsbauSlotInfos 🦡     `, { headers: RESPONSE_HEADERS });
+            return new Response(`@${cleanUsername} ✅ Du wurdest vom Slots spielen ausgeschlossen. Nur Admins (exaint_, frechhdachs) können dich wieder freischalten. Wenn du Hilfe brauchst: ${URLS.INFO} 🦡`, { headers: RESPONSE_HEADERS });
           }
         }
 

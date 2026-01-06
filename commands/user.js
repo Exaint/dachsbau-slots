@@ -9,7 +9,8 @@ import {
   LEADERBOARD_CACHE_TTL,
   MONTHLY_LOGIN_REWARDS,
   DAILY_AMOUNT,
-  DAILY_BOOST_AMOUNT
+  DAILY_BOOST_AMOUNT,
+  URLS
 } from '../constants.js';
 import { sanitizeUsername, validateAmount, isLeaderboardBlocked } from '../utils.js';
 import {
@@ -244,7 +245,7 @@ async function handleBuffs(username, env) {
 
     // Build response (ONE LINE with ||)
     if (buffs.length === 0) {
-      return new Response(`@${username} ❌ Keine aktiven Buffs! Schau im Shop vorbei: https://git.new/DachsbauSlotsShop`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ❌ Keine aktiven Buffs! Schau im Shop vorbei: ${URLS.SHOP}`, { headers: RESPONSE_HEADERS });
     }
 
     const buffList = buffs.join(' || ');
@@ -302,13 +303,14 @@ async function handleTransfer(username, target, amount, env) {
 
       const newSenderBalance = senderBalance - parsedAmount;
 
-      // Update both atomically to prevent race condition
+      // Update sender balance and bank atomically
       await Promise.all([
         setBalance(username, newSenderBalance, env),
         updateBankBalance(parsedAmount, env)
       ]);
 
-      const newBankBalance = await getBalance(BANK_USERNAME, env);
+      // Get final bank balance for display
+      const newBankBalance = await getBankBalance(env);
 
       return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DT 🏦`, { headers: RESPONSE_HEADERS });
     }

@@ -23,7 +23,15 @@ import {
   DACHS_TRIPLE_PAYOUT,
   DACHS_PAIR_PAYOUT,
   DACHS_SINGLE_PAYOUT,
-  INSURANCE_REFUND_RATE
+  INSURANCE_REFUND_RATE,
+  GRID_SIZE,
+  GRID_WIDTH,
+  MIDDLE_ROW_START,
+  MIDDLE_ROW_END,
+  DEBUG_DACHS_PAIR_CHANCE,
+  BUFF_REROLL_CHANCE,
+  SYMBOL_BOOST_CHANCE,
+  URLS
 } from '../constants.js';
 import { getWeightedSymbol } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
@@ -42,6 +50,301 @@ function getCustomMessage(username, isWin, data) {
     .replace(/{balance}/g, data.balance)
     .replace(/{grid}/g, data.grid);
 }
+
+// Helper: Parse and validate spin cost/multiplier
+async function parseSpinAmount(username, amountParam, currentBalance, isFreeSpinUsed, env) {
+  let spinCost = BASE_SPIN_COST;
+  let multiplier = 1;
+
+  if (isFreeSpinUsed || !amountParam) {
+    return { spinCost, multiplier };
+  }
+
+  const lower = amountParam.toLowerCase();
+
+  if (lower === 'all') {
+    if (!await hasUnlock(username, 'slots_all', env)) {
+      return { error: `@${username} ❌ !slots all nicht freigeschaltet! Weitere Infos: ${URLS.UNLOCK}` };
+    }
+    if (currentBalance < BASE_SPIN_COST) {
+      return { error: `@${username} ❌ Du brauchst mindestens ${BASE_SPIN_COST} DachsTaler für !slots all!` };
+    }
+    return { spinCost: currentBalance, multiplier: Math.floor(currentBalance / BASE_SPIN_COST) };
+  }
+
+  const customAmount = parseInt(amountParam, 10);
+  if (isNaN(customAmount)) {
+    return { spinCost, multiplier };
+  }
+
+  if (customAmount < BASE_SPIN_COST) {
+    return { error: `@${username} ❌ Minimum ist !slots ${BASE_SPIN_COST}! Verfügbar: 10, 20, 30, 50, 100, all 💡` };
+  }
+
+  if (customAmount > 100) {
+    return { error: `@${username} ❌ Maximum ist !slots 100! Verfügbar: 10, 20, 30, 50, 100, all 💡` };
+  }
+
+  if (customAmount === BASE_SPIN_COST) {
+    return { spinCost: BASE_SPIN_COST, multiplier: 1 };
+  }
+
+  if (UNLOCK_MAP[customAmount]) {
+    if (await hasUnlock(username, UNLOCK_MAP[customAmount], env)) {
+      return { spinCost: customAmount, multiplier: MULTIPLIER_MAP[customAmount] };
+    }
+    return { error: `@${username} ❌ !slots ${customAmount} nicht freigeschaltet! Weitere Infos: ${URLS.UNLOCK}` };
+  }
+
+  return { error: `@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all | Info: ${URLS.UNLOCK}` };
+}
+
+// Helper: Generate spin grid
+async function generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush, env) {
+  // Check if user has a stored peek grid
+  const peekKey = `peek:${username.toLowerCase()}`;
+  const storedPeek = await env.SLOTS_KV.get(peekKey);
+
+  if (storedPeek) {
+    await env.SLOTS_KV.delete(peekKey);
+    return JSON.parse(storedPeek);
+  }
+
+  const grid = [];
+
+  // DEBUG MODE: Special user gets higher chance for exactly 2 dachs
+  if (DEBUG_MODE && username.toLowerCase() === 'exaint_') {
+    const roll = Math.random();
+    if (roll < DEBUG_DACHS_PAIR_CHANCE) {
+      const dachsPair = Math.random() < 0.5 ? [MIDDLE_ROW_START, MIDDLE_ROW_START + 1] : [MIDDLE_ROW_START + 1, MIDDLE_ROW_END];
+
+      for (let i = MIDDLE_ROW_START; i <= MIDDLE_ROW_END; i++) {
+        grid[i] = dachsPair.includes(i) ? '🦡' : getWeightedSymbol();
+      }
+
+      for (let i = 0; i < GRID_WIDTH; i++) {
+        grid[i] = getWeightedSymbol();
+        grid[i + GRID_WIDTH * 2] = getWeightedSymbol();
+      }
+      return grid;
+    }
+  }
+
+  // Normal generation
+  for (let i = 0; i < GRID_SIZE; i++) {
+    if (Math.random() < dachsChance) {
+      grid.push('🦡');
+    } else {
+      let symbol = getWeightedSymbol();
+      if (hasStarMagnet && Math.random() < BUFF_REROLL_CHANCE) {
+        const starRoll = Math.random();
+        if (starRoll < SYMBOL_BOOST_CHANCE) symbol = '⭐';
+      }
+      if (hasDiamondRush && symbol !== '💎' && Math.random() < BUFF_REROLL_CHANCE) {
+        const diamondRoll = Math.random();
+        if (diamondRoll < SYMBOL_BOOST_CHANCE) symbol = '💎';
+      }
+      grid.push(symbol);
+    }
+  }
+
+  return grid;
+}
+
+// Helper: Apply special items to grid
+async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWildCardToken, env) {
+  if (hasGuaranteedPairToken) {
+    const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
+    const hasPair = (middle[0] === middle[1]) || (middle[1] === middle[2]) || (middle[0] === middle[2]);
+
+    if (!hasPair) {
+      const symbols = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐'];
+      const pairSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+      grid[MIDDLE_ROW_START] = pairSymbol;
+      grid[MIDDLE_ROW_START + 1] = pairSymbol;
+    }
+    await consumeGuaranteedPair(username, env);
+  }
+
+  if (hasWildCardToken) {
+    const wildPos = Math.floor(Math.random() * GRID_WIDTH) + MIDDLE_ROW_START;
+    grid[wildPos] = '🃏';
+    await consumeWildCard(username, env);
+  }
+}
+
+// Helper: Apply multipliers and buffs to win result
+async function applyMultipliersAndBuffs(username, result, multiplier, grid, env) {
+  // Award Free Spins
+  if (result.freeSpins && result.freeSpins > 0) {
+    try {
+      await addFreeSpinsWithMultiplier(username, result.freeSpins, multiplier, env);
+    } catch (error) {
+      console.error('Add Free Spins Error:', error);
+    }
+  }
+
+  result.points = result.points * multiplier;
+
+  // Win Multiplier
+  if (result.points > 0 && await consumeWinMultiplier(username, env)) {
+    result.points *= 2;
+    result.message += ' (⚡ 2x Win Boost!)';
+  }
+
+  // Symbol Boost
+  const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
+  if (result.points > 0) {
+    const uniqueMiddleSymbols = [...new Set(middle)];
+    const boostChecks = await Promise.all(
+      uniqueMiddleSymbols.map(symbol =>
+        consumeBoost(username, symbol, env).then(hasBoost => ({ symbol, hasBoost }))
+      )
+    );
+
+    for (const { symbol, hasBoost } of boostChecks) {
+      if (hasBoost) {
+        const hasMatch = (middle[0] === symbol && middle[1] === symbol) ||
+          (middle[1] === symbol && middle[2] === symbol) ||
+          (middle[0] === symbol && middle[2] === symbol) ||
+          (middle[0] === symbol && middle[1] === symbol && middle[2] === symbol);
+
+        if (hasMatch) {
+          result.points *= 2;
+          result.message += ' (🔥 2x Boost!)';
+          break;
+        }
+      }
+    }
+  }
+
+  // Golden Hour & Profit Doubler
+  if (result.points > 0) {
+    const [hasGoldenHour, hasProfitDoubler] = await Promise.all([
+      isBuffActive(username, 'golden_hour', env),
+      isBuffActive(username, 'profit_doubler', env)
+    ]);
+
+    if (hasGoldenHour) {
+      result.points = Math.floor(result.points * 1.3);
+      result.message += ' (+30%)';
+    }
+
+    if (hasProfitDoubler && result.points > 100) {
+      result.points *= 2;
+      result.message += ' (📈 Profit x2!)';
+    }
+  }
+
+  // Streak Multiplier
+  const currentStreakMulti = await getStreakMultiplier(username, env);
+  if (result.points > 0 && currentStreakMulti > 1.0) {
+    result.points = Math.floor(result.points * currentStreakMulti);
+    result.message += ` (🔥 ${currentStreakMulti.toFixed(1)}x Streak!)`;
+  }
+}
+
+// Helper: Calculate streak bonuses
+async function calculateStreakBonuses(username, isWin, env) {
+  const previousStreak = await getStreak(username, env);
+
+  const newStreak = { ...previousStreak };
+  if (isWin) {
+    newStreak.wins++;
+    newStreak.losses = 0;
+  } else {
+    newStreak.losses++;
+    newStreak.wins = 0;
+  }
+  await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
+
+  let streakBonus = 0;
+  let streakMessage = '';
+  let comboBonus = 0;
+  let comboMessage = '';
+  let lossWarningMessage = '';
+
+  // Hot Streak
+  if (isWin && newStreak.wins === STREAK_THRESHOLD) {
+    streakBonus = HOT_STREAK_BONUS;
+    streakMessage = ` 🔥 HOT STREAK! ${STREAK_THRESHOLD} Wins in Folge! +${HOT_STREAK_BONUS} DT Bonus!`;
+    await resetStreak(username, env);
+  }
+
+  // Comeback King
+  if (isWin && previousStreak.losses >= STREAK_THRESHOLD) {
+    streakBonus = COMEBACK_BONUS;
+    streakMessage = ` 👑 COMEBACK KING! Nach ${STREAK_THRESHOLD} Verlusten gewonnen! +${COMEBACK_BONUS} DT Bonus!`;
+    await resetStreak(username, env);
+  }
+
+  // Combo Bonus
+  if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {
+    comboBonus = COMBO_BONUSES[newStreak.wins] || 0;
+    if (comboBonus > 0) {
+      comboMessage = ` 🎯 ${newStreak.wins}x Combo! +${comboBonus} DT!`;
+    }
+  }
+
+  // Loss Warning
+  if (!isWin && newStreak.losses >= 10) {
+    if (LOSS_MESSAGES[newStreak.losses]) {
+      lossWarningMessage = LOSS_MESSAGES[newStreak.losses];
+    } else if (newStreak.losses > 20) {
+      const index = (newStreak.losses - 21) % ROTATING_LOSS_MESSAGES.length;
+      lossWarningMessage = ROTATING_LOSS_MESSAGES[index];
+    }
+  }
+
+  return { streakBonus, streakMessage, comboBonus, comboMessage, lossWarningMessage, newStreak };
+}
+
+// Helper: Build response message
+function buildResponseMessage(username, grid, result, spinCost, totalBonuses, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, streakMessage, comboMessage, lossWarningMessage) {
+  const rankSymbol = rank ? `${rank} ` : '';
+  const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DT)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
+  const middleRow = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ');
+  const messageParts = [`@${username}`, rankSymbol, freeSpinPrefix, `[ ${middleRow} ]`];
+
+  if (result.freeSpins && result.freeSpins > 0) {
+    messageParts.push(`║ ${result.message}`);
+  } else if (result.points > 0 || totalBonuses > 0) {
+    const totalWin = result.points + totalBonuses;
+    const netWin = totalWin - spinCost;
+    messageParts.push(`║ ${result.message}`);
+    if (result.points > 0) {
+      messageParts.push(`+${result.points}`);
+    }
+    if (hourlyJackpotWon) {
+      messageParts.push(`⏰ HOURLY JACKPOT! +${HOURLY_JACKPOT_AMOUNT} DT!`);
+    }
+    if (streakMessage) {
+      messageParts.push(streakMessage);
+    }
+    if (comboMessage) {
+      messageParts.push(comboMessage);
+    }
+    if (spinCost > 0) {
+      messageParts.push(`(-${spinCost}) = ${netWin >= 0 ? '+' : ''}${netWin} 💰`);
+    } else {
+      messageParts.push('💰');
+    }
+  } else {
+    if (spinCost > 0) {
+      messageParts.push(`║ ${result.message} -${spinCost} 💸`);
+    } else {
+      messageParts.push(`║ ${result.message}`);
+    }
+  }
+
+  messageParts.push(`║ Kontostand: ${newBalance} DachsTaler 🦡`);
+
+  if (lossWarningMessage) {
+    messageParts.push(lossWarningMessage);
+  }
+
+  return messageParts.filter(p => p).join(' ');
+}
 import {
   getBalance,
   setBalance,
@@ -50,7 +353,6 @@ import {
   hasAcceptedDisclaimer,
   setDisclaimerAccepted,
   isSelfBanned,
-  setSelfBan,
   hasGuaranteedPair,
   consumeGuaranteedPair,
   hasWildCard,
@@ -62,7 +364,6 @@ import {
   isBuffActive,
   getBuffWithUses,
   getBuffWithStack,
-  decrementBuffUses,
   consumeBoost,
   consumeWinMultiplier,
   getMulliganCount,
@@ -73,10 +374,7 @@ import {
   incrementStreakMultiplier,
   resetStreakMultiplier,
   getStreak,
-  updateStreak,
   resetStreak,
-  incrementRageModeStack,
-  resetRageModeStack,
   updateStats,
   getPrestigeRank,
   updateBankBalance,
@@ -86,8 +384,6 @@ import {
 
 async function handleSlot(username, amountParam, url, env) {
   try {
-    // OPTIMIZED: Cache username.toLowerCase() to avoid repeated calls
-    const usernameLower = username.toLowerCase();
 
     // Sanitize amountParam: Remove invisible characters, zero-width spaces, etc.
     if (amountParam) {
@@ -112,13 +408,13 @@ async function handleSlot(username, amountParam, url, env) {
 
     // Selfban Check
     if (selfBanData) {
-      return new Response(`@${username} 🚫 Du hast dich selbst vom Spielen ausgeschlossen (seit ${selfBanData.date}). Kontaktiere einen Admin für eine Freischaltung. Hilfe: https://git.new/DachsbauSlotInfos     `, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} 🚫 Du hast dich selbst vom Spielen ausgeschlossen (seit ${selfBanData.date}). Kontaktiere einen Admin für eine Freischaltung. Hilfe: ${URLS.INFO}`, { headers: RESPONSE_HEADERS });
     }
 
     // First-Time Disclaimer Check
     if (!hasAccepted) {
       await setDisclaimerAccepted(username, env);
-      return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - kein Echtgeld! Verstanden? Schreib nochmal !slots zum Spielen! Weitere Infos: https://git.new/DachsbauSlotInfos | Shop: https://git.new/DachsbauSlotsShop 🎰     `, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - kein Echtgeld! Verstanden? Schreib nochmal !slots zum Spielen! Weitere Infos: ${URLS.INFO} | Shop: ${URLS.SHOP} 🎰`, { headers: RESPONSE_HEADERS });
     }
 
     // Cooldown Check (before processing actual spin)
@@ -146,57 +442,14 @@ async function handleSlot(username, amountParam, url, env) {
       freeSpinMultiplier = 1;
     }
 
-    let spinCost = isFreeSpinUsed ? 0 : 10;
-    let multiplier = isFreeSpinUsed ? freeSpinMultiplier : 1;
-
-    // Check custom stake
-    if (!isFreeSpinUsed && amountParam) {
-      const lower = amountParam.toLowerCase();
-
-      if (lower === 'all') {
-        if (!await hasUnlock(username, 'slots_all', env)) {
-          return new Response(`@${username} ❌ !slots all nicht freigeschaltet! Weitere Infos: https://dub.sh/SlotUnlock`, { headers: RESPONSE_HEADERS });
-        }
-        if (currentBalance < 10) {
-          return new Response(`@${username} ❌ Du brauchst mindestens 10 DachsTaler für !slots all!`, { headers: RESPONSE_HEADERS });
-        }
-        spinCost = currentBalance;
-        multiplier = Math.floor(currentBalance / 10);
-      } else {
-        const customAmount = parseInt(amountParam, 10);
-        if (!isNaN(customAmount)) {
-          // OPTIMIZED: Use module-level constants UNLOCK_MAP and MULTIPLIER_MAP
-
-          // Check if amount is too low
-          if (customAmount < 10) {
-
-            return new Response(`@${username} ❌ Minimum ist !slots 10! Verfügbar: 10, 20, 30, 50, 100, all 💡     `, { headers: RESPONSE_HEADERS });
-          }
-
-          // Check if amount is too high
-          if (customAmount > 100) {
-
-            return new Response(`@${username} ❌ Maximum ist !slots 100! Verfügbar: 10, 20, 30, 50, 100, all 💡     `, { headers: RESPONSE_HEADERS });
-          }
-
-          if (customAmount === BASE_SPIN_COST) {
-            spinCost = BASE_SPIN_COST;
-            multiplier = 1;
-          } else if (UNLOCK_MAP[customAmount]) {
-            if (await hasUnlock(username, UNLOCK_MAP[customAmount], env)) {
-              spinCost = customAmount;
-              multiplier = MULTIPLIER_MAP[customAmount];
-            } else {
-              return new Response(`@${username} ❌ !slots ${customAmount} nicht freigeschaltet! Weitere Infos: https://dub.sh/SlotUnlock`, { headers: RESPONSE_HEADERS });
-            }
-          } else {
-            // Numbers like 15, 25, 35, 45, 69, etc.
-
-            return new Response(`@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all | Info: https://dub.sh/SlotUnlock     `, { headers: RESPONSE_HEADERS });
-          }
-        }
-      }
+    // Parse spin amount and multiplier
+    const spinAmountResult = await parseSpinAmount(username, amountParam, currentBalance, isFreeSpinUsed, env);
+    if (spinAmountResult.error) {
+      return new Response(spinAmountResult.error, { headers: RESPONSE_HEADERS });
     }
+
+    let spinCost = isFreeSpinUsed ? 0 : (spinAmountResult.spinCost || BASE_SPIN_COST);
+    let multiplier = isFreeSpinUsed ? freeSpinMultiplier : (spinAmountResult.multiplier || 1);
 
     // OPTIMIZED: Only check Happy Hour if not using free spin
     if (!isFreeSpinUsed && spinCost < 1000) {
@@ -231,91 +484,19 @@ async function handleSlot(username, amountParam, url, env) {
       ]);
     }
 
-    // Generate spin with modified probabilities
+    // Calculate Dachs chance with buffs
     let dachsChance = DACHS_BASE_CHANCE;
     if (hasLuckyCharm) dachsChance = DACHS_BASE_CHANCE * 2;
-    if (hasDachsLocator.active) dachsChance = dachsChance * 3; // 3x Dachs chance
+    if (hasDachsLocator.active) dachsChance = dachsChance * 3;
 
-    // Rage Mode: Apply stack bonus to win chance (simulated by adjusting dachs chance)
-    // Each stack gives +5% win chance, max 50%
-    // We simulate this by also boosting dachs chance
+    // Rage Mode: Apply stack bonus to win chance
     if (hasRageMode.active && hasRageMode.stack > 0) {
-      const rageBoost = 1 + (hasRageMode.stack / 100); // 5% = 1.05, 50% = 1.5
+      const rageBoost = 1 + (hasRageMode.stack / 100);
       dachsChance = dachsChance * rageBoost;
     }
 
-    // Check if user has a stored peek grid
-    const peekKey = `peek:${username.toLowerCase()}`;
-    const storedPeek = await env.SLOTS_KV.get(peekKey);
-    let grid = [];
-
-    if (storedPeek) {
-      // Use the stored peek grid
-      grid = JSON.parse(storedPeek);
-      // Delete the peek after use
-      await env.SLOTS_KV.delete(peekKey);
-    } else {
-      // Normal grid generation
-      // DEBUG MODE: exaint_ gets 75% chance for exactly 2 dachs (next to each other)
-      if (DEBUG_MODE && username.toLowerCase() === 'exaint_') {
-        const roll = Math.random();
-        if (roll < 0.75) {
-          // 75% chance: Exactly 2 dachs next to each other on middle row
-          // Possible positions: [0,1] or [1,2]
-          const dachsPair = Math.random() < 0.5 ? [3, 4] : [4, 5]; // Position 0-1 or 1-2 on middle row
-
-          // Build middle row
-          for (let i = 3; i < 6; i++) {
-            if (dachsPair.includes(i)) {
-              grid[i] = '🦡';
-            } else {
-              grid[i] = getWeightedSymbol();
-            }
-          }
-
-          // Fill top and bottom rows normally (no dachs)
-          for (let i = 0; i < 3; i++) {
-            grid[i] = getWeightedSymbol();
-            grid[i + 6] = getWeightedSymbol();
-          }
-        } else {
-          // 25% chance: Normal generation with normal dachs chance
-          for (let i = 0; i < 9; i++) {
-            if (Math.random() < dachsChance) {
-              grid.push('🦡');
-            } else {
-              let symbol = getWeightedSymbol();
-              if (hasStarMagnet && Math.random() < 0.66) {
-                const starRoll = Math.random();
-                if (starRoll < 0.33) symbol = '⭐';
-              }
-              grid.push(symbol);
-            }
-          }
-        }
-      } else {
-        // Normal generation for all other users
-        for (let i = 0; i < 9; i++) {
-          if (Math.random() < dachsChance) {
-            grid.push('🦡');
-          } else {
-            // Star Magnet: 3x more stars
-            let symbol = getWeightedSymbol();
-            if (hasStarMagnet && Math.random() < 0.66) {
-              // 66% chance to re-roll for star if not already star
-              const starRoll = Math.random();
-              if (starRoll < 0.33) symbol = '⭐'; // Extra star chance
-            }
-            // Diamond Rush: 3x more diamonds
-            if (hasDiamondRush && symbol !== '💎' && Math.random() < 0.66) {
-              const diamondRoll = Math.random();
-              if (diamondRoll < 0.33) symbol = '💎'; // Extra diamond chance
-            }
-            grid.push(symbol);
-          }
-        }
-      }
-    }
+    // Generate grid
+    const grid = await generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush, env);
 
     // OPTIMIZED: Decrement Dachs Locator uses inline (avoids redundant KV read)
     if (hasDachsLocator.active) {
@@ -330,27 +511,8 @@ async function handleSlot(username, amountParam, url, env) {
       }
     }
 
-    // Guaranteed Pair: Ensure at least a pair in middle row
-    if (hasGuaranteedPairToken) {
-      const middle = [grid[3], grid[4], grid[5]];
-      const hasPair = (middle[0] === middle[1]) || (middle[1] === middle[2]) || (middle[0] === middle[2]);
-
-      if (!hasPair) {
-        // Force a pair by making positions 0 and 1 the same
-        const symbols = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐'];
-        const pairSymbol = symbols[Math.floor(Math.random() * symbols.length)];
-        grid[3] = pairSymbol;
-        grid[4] = pairSymbol;
-      }
-      await consumeGuaranteedPair(username, env);
-    }
-
-    // Wild Card: Add 🃏 to middle row at random position
-    if (hasWildCardToken) {
-      const wildPos = Math.floor(Math.random() * 3) + 3; // Position 3, 4, or 5
-      grid[wildPos] = '🃏';
-      await consumeWildCard(username, env);
-    }
+    // Apply special items to grid
+    await applySpecialItems(username, grid, hasGuaranteedPairToken, hasWildCardToken, env);
 
     let result = calculateWin(grid);
 
@@ -361,123 +523,20 @@ async function handleSlot(username, amountParam, url, env) {
       hourlyJackpotWon = true;
     }
 
-    // Award Free Spins
-    if (result.freeSpins && result.freeSpins > 0) {
-      try {
-        await addFreeSpinsWithMultiplier(username, result.freeSpins, multiplier, env);
-      } catch (addFreeSpinError) {
-        console.error('Add Free Spins Error:', addFreeSpinError);
-      }
-    }
+    // Apply multipliers and buffs to result
+    await applyMultipliersAndBuffs(username, result, multiplier, grid, env);
 
-    result.points = result.points * multiplier;
-
-    // Win Multiplier
-    if (result.points > 0 && await consumeWinMultiplier(username, env)) {
-      result.points *= 2;
-      result.message += ' (⚡ 2x Win Boost!)';
-    }
-
-    // OPTIMIZED: Symbol Boost - only check symbols present in middle row (parallel)
-    const middle = [grid[3], grid[4], grid[5]];
-    if (result.points > 0) {
-      // Only check unique symbols that actually appear in middle row
-      const uniqueMiddleSymbols = [...new Set(middle)];
-
-      // Check all boosts in parallel
-      const boostChecks = await Promise.all(
-        uniqueMiddleSymbols.map(symbol =>
-          consumeBoost(username, symbol, env).then(hasBoost => ({ symbol, hasBoost }))
-        )
-      );
-
-      // Find first active boost
-      for (const { symbol, hasBoost } of boostChecks) {
-        if (hasBoost) {
-          const hasMatch = (middle[0] === symbol && middle[1] === symbol) ||
-            (middle[1] === symbol && middle[2] === symbol) ||
-            (middle[0] === symbol && middle[2] === symbol) ||
-            (middle[0] === symbol && middle[1] === symbol && middle[2] === symbol);
-
-          if (hasMatch) {
-            result.points *= 2;
-            result.message += ' (🔥 2x Boost!)';
-            break;
-          }
-        }
-      }
-    }
-
-    // OPTIMIZED: Only check Golden Hour and Profit Doubler if we have points
-    if (result.points > 0) {
-      const [hasGoldenHour, hasProfitDoubler] = await Promise.all([
-        isBuffActive(username, 'golden_hour', env),
-        isBuffActive(username, 'profit_doubler', env)
-      ]);
-
-      if (hasGoldenHour) {
-        result.points = Math.floor(result.points * 1.3);
-        result.message += ' (+30%)';
-      }
-
-      if (hasProfitDoubler && result.points > 100) {
-        result.points *= 2;
-        result.message += ' (📈 Profit x2!)';
-      }
-    }
-
-    // Streak Multiplier: Increases with consecutive wins
-    const currentStreakMulti = await getStreakMultiplier(username, env);
-    if (result.points > 0 && currentStreakMulti > 1.0) {
-      result.points = Math.floor(result.points * currentStreakMulti);
-      result.message += ` (🔥 ${currentStreakMulti.toFixed(1)}x Streak!)`;
-    }
-
-    // OPTIMIZED: Update streak and check for bonuses (combined read/write)
+    // Calculate streak bonuses
     const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
-    const previousStreak = await getStreak(username, env);
-
-    // Inline update logic to avoid redundant read
-    const newStreak = { ...previousStreak };
-    if (isWin) {
-      newStreak.wins++;
-      newStreak.losses = 0;
-    } else {
-      newStreak.losses++;
-      newStreak.wins = 0;
-    }
-    await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
-
-    let streakBonus = 0;
-    let streakMessage = '';
-
-    // Hot Streak: 5 wins in a row
-    if (isWin && newStreak.wins === STREAK_THRESHOLD) {
-      streakBonus = HOT_STREAK_BONUS;
-      streakMessage = ` 🔥 HOT STREAK! ${STREAK_THRESHOLD} Wins in Folge! +${HOT_STREAK_BONUS} DT Bonus!`;
-      await resetStreak(username, env);
-    }
-
-    // Comeback King: 5 losses then a win
-    if (isWin && previousStreak.losses >= STREAK_THRESHOLD) {
-      streakBonus = COMEBACK_BONUS;
-      streakMessage = ` 👑 COMEBACK KING! Nach ${STREAK_THRESHOLD} Verlusten gewonnen! +${COMEBACK_BONUS} DT Bonus!`;
-      await resetStreak(username, env);
-    }
-
-    // Combo Bonus System
-    let comboBonus = 0;
-    let comboMessage = '';
-    if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {
-      comboBonus = COMBO_BONUSES[newStreak.wins] || 0;
-      if (comboBonus > 0) {
-        comboMessage = ` 🎯 ${newStreak.wins}x Combo! +${comboBonus} DT!`;
-      }
-    }
+    const streakBonusResult = await calculateStreakBonuses(username, isWin, env);
+    const streakBonus = streakBonusResult.streakBonus;
+    const streakMessage = streakBonusResult.streakMessage;
+    const comboBonus = streakBonusResult.comboBonus;
+    const comboMessage = streakBonusResult.comboMessage;
+    let lossWarningMessage = streakBonusResult.lossWarningMessage;
 
     // OPTIMIZED: Rage Mode inline updates (avoids redundant KV reads)
     if (!isWin && hasRageMode.active) {
-      // Inline increment logic
       const data = hasRageMode.data;
       data.stack = Math.min((data.stack || 0) + 5, 50);
       const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
@@ -486,7 +545,6 @@ async function handleSlot(username, amountParam, url, env) {
         resetStreakMultiplier(username, env)
       ]);
     } else if (isWin && hasRageMode.active) {
-      // Inline reset logic
       const data = hasRageMode.data;
       data.stack = 0;
       const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
@@ -495,21 +553,9 @@ async function handleSlot(username, amountParam, url, env) {
         incrementStreakMultiplier(username, env)
       ]);
     } else if (isWin) {
-      await incrementStreakMultiplier(username, env); // Increment even without Rage Mode
+      await incrementStreakMultiplier(username, env);
     } else {
-      await resetStreakMultiplier(username, env); // Reset on loss
-    }
-
-    // OPTIMIZED: Use module-level LOSS_MESSAGES constants
-    let lossWarningMessage = '';
-    if (!isWin && newStreak.losses >= 10) {
-      if (LOSS_MESSAGES[newStreak.losses]) {
-        lossWarningMessage = LOSS_MESSAGES[newStreak.losses];
-      } else if (newStreak.losses > 20) {
-        // Rotate through messages for 21+
-        const index = (newStreak.losses - 21) % ROTATING_LOSS_MESSAGES.length;
-        lossWarningMessage = ROTATING_LOSS_MESSAGES[index];
-      }
+      await resetStreakMultiplier(username, env);
     }
 
     // Mulligan/Insurance
@@ -560,7 +606,6 @@ async function handleSlot(username, amountParam, url, env) {
 
     const results = await Promise.all(finalUpdates);
     const rank = results[3]; // Rank is 4th promise
-    const rankSymbol = rank ? `${rank} ` : '';
 
     let remainingCount = 0;
     try {
@@ -572,50 +617,10 @@ async function handleSlot(username, amountParam, url, env) {
       console.error('Get Remaining Free Spins Error:', error);
     }
 
-    const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DT)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
-
-    // OPTIMIZED: Build message using array join (reduces string concatenation overhead)
-    const middleRow = [grid[3], grid[4], grid[5]].join(' ');
-    const messageParts = [`@${username}`, rankSymbol, freeSpinPrefix, `[ ${middleRow} ]`];
-
-    if (result.freeSpins && result.freeSpins > 0) {
-      messageParts.push(`║ ${result.message}`);
-    } else if (result.points > 0 || totalBonuses > 0) {
-      const totalWin = result.points + totalBonuses;
-      const netWin = totalWin - spinCost;
-      messageParts.push(`║ ${result.message}`);
-      if (result.points > 0) {
-        messageParts.push(`+${result.points}`);
-      }
-      if (hourlyJackpotWon) {
-        messageParts.push(`⏰ HOURLY JACKPOT! +${HOURLY_JACKPOT_AMOUNT} DT!`);
-      }
-      if (streakBonus > 0) {
-        messageParts.push(streakMessage);
-      }
-      if (comboBonus > 0) {
-        messageParts.push(comboMessage);
-      }
-      if (spinCost > 0) {
-        messageParts.push(`(-${spinCost}) = ${netWin >= 0 ? '+' : ''}${netWin} 💰`);
-      } else {
-        messageParts.push('💰');
-      }
-    } else {
-      if (spinCost > 0) {
-        messageParts.push(`║ ${result.message} -${spinCost} 💸`);
-      } else {
-        messageParts.push(`║ ${result.message}`);
-      }
-    }
-
-    messageParts.push(`║ Kontostand: ${newBalance} DachsTaler 🦡`);
-
-    // Low Balance Warning: Check if under threshold and daily is available
+    // Low Balance Warning
     if (newBalance < LOW_BALANCE_WARNING) {
       try {
         const lastDaily = await getLastDaily(username, env);
-        const now = Date.now();
         const nowDate = new Date(now);
         const todayUTC = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
 
@@ -631,32 +636,30 @@ async function handleSlot(username, amountParam, url, env) {
         if (dailyAvailable) {
           const hasBoost = await hasUnlock(username, 'daily_boost', env);
           const dailyAmountValue = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
-          messageParts.push(`⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DT`);
+          lossWarningMessage = lossWarningMessage
+            ? `${lossWarningMessage} ⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DT`
+            : `⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DT`;
         }
       } catch (error) {
         console.error('Low Balance Warning Check Error:', error);
       }
     }
 
-    // Add loss warning if applicable
-    if (lossWarningMessage) {
-      messageParts.push(lossWarningMessage);
-    }
-
-    // Custom Message Check - ersetzt Standard-Message falls vorhanden
+    // Custom Message Check
     const isCustomWin = result.points > 0 || totalBonuses > 0;
     const totalWinAmount = (result.points || 0) + totalBonuses;
     const customMsg = getCustomMessage(username, isCustomWin, {
       amount: isCustomWin ? totalWinAmount : spinCost,
       balance: newBalance,
-      grid: [grid[3], grid[4], grid[5]].join(' ')
+      grid: [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')
     });
 
     if (customMsg) {
-      return new Response(`@${username} [ ${[grid[3], grid[4], grid[5]].join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DT`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} [ ${[grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DT`, { headers: RESPONSE_HEADERS });
     }
 
-    const message = messageParts.filter(p => p).join(' ');
+    // Build response message
+    const message = buildResponseMessage(username, grid, result, spinCost, totalBonuses, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, streakMessage, comboMessage, lossWarningMessage);
     return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleSlot Error:', error);
@@ -665,10 +668,11 @@ async function handleSlot(username, amountParam, url, env) {
 }
 
 function calculateWin(grid) {
-  const middle = [grid[3], grid[4], grid[5]];
+  const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
 
   // Count Wild Cards
   const wildCount = middle.filter(s => s === '🃏').length;
+  const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
 
   // Process wilds: Replace with best matching symbol
   let processedMiddle = [...middle];
@@ -702,15 +706,12 @@ function calculateWin(grid) {
   // Check Dachs (using processed middle)
   const dachsCount = processedMiddle.filter(s => s === '🦡').length;
   if (dachsCount === 3) {
-    const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
     return { points: DACHS_TRIPLE_PAYOUT, message: '🔥🦡🔥 MEGAAA DACHS JACKPOT!!! 🔥🦡🔥 HOLY MOLY!!!' + wildSuffix };
   }
   if (dachsCount === 2) {
-    const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
     return { points: DACHS_PAIR_PAYOUT, message: '💥🦡💥 KRASSER DOPPEL-DACHS!!! 💥🦡💥' + wildSuffix };
   }
   if (dachsCount === 1) {
-    const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
     return { points: DACHS_SINGLE_PAYOUT, message: '🦡 Dachs gesichtet! Nice!' + wildSuffix };
   }
 
@@ -728,7 +729,6 @@ function calculateWin(grid) {
   if (processedMiddle[0] === processedMiddle[1] && processedMiddle[1] === processedMiddle[2]) {
     const symbol = processedMiddle[0];
     const points = TRIPLE_PAYOUTS[symbol] || 50;
-    const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
     return { points, message: `Dreifach ${symbol}!${wildSuffix}` };
   }
 
@@ -737,7 +737,6 @@ function calculateWin(grid) {
     (processedMiddle[1] === processedMiddle[2] && processedMiddle[0] !== processedMiddle[1])) {
     const symbol = processedMiddle[0] === processedMiddle[1] ? processedMiddle[0] : processedMiddle[1];
     const points = PAIR_PAYOUTS[symbol] || 5;
-    const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
     return { points, message: `Doppel ${symbol}!${wildSuffix}` };
   }
 

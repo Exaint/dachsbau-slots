@@ -4,6 +4,7 @@ import {
   getBalance,
   setBalance,
   getStats,
+  getStreak,
   removeSelfBan,
   setPrestigeRank,
   setUnlock,
@@ -403,17 +404,13 @@ async function handleGetStats(username, target, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    const [balance, stats, streak, lossStreak] = await Promise.all([
+    const [balance, stats, streak] = await Promise.all([
       getBalance(cleanTarget, env),
       getStats(cleanTarget, env),
-      env.SLOTS_KV.get(`streak:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.get(`lossstreak:${cleanTarget.toLowerCase()}`)
+      getStreak(cleanTarget, env)
     ]);
 
-    const currentStreak = streak ? parseInt(streak, 10) : 0;
-    const currentLossStreak = lossStreak ? parseInt(lossStreak, 10) : 0;
-
-    return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} DT | Wins: ${stats.wins} | Losses: ${stats.losses} | Total: ${stats.totalSpins} | Streak: ${currentStreak}W ${currentLossStreak}L`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} DT | Wins: ${stats.wins} | Losses: ${stats.losses} | Total: ${stats.totalSpins} | Streak: ${streak.wins}W ${streak.losses}L`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleGetStats Error:', error);
     return new Response(`@${username} ❌ Fehler beim Abrufen der Stats.`, { headers: RESPONSE_HEADERS });

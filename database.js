@@ -864,6 +864,5 @@ export {
   isBlacklisted,
   updateBankBalance,
   getBankBalance,
-  checkAndClaimHourlyJackpot,
-  getCurrentDate
+  checkAndClaimHourlyJackpot
 };

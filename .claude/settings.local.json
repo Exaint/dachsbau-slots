@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wc -l:*)"
+      "Bash(wc -l:*)",
+      "Bash(git push)"
     ]
   }
 }

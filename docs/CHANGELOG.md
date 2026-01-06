@@ -1,6 +1,6 @@
 # 🦡 DACHSBAU SLOTS - CHANGELOG 📋
 
-> **Aktuelle Version:** 1.5.2 - "Refactoring & Race Condition Fixes"
+> **Aktuelle Version:** 1.5.3 - "Bug Fixes & Code Quality"
 > **Letztes Update:** 6. Januar 2026
 
 ---
@@ -48,7 +48,109 @@ Du kannst dich jederzeit selbst vom Spielen ausschließen:
 ---
 
 <details open>
-<summary>🆕 Version 1.5.2 - "Refactoring & Race Condition Fixes" (6. Januar 2026)</summary>
+<summary>🆕 Version 1.5.3 - "Bug Fixes & Code Quality" (6. Januar 2026)</summary>
+
+### 🔧 Bug Fixes
+
+**🛒 Shop-Items mit Random-Rewards (shop.js)**
+
+- **Chaos Spin, Reverse Chaos, Glücksrad:** Bank-Balance wird jetzt korrekt aktualisiert
+  - Vorher: Nur der Kaufpreis wurde zur Bank addiert
+  - Jetzt: `netBankChange = itemPrice - result` (Bank gewinnt bei negativen/kleinen Results)
+
+- **Mystery Box:** Rollback bei Item-Aktivierungs-Fehlern
+  - Vorher: Balance wurde abgezogen, aber Item ggf. nicht aktiviert
+  - Jetzt: Bei Fehler wird Balance automatisch zurückerstattet
+
+---
+
+### 🔒 Sicherheits-Verbesserungen
+
+**💰 Balance-Protection (slots.js)**
+
+Zusätzliche Absicherung gegen negative Balances:
+
+```javascript
+// Vorher:
+const newBalance = Math.min(currentBalance - spinCost + result.points + totalBonuses, MAX_BALANCE);
+
+// Jetzt:
+const newBalance = Math.max(0, Math.min(currentBalance - spinCost + result.points + totalBonuses, MAX_BALANCE));
+```
+
+Diese Änderung betrifft:
+- Normale Spin-Balance-Berechnung
+- Insurance-Refund-Berechnung
+
+---
+
+### 🧹 Code Quality (DRY-Principle)
+
+**👮 Admin-Commands Refactoring (admin.js)**
+
+17x wiederholter Admin-Check wurde in Helper-Funktion extrahiert:
+
+```javascript
+// Vorher (17x wiederholt):
+if (!isAdmin(username)) {
+  return new Response(`@${username} ❌ Du hast keine Berechtigung!`, ...);
+}
+
+// Jetzt:
+function requireAdmin(username) {
+  if (!isAdmin(username)) {
+    return new Response(`@${username} ❌ Du hast keine Berechtigung!`, ...);
+  }
+  return null;
+}
+
+// In jeder Funktion:
+const adminCheck = requireAdmin(username);
+if (adminCheck) return adminCheck;
+```
+
+**📦 Import-Organisation (slots.js)**
+
+- Falsch platzierte Imports (Zeilen 348-383) an den Dateianfang verschoben
+- ES6-Module erfordern Imports am Dateianfang
+
+---
+
+### 🛡️ Defensive Coding
+
+**Buff-Daten TTL Protection (slots.js)**
+
+Zusätzliche Absicherungen für Dachs Locator und Rage Mode:
+
+```javascript
+// Vorher: Potentiell negative TTL
+const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
+
+// Jetzt: Minimum 60 Sekunden TTL garantiert
+const ttl = Math.max(60, Math.floor((data.expireAt - Date.now()) / 1000) + 60);
+
+// Zusätzliche null-Prüfung
+if (hasDachsLocator.active && hasDachsLocator.data) { ... }
+```
+
+---
+
+### 📊 Zusammenfassung
+
+| Kategorie | Änderung |
+|-----------|----------|
+| 🐛 Bug Fixes | 3 (Bank-Updates, Mystery Box Rollback) |
+| 🔒 Security | 2 (Balance-Protection mit Math.max(0, ...)) |
+| 🛡️ Defensive | 2 (TTL Protection für Buffs) |
+| 🧹 DRY | 1 (Admin-Check Helper-Funktion) |
+| 📦 Code Org | 1 (Import-Reorganisation) |
+
+</details>
+
+---
+
+<details>
+<summary>📦 Version 1.5.2 - "Refactoring & Race Condition Fixes" (6. Januar 2026)</summary>
 
 ### 🔧 Critical Fixes & Optimizations
 

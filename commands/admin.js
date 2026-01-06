@@ -16,11 +16,18 @@ import {
   activateBuffWithStack
 } from '../database.js';
 
+// Helper: Check admin permission and return error response if not admin
+function requireAdmin(username) {
+  if (!isAdmin(username)) {
+    return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
+  }
+  return null;
+}
+
 async function handleGive(username, target, amount, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots give @user [Betrag]`, { headers: RESPONSE_HEADERS });
@@ -53,9 +60,8 @@ async function handleGive(username, target, amount, env) {
 
 async function handleBan(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots ban @user`, { headers: RESPONSE_HEADERS });
@@ -78,9 +84,8 @@ async function handleBan(username, target, env) {
 
 async function handleUnban(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots unban @user`, { headers: RESPONSE_HEADERS });
@@ -106,9 +111,8 @@ async function handleUnban(username, target, env) {
 
 async function handleReset(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots reset @user`, { headers: RESPONSE_HEADERS });
@@ -135,9 +139,8 @@ async function handleReset(username, target, env) {
 
 async function handleFreeze(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots freeze @user`, { headers: RESPONSE_HEADERS });
@@ -159,9 +162,8 @@ async function handleFreeze(username, target, env) {
 
 async function handleUnfreeze(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots unfreeze @user`, { headers: RESPONSE_HEADERS });
@@ -183,9 +185,8 @@ async function handleUnfreeze(username, target, env) {
 
 async function handleSetBalance(username, target, amount, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target || !amount) {
       return new Response(`@${username} ❌ Nutze: !slots setbalance @user [Betrag]`, { headers: RESPONSE_HEADERS });
@@ -213,9 +214,8 @@ async function handleSetBalance(username, target, amount, env) {
 
 async function handleBankSet(username, amount, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!amount) {
       return new Response(`@${username} ❌ Nutze: !slots bankset [Betrag]`, { headers: RESPONSE_HEADERS });
@@ -237,9 +237,8 @@ async function handleBankSet(username, amount, env) {
 
 async function handleBankReset(username, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     await env.SLOTS_KV.put(BANK_KEY, '0');
 
@@ -252,9 +251,8 @@ async function handleBankReset(username, env) {
 
 async function handleGiveBuff(username, target, shopNumber, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target || !shopNumber) {
       return new Response(`@${username} ❌ Nutze: !slots givebuff @user [Shopnummer]`, { headers: RESPONSE_HEADERS });
@@ -308,9 +306,8 @@ async function handleGiveBuff(username, target, shopNumber, env) {
 
 async function handleRemoveBuff(username, target, shopNumber, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target || !shopNumber) {
       return new Response(`@${username} ❌ Nutze: !slots removebuff @user [Shopnummer]`, { headers: RESPONSE_HEADERS });
@@ -352,9 +349,8 @@ async function handleRemoveBuff(username, target, shopNumber, env) {
 
 async function handleClearAllBuffs(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots clearallbuffs @user`, { headers: RESPONSE_HEADERS });
@@ -388,9 +384,8 @@ async function handleClearAllBuffs(username, target, env) {
 
 async function handleGetStats(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots getstats @user`, { headers: RESPONSE_HEADERS });
@@ -417,9 +412,8 @@ async function handleGetStats(username, target, env) {
 
 async function handleGetDaily(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots getdaily @user`, { headers: RESPONSE_HEADERS });
@@ -451,9 +445,8 @@ async function handleGetDaily(username, target, env) {
 
 async function handleResetDaily(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots resetdaily @user`, { headers: RESPONSE_HEADERS });
@@ -475,9 +468,8 @@ async function handleResetDaily(username, target, env) {
 
 async function handleMaintenance(username, mode, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!mode || (mode.toLowerCase() !== 'on' && mode.toLowerCase() !== 'off')) {
       return new Response(`@${username} ❌ Nutze: !slots maintenance [on/off]`, { headers: RESPONSE_HEADERS });
@@ -498,9 +490,8 @@ async function handleMaintenance(username, mode, env) {
 
 async function handleWipe(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots wipe @user`, { headers: RESPONSE_HEADERS });
@@ -549,9 +540,8 @@ async function handleWipe(username, target, env) {
 
 async function handleRemoveFromLB(username, target, env) {
   try {
-    if (!isAdmin(username)) {
-      return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-    }
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
 
     if (!target) {
       return new Response(`@${username} ❌ Nutze: !slots removefromlb @user`, { headers: RESPONSE_HEADERS });

@@ -247,9 +247,11 @@ async function buyShopItem(username, itemId, env) {
         const range = CHAOS_SPIN_MAX - CHAOS_SPIN_MIN + 1;
         const result = Math.floor(Math.random() * range) + CHAOS_SPIN_MIN;
         const newBalance = Math.min(balance - item.price + result, MAX_BALANCE);
+        // Bank gets: item price minus the result (negative result = bank profit)
+        const netBankChange = item.price - result;
         await Promise.all([
           setBalance(username, Math.max(0, newBalance), env),
-          updateBankBalance(item.price, env)
+          updateBankBalance(netBankChange, env)
         ]);
         return new Response(`@${username} 🎲 Chaos Spin! ${result >= 0 ? '+' : ''}${result} DachsTaler! | Kontostand: ${Math.max(0, newBalance)}`, { headers: RESPONSE_HEADERS });
       }
@@ -257,9 +259,11 @@ async function buyShopItem(username, itemId, env) {
       if (itemId === 12) { // Glücksrad
         const wheel = spinWheel();
         const newBalance = Math.min(balance - item.price + wheel.prize, MAX_BALANCE);
+        // Bank gets: item price minus the prize won
+        const netBankChange = item.price - wheel.prize;
         await Promise.all([
           setBalance(username, newBalance, env),
-          updateBankBalance(item.price, env)
+          updateBankBalance(netBankChange, env)
         ]);
         const netResult = wheel.prize - item.price;
         return new Response(`@${username} 🎡 [ ${wheel.result} ] ${wheel.message} ${netResult >= 0 ? '+' : ''}${netResult} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
@@ -281,20 +285,27 @@ async function buyShopItem(username, itemId, env) {
         const mysteryItemId = mysteryItems[Math.floor(Math.random() * mysteryItems.length)];
         const mysteryResult = SHOP_ITEMS[mysteryItemId];
 
-        if (mysteryResult.type === 'boost') {
-          await addBoost(username, mysteryResult.symbol, env);
-        } else if (mysteryResult.type === 'insurance') {
-          await addInsurance(username, 5, env);
-        } else if (mysteryResult.type === 'winmulti') {
-          await addWinMultiplier(username, env);
-        } else if (mysteryResult.type === 'timed') {
-          if (mysteryResult.uses) {
-            await activateBuffWithUses(username, mysteryResult.buffKey, mysteryResult.duration, mysteryResult.uses, env);
-          } else if (mysteryResult.buffKey === 'rage_mode') {
-            await activateBuffWithStack(username, mysteryResult.buffKey, mysteryResult.duration, env);
-          } else {
-            await activateBuff(username, mysteryResult.buffKey, mysteryResult.duration, env);
+        try {
+          if (mysteryResult.type === 'boost') {
+            await addBoost(username, mysteryResult.symbol, env);
+          } else if (mysteryResult.type === 'insurance') {
+            await addInsurance(username, 5, env);
+          } else if (mysteryResult.type === 'winmulti') {
+            await addWinMultiplier(username, env);
+          } else if (mysteryResult.type === 'timed') {
+            if (mysteryResult.uses) {
+              await activateBuffWithUses(username, mysteryResult.buffKey, mysteryResult.duration, mysteryResult.uses, env);
+            } else if (mysteryResult.buffKey === 'rage_mode') {
+              await activateBuffWithStack(username, mysteryResult.buffKey, mysteryResult.duration, env);
+            } else {
+              await activateBuff(username, mysteryResult.buffKey, mysteryResult.duration, env);
+            }
           }
+        } catch (activationError) {
+          // Rollback: Refund the balance if item activation failed
+          console.error('Mystery Box activation failed, rolling back:', activationError);
+          await setBalance(username, balance, env);
+          return new Response(`@${username} ❌ Mystery Box Fehler! Dein Einsatz wurde zurückerstattet.`, { headers: RESPONSE_HEADERS });
         }
 
         return new Response(`@${username} 📦 Mystery Box! Du hast gewonnen: ${mysteryResult.name} (Wert: ${mysteryResult.price})! Item wurde aktiviert! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
@@ -304,7 +315,12 @@ async function buyShopItem(username, itemId, env) {
         const range = REVERSE_CHAOS_MAX - REVERSE_CHAOS_MIN + 1;
         const result = Math.floor(Math.random() * range) + REVERSE_CHAOS_MIN;
         const newBalance = Math.min(balance - item.price + result, MAX_BALANCE);
-        await setBalance(username, newBalance, env);
+        // Bank gets: item price minus the result won
+        const netBankChange = item.price - result;
+        await Promise.all([
+          setBalance(username, newBalance, env),
+          updateBankBalance(netBankChange, env)
+        ]);
         return new Response(`@${username} 🎲 Reverse Chaos! +${result} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
       }
 

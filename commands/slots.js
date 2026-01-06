@@ -35,6 +35,42 @@ import {
 } from '../constants.js';
 import { getWeightedSymbol } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
+import {
+  getBalance,
+  setBalance,
+  getLastSpin,
+  setLastSpin,
+  hasAcceptedDisclaimer,
+  setDisclaimerAccepted,
+  isSelfBanned,
+  hasGuaranteedPair,
+  consumeGuaranteedPair,
+  hasWildCard,
+  consumeWildCard,
+  getFreeSpins,
+  addFreeSpinsWithMultiplier,
+  consumeFreeSpinWithMultiplier,
+  hasUnlock,
+  isBuffActive,
+  getBuffWithUses,
+  getBuffWithStack,
+  consumeBoost,
+  consumeWinMultiplier,
+  getMulliganCount,
+  decrementMulligan,
+  getInsuranceCount,
+  decrementInsurance,
+  getStreakMultiplier,
+  incrementStreakMultiplier,
+  resetStreakMultiplier,
+  getStreak,
+  resetStreak,
+  updateStats,
+  getPrestigeRank,
+  updateBankBalance,
+  checkAndClaimHourlyJackpot,
+  getLastDaily
+} from '../database.js';
 
 // Helper: Generiert Custom Message falls vorhanden
 function getCustomMessage(username, isWin, data) {
@@ -345,42 +381,6 @@ function buildResponseMessage(username, grid, result, spinCost, totalBonuses, ne
 
   return messageParts.filter(p => p).join(' ');
 }
-import {
-  getBalance,
-  setBalance,
-  getLastSpin,
-  setLastSpin,
-  hasAcceptedDisclaimer,
-  setDisclaimerAccepted,
-  isSelfBanned,
-  hasGuaranteedPair,
-  consumeGuaranteedPair,
-  hasWildCard,
-  consumeWildCard,
-  getFreeSpins,
-  addFreeSpinsWithMultiplier,
-  consumeFreeSpinWithMultiplier,
-  hasUnlock,
-  isBuffActive,
-  getBuffWithUses,
-  getBuffWithStack,
-  consumeBoost,
-  consumeWinMultiplier,
-  getMulliganCount,
-  decrementMulligan,
-  getInsuranceCount,
-  decrementInsurance,
-  getStreakMultiplier,
-  incrementStreakMultiplier,
-  resetStreakMultiplier,
-  getStreak,
-  resetStreak,
-  updateStats,
-  getPrestigeRank,
-  updateBankBalance,
-  checkAndClaimHourlyJackpot,
-  getLastDaily
-} from '../database.js';
 
 async function handleSlot(username, amountParam, url, env) {
   try {
@@ -499,15 +499,15 @@ async function handleSlot(username, amountParam, url, env) {
     const grid = await generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush, env);
 
     // OPTIMIZED: Decrement Dachs Locator uses inline (avoids redundant KV read)
-    if (hasDachsLocator.active) {
+    if (hasDachsLocator.active && hasDachsLocator.data) {
       const data = hasDachsLocator.data;
       data.uses--;
 
       if (data.uses <= 0) {
         await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:dachs_locator`);
       } else {
-        const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
-        await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:dachs_locator`, JSON.stringify(data), { expirationTtl: ttl + 60 });
+        const ttl = Math.max(60, Math.floor((data.expireAt - Date.now()) / 1000) + 60);
+        await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:dachs_locator`, JSON.stringify(data), { expirationTtl: ttl });
       }
     }
 
@@ -536,20 +536,20 @@ async function handleSlot(username, amountParam, url, env) {
     let lossWarningMessage = streakBonusResult.lossWarningMessage;
 
     // OPTIMIZED: Rage Mode inline updates (avoids redundant KV reads)
-    if (!isWin && hasRageMode.active) {
+    if (!isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = Math.min((data.stack || 0) + 5, 50);
-      const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
+      const ttl = Math.max(60, Math.floor((data.expireAt - Date.now()) / 1000) + 60);
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl + 60 }),
+        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl }),
         resetStreakMultiplier(username, env)
       ]);
-    } else if (isWin && hasRageMode.active) {
+    } else if (isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = 0;
-      const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
+      const ttl = Math.max(60, Math.floor((data.expireAt - Date.now()) / 1000) + 60);
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl + 60 }),
+        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl }),
         incrementStreakMultiplier(username, env)
       ]);
     } else if (isWin) {
@@ -573,7 +573,7 @@ async function handleSlot(username, amountParam, url, env) {
       if (insuranceCount > 0) {
         await decrementInsurance(username, env);
         const refund = Math.floor(spinCost * INSURANCE_REFUND_RATE);
-        const newBalanceWithRefund = Math.min(currentBalance - spinCost + refund, MAX_BALANCE);
+        const newBalanceWithRefund = Math.max(0, Math.min(currentBalance - spinCost + refund, MAX_BALANCE));
 
         await Promise.all([
           setBalance(username, newBalanceWithRefund, env),
@@ -588,7 +588,7 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     const totalBonuses = streakBonus + comboBonus;
-    const newBalance = Math.min(currentBalance - spinCost + result.points + totalBonuses, MAX_BALANCE);
+    const newBalance = Math.max(0, Math.min(currentBalance - spinCost + result.points + totalBonuses, MAX_BALANCE));
 
     // OPTIMIZED: Parallelize all final updates including rank fetch
     const finalUpdates = [

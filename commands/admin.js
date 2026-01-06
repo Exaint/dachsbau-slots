@@ -123,8 +123,7 @@ async function handleReset(username, target, env) {
     await Promise.all([
       setBalance(cleanTarget, 0, env),
       env.SLOTS_KV.delete(`stats:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`streak:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`lossstreak:${cleanTarget.toLowerCase()}`)
+      env.SLOTS_KV.delete(`streak:${cleanTarget.toLowerCase()}`)
     ]);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde zurückgesetzt (Balance & Stats auf 0). 🔄`, { headers: RESPONSE_HEADERS });
@@ -367,7 +366,7 @@ async function handleClearAllBuffs(username, target, env) {
     }
 
     // Delete all possible buffs (timed buffs)
-    const buffKeys = ['happy_hour', 'lucky_charm', 'golden_hour', 'dachs_locator', 'rage_mode', 'ultra_instinct', 'jackpot_magnet', 'divine_protection', 'chaos_shield'];
+    const buffKeys = ['happy_hour', 'lucky_charm', 'golden_hour', 'dachs_locator', 'rage_mode', 'star_magnet', 'profit_doubler', 'diamond_rush'];
     const deletePromises = buffKeys.map(key => env.SLOTS_KV.delete(`buff:${cleanTarget.toLowerCase()}:${key}`));
 
     // Delete all symbol boosts
@@ -520,9 +519,8 @@ async function handleWipe(username, target, env) {
       setBalance(cleanTarget, 0, env),
       env.SLOTS_KV.delete(`stats:${cleanTarget.toLowerCase()}`),
       env.SLOTS_KV.delete(`streak:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`lossstreak:${cleanTarget.toLowerCase()}`),
       env.SLOTS_KV.delete(`daily:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`prestige:${cleanTarget.toLowerCase()}`),
+      env.SLOTS_KV.delete(`rank:${cleanTarget.toLowerCase()}`),
 
       // Buffs
       env.SLOTS_KV.delete(`insurance:${cleanTarget.toLowerCase()}`),
@@ -534,7 +532,7 @@ async function handleWipe(username, target, env) {
     ];
 
     // Delete all timed buffs
-    const buffKeys = ['happy_hour', 'lucky_charm', 'golden_hour', 'dachs_locator', 'rage_mode', 'ultra_instinct', 'jackpot_magnet', 'divine_protection', 'chaos_shield'];
+    const buffKeys = ['happy_hour', 'lucky_charm', 'golden_hour', 'dachs_locator', 'rage_mode', 'star_magnet', 'profit_doubler', 'diamond_rush'];
     buffKeys.forEach(key => deletePromises.push(env.SLOTS_KV.delete(`buff:${cleanTarget.toLowerCase()}:${key}`)));
 
     // Delete all symbol boosts

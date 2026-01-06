@@ -1,7 +1,7 @@
 # 🦡 DACHSBAU SLOTS - CHANGELOG 📋
 
-> **Aktuelle Version:** 1.5.0 - "Modular Architecture & Performance Boost"
-> **Letztes Update:** 5. Januar 2026
+> **Aktuelle Version:** 1.5.1 - "Code Quality & Maintainability"
+> **Letztes Update:** 6. Januar 2026
 
 ---
 
@@ -48,7 +48,94 @@ Du kannst dich jederzeit selbst vom Spielen ausschließen:
 ---
 
 <details open>
-<summary>🆕 Version 1.5.0 - "Modular Architecture & Performance Boost" (5. Januar 2026)</summary>
+<summary>🆕 Version 1.5.1 - "Code Quality & Maintainability" (6. Januar 2026)</summary>
+
+### 🐛 Bug Fixes
+
+**Kritische Fixes:**
+
+| Bug | Datei | Problem | Fix |
+|-----|-------|---------|-----|
+| Stats Streak Anzeige | `admin.js` | `!getstats` zeigte immer "0W 0L" | Nutzt jetzt `getStreak()` Funktion korrekt |
+| Stats Losses Anzeige | `admin.js` | Losses waren "undefined" | Wird jetzt berechnet aus `totalSpins - wins` |
+| handleWipe Prestige | `admin.js` | Löschte falschen KV-Key `prestige:` | Korrigiert zu `rank:` |
+| Tote lossstreak Keys | `admin.js` | Versuchte nicht-existente Keys zu löschen | Entfernt |
+| Dynamic Import | `user.js` | Unnötiger `import()` für `getMonthlyLogin` | Durch normalen Import ersetzt |
+| Mystery Box Buffs | `shop.js` | Dachs Locator/Rage Mode falsch aktiviert | Korrekte Buff-Typ-Unterscheidung |
+
+### 🔧 Code-Optimierungen
+
+**Neue Konfigurationsdatei: `config.js`**
+
+Zentrale Stelle für häufig angepasste Einstellungen:
+
+```javascript
+// Admin-Liste (einfach erweiterbar)
+const ADMINS = ['exaint_', 'frechhdachs'];
+
+// Custom Win/Loss Messages pro Spieler
+const CUSTOM_MESSAGES = {
+  'username': {
+    win: '🎉 {username} gewinnt +{amount} DT!',
+    loss: '😢 {username} verliert {amount} DT...'
+  }
+};
+```
+
+**Platzhalter für Custom Messages:**
+- `{username}` - Spielername
+- `{amount}` - Gewinn/Verlust Betrag
+- `{balance}` - Neuer Kontostand
+- `{grid}` - Slot-Ergebnis (Emojis)
+
+### 📦 Konstanten Konsolidierung
+
+**Neue Konstanten in `constants.js`:**
+
+| Konstante | Wert | Beschreibung |
+|-----------|------|--------------|
+| `DAILY_AMOUNT` | 50 | Basis Daily Reward |
+| `DAILY_BOOST_AMOUNT` | 250 | Daily mit Boost |
+| `LOW_BALANCE_WARNING` | 100 | Warnung unter diesem Betrag |
+| `STREAK_THRESHOLD` | 5 | Wins/Losses für Streak-Bonus |
+| `HOT_STREAK_BONUS` | 500 | Bonus für 5 Wins in Folge |
+| `COMEBACK_BONUS` | 150 | Bonus nach 5 Losses |
+| `STREAK_TTL_SECONDS` | 604800 | Streak-Ablauf (7 Tage) |
+| `DACHS_TRIPLE_PAYOUT` | 15000 | 3x Dachs Jackpot |
+| `DACHS_PAIR_PAYOUT` | 2500 | 2x Dachs |
+| `DACHS_SINGLE_PAYOUT` | 100 | 1x Dachs |
+| `INSURANCE_REFUND_RATE` | 0.5 | 50% Refund bei Insurance |
+
+**Vorteile:**
+- ✅ Zentrale Anpassung aller Werte
+- ✅ Keine hardcoded Magic Numbers mehr
+- ✅ Bessere Wartbarkeit
+- ✅ Einfachere Balance-Anpassungen
+
+### 🗑️ Aufräumarbeiten
+
+**Entfernte ungenutzte Elemente:**
+- `COMMAND_MAP` Konstante (nie verwendet)
+- `SECONDS_PER_MINUTE` Konstante (nie verwendet)
+- `getCurrentDate` Export aus `database.js` (nur intern genutzt)
+- Falsche Buff-Keys in `handleClearAllBuffs` und `handleWipe`:
+  - Entfernt: `ultra_instinct`, `jackpot_magnet`, `divine_protection`, `chaos_shield`
+  - Hinzugefügt: `star_magnet`, `profit_doubler`, `diamond_rush`
+
+**Korrigierte Buff-Keys:**
+Die Admin-Commands `clearallbuffs` und `wipe` löschen jetzt alle tatsächlich existierenden Buffs.
+
+### 🔄 Refactoring
+
+**DACHS_BASE_CHANCE Verwendung:**
+- Hardcoded `1/150` durch `DACHS_BASE_CHANCE` ersetzt
+- Lucky Charm: `DACHS_BASE_CHANCE * 2` statt `1/75`
+- Zentrale Änderung der Dachs-Wahrscheinlichkeit möglich
+
+</details>
+
+<details>
+<summary>📦 Version 1.5.0 - "Modular Architecture & Performance Boost" (5. Januar 2026)</summary>
 
 ### ⚡ Performance-Optimierungen
 

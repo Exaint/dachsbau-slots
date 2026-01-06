@@ -7,7 +7,9 @@ import {
   MAX_TRANSFER,
   BANK_USERNAME,
   LEADERBOARD_CACHE_TTL,
-  MONTHLY_LOGIN_REWARDS
+  MONTHLY_LOGIN_REWARDS,
+  DAILY_AMOUNT,
+  DAILY_BOOST_AMOUNT
 } from '../constants.js';
 import { sanitizeUsername, validateAmount, isLeaderboardBlocked } from '../utils.js';
 import {
@@ -17,6 +19,7 @@ import {
   getStats,
   hasUnlock,
   getLastDaily,
+  getMonthlyLogin,
   updateMonthlyLogin,
   markMilestoneClaimed,
   setLastDaily,
@@ -76,10 +79,10 @@ async function handleDaily(username, env) {
       hasUnlock(username, 'daily_boost', env),
       getLastDaily(username, env),
       getBalance(username, env),
-      await import('../database.js').then(m => m.getMonthlyLogin(username, env))
+      getMonthlyLogin(username, env)
     ]);
 
-    const dailyAmount = hasBoost ? 250 : 50;
+    const dailyAmount = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
     const now = Date.now();
 
     // Check if daily was already claimed today (UTC day reset)

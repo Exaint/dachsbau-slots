@@ -15,6 +15,25 @@ const BANK_KEY = `user:${BANK_USERNAME}`;
 // Leaderboard cache duration (5 minutes)
 const LEADERBOARD_CACHE_TTL = 300;
 
+// Daily Rewards
+const DAILY_AMOUNT = 50;
+const DAILY_BOOST_AMOUNT = 250;
+const LOW_BALANCE_WARNING = 100;
+
+// Streak System
+const STREAK_THRESHOLD = 5; // Wins/Losses in Folge für Bonus
+const HOT_STREAK_BONUS = 500; // Bonus für 5 Wins in Folge
+const COMEBACK_BONUS = 150; // Bonus für Win nach 5 Losses
+const STREAK_TTL_SECONDS = 604800; // 7 Tage
+
+// Dachs Payouts
+const DACHS_TRIPLE_PAYOUT = 15000; // 3x Dachs Jackpot
+const DACHS_PAIR_PAYOUT = 2500; // 2x Dachs
+const DACHS_SINGLE_PAYOUT = 100; // 1x Dachs
+
+// Insurance
+const INSURANCE_REFUND_RATE = 0.5; // 50% Refund
+
 // DEBUG MODE - Set to true for testing (exaint_ only)
 const DEBUG_MODE = false; // Change to true to enable
 
@@ -89,20 +108,6 @@ const UNLOCK_MAP = { 20: 'slots_20', 30: 'slots_30', 50: 'slots_50', 100: 'slots
 const MULTIPLIER_MAP = { 10: 1, 20: 2, 30: 3, 50: 5, 100: 10 };
 const BASE_SPIN_COST = 10;
 const DACHS_BASE_CHANCE = 1 / 150;
-const SECONDS_PER_MINUTE = 60;
-
-// OPTIMIZED: Command map for O(1) lookup instead of sequential if-else chain
-const COMMAND_MAP = {
-  lb: 'handleLeaderboard',
-  leaderboard: 'handleLeaderboard',
-  balance: 'handleBalance',
-  konto: 'handleBalance',
-  daily: 'handleDaily',
-  info: 'handleInfo',
-  stats: 'handleStats',
-  buffs: 'handleBuffs',
-  bank: 'handleBank'
-};
 
 // OPTIMIZED: Loss messages as constant
 const LOSS_MESSAGES = {
@@ -166,8 +171,17 @@ export {
   MULTIPLIER_MAP,
   BASE_SPIN_COST,
   DACHS_BASE_CHANCE,
-  SECONDS_PER_MINUTE,
-  COMMAND_MAP,
+  DAILY_AMOUNT,
+  DAILY_BOOST_AMOUNT,
+  LOW_BALANCE_WARNING,
+  STREAK_THRESHOLD,
+  HOT_STREAK_BONUS,
+  COMEBACK_BONUS,
+  STREAK_TTL_SECONDS,
+  DACHS_TRIPLE_PAYOUT,
+  DACHS_PAIR_PAYOUT,
+  DACHS_SINGLE_PAYOUT,
+  INSURANCE_REFUND_RATE,
   LOSS_MESSAGES,
   ROTATING_LOSS_MESSAGES,
   MONTHLY_LOGIN_REWARDS,

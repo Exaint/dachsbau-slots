@@ -11,9 +11,37 @@ import {
   COMBO_BONUSES,
   HOURLY_JACKPOT_AMOUNT,
   TRIPLE_PAYOUTS,
-  PAIR_PAYOUTS
+  PAIR_PAYOUTS,
+  DACHS_BASE_CHANCE,
+  DAILY_BOOST_AMOUNT,
+  DAILY_AMOUNT,
+  LOW_BALANCE_WARNING,
+  STREAK_THRESHOLD,
+  HOT_STREAK_BONUS,
+  COMEBACK_BONUS,
+  STREAK_TTL_SECONDS,
+  DACHS_TRIPLE_PAYOUT,
+  DACHS_PAIR_PAYOUT,
+  DACHS_SINGLE_PAYOUT,
+  INSURANCE_REFUND_RATE
 } from '../constants.js';
 import { getWeightedSymbol } from '../utils.js';
+import { CUSTOM_MESSAGES } from '../config.js';
+
+// Helper: Generiert Custom Message falls vorhanden
+function getCustomMessage(username, isWin, data) {
+  const userMessages = CUSTOM_MESSAGES[username.toLowerCase()];
+  if (!userMessages) return null;
+
+  const template = isWin ? userMessages.win : userMessages.loss;
+  if (!template) return null;
+
+  return template
+    .replace(/{username}/g, username)
+    .replace(/{amount}/g, data.amount)
+    .replace(/{balance}/g, data.balance)
+    .replace(/{grid}/g, data.grid);
+}
 import {
   getBalance,
   setBalance,
@@ -204,8 +232,8 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     // Generate spin with modified probabilities
-    let dachsChance = 1 / 150;
-    if (hasLuckyCharm) dachsChance = 1 / 75;
+    let dachsChance = DACHS_BASE_CHANCE;
+    if (hasLuckyCharm) dachsChance = DACHS_BASE_CHANCE * 2;
     if (hasDachsLocator.active) dachsChance = dachsChance * 3; // 3x Dachs chance
 
     // Rage Mode: Apply stack bonus to win chance (simulated by adjusting dachs chance)
@@ -418,22 +446,22 @@ async function handleSlot(username, amountParam, url, env) {
       newStreak.losses++;
       newStreak.wins = 0;
     }
-    await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(newStreak), { expirationTtl: 604800 });
+    await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
 
     let streakBonus = 0;
     let streakMessage = '';
 
     // Hot Streak: 5 wins in a row
-    if (isWin && newStreak.wins === 5) {
-      streakBonus = 500;
-      streakMessage = ' 🔥 HOT STREAK! 5 Wins in Folge! +500 DT Bonus!';
+    if (isWin && newStreak.wins === STREAK_THRESHOLD) {
+      streakBonus = HOT_STREAK_BONUS;
+      streakMessage = ` 🔥 HOT STREAK! ${STREAK_THRESHOLD} Wins in Folge! +${HOT_STREAK_BONUS} DT Bonus!`;
       await resetStreak(username, env);
     }
 
     // Comeback King: 5 losses then a win
-    if (isWin && previousStreak.losses >= 5) {
-      streakBonus = 150;
-      streakMessage = ' 👑 COMEBACK KING! Nach 5 Verlusten gewonnen! +150 DT Bonus!';
+    if (isWin && previousStreak.losses >= STREAK_THRESHOLD) {
+      streakBonus = COMEBACK_BONUS;
+      streakMessage = ` 👑 COMEBACK KING! Nach ${STREAK_THRESHOLD} Verlusten gewonnen! +${COMEBACK_BONUS} DT Bonus!`;
       await resetStreak(username, env);
     }
 
@@ -498,7 +526,7 @@ async function handleSlot(username, amountParam, url, env) {
 
       if (insuranceCount > 0) {
         await decrementInsurance(username, env);
-        const refund = Math.floor(spinCost * 0.5);
+        const refund = Math.floor(spinCost * INSURANCE_REFUND_RATE);
         const newBalanceWithRefund = Math.min(currentBalance - spinCost + refund, MAX_BALANCE);
 
         await Promise.all([
@@ -583,8 +611,8 @@ async function handleSlot(username, amountParam, url, env) {
 
     messageParts.push(`║ Kontostand: ${newBalance} DachsTaler 🦡`);
 
-    // Low Balance Warning: Check if under 100 DT and daily is available
-    if (newBalance < 100) {
+    // Low Balance Warning: Check if under threshold and daily is available
+    if (newBalance < LOW_BALANCE_WARNING) {
       try {
         const lastDaily = await getLastDaily(username, env);
         const now = Date.now();
@@ -602,8 +630,8 @@ async function handleSlot(username, amountParam, url, env) {
 
         if (dailyAvailable) {
           const hasBoost = await hasUnlock(username, 'daily_boost', env);
-          const dailyAmount = hasBoost ? 250 : 50;
-          messageParts.push(`⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmount} DT`);
+          const dailyAmountValue = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
+          messageParts.push(`⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DT`);
         }
       } catch (error) {
         console.error('Low Balance Warning Check Error:', error);
@@ -613,6 +641,19 @@ async function handleSlot(username, amountParam, url, env) {
     // Add loss warning if applicable
     if (lossWarningMessage) {
       messageParts.push(lossWarningMessage);
+    }
+
+    // Custom Message Check - ersetzt Standard-Message falls vorhanden
+    const isCustomWin = result.points > 0 || totalBonuses > 0;
+    const totalWinAmount = (result.points || 0) + totalBonuses;
+    const customMsg = getCustomMessage(username, isCustomWin, {
+      amount: isCustomWin ? totalWinAmount : spinCost,
+      balance: newBalance,
+      grid: [grid[3], grid[4], grid[5]].join(' ')
+    });
+
+    if (customMsg) {
+      return new Response(`@${username} [ ${[grid[3], grid[4], grid[5]].join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DT`, { headers: RESPONSE_HEADERS });
     }
 
     const message = messageParts.filter(p => p).join(' ');
@@ -662,15 +703,15 @@ function calculateWin(grid) {
   const dachsCount = processedMiddle.filter(s => s === '🦡').length;
   if (dachsCount === 3) {
     const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
-    return { points: 15000, message: '🔥🦡🔥 MEGAAA DACHS JACKPOT!!! 🔥🦡🔥 HOLY MOLY!!!' + wildSuffix };
+    return { points: DACHS_TRIPLE_PAYOUT, message: '🔥🦡🔥 MEGAAA DACHS JACKPOT!!! 🔥🦡🔥 HOLY MOLY!!!' + wildSuffix };
   }
   if (dachsCount === 2) {
     const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
-    return { points: 2500, message: '💥🦡💥 KRASSER DOPPEL-DACHS!!! 💥🦡💥' + wildSuffix };
+    return { points: DACHS_PAIR_PAYOUT, message: '💥🦡💥 KRASSER DOPPEL-DACHS!!! 💥🦡💥' + wildSuffix };
   }
   if (dachsCount === 1) {
     const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
-    return { points: 100, message: '🦡 Dachs gesichtet! Nice!' + wildSuffix };
+    return { points: DACHS_SINGLE_PAYOUT, message: '🦡 Dachs gesichtet! Nice!' + wildSuffix };
   }
 
   // Check Diamonds (using ORIGINAL middle, not processed - wilds don't count for free spins)

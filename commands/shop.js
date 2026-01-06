@@ -3,7 +3,8 @@ import {
   MAX_BALANCE,
   SHOP_ITEMS,
   PREREQUISITE_NAMES,
-  PRESTIGE_RANKS
+  PRESTIGE_RANKS,
+  DACHS_BASE_CHANCE
 } from '../constants.js';
 import { getWeightedSymbol } from '../utils.js';
 import {
@@ -210,7 +211,7 @@ async function buyShopItem(username, itemId, env) {
       ]);
 
       const hasLuckyCharm = await isBuffActive(username, 'lucky_charm', env);
-      const peekDachsChance = hasLuckyCharm ? 1 / 75 : 1 / 150;
+      const peekDachsChance = hasLuckyCharm ? DACHS_BASE_CHANCE * 2 : DACHS_BASE_CHANCE;
       const peekGrid = [];
 
       // Generate the peek grid (this will be the actual next spin)
@@ -278,7 +279,13 @@ async function buyShopItem(username, itemId, env) {
         } else if (mysteryResult.type === 'winmulti') {
           await addWinMultiplier(username, env);
         } else if (mysteryResult.type === 'timed') {
-          await activateBuff(username, mysteryResult.buffKey, mysteryResult.duration, env);
+          if (mysteryResult.uses) {
+            await activateBuffWithUses(username, mysteryResult.buffKey, mysteryResult.duration, mysteryResult.uses, env);
+          } else if (mysteryResult.buffKey === 'rage_mode') {
+            await activateBuffWithStack(username, mysteryResult.buffKey, mysteryResult.duration, env);
+          } else {
+            await activateBuff(username, mysteryResult.buffKey, mysteryResult.duration, env);
+          }
         }
 
         return new Response(`@${username} 📦 Mystery Box! Du hast gewonnen: ${mysteryResult.name} (Wert: ${mysteryResult.price})! Item wurde aktiviert! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });

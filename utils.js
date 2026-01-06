@@ -1,4 +1,5 @@
 import { SYMBOL_WEIGHTS, TOTAL_WEIGHT } from './constants.js';
+import { ADMINS } from './config.js';
 
 // OPTIMIZED: Function to get weighted random symbol (saves memory)
 function getWeightedSymbol() {
@@ -11,11 +12,10 @@ function getWeightedSymbol() {
   return '⭐'; // Fallback
 }
 
-// OPTIMIZED: Helper function to check if user is admin (eliminates code duplication)
+// Helper function to check if user is admin (uses config.js)
 function isAdmin(username) {
-  const allowedUsers = ['exaint_', 'frechhdachs'];
   const lowerUsername = username.toLowerCase();
-  return allowedUsers.includes(lowerUsername);
+  return ADMINS.includes(lowerUsername);
 }
 
 function sanitizeUsername(username) {

@@ -410,7 +410,8 @@ async function handleGetStats(username, target, env) {
       getStreak(cleanTarget, env)
     ]);
 
-    return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} DT | Wins: ${stats.wins} | Losses: ${stats.losses} | Total: ${stats.totalSpins} | Streak: ${streak.wins}W ${streak.losses}L`, { headers: RESPONSE_HEADERS });
+    const losses = stats.totalSpins - stats.wins;
+    return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} DT | Wins: ${stats.wins} | Losses: ${losses} | Total: ${stats.totalSpins} | Streak: ${streak.wins}W ${streak.losses}L`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleGetStats Error:', error);
     return new Response(`@${username} ❌ Fehler beim Abrufen der Stats.`, { headers: RESPONSE_HEADERS });

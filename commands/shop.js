@@ -14,7 +14,7 @@ import {
   DIAMOND_MINE_MAX_SPINS,
   URLS
 } from '../constants.js';
-import { getWeightedSymbol } from '../utils.js';
+import { getWeightedSymbol, secureRandom, secureRandomInt } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -224,7 +224,7 @@ async function buyShopItem(username, itemId, env) {
 
       // Generate the peek grid (this will be the actual next spin)
       for (let i = 0; i < GRID_SIZE; i++) {
-        if (Math.random() < peekDachsChance) {
+        if (secureRandom() < peekDachsChance) {
           peekGrid.push('🦡');
         } else {
           peekGrid.push(getWeightedSymbol());
@@ -244,8 +244,7 @@ async function buyShopItem(username, itemId, env) {
 
     if (item.type === 'instant') {
       if (itemId === 11) { // Chaos Spin
-        const range = CHAOS_SPIN_MAX - CHAOS_SPIN_MIN + 1;
-        const result = Math.floor(Math.random() * range) + CHAOS_SPIN_MIN;
+        const result = secureRandomInt(CHAOS_SPIN_MIN, CHAOS_SPIN_MAX);
         const newBalance = Math.min(balance - item.price + result, MAX_BALANCE);
         // Bank gets: item price minus the result (negative result = bank profit)
         const netBankChange = item.price - result;
@@ -258,7 +257,7 @@ async function buyShopItem(username, itemId, env) {
 
       if (itemId === 12) { // Glücksrad
         const wheel = spinWheel();
-        const newBalance = Math.min(balance - item.price + wheel.prize, MAX_BALANCE);
+        const newBalance = Math.max(0, Math.min(balance - item.price + wheel.prize, MAX_BALANCE));
         // Bank gets: item price minus the prize won
         const netBankChange = item.price - wheel.prize;
         await Promise.all([
@@ -282,7 +281,7 @@ async function buyShopItem(username, itemId, env) {
           14, 20, 24,              // Timed Buffs Classic (3)
           32, 33, 34, 35, 39       // Timed Buffs Premium (5)
         ]; // Total: 17 Items (Stats Tracker, Unlocks, Prestige, Instants excluded)
-        const mysteryItemId = mysteryItems[Math.floor(Math.random() * mysteryItems.length)];
+        const mysteryItemId = mysteryItems[secureRandomInt(0, mysteryItems.length - 1)];
         const mysteryResult = SHOP_ITEMS[mysteryItemId];
 
         try {
@@ -302,9 +301,17 @@ async function buyShopItem(username, itemId, env) {
             }
           }
         } catch (activationError) {
-          // Rollback: Refund the balance if item activation failed
+          // Rollback: Refund the balance and reverse bank update if item activation failed
           console.error('Mystery Box activation failed, rolling back:', activationError);
-          await setBalance(username, balance, env);
+          try {
+            await Promise.all([
+              setBalance(username, balance, env),
+              updateBankBalance(-item.price, env) // Reverse the bank update
+            ]);
+          } catch (rollbackError) {
+            console.error('CRITICAL: Mystery Box rollback failed!', rollbackError);
+            // At this point, manual intervention may be needed
+          }
           return new Response(`@${username} ❌ Mystery Box Fehler! Dein Einsatz wurde zurückerstattet.`, { headers: RESPONSE_HEADERS });
         }
 
@@ -312,9 +319,8 @@ async function buyShopItem(username, itemId, env) {
       }
 
       if (itemId === 31) { // Reverse Chaos
-        const range = REVERSE_CHAOS_MAX - REVERSE_CHAOS_MIN + 1;
-        const result = Math.floor(Math.random() * range) + REVERSE_CHAOS_MIN;
-        const newBalance = Math.min(balance - item.price + result, MAX_BALANCE);
+        const result = secureRandomInt(REVERSE_CHAOS_MIN, REVERSE_CHAOS_MAX);
+        const newBalance = Math.max(0, Math.min(balance - item.price + result, MAX_BALANCE));
         // Bank gets: item price minus the result won
         const netBankChange = item.price - result;
         await Promise.all([
@@ -325,8 +331,7 @@ async function buyShopItem(username, itemId, env) {
       }
 
       if (itemId === 36) { // Diamond Mine
-        const range = DIAMOND_MINE_MAX_SPINS - DIAMOND_MINE_MIN_SPINS + 1;
-        const freeSpinsAmount = Math.floor(Math.random() * range) + DIAMOND_MINE_MIN_SPINS;
+        const freeSpinsAmount = secureRandomInt(DIAMOND_MINE_MIN_SPINS, DIAMOND_MINE_MAX_SPINS);
         await addFreeSpinsWithMultiplier(username, freeSpinsAmount, 1, env);
         return new Response(`@${username} 💎 Diamond Mine! Du hast ${freeSpinsAmount} Free Spins gefunden! 💎 | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
       }
@@ -350,9 +355,9 @@ async function buyShopItem(username, itemId, env) {
 }
 
 function spinWheel() {
-  const rand = Math.random() * 100;
+  const rand = secureRandom() * 100;
   if (rand < 1) {
-    if (Math.random() < 0.00032) return { result: '🦡 🦡 🦡 🦡 🦡', message: '🔥 5x DACHS JACKPOT! 🔥', prize: 100000 };
+    if (secureRandom() < 0.00032) return { result: '🦡 🦡 🦡 🦡 🦡', message: '🔥 5x DACHS JACKPOT! 🔥', prize: 100000 };
     return { result: '🦡 🦡 💎 ⭐ 💰', message: 'Dachse!', prize: 500 };
   }
   if (rand < 5) return { result: '💎 💎 💎 ⭐ 💰', message: 'Diamanten!', prize: 1000 };

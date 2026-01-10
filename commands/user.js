@@ -187,12 +187,10 @@ async function handleBuffs(username, env) {
       buffs.push(`🦡 Dachs Locator (${dachsLocator.uses} Spins)`);
     }
 
-    // Buffs with Stack (Rage Mode)
+    // Buffs with Stack (Rage Mode) - use data from getBuffWithStack to avoid redundant reads
     const rageMode = await getBuffWithStack(username, 'rage_mode', env);
-    if (rageMode.active) {
-      const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:rage_mode`);
-      const data = JSON.parse(value);
-      const remaining = data.expireAt - Date.now();
+    if (rageMode.active && rageMode.data) {
+      const remaining = rageMode.data.expireAt - Date.now();
       const minutes = Math.floor(remaining / MS_PER_MINUTE);
       buffs.push(`🔥 Rage Mode (${minutes}m, Stack: ${rageMode.stack}%)`);
     }

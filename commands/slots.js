@@ -33,7 +33,7 @@ import {
   SYMBOL_BOOST_CHANCE,
   URLS
 } from '../constants.js';
-import { getWeightedSymbol } from '../utils.js';
+import { getWeightedSymbol, secureRandom, secureRandomInt } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
 import {
   getBalance,
@@ -150,9 +150,9 @@ async function generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush
 
   // DEBUG MODE: Special user gets higher chance for exactly 2 dachs
   if (DEBUG_MODE && username.toLowerCase() === 'exaint_') {
-    const roll = Math.random();
+    const roll = secureRandom();
     if (roll < DEBUG_DACHS_PAIR_CHANCE) {
-      const dachsPair = Math.random() < 0.5 ? [MIDDLE_ROW_START, MIDDLE_ROW_START + 1] : [MIDDLE_ROW_START + 1, MIDDLE_ROW_END];
+      const dachsPair = secureRandom() < 0.5 ? [MIDDLE_ROW_START, MIDDLE_ROW_START + 1] : [MIDDLE_ROW_START + 1, MIDDLE_ROW_END];
 
       for (let i = MIDDLE_ROW_START; i <= MIDDLE_ROW_END; i++) {
         grid[i] = dachsPair.includes(i) ? '🦡' : getWeightedSymbol();
@@ -168,16 +168,16 @@ async function generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush
 
   // Normal generation
   for (let i = 0; i < GRID_SIZE; i++) {
-    if (Math.random() < dachsChance) {
+    if (secureRandom() < dachsChance) {
       grid.push('🦡');
     } else {
       let symbol = getWeightedSymbol();
-      if (hasStarMagnet && Math.random() < BUFF_REROLL_CHANCE) {
-        const starRoll = Math.random();
+      if (hasStarMagnet && secureRandom() < BUFF_REROLL_CHANCE) {
+        const starRoll = secureRandom();
         if (starRoll < SYMBOL_BOOST_CHANCE) symbol = '⭐';
       }
-      if (hasDiamondRush && symbol !== '💎' && Math.random() < BUFF_REROLL_CHANCE) {
-        const diamondRoll = Math.random();
+      if (hasDiamondRush && symbol !== '💎' && secureRandom() < BUFF_REROLL_CHANCE) {
+        const diamondRoll = secureRandom();
         if (diamondRoll < SYMBOL_BOOST_CHANCE) symbol = '💎';
       }
       grid.push(symbol);
@@ -195,7 +195,7 @@ async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWild
 
     if (!hasPair) {
       const symbols = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐'];
-      const pairSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+      const pairSymbol = symbols[secureRandomInt(0, symbols.length - 1)];
       grid[MIDDLE_ROW_START] = pairSymbol;
       grid[MIDDLE_ROW_START + 1] = pairSymbol;
     }
@@ -203,7 +203,7 @@ async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWild
   }
 
   if (hasWildCardToken) {
-    const wildPos = Math.floor(Math.random() * GRID_WIDTH) + MIDDLE_ROW_START;
+    const wildPos = secureRandomInt(0, GRID_WIDTH - 1) + MIDDLE_ROW_START;
     grid[wildPos] = '🃏';
     await consumeWildCard(username, env);
   }
@@ -299,18 +299,29 @@ async function calculateStreakBonuses(username, isWin, env) {
   let comboBonus = 0;
   let comboMessage = '';
   let lossWarningMessage = '';
+  let shouldResetStreak = false;
 
   // Hot Streak
   if (isWin && newStreak.wins === STREAK_THRESHOLD) {
-    streakBonus = HOT_STREAK_BONUS;
+    streakBonus += HOT_STREAK_BONUS;
     streakMessage = ` 🔥 HOT STREAK! ${STREAK_THRESHOLD} Wins in Folge! +${HOT_STREAK_BONUS} DT Bonus!`;
-    await resetStreak(username, env);
+    shouldResetStreak = true;
   }
 
-  // Comeback King
+  // Comeback King (can stack with Hot Streak if both conditions are met)
   if (isWin && previousStreak.losses >= STREAK_THRESHOLD) {
-    streakBonus = COMEBACK_BONUS;
-    streakMessage = ` 👑 COMEBACK KING! Nach ${STREAK_THRESHOLD} Verlusten gewonnen! +${COMEBACK_BONUS} DT Bonus!`;
+    streakBonus += COMEBACK_BONUS;
+    // Combine messages if both bonuses triggered
+    if (streakMessage) {
+      streakMessage += ` 👑 COMEBACK KING! +${COMEBACK_BONUS} DT!`;
+    } else {
+      streakMessage = ` 👑 COMEBACK KING! Nach ${STREAK_THRESHOLD} Verlusten gewonnen! +${COMEBACK_BONUS} DT Bonus!`;
+    }
+    shouldResetStreak = true;
+  }
+
+  // Reset streak only once after processing all bonuses
+  if (shouldResetStreak) {
     await resetStreak(username, env);
   }
 
@@ -688,17 +699,31 @@ function calculateWin(grid) {
       const symbol = nonWildSymbols[0];
       processedMiddle = [symbol, symbol, symbol];
     } else if (wildCount === 1) {
-      // 1 wild → make best pair
-      // Find if we already have a pair
+      // 1 wild → make best pair or triple
       if (nonWildSymbols[0] === nonWildSymbols[1]) {
         // Already a pair, wild makes triple
         processedMiddle = [nonWildSymbols[0], nonWildSymbols[0], nonWildSymbols[0]];
       } else {
-        // No pair, wild creates pair with higher value symbol
+        // No pair, wild creates pair with HIGHER VALUE symbol
         const symbol1 = nonWildSymbols[0];
         const symbol2 = nonWildSymbols[1];
-        // Use the symbol that appears first (simple heuristic)
-        processedMiddle = [symbol1, symbol1, symbol2];
+
+        // Get payouts for both symbols (Dachs has special payouts, use PAIR_PAYOUTS for others)
+        const getPairValue = (s) => {
+          if (s === '🦡') return DACHS_PAIR_PAYOUT; // 2500
+          if (s === '💎') return 0; // Diamonds give free spins, not points - treat as lowest for pair
+          return PAIR_PAYOUTS[s] || 5;
+        };
+
+        const value1 = getPairValue(symbol1);
+        const value2 = getPairValue(symbol2);
+
+        // Use the symbol with higher payout for the pair
+        if (value1 >= value2) {
+          processedMiddle = [symbol1, symbol1, symbol2];
+        } else {
+          processedMiddle = [symbol2, symbol2, symbol1];
+        }
       }
     }
   }
@@ -741,7 +766,7 @@ function calculateWin(grid) {
   }
 
   const messages = ['Leider verloren! 😢', 'Nächstes Mal!', 'Fast! Versuch es nochmal!', 'Kein Glück diesmal...'];
-  return { points: 0, message: messages[Math.floor(Math.random() * messages.length)] };
+  return { points: 0, message: messages[secureRandomInt(0, messages.length - 1)] };
 }
 
 export { handleSlot, calculateWin };

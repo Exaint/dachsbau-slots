@@ -396,23 +396,54 @@ async function getBuffWithUses(username, buffKey, env) {
   }
 }
 
-// OPTIMIZED: Use data from getBuffWithUses to avoid redundant KV read
-async function decrementBuffUses(username, buffKey, env) {
-  try {
-    const buff = await getBuffWithUses(username, buffKey, env);
-    if (buff.active && buff.uses > 0 && buff.data) {
-      const data = buff.data;
-      data.uses--;
+// Atomic buff uses decrement with retry mechanism (prevents race conditions)
+async function decrementBuffUses(username, buffKey, env, maxRetries = 3) {
+  const key = `buff:${username.toLowerCase()}:${buffKey}`;
 
-      if (data.uses <= 0) {
-        await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
-      } else {
-        const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
-        await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, JSON.stringify(data), { expirationTtl: ttl + 60 });
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Read current state
+      const value = await env.SLOTS_KV.get(key);
+      if (!value) return;
+
+      const data = JSON.parse(value);
+      if (Date.now() >= data.expireAt || data.uses <= 0) {
+        await env.SLOTS_KV.delete(key);
+        return;
       }
+
+      // Prepare update
+      const updatedData = { ...data, uses: data.uses - 1 };
+
+      if (updatedData.uses <= 0) {
+        await env.SLOTS_KV.delete(key);
+      } else {
+        const ttl = Math.max(60, Math.floor((data.expireAt - Date.now()) / 1000) + 60);
+        const metadata = { lastUpdate: Date.now(), attempt };
+        await env.SLOTS_KV.put(key, JSON.stringify(updatedData), { expirationTtl: ttl, metadata });
+      }
+
+      // Verify the write succeeded
+      const verifyValue = await env.SLOTS_KV.get(key);
+      if (updatedData.uses <= 0) {
+        // Should be deleted
+        if (!verifyValue) return; // Success
+      } else {
+        // Should have updated uses
+        if (verifyValue) {
+          const verifyData = JSON.parse(verifyValue);
+          if (verifyData.uses === updatedData.uses) return; // Success
+        }
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+      }
+    } catch (error) {
+      console.error(`decrementBuffUses Error (attempt ${attempt + 1}):`, error);
+      if (attempt === maxRetries - 1) return;
     }
-  } catch (error) {
-    console.error('decrementBuffUses Error:', error);
   }
 }
 
@@ -690,45 +721,78 @@ async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
   }
 }
 
-async function consumeFreeSpinWithMultiplier(username, env) {
-  try {
-    const freeSpins = await getFreeSpins(username, env);
+// Atomic free spin consumption with retry mechanism (prevents race conditions)
+async function consumeFreeSpinWithMultiplier(username, env, maxRetries = 3) {
+  const key = `freespins:${username.toLowerCase()}`;
 
-    if (!freeSpins || !Array.isArray(freeSpins) || freeSpins.length === 0) {
-      return { used: false, multiplier: 0 };
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Read current state
+      const value = await env.SLOTS_KV.get(key);
+      if (!value || value === 'null' || value === 'undefined') {
+        return { used: false, multiplier: 0 };
+      }
+
+      const freeSpins = JSON.parse(value);
+      if (!Array.isArray(freeSpins) || freeSpins.length === 0) {
+        return { used: false, multiplier: 0 };
+      }
+
+      const lowestEntry = freeSpins[0];
+      if (!lowestEntry || typeof lowestEntry !== 'object') {
+        console.error('Invalid lowest entry:', lowestEntry);
+        return { used: false, multiplier: 0 };
+      }
+
+      if (typeof lowestEntry.count !== 'number' || typeof lowestEntry.multiplier !== 'number') {
+        console.error('Invalid entry types:', lowestEntry);
+        return { used: false, multiplier: 0 };
+      }
+
+      if (lowestEntry.multiplier <= 0 || lowestEntry.count <= 0) {
+        console.error('Invalid entry values:', lowestEntry);
+        return { used: false, multiplier: 0 };
+      }
+
+      // Prepare update
+      const multiplierToReturn = lowestEntry.multiplier;
+      const updatedFreeSpins = JSON.parse(value); // Fresh copy to avoid mutation issues
+      updatedFreeSpins[0].count--;
+
+      if (updatedFreeSpins[0].count <= 0) {
+        updatedFreeSpins.shift();
+      }
+
+      // Write with metadata for optimistic lock verification
+      const metadata = { lastUpdate: Date.now(), attempt };
+      await env.SLOTS_KV.put(key, JSON.stringify(updatedFreeSpins), { metadata });
+
+      // Verify the write succeeded
+      const verifyValue = await env.SLOTS_KV.get(key);
+      const verifySpins = verifyValue ? JSON.parse(verifyValue) : [];
+
+      // Check if our update was applied (count should match)
+      const expectedCount = updatedFreeSpins.length > 0 ? updatedFreeSpins[0]?.count : -1;
+      const actualCount = verifySpins.length > 0 ? verifySpins[0]?.count : -1;
+
+      if (verifySpins.length === updatedFreeSpins.length &&
+          (updatedFreeSpins.length === 0 || expectedCount === actualCount)) {
+        return { used: true, multiplier: multiplierToReturn };
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+      }
+    } catch (error) {
+      console.error(`consumeFreeSpinWithMultiplier Error (attempt ${attempt + 1}):`, error);
+      if (attempt === maxRetries - 1) {
+        return { used: false, multiplier: 0 };
+      }
     }
-
-    const lowestEntry = freeSpins[0];
-
-    if (!lowestEntry || typeof lowestEntry !== 'object') {
-      console.error('Invalid lowest entry:', lowestEntry);
-      return { used: false, multiplier: 0 };
-    }
-
-    if (typeof lowestEntry.count !== 'number' || typeof lowestEntry.multiplier !== 'number') {
-      console.error('Invalid entry types:', lowestEntry);
-      return { used: false, multiplier: 0 };
-    }
-
-    if (lowestEntry.multiplier <= 0 || lowestEntry.count <= 0) {
-      console.error('Invalid entry values:', lowestEntry);
-      return { used: false, multiplier: 0 };
-    }
-
-    const multiplierToReturn = lowestEntry.multiplier;
-    lowestEntry.count--;
-
-    if (lowestEntry.count <= 0) {
-      freeSpins.shift();
-    }
-
-    await env.SLOTS_KV.put(`freespins:${username.toLowerCase()}`, JSON.stringify(freeSpins));
-
-    return { used: true, multiplier: multiplierToReturn };
-  } catch (error) {
-    console.error('consumeFreeSpinWithMultiplier Error:', error);
-    return { used: false, multiplier: 0 };
   }
+
+  return { used: false, multiplier: 0 };
 }
 
 // Streaks

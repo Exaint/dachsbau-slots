@@ -1,9 +1,24 @@
 import { SYMBOL_WEIGHTS, TOTAL_WEIGHT } from './constants.js';
 import { ADMINS } from './config.js';
 
-// OPTIMIZED: Function to get weighted random symbol (saves memory)
+// Cryptographically secure random number generator (0 to 1, like Math.random but secure)
+function secureRandom() {
+  const buffer = new Uint32Array(1);
+  crypto.getRandomValues(buffer);
+  return buffer[0] / (0xFFFFFFFF + 1);
+}
+
+// Secure random integer in range [min, max] (inclusive)
+function secureRandomInt(min, max) {
+  const range = max - min + 1;
+  const buffer = new Uint32Array(1);
+  crypto.getRandomValues(buffer);
+  return (buffer[0] % range) + min;
+}
+
+// OPTIMIZED: Function to get weighted random symbol (saves memory) - NOW CRYPTOGRAPHICALLY SECURE
 function getWeightedSymbol() {
-  const rand = Math.random() * TOTAL_WEIGHT;
+  const rand = secureRandom() * TOTAL_WEIGHT;
   let cumulative = 0;
   for (const { symbol, weight } of SYMBOL_WEIGHTS) {
     cumulative += weight;
@@ -57,6 +72,8 @@ function isLeaderboardBlocked(username) {
 }
 
 export {
+  secureRandom,
+  secureRandomInt,
   getWeightedSymbol,
   isAdmin,
   sanitizeUsername,

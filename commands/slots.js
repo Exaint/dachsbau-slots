@@ -31,9 +31,10 @@ import {
   DEBUG_DACHS_PAIR_CHANCE,
   BUFF_REROLL_CHANCE,
   SYMBOL_BOOST_CHANCE,
-  URLS
+  URLS,
+  GUARANTEED_PAIR_SYMBOLS
 } from '../constants.js';
-import { getWeightedSymbol, secureRandom, secureRandomInt } from '../utils.js';
+import { getWeightedSymbol, secureRandom, secureRandomInt, calculateBuffTTL } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
 import {
   getBalance,
@@ -57,9 +58,9 @@ import {
   consumeBoost,
   consumeWinMultiplier,
   getMulliganCount,
-  decrementMulligan,
+  setMulliganCount,
   getInsuranceCount,
-  decrementInsurance,
+  setInsuranceCount,
   getStreakMultiplier,
   incrementStreakMultiplier,
   resetStreakMultiplier,
@@ -194,8 +195,8 @@ async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWild
     const hasPair = (middle[0] === middle[1]) || (middle[1] === middle[2]) || (middle[0] === middle[2]);
 
     if (!hasPair) {
-      const symbols = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐'];
-      const pairSymbol = symbols[secureRandomInt(0, symbols.length - 1)];
+      // OPTIMIZED: Use static constant instead of recreating array
+      const pairSymbol = GUARANTEED_PAIR_SYMBOLS[secureRandomInt(0, GUARANTEED_PAIR_SYMBOLS.length - 1)];
       grid[MIDDLE_ROW_START] = pairSymbol;
       grid[MIDDLE_ROW_START + 1] = pairSymbol;
     }
@@ -254,11 +255,12 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
     }
   }
 
-  // Golden Hour & Profit Doubler
+  // OPTIMIZED: Golden Hour, Profit Doubler & Streak Multiplier in parallel
   if (result.points > 0) {
-    const [hasGoldenHour, hasProfitDoubler] = await Promise.all([
+    const [hasGoldenHour, hasProfitDoubler, currentStreakMulti] = await Promise.all([
       isBuffActive(username, 'golden_hour', env),
-      isBuffActive(username, 'profit_doubler', env)
+      isBuffActive(username, 'profit_doubler', env),
+      getStreakMultiplier(username, env)
     ]);
 
     if (hasGoldenHour) {
@@ -270,29 +272,18 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
       result.points *= 2;
       result.message += ' (📈 Profit x2!)';
     }
-  }
 
-  // Streak Multiplier
-  const currentStreakMulti = await getStreakMultiplier(username, env);
-  if (result.points > 0 && currentStreakMulti > 1.0) {
-    result.points = Math.floor(result.points * currentStreakMulti);
-    result.message += ` (🔥 ${currentStreakMulti.toFixed(1)}x Streak!)`;
+    // Streak Multiplier
+    if (currentStreakMulti > 1.0) {
+      result.points = Math.floor(result.points * currentStreakMulti);
+      result.message += ` (🔥 ${currentStreakMulti.toFixed(1)}x Streak!)`;
+    }
   }
 }
 
 // Helper: Calculate streak bonuses
 async function calculateStreakBonuses(username, isWin, env) {
   const previousStreak = await getStreak(username, env);
-
-  const newStreak = { ...previousStreak };
-  if (isWin) {
-    newStreak.wins++;
-    newStreak.losses = 0;
-  } else {
-    newStreak.losses++;
-    newStreak.wins = 0;
-  }
-  await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
 
   let streakBonus = 0;
   let streakMessage = '';
@@ -302,7 +293,7 @@ async function calculateStreakBonuses(username, isWin, env) {
   let shouldResetStreak = false;
 
   // Hot Streak
-  if (isWin && newStreak.wins === STREAK_THRESHOLD) {
+  if (isWin && previousStreak.wins + 1 === STREAK_THRESHOLD) {
     streakBonus += HOT_STREAK_BONUS;
     streakMessage = ` 🔥 HOT STREAK! ${STREAK_THRESHOLD} Wins in Folge! +${HOT_STREAK_BONUS} DT Bonus!`;
     shouldResetStreak = true;
@@ -311,7 +302,6 @@ async function calculateStreakBonuses(username, isWin, env) {
   // Comeback King (can stack with Hot Streak if both conditions are met)
   if (isWin && previousStreak.losses >= STREAK_THRESHOLD) {
     streakBonus += COMEBACK_BONUS;
-    // Combine messages if both bonuses triggered
     if (streakMessage) {
       streakMessage += ` 👑 COMEBACK KING! +${COMEBACK_BONUS} DT!`;
     } else {
@@ -320,10 +310,12 @@ async function calculateStreakBonuses(username, isWin, env) {
     shouldResetStreak = true;
   }
 
-  // Reset streak only once after processing all bonuses
-  if (shouldResetStreak) {
-    await resetStreak(username, env);
-  }
+  // OPTIMIZED: Calculate final streak state and write only ONCE
+  const newStreak = shouldResetStreak
+    ? { wins: 0, losses: 0 }
+    : { wins: isWin ? previousStreak.wins + 1 : 0, losses: isWin ? 0 : previousStreak.losses + 1 };
+
+  await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
 
   // Combo Bonus
   if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {
@@ -396,13 +388,11 @@ function buildResponseMessage(username, grid, result, spinCost, totalBonuses, ne
 async function handleSlot(username, amountParam, url, env) {
   try {
 
-    // Sanitize amountParam: Remove invisible characters, zero-width spaces, etc.
+    // OPTIMIZED: Sanitize amountParam with single combined regex
     if (amountParam) {
-      // Remove all invisible/control characters but keep normal spaces and alphanumeric
       amountParam = amountParam
-        .replace(/[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E]/g, '') // Zero-width spaces
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Control characters
-        .replace(/\s+/g, ' ') // Normalize multiple spaces to single space
+        .replace(/[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u0000-\u001F\u007F-\u009F]+/g, '') // All invisible/control chars
+        .replace(/\s+/g, ' ') // Normalize spaces
         .trim();
     }
 
@@ -475,20 +465,23 @@ async function handleSlot(username, amountParam, url, env) {
       return new Response(`@${username} ❌ Nicht genug DachsTaler! Du brauchst ${spinCost} (Aktuell: ${currentBalance}) 🦡`, { headers: RESPONSE_HEADERS });
     }
 
-    // OPTIMIZED: Load buffs in two stages
-    // Stage 1: Always needed (for grid generation)
-    const [hasStarMagnet, hasDiamondRush] = await Promise.all([
-      isBuffActive(username, 'star_magnet', env),
-      isBuffActive(username, 'diamond_rush', env)
-    ]);
+    // OPTIMIZED: Load all buffs in single Promise.all() for maximum parallelization
+    let hasStarMagnet, hasDiamondRush, hasLuckyCharm, hasDachsLocator, hasRageMode;
 
-    // Stage 2: Only for normal spins (for dachs chance calculation)
-    let hasLuckyCharm = false;
-    let hasDachsLocator = { active: false, uses: 0 };
-    let hasRageMode = { active: false, stack: 0 };
-
-    if (!isFreeSpinUsed) {
-      [hasLuckyCharm, hasDachsLocator, hasRageMode] = await Promise.all([
+    if (isFreeSpinUsed) {
+      // Free spin: Only need grid generation buffs
+      [hasStarMagnet, hasDiamondRush] = await Promise.all([
+        isBuffActive(username, 'star_magnet', env),
+        isBuffActive(username, 'diamond_rush', env)
+      ]);
+      hasLuckyCharm = false;
+      hasDachsLocator = { active: false, uses: 0 };
+      hasRageMode = { active: false, stack: 0 };
+    } else {
+      // Normal spin: Load ALL buffs in single batch
+      [hasStarMagnet, hasDiamondRush, hasLuckyCharm, hasDachsLocator, hasRageMode] = await Promise.all([
+        isBuffActive(username, 'star_magnet', env),
+        isBuffActive(username, 'diamond_rush', env),
         isBuffActive(username, 'lucky_charm', env),
         getBuffWithUses(username, 'dachs_locator', env),
         getBuffWithStack(username, 'rage_mode', env)
@@ -517,8 +510,7 @@ async function handleSlot(username, amountParam, url, env) {
       if (data.uses <= 0) {
         await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:dachs_locator`);
       } else {
-        const ttl = Math.max(60, Math.floor((data.expireAt - Date.now()) / 1000) + 60);
-        await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:dachs_locator`, JSON.stringify(data), { expirationTtl: ttl });
+        await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:dachs_locator`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) });
       }
     }
 
@@ -546,21 +538,19 @@ async function handleSlot(username, amountParam, url, env) {
     const comboMessage = streakBonusResult.comboMessage;
     let lossWarningMessage = streakBonusResult.lossWarningMessage;
 
-    // OPTIMIZED: Rage Mode inline updates (avoids redundant KV reads)
+    // OPTIMIZED: Rage Mode inline updates (avoids redundant KV reads) + use calculateBuffTTL helper
     if (!isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = Math.min((data.stack || 0) + 5, 50);
-      const ttl = Math.max(60, Math.floor((data.expireAt - Date.now()) / 1000) + 60);
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl }),
+        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
         resetStreakMultiplier(username, env)
       ]);
     } else if (isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = 0;
-      const ttl = Math.max(60, Math.floor((data.expireAt - Date.now()) / 1000) + 60);
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl }),
+        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
         incrementStreakMultiplier(username, env)
       ]);
     } else if (isWin) {
@@ -569,7 +559,7 @@ async function handleSlot(username, amountParam, url, env) {
       await resetStreakMultiplier(username, env);
     }
 
-    // Mulligan/Insurance
+    // Mulligan/Insurance - OPTIMIZED: Use setMulliganCount/setInsuranceCount to avoid redundant KV reads
     if (!isFreeSpinUsed && result.points === 0 && !result.freeSpins) {
       const [mulliganCount, insuranceCount] = await Promise.all([
         getMulliganCount(username, env),
@@ -577,21 +567,21 @@ async function handleSlot(username, amountParam, url, env) {
       ]);
 
       if (mulliganCount > 0) {
-        await decrementMulligan(username, env);
+        await setMulliganCount(username, mulliganCount - 1, env);
         return new Response(`@${username} 🔄 Mulligan! Du hast noch ${mulliganCount - 1} Re-Spins. Spin nochmal!`, { headers: RESPONSE_HEADERS });
       }
 
       if (insuranceCount > 0) {
-        await decrementInsurance(username, env);
         const refund = Math.floor(spinCost * INSURANCE_REFUND_RATE);
         const newBalanceWithRefund = Math.max(0, Math.min(currentBalance - spinCost + refund, MAX_BALANCE));
 
-        await Promise.all([
+        // OPTIMIZED: Fetch rank in parallel with balance/stats/insurance updates
+        const [, , , rank] = await Promise.all([
           setBalance(username, newBalanceWithRefund, env),
-          updateStats(username, false, result.points, spinCost, env)
+          updateStats(username, false, result.points, spinCost, env),
+          setInsuranceCount(username, insuranceCount - 1, env),
+          getPrestigeRank(username, env)
         ]);
-
-        const rank = await getPrestigeRank(username, env);
         const rankSymbol = rank ? `${rank} ` : '';
 
         return new Response(`@${username} ${rankSymbol}[ ${grid[3]} ${grid[4]} ${grid[5]} ] ║ ${result.message} -${spinCost} (+${refund} Insurance) = -${spinCost - refund} 🛡️ ║ Kontostand: ${newBalanceWithRefund} DachsTaler (${insuranceCount - 1} Insurance übrig)`, { headers: RESPONSE_HEADERS });
@@ -601,12 +591,13 @@ async function handleSlot(username, amountParam, url, env) {
     const totalBonuses = streakBonus + comboBonus;
     const newBalance = Math.max(0, Math.min(currentBalance - spinCost + result.points + totalBonuses, MAX_BALANCE));
 
-    // OPTIMIZED: Parallelize all final updates including rank fetch
+    // OPTIMIZED: Parallelize all final updates including rank fetch AND free spins check
     const finalUpdates = [
       setBalance(username, newBalance, env),
       updateStats(username, result.points > 0, result.points, spinCost, env),
       setLastSpin(username, now, env),
-      getPrestigeRank(username, env) // Fetch rank in parallel
+      getPrestigeRank(username, env),
+      getFreeSpins(username, env) // Fetch remaining free spins in parallel
     ];
 
     // Add bank update if not free spin
@@ -616,11 +607,11 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     const results = await Promise.all(finalUpdates);
-    const rank = results[3]; // Rank is 4th promise
+    const rank = results[3];
+    const remainingFreeSpins = results[4];
 
     let remainingCount = 0;
     try {
-      const remainingFreeSpins = await getFreeSpins(username, env);
       if (Array.isArray(remainingFreeSpins)) {
         remainingCount = remainingFreeSpins.reduce((sum, fs) => sum + (fs.count || 0), 0);
       }
@@ -628,10 +619,14 @@ async function handleSlot(username, amountParam, url, env) {
       console.error('Get Remaining Free Spins Error:', error);
     }
 
-    // Low Balance Warning
+    // Low Balance Warning - OPTIMIZED: Parallel fetch of lastDaily and hasBoost
     if (newBalance < LOW_BALANCE_WARNING) {
       try {
-        const lastDaily = await getLastDaily(username, env);
+        const [lastDaily, hasBoost] = await Promise.all([
+          getLastDaily(username, env),
+          hasUnlock(username, 'daily_boost', env)
+        ]);
+
         const nowDate = new Date(now);
         const todayUTC = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
 
@@ -645,7 +640,6 @@ async function handleSlot(username, amountParam, url, env) {
         }
 
         if (dailyAvailable) {
-          const hasBoost = await hasUnlock(username, 'daily_boost', env);
           const dailyAmountValue = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
           lossWarningMessage = lossWarningMessage
             ? `${lossWarningMessage} ⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DT`

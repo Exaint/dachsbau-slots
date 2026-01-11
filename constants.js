@@ -183,6 +183,18 @@ const ALL_BUFF_KEYS = ['happy_hour', 'lucky_charm', 'golden_hour', 'dachs_locato
 const ALL_SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐', '🦡', '💎'];
 const ALL_UNLOCK_KEYS = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'stats_tracker', 'daily_boost', 'custom_message'];
 
+// OPTIMIZED: Static symbol arrays for reuse (avoid recreation per request)
+const GUARANTEED_PAIR_SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🍉', '⭐'];
+const BUFF_SYMBOLS_WITH_NAMES = [
+  { symbol: '🍒', name: 'Kirschen' },
+  { symbol: '🍋', name: 'Zitronen' },
+  { symbol: '🍊', name: 'Orangen' },
+  { symbol: '🍇', name: 'Trauben' },
+  { symbol: '🍉', name: 'Wassermelonen' },
+  { symbol: '⭐', name: 'Stern' },
+  { symbol: '🦡', name: 'Dachs' }
+];
+
 export {
   RESPONSE_HEADERS,
   MS_PER_HOUR,
@@ -239,5 +251,7 @@ export {
   URLS,
   ALL_BUFF_KEYS,
   ALL_SYMBOLS,
-  ALL_UNLOCK_KEYS
+  ALL_UNLOCK_KEYS,
+  GUARANTEED_PAIR_SYMBOLS,
+  BUFF_SYMBOLS_WITH_NAMES
 };

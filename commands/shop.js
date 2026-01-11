@@ -65,25 +65,46 @@ async function handleShop(username, item, env) {
 
 async function buyShopItem(username, itemId, env) {
   try {
-    const balance = await getBalance(username, env);
     const item = SHOP_ITEMS[itemId];
 
     if (!item) {
       return new Response(`@${username} ❌ Item nicht gefunden!`, { headers: RESPONSE_HEADERS });
     }
 
+    // OPTIMIZED: Load balance and prerequisites in parallel based on item type
+    let balance, hasPrerequisite, currentRank, hasExistingUnlock;
+
+    if (item.type === 'prestige') {
+      [balance, currentRank] = await Promise.all([
+        getBalance(username, env),
+        getPrestigeRank(username, env)
+      ]);
+    } else if (item.type === 'unlock') {
+      const promises = [getBalance(username, env)];
+      if (item.requires) promises.push(hasUnlock(username, item.requires, env));
+      promises.push(hasUnlock(username, item.unlockKey, env));
+
+      const results = await Promise.all(promises);
+      balance = results[0];
+      if (item.requires) {
+        hasPrerequisite = results[1];
+        hasExistingUnlock = results[2];
+      } else {
+        hasExistingUnlock = results[1];
+      }
+    } else {
+      balance = await getBalance(username, env);
+    }
+
     if (balance < item.price) {
       return new Response(`@${username} ❌ Nicht genug DachsTaler! ${item.name} kostet ${item.price}, du hast ${balance}.`, { headers: RESPONSE_HEADERS });
     }
 
-    if (item.type === 'unlock' && item.requires) {
-      if (!await hasUnlock(username, item.requires, env)) {
-        return new Response(`@${username} ❌ Du musst zuerst ${PREREQUISITE_NAMES[item.requires]} freischalten!`, { headers: RESPONSE_HEADERS });
-      }
+    if (item.type === 'unlock' && item.requires && !hasPrerequisite) {
+      return new Response(`@${username} ❌ Du musst zuerst ${PREREQUISITE_NAMES[item.requires]} freischalten!`, { headers: RESPONSE_HEADERS });
     }
 
     if (item.type === 'prestige') {
-      const currentRank = await getPrestigeRank(username, env);
       const currentIndex = currentRank ? PRESTIGE_RANKS.indexOf(currentRank) : -1;
       const newIndex = PRESTIGE_RANKS.indexOf(item.rank);
 
@@ -108,7 +129,8 @@ async function buyShopItem(username, itemId, env) {
     }
 
     if (item.type === 'unlock') {
-      if (await hasUnlock(username, item.unlockKey, env)) {
+      // OPTIMIZED: hasExistingUnlock already loaded in parallel above
+      if (hasExistingUnlock) {
         return new Response(`@${username} ❌ Du hast ${item.name} bereits freigeschaltet!`, { headers: RESPONSE_HEADERS });
       }
       await Promise.all([
@@ -145,15 +167,17 @@ async function buyShopItem(username, itemId, env) {
     if (item.type === 'boost') {
       // Check weekly limit for Dachs-Boost
       if (item.weeklyLimit) {
-        // Check if boost is already active
+        // OPTIMIZED: Check existing boost AND weekly purchases in parallel
         const boostKey = `boost:${username.toLowerCase()}:${item.symbol}`;
-        const existingBoost = await env.SLOTS_KV.get(boostKey);
+        const [existingBoost, purchases] = await Promise.all([
+          env.SLOTS_KV.get(boostKey),
+          getDachsBoostPurchases(username, env)
+        ]);
 
         if (existingBoost === 'active') {
           return new Response(`@${username} ❌ Du hast bereits einen aktiven ${item.name}! Nutze ihn erst, bevor du einen neuen kaufst.`, { headers: RESPONSE_HEADERS });
         }
 
-        const purchases = await getDachsBoostPurchases(username, env);
         if (purchases.count >= 1) {
           return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal 1 Dachs-Boost pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
         }

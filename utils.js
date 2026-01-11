@@ -71,6 +71,11 @@ function isLeaderboardBlocked(username) {
   return leaderboardBlocklist.includes(username.toLowerCase());
 }
 
+// OPTIMIZED: Helper function to calculate TTL for buffs (avoids repeated inline calculation)
+function calculateBuffTTL(expireAt, minTTL = 60) {
+  return Math.max(minTTL, Math.floor((expireAt - Date.now()) / 1000) + 60);
+}
+
 export {
   secureRandom,
   secureRandomInt,
@@ -81,5 +86,6 @@ export {
   getCurrentMonth,
   getCurrentDate,
   getWeekStart,
-  isLeaderboardBlocked
+  isLeaderboardBlocked,
+  calculateBuffTTL
 };

@@ -41,6 +41,34 @@ import { handleSlot } from './commands/slots.js';
 // Shop commands
 import { handleShop } from './commands/shop.js';
 
+// OPTIMIZED: Static command maps at module level (avoid recreation per request)
+const LEADERBOARD_ALIASES = new Set(['lb', 'leaderboard', 'rank', 'ranking']);
+const BALANCE_ALIASES = new Set(['balance', 'konto']);
+const INFO_ALIASES = new Set(['info', 'help', 'commands']);
+
+// Admin commands that take (username, target, env)
+const ADMIN_COMMANDS_TARGET = {
+  ban: handleBan,
+  unban: handleUnban,
+  reset: handleReset,
+  freeze: handleFreeze,
+  unfreeze: handleUnfreeze,
+  clearallbuffs: handleClearAllBuffs,
+  getstats: handleGetStats,
+  getdaily: handleGetDaily,
+  resetdaily: handleResetDaily,
+  wipe: handleWipe,
+  removefromlb: handleRemoveFromLB
+};
+
+// Admin commands that take (username, target, amount, env)
+const ADMIN_COMMANDS_AMOUNT = {
+  give: handleGive,
+  setbalance: handleSetBalance,
+  givebuff: handleGiveBuff,
+  removebuff: handleRemoveBuff
+};
+
 export default {
   async fetch(request, env) {
     try {
@@ -57,21 +85,22 @@ export default {
         return new Response('Invalid username', { headers: RESPONSE_HEADERS });
       }
 
+      // OPTIMIZED: Parallelize security checks for faster response
       if (action !== 'leaderboard') {
-        if (await isBlacklisted(cleanUsername, env)) {
+        const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
+          isBlacklisted(cleanUsername, env),
+          env.SLOTS_KV.get(`frozen:${cleanUsername.toLowerCase()}`),
+          env.SLOTS_KV.get('maintenance_mode')
+        ]);
+
+        if (blacklisted) {
           return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
         }
-
-        // Check if user is frozen
-        const isFrozen = await env.SLOTS_KV.get(`frozen:${cleanUsername.toLowerCase()}`);
         if (isFrozen === 'true') {
           return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
         }
-
-        // Check maintenance mode (only for non-admins)
-        const maintenanceMode = await env.SLOTS_KV.get('maintenance_mode');
         if (maintenanceMode === 'true' && !isAdmin(cleanUsername)) {
-          return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
+          return new Response(`@${cleanUsername} �� Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
         }
       }
 
@@ -92,42 +121,29 @@ export default {
             return new Response(`@${cleanUsername} ❓ Meintest du !shop buy [Nummer]? (z.B. !shop buy 1)`, { headers: RESPONSE_HEADERS });
           }
 
-          // Special commands map for O(1) lookup
-          const specialCommands = {
-            lb: () => handleLeaderboard(env),
-            leaderboard: () => handleLeaderboard(env),
-            rank: () => handleLeaderboard(env),
-            ranking: () => handleLeaderboard(env),
-            balance: () => handleBalance(cleanUsername, env),
-            konto: () => handleBalance(cleanUsername, env),
-            daily: () => handleDaily(cleanUsername, env),
-            info: () => new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS }),
-            help: () => new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS }),
-            commands: () => new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS }),
-            stats: () => handleStats(cleanUsername, env),
-            buffs: () => handleBuffs(cleanUsername, env),
-            bank: () => handleBank(cleanUsername, env)
-          };
+          // OPTIMIZED: Use static command maps for O(1) lookup
+          if (LEADERBOARD_ALIASES.has(lower)) return await handleLeaderboard(env);
+          if (BALANCE_ALIASES.has(lower)) return await handleBalance(cleanUsername, env);
+          if (INFO_ALIASES.has(lower)) return new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS });
+          if (lower === 'daily') return await handleDaily(cleanUsername, env);
+          if (lower === 'stats') return await handleStats(cleanUsername, env);
+          if (lower === 'buffs') return await handleBuffs(cleanUsername, env);
+          if (lower === 'bank') return await handleBank(cleanUsername, env);
 
-          if (specialCommands[lower]) return await specialCommands[lower]();
-          if (lower === 'give') return await handleGive(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
-          if (lower === 'ban') return await handleBan(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'unban') return await handleUnban(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'reset') return await handleReset(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'freeze') return await handleFreeze(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'unfreeze') return await handleUnfreeze(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'setbalance') return await handleSetBalance(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
+          // Admin commands with target only
+          if (ADMIN_COMMANDS_TARGET[lower]) {
+            return await ADMIN_COMMANDS_TARGET[lower](cleanUsername, url.searchParams.get('target'), env);
+          }
+
+          // Admin commands with target and amount
+          if (ADMIN_COMMANDS_AMOUNT[lower]) {
+            return await ADMIN_COMMANDS_AMOUNT[lower](cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
+          }
+
+          // Special admin commands with unique signatures
           if (lower === 'bankset') return await handleBankSet(cleanUsername, url.searchParams.get('target'), env);
           if (lower === 'bankreset') return await handleBankReset(cleanUsername, env);
-          if (lower === 'givebuff') return await handleGiveBuff(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
-          if (lower === 'removebuff') return await handleRemoveBuff(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
-          if (lower === 'clearallbuffs') return await handleClearAllBuffs(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'getstats') return await handleGetStats(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'getdaily') return await handleGetDaily(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'resetdaily') return await handleResetDaily(cleanUsername, url.searchParams.get('target'), env);
           if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'wipe') return await handleWipe(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'removefromlb') return await handleRemoveFromLB(cleanUsername, url.searchParams.get('target'), env);
           if (lower === 'disclaimer') {
             // For disclaimer, check the target parameter (which is $(2) in Fossabot)
             const targetParam = url.searchParams.get('target');

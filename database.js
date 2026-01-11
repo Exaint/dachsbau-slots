@@ -555,6 +555,19 @@ async function decrementMulligan(username, env) {
   }
 }
 
+// OPTIMIZED: Set mulligan directly when count is already known (avoids redundant KV read)
+async function setMulliganCount(username, count, env) {
+  try {
+    if (count <= 0) {
+      await env.SLOTS_KV.delete(`mulligan:${username.toLowerCase()}`);
+    } else {
+      await env.SLOTS_KV.put(`mulligan:${username.toLowerCase()}`, count.toString());
+    }
+  } catch (error) {
+    console.error('setMulliganCount Error:', error);
+  }
+}
+
 // Insurance
 async function addInsurance(username, count, env) {
   try {
@@ -586,14 +599,28 @@ async function decrementInsurance(username, env) {
   }
 }
 
+// OPTIMIZED: Set insurance directly when count is already known (avoids redundant KV read)
+async function setInsuranceCount(username, count, env) {
+  try {
+    if (count <= 0) {
+      await env.SLOTS_KV.delete(`insurance:${username.toLowerCase()}`);
+    } else {
+      await env.SLOTS_KV.put(`insurance:${username.toLowerCase()}`, count.toString());
+    }
+  } catch (error) {
+    console.error('setInsuranceCount Error:', error);
+  }
+}
+
 // Spin Bundle Purchases
 async function getSpinBundlePurchases(username, env) {
   try {
+    // OPTIMIZED: Cache getWeekStart() result to avoid multiple Date calculations
+    const currentWeekStart = getWeekStart();
     const value = await env.SLOTS_KV.get(`bundle_purchases:${username.toLowerCase()}`);
-    if (!value) return { count: 0, weekStart: getWeekStart() };
+    if (!value) return { count: 0, weekStart: currentWeekStart };
     const data = JSON.parse(value);
 
-    const currentWeekStart = getWeekStart();
     if (data.weekStart !== currentWeekStart) {
       return { count: 0, weekStart: currentWeekStart };
     }
@@ -618,11 +645,12 @@ async function incrementSpinBundlePurchases(username, env) {
 // Dachs Boost Purchases
 async function getDachsBoostPurchases(username, env) {
   try {
+    // OPTIMIZED: Cache getWeekStart() result to avoid multiple Date calculations
+    const currentWeekStart = getWeekStart();
     const value = await env.SLOTS_KV.get(`dachsboost_purchases:${username.toLowerCase()}`);
-    if (!value) return { count: 0, weekStart: getWeekStart() };
+    if (!value) return { count: 0, weekStart: currentWeekStart };
     const data = JSON.parse(value);
 
-    const currentWeekStart = getWeekStart();
     if (data.weekStart !== currentWeekStart) {
       return { count: 0, weekStart: currentWeekStart };
     }
@@ -978,9 +1006,11 @@ export {
   consumeBoost,
   getMulliganCount,
   decrementMulligan,
+  setMulliganCount,
   addInsurance,
   getInsuranceCount,
   decrementInsurance,
+  setInsuranceCount,
   getSpinBundlePurchases,
   incrementSpinBundlePurchases,
   getDachsBoostPurchases,

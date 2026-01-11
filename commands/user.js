@@ -10,7 +10,8 @@ import {
   MONTHLY_LOGIN_REWARDS,
   DAILY_AMOUNT,
   DAILY_BOOST_AMOUNT,
-  URLS
+  URLS,
+  BUFF_SYMBOLS_WITH_NAMES
 } from '../constants.js';
 import { sanitizeUsername, validateAmount, isLeaderboardBlocked } from '../utils.js';
 import {
@@ -60,11 +61,16 @@ async function handleBalance(username, env) {
 
 async function handleStats(username, env) {
   try {
-    if (!await hasUnlock(username, 'stats_tracker', env)) {
+    // OPTIMIZED: Load unlock check and stats in parallel
+    const [hasStatsUnlock, stats] = await Promise.all([
+      hasUnlock(username, 'stats_tracker', env),
+      getStats(username, env)
+    ]);
+
+    if (!hasStatsUnlock) {
       return new Response(`@${username} ❌ Du benötigst den Stats Tracker! Kaufe ihn im Shop: !shop buy 18`, { headers: RESPONSE_HEADERS });
     }
 
-    const stats = await getStats(username, env);
     const winRate = stats.totalSpins > 0 ? ((stats.wins / stats.totalSpins) * 100).toFixed(1) : 0;
 
     return new Response(`@${username} 📊 Stats: ${stats.totalSpins} Spins | ${stats.wins} Wins (${winRate}%) | Größter Gewinn: ${stats.biggestWin} | Total: ${stats.totalWon - stats.totalLost >= 0 ? '+' : ''}${stats.totalWon - stats.totalLost}`, { headers: RESPONSE_HEADERS });
@@ -178,66 +184,65 @@ async function handleBuffs(username, env) {
       return null;
     });
 
-    const timedResults = await Promise.all(timedBuffPromises);
+    // OPTIMIZED: Load ALL buff data in parallel, use static constant for symbols
+    const [
+      timedResults,
+      dachsLocator,
+      rageMode,
+      ...otherResults
+    ] = await Promise.all([
+      Promise.all(timedBuffPromises),
+      getBuffWithUses(username, 'dachs_locator', env),
+      getBuffWithStack(username, 'rage_mode', env),
+      // Symbol boosts - use static constant
+      ...BUFF_SYMBOLS_WITH_NAMES.map(s => env.SLOTS_KV.get(`boost:${username.toLowerCase()}:${s.symbol}`)),
+      // Win Multiplier
+      env.SLOTS_KV.get(`winmulti:${username.toLowerCase()}`),
+      // Insurance, Guaranteed Pair, Wild Card
+      getInsuranceCount(username, env),
+      hasGuaranteedPair(username, env),
+      hasWildCard(username, env)
+    ]);
+
+    // Process timed buffs
     buffs.push(...timedResults.filter(b => b !== null));
 
-    // Buffs with Uses (Dachs Locator)
-    const dachsLocator = await getBuffWithUses(username, 'dachs_locator', env);
+    // Dachs Locator
     if (dachsLocator.active) {
       buffs.push(`🦡 Dachs Locator (${dachsLocator.uses} Spins)`);
     }
 
-    // Buffs with Stack (Rage Mode) - use data from getBuffWithStack to avoid redundant reads
-    const rageMode = await getBuffWithStack(username, 'rage_mode', env);
+    // Rage Mode
     if (rageMode.active && rageMode.data) {
       const remaining = rageMode.data.expireAt - Date.now();
       const minutes = Math.floor(remaining / MS_PER_MINUTE);
       buffs.push(`🔥 Rage Mode (${minutes}m, Stack: ${rageMode.stack}%)`);
     }
 
-    // Symbol Boosts (check all symbols)
-    const symbols = [
-      { symbol: '🍒', name: 'Kirschen' },
-      { symbol: '🍋', name: 'Zitronen' },
-      { symbol: '🍊', name: 'Orangen' },
-      { symbol: '🍇', name: 'Trauben' },
-      { symbol: '🍉', name: 'Wassermelonen' },
-      { symbol: '⭐', name: 'Stern' },
-      { symbol: '🦡', name: 'Dachs' }
-    ];
-
-    const boostPromises = symbols.map(async s => {
-      const value = await env.SLOTS_KV.get(`boost:${username.toLowerCase()}:${s.symbol}`);
-      if (value === 'active') {
-        return `${s.symbol} ${s.name}-Boost (1x)`;
+    // Symbol Boosts (indices 0-6 in otherResults) - use static constant
+    BUFF_SYMBOLS_WITH_NAMES.forEach((s, i) => {
+      if (otherResults[i] === 'active') {
+        buffs.push(`${s.symbol} ${s.name}-Boost (1x)`);
       }
-      return null;
     });
 
-    const boostResults = await Promise.all(boostPromises);
-    buffs.push(...boostResults.filter(b => b !== null));
-
-    // Win Multiplier
-    const winMulti = await env.SLOTS_KV.get(`winmulti:${username.toLowerCase()}`);
-    if (winMulti === 'active') {
+    // Win Multiplier (index 7)
+    if (otherResults[7] === 'active') {
       buffs.push('⚡ Win Multiplier (1x)');
     }
 
-    // Insurance Pack
-    const insurance = await getInsuranceCount(username, env);
-    if (insurance > 0) {
-      buffs.push(`🛡️ Insurance Pack (${insurance}x)`);
+    // Insurance Pack (index 8)
+    if (otherResults[8] > 0) {
+      buffs.push(`🛡️ Insurance Pack (${otherResults[8]}x)`);
     }
 
-    // Guaranteed Pair
-    const guaranteedPair = await hasGuaranteedPair(username, env);
-    if (guaranteedPair) {
+    // Guaranteed Pair (index 9)
+    if (otherResults[9]) {
       buffs.push('🎯 Guaranteed Pair (1x)');
     }
 
-    // Wild Card
-    const wildCard = await hasWildCard(username, env);
-    if (wildCard) {
+    // Wild Card (index 10)
+    if (otherResults[10]) {
       buffs.push('🃏 Wild Card (1x)');
     }
 
@@ -301,14 +306,11 @@ async function handleTransfer(username, target, amount, env) {
 
       const newSenderBalance = senderBalance - parsedAmount;
 
-      // Update sender balance and bank atomically
-      await Promise.all([
+      // OPTIMIZED: Update balance and bank atomically, use returned value instead of re-fetching
+      const [, newBankBalance] = await Promise.all([
         setBalance(username, newSenderBalance, env),
         updateBankBalance(parsedAmount, env)
       ]);
-
-      // Get final bank balance for display
-      const newBankBalance = await getBankBalance(env);
 
       return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DT 🏦`, { headers: RESPONSE_HEADERS });
     }

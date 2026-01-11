@@ -782,9 +782,9 @@ async function consumeFreeSpinWithMultiplier(username, env, maxRetries = 3) {
         return { used: false, multiplier: 0 };
       }
 
-      // Prepare update
+      // Prepare update - OPTIMIZED: Use deep copy instead of redundant JSON.parse
       const multiplierToReturn = lowestEntry.multiplier;
-      const updatedFreeSpins = JSON.parse(value); // Fresh copy to avoid mutation issues
+      const updatedFreeSpins = freeSpins.map(entry => ({ ...entry }));
       updatedFreeSpins[0].count--;
 
       if (updatedFreeSpins[0].count <= 0) {

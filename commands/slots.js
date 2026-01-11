@@ -32,7 +32,8 @@ import {
   BUFF_REROLL_CHANCE,
   SYMBOL_BOOST_CHANCE,
   URLS,
-  GUARANTEED_PAIR_SYMBOLS
+  GUARANTEED_PAIR_SYMBOLS,
+  SPIN_LOSS_MESSAGES
 } from '../constants.js';
 import { getWeightedSymbol, secureRandom, secureRandomInt, calculateBuffTTL } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
@@ -759,8 +760,8 @@ function calculateWin(grid) {
     return { points, message: `Doppel ${symbol}!${wildSuffix}` };
   }
 
-  const messages = ['Leider verloren! 😢', 'Nächstes Mal!', 'Fast! Versuch es nochmal!', 'Kein Glück diesmal...'];
-  return { points: 0, message: messages[secureRandomInt(0, messages.length - 1)] };
+  // OPTIMIZED: Use static constant instead of recreating array
+  return { points: 0, message: SPIN_LOSS_MESSAGES[secureRandomInt(0, SPIN_LOSS_MESSAGES.length - 1)] };
 }
 
 export { handleSlot, calculateWin };

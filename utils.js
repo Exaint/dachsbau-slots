@@ -1,5 +1,10 @@
-import { SYMBOL_WEIGHTS, TOTAL_WEIGHT } from './constants.js';
+import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, RESPONSE_HEADERS } from './constants.js';
 import { ADMINS } from './config.js';
+
+// OPTIMIZED: Response helper to reduce code duplication (~80+ usages)
+function respond(message) {
+  return new Response(message, { headers: RESPONSE_HEADERS });
+}
 
 // Cryptographically secure random number generator (0 to 1, like Math.random but secure)
 function secureRandom() {
@@ -16,12 +21,11 @@ function secureRandomInt(min, max) {
   return (buffer[0] % range) + min;
 }
 
-// OPTIMIZED: Function to get weighted random symbol (saves memory) - NOW CRYPTOGRAPHICALLY SECURE
+// OPTIMIZED: Function to get weighted random symbol using pre-computed cumulative weights
 function getWeightedSymbol() {
   const rand = secureRandom() * TOTAL_WEIGHT;
-  let cumulative = 0;
-  for (const { symbol, weight } of SYMBOL_WEIGHTS) {
-    cumulative += weight;
+  // Use pre-computed cumulative weights for faster lookup
+  for (const { symbol, cumulative } of CUMULATIVE_WEIGHTS) {
     if (rand < cumulative) return symbol;
   }
   return '⭐'; // Fallback
@@ -77,6 +81,7 @@ function calculateBuffTTL(expireAt, minTTL = 60) {
 }
 
 export {
+  respond,
   secureRandom,
   secureRandomInt,
   getWeightedSymbol,

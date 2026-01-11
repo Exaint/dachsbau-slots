@@ -37,7 +37,7 @@ const INSURANCE_REFUND_RATE = 0.5; // 50% Refund
 // DEBUG MODE - Set to true for testing (exaint_ only)
 const DEBUG_MODE = false; // Change to true to enable
 
-// OPTIMIZED: Symbol weights for weighted random selection (replaces 120-element array)
+// OPTIMIZED: Symbol weights with pre-computed cumulative weights (eliminates loop iteration)
 const SYMBOL_WEIGHTS = [
   { symbol: '🍒', weight: 24 },
   { symbol: '🍋', weight: 20 },
@@ -48,6 +48,13 @@ const SYMBOL_WEIGHTS = [
   { symbol: '⭐', weight: 10 }
 ];
 const TOTAL_WEIGHT = 120;
+
+// Pre-computed cumulative weights for O(1) binary search lookup
+const CUMULATIVE_WEIGHTS = SYMBOL_WEIGHTS.reduce((acc, { symbol, weight }) => {
+  const cumulative = (acc.length > 0 ? acc[acc.length - 1].cumulative : 0) + weight;
+  acc.push({ symbol, cumulative });
+  return acc;
+}, []);
 
 const SHOP_ITEMS = {
   1: { name: 'Peek Token', price: 75, type: 'peek' },
@@ -132,6 +139,9 @@ const ROTATING_LOSS_MESSAGES = [
   ' 🦡🌳 Der Dachs genießt die Natur... Geh raus! 🌳'
 ];
 
+// OPTIMIZED: Static loss messages array (avoid recreation per spin)
+const SPIN_LOSS_MESSAGES = ['Leider verloren! 😢', 'Nächstes Mal!', 'Fast! Versuch es nochmal!', 'Kein Glück diesmal...'];
+
 // Monthly Login rewards
 const MONTHLY_LOGIN_REWARDS = {
   1: 50,
@@ -211,6 +221,7 @@ export {
   DEBUG_MODE,
   SYMBOL_WEIGHTS,
   TOTAL_WEIGHT,
+  CUMULATIVE_WEIGHTS,
   SHOP_ITEMS,
   PREREQUISITE_NAMES,
   PRESTIGE_RANKS,
@@ -253,5 +264,6 @@ export {
   ALL_SYMBOLS,
   ALL_UNLOCK_KEYS,
   GUARANTEED_PAIR_SYMBOLS,
-  BUFF_SYMBOLS_WITH_NAMES
+  BUFF_SYMBOLS_WITH_NAMES,
+  SPIN_LOSS_MESSAGES
 };

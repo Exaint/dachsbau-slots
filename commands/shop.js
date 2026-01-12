@@ -245,7 +245,7 @@ async function buyShopItem(username, itemId, env) {
       ]);
 
       const remainingPurchases = WEEKLY_SPIN_BUNDLE_LIMIT - (purchases.count + 1);
-      return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DT) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Noch ${remainingPurchases} Käufe diese Woche möglich`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DachsTaler) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Noch ${remainingPurchases} Käufe diese Woche möglich`, { headers: RESPONSE_HEADERS });
     }
 
     if (item.type === 'peek') {
@@ -396,4 +396,4 @@ function spinWheel() {
   return { result: '💸 💸 ⭐ 💰 🦡', message: 'Leider verloren!', prize: 0 };
 }
 
-export { handleShop, buyShopItem, spinWheel };
+export { handleShop, buyShopItem };

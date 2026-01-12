@@ -1,4 +1,4 @@
-import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, RESPONSE_HEADERS, BUFF_TTL_BUFFER_SECONDS } from './constants.js';
+import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS } from './constants.js';
 import { ADMINS } from './config.js';
 
 // OPTIMIZED: Cached DateTimeFormat instances (avoid recreation per request)
@@ -11,11 +11,6 @@ const GERMAN_DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
 
 // OPTIMIZED: Pre-compiled regex patterns (avoid recompilation per request)
 const USERNAME_SANITIZE_REGEX = /[^a-z0-9_]/gi;
-
-// OPTIMIZED: Response helper to reduce code duplication (~80+ usages)
-function respond(message) {
-  return new Response(message, { headers: RESPONSE_HEADERS });
-}
 
 // Cryptographically secure random number generator (0 to 1, like Math.random but secure)
 function secureRandom() {
@@ -114,7 +109,6 @@ function exponentialBackoff(attempt, baseMs = 10) {
 }
 
 export {
-  respond,
   secureRandom,
   secureRandomInt,
   getWeightedSymbol,

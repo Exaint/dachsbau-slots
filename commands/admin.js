@@ -205,7 +205,7 @@ async function handleSetBalance(username, target, amount, env) {
     const newBalance = Math.min(parsedAmount, MAX_BALANCE);
     await setBalance(cleanTarget, newBalance, env);
 
-    return new Response(`@${username} ✅ Balance von @${cleanTarget} auf ${newBalance} DT gesetzt! 💰`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ Balance von @${cleanTarget} auf ${newBalance} DachsTaler gesetzt! 💰`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleSetBalance Error:', error);
     return new Response(`@${username} ❌ Fehler beim Setzen der Balance.`, { headers: RESPONSE_HEADERS });
@@ -228,7 +228,7 @@ async function handleBankSet(username, amount, env) {
 
     await env.SLOTS_KV.put(BANK_KEY, parsedAmount.toString());
 
-    return new Response(`@${username} ✅ DachsBank auf ${parsedAmount.toLocaleString('de-DE')} DT gesetzt! 🏦`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ DachsBank auf ${parsedAmount.toLocaleString('de-DE')} DachsTaler gesetzt! 🏦`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleBankSet Error:', error);
     return new Response(`@${username} ❌ Fehler beim Setzen der Bank.`, { headers: RESPONSE_HEADERS });
@@ -242,7 +242,7 @@ async function handleBankReset(username, env) {
 
     await env.SLOTS_KV.put(BANK_KEY, '0');
 
-    return new Response(`@${username} ✅ DachsBank wurde auf 0 DT zurückgesetzt! 🏦`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ DachsBank wurde auf 0 DachsTaler zurückgesetzt! 🏦`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleBankReset Error:', error);
     return new Response(`@${username} ❌ Fehler beim Zurücksetzen der Bank.`, { headers: RESPONSE_HEADERS });
@@ -403,7 +403,7 @@ async function handleGetStats(username, target, env) {
     ]);
 
     const losses = stats.totalSpins - stats.wins;
-    return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} DT | Wins: ${stats.wins} | Losses: ${losses} | Total: ${stats.totalSpins} | Streak: ${streak.wins}W ${streak.losses}L`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} DachsTaler | Wins: ${stats.wins} | Losses: ${losses} | Total: ${stats.totalSpins} | Streak: ${streak.wins}W ${streak.losses}L`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleGetStats Error:', error);
     return new Response(`@${username} ❌ Fehler beim Abrufen der Stats.`, { headers: RESPONSE_HEADERS });
@@ -471,11 +471,12 @@ async function handleMaintenance(username, mode, env) {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
 
-    if (!mode || (mode.toLowerCase() !== 'on' && mode.toLowerCase() !== 'off')) {
+    const lowerMode = mode?.toLowerCase();
+    if (!lowerMode || (lowerMode !== 'on' && lowerMode !== 'off')) {
       return new Response(`@${username} ❌ Nutze: !slots maintenance [on/off]`, { headers: RESPONSE_HEADERS });
     }
 
-    if (mode.toLowerCase() === 'on') {
+    if (lowerMode === 'on') {
       await env.SLOTS_KV.put('maintenance_mode', 'true');
       return new Response(`@${username} ✅ Wartungsmodus aktiviert! Nur Admins können spielen. 🔧`, { headers: RESPONSE_HEADERS });
     } else {

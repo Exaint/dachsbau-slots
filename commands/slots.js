@@ -354,10 +354,10 @@ async function calculateStreakBonuses(username, isWin, env) {
 }
 
 // Helper: Build response message (D2 format)
-// Format: [ Grid ] Result! +X DT 💰 ║ Natural Bonuses ║ 🛒 Shop Buffs ║ Kontostand: X DT
+// Format: [ Grid ] Result! +X DachsTaler 💰 ║ Natural Bonuses ║ 🛒 Shop Buffs ║ Kontostand: X DachsTaler
 function buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage) {
   const rankSymbol = rank ? `${rank} ` : '';
-  const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DT)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
+  const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DachsTaler)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
   const middleRow = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ');
 
   const messageParts = [`@${username}`, rankSymbol, freeSpinPrefix, `[ ${middleRow} ]`];
@@ -368,7 +368,7 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
   }
   // Win
   else if (totalWin > 0) {
-    messageParts.push(`${result.message} +${totalWin} DT 💰`);
+    messageParts.push(`${result.message} +${totalWin} DachsTaler 💰`);
 
     // Hourly Jackpot (special natural bonus)
     if (hourlyJackpotWon) {
@@ -395,7 +395,7 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
     messageParts.push(`${result.message} 💸`);
   }
 
-  messageParts.push(`║ Kontostand: ${newBalance} DT`);
+  messageParts.push(`║ Kontostand: ${newBalance} DachsTaler`);
 
   if (lossWarningMessage) {
     messageParts.push(lossWarningMessage);
@@ -602,7 +602,7 @@ async function handleSlot(username, amountParam, url, env) {
         ]);
         const rankSymbol = rank ? `${rank} ` : '';
 
-        return new Response(`@${username} ${rankSymbol}[ ${grid[3]} ${grid[4]} ${grid[5]} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DT`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} ${rankSymbol}[ ${grid[3]} ${grid[4]} ${grid[5]} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
       }
     }
 
@@ -660,8 +660,8 @@ async function handleSlot(username, amountParam, url, env) {
         if (dailyAvailable) {
           const dailyAmountValue = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
           lossWarningMessage = lossWarningMessage
-            ? `${lossWarningMessage} ⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DT`
-            : `⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DT`;
+            ? `${lossWarningMessage} ⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DachsTaler`
+            : `⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DachsTaler`;
         }
       } catch (error) {
         console.error('Low Balance Warning Check Error:', error);
@@ -678,7 +678,7 @@ async function handleSlot(username, amountParam, url, env) {
     });
 
     if (customMsg) {
-      return new Response(`@${username} [ ${[grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DT`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} [ ${[grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DachsTaler`, { headers: RESPONSE_HEADERS });
     }
 
     // Build response message (D2 format)

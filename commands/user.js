@@ -70,7 +70,7 @@ async function handleBalance(username, env) {
       return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰`, { headers: RESPONSE_HEADERS });
     }
 
-    const details = freeSpins.map(fs => `${fs.count}x ${fs.multiplier * 10}DT`).join(', ');
+    const details = freeSpins.map(fs => `${fs.count}x ${fs.multiplier * 10} DachsTaler`).join(', ');
 
     return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰 | 🎰 ${totalCount} Free Spins | Details: ${details}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -115,6 +115,7 @@ async function handleDaily(username, env) {
     // Check if daily was already claimed today (UTC day reset)
     const nowDate = new Date(now);
     const todayUTC = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
+    const daysInMonth = getDaysInCurrentMonth(); // Cache once at start
 
     if (lastDaily) {
       const lastDailyDate = new Date(lastDaily);
@@ -128,7 +129,6 @@ async function handleDaily(username, env) {
         const remainingHours = Math.floor(remainingMs / MS_PER_HOUR);
         const remainingMinutes = Math.floor((remainingMs % MS_PER_HOUR) / MS_PER_MINUTE);
 
-        const daysInMonth = getDaysInCurrentMonth();
         return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${remainingHours}h ${remainingMinutes}m | Login-Tage: ${monthlyLogin.days.length}/${daysInMonth} 📅`, { headers: RESPONSE_HEADERS });
       }
     }
@@ -151,11 +151,9 @@ async function handleDaily(username, env) {
     let milestoneText = '';
 
     if (isNewMilestone) {
-      milestoneText = ` | 🎉 ${newMonthlyLogin.days.length} Tage Milestone: +${milestoneBonus} DT!`;
+      milestoneText = ` | 🎉 ${newMonthlyLogin.days.length} Tage Milestone: +${milestoneBonus} DachsTaler!`;
     }
 
-
-    const daysInMonth = getDaysInCurrentMonth();
     return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/${daysInMonth} 📅 | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleDaily Error:', error);
@@ -292,10 +290,10 @@ async function handleBank(username, env) {
     const balance = await getBankBalance(env);
 
     if (balance >= 0) {
-      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DT | Die Bank ist im Plus! 💰`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DachsTaler | Die Bank ist im Plus! 💰`, { headers: RESPONSE_HEADERS });
     } else {
       const deficit = Math.abs(balance);
-      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DT | Die Community hat die Bank um ${deficit.toLocaleString('de-DE')} DT geplündert! 🦡💸`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DachsTaler | Die Community hat die Bank um ${deficit.toLocaleString('de-DE')} DachsTaler geplündert! 🦡💸`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {
     console.error('handleBank Error:', error);
@@ -339,7 +337,7 @@ async function handleTransfer(username, target, amount, env) {
         updateBankBalance(parsedAmount, env)
       ]);
 
-      return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DT 🏦`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DachsTaler 🏦`, { headers: RESPONSE_HEADERS });
     }
 
     // Atomic transfer with retry mechanism to prevent race conditions

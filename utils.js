@@ -1,5 +1,16 @@
-import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, RESPONSE_HEADERS } from './constants.js';
+import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, RESPONSE_HEADERS, BUFF_TTL_BUFFER_SECONDS } from './constants.js';
 import { ADMINS } from './config.js';
+
+// OPTIMIZED: Cached DateTimeFormat instances (avoid recreation per request)
+const GERMAN_DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
+  timeZone: 'Europe/Berlin',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
+
+// OPTIMIZED: Pre-compiled regex patterns (avoid recompilation per request)
+const USERNAME_SANITIZE_REGEX = /[^a-z0-9_]/gi;
 
 // OPTIMIZED: Response helper to reduce code duplication (~80+ usages)
 function respond(message) {
@@ -39,7 +50,7 @@ function isAdmin(username) {
 
 function sanitizeUsername(username) {
   if (!username || typeof username !== 'string') return null;
-  const clean = username.trim().toLowerCase().replace(/[^a-z0-9_]/gi, '');
+  const clean = username.trim().toLowerCase().replace(USERNAME_SANITIZE_REGEX, '');
   if (clean.length < 1 || clean.length > 25) return null;
   return clean;
 }
@@ -53,13 +64,7 @@ function validateAmount(amount, min = 1, max = 100000) {
 // Helper to get date parts in German timezone (Europe/Berlin)
 function getGermanDateParts() {
   const now = new Date();
-  const formatter = new Intl.DateTimeFormat('de-DE', {
-    timeZone: 'Europe/Berlin',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
-  const parts = formatter.formatToParts(now);
+  const parts = GERMAN_DATE_FORMATTER.formatToParts(now);
   const year = parts.find(p => p.type === 'year').value;
   const month = parts.find(p => p.type === 'month').value;
   const day = parts.find(p => p.type === 'day').value;
@@ -99,8 +104,8 @@ function isLeaderboardBlocked(username) {
 }
 
 // OPTIMIZED: Helper function to calculate TTL for buffs (avoids repeated inline calculation)
-function calculateBuffTTL(expireAt, minTTL = 60) {
-  return Math.max(minTTL, Math.floor((expireAt - Date.now()) / 1000) + 60);
+function calculateBuffTTL(expireAt, minTTL = BUFF_TTL_BUFFER_SECONDS) {
+  return Math.max(minTTL, Math.floor((expireAt - Date.now()) / 1000) + BUFF_TTL_BUFFER_SECONDS);
 }
 
 export {

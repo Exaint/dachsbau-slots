@@ -13,7 +13,11 @@ import {
   DIAMOND_MINE_MIN_SPINS,
   DIAMOND_MINE_MAX_SPINS,
   URLS,
-  PEEK_TTL_SECONDS
+  PEEK_TTL_SECONDS,
+  WEEKLY_DACHS_BOOST_LIMIT,
+  WEEKLY_SPIN_BUNDLE_LIMIT,
+  SPIN_BUNDLE_COUNT,
+  SPIN_BUNDLE_MULTIPLIER
 } from '../constants.js';
 import { getWeightedSymbol, secureRandom, secureRandomInt } from '../utils.js';
 import {
@@ -187,8 +191,8 @@ async function buyShopItem(username, itemId, env) {
           return new Response(`@${username} ❌ Du hast bereits einen aktiven ${item.name}! Nutze ihn erst, bevor du einen neuen kaufst.`, { headers: RESPONSE_HEADERS });
         }
 
-        if (purchases.count >= 1) {
-          return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal 1 Dachs-Boost pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
+        if (purchases.count >= WEEKLY_DACHS_BOOST_LIMIT) {
+          return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal ${WEEKLY_DACHS_BOOST_LIMIT} Dachs-Boost pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
         }
 
         await Promise.all([
@@ -229,19 +233,19 @@ async function buyShopItem(username, itemId, env) {
 
     if (item.type === 'bundle') {
       const purchases = await getSpinBundlePurchases(username, env);
-      if (purchases.count >= 3) {
-        return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal 3 Spin Bundles pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
+      if (purchases.count >= WEEKLY_SPIN_BUNDLE_LIMIT) {
+        return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal ${WEEKLY_SPIN_BUNDLE_LIMIT} Spin Bundles pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
       }
 
       await Promise.all([
         setBalance(username, balance - item.price, env),
-        addFreeSpinsWithMultiplier(username, 10, 1, env),
+        addFreeSpinsWithMultiplier(username, SPIN_BUNDLE_COUNT, SPIN_BUNDLE_MULTIPLIER, env),
         incrementSpinBundlePurchases(username, env),
         updateBankBalance(item.price, env)
       ]);
 
-      const remainingPurchases = 3 - (purchases.count + 1);
-      return new Response(`@${username} ✅ Spin Bundle erhalten! 10 Free Spins (10 DT) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Noch ${remainingPurchases} Käufe diese Woche möglich`, { headers: RESPONSE_HEADERS });
+      const remainingPurchases = WEEKLY_SPIN_BUNDLE_LIMIT - (purchases.count + 1);
+      return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DT) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Noch ${remainingPurchases} Käufe diese Woche möglich`, { headers: RESPONSE_HEADERS });
     }
 
     if (item.type === 'peek') {

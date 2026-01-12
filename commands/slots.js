@@ -33,7 +33,11 @@ import {
   SYMBOL_BOOST_CHANCE,
   URLS,
   GUARANTEED_PAIR_SYMBOLS,
-  SPIN_LOSS_MESSAGES
+  SPIN_LOSS_MESSAGES,
+  RAGE_MODE_LOSS_STACK,
+  RAGE_MODE_MAX_STACK,
+  RAGE_MODE_WIN_THRESHOLD,
+  BUFF_TTL_BUFFER_SECONDS
 } from '../constants.js';
 import { getWeightedSymbol, secureRandom, secureRandomInt, calculateBuffTTL } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
@@ -72,6 +76,10 @@ import {
   checkAndClaimHourlyJackpot,
   getLastDaily
 } from '../database.js';
+
+// OPTIMIZED: Pre-compiled regex patterns (avoid recompilation per request)
+const INVISIBLE_CHARS_REGEX = /[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u0000-\u001F\u007F-\u009F]+/g;
+const NORMALIZE_SPACES_REGEX = /\s+/g;
 
 // Helper: Generiert Custom Message falls vorhanden
 function getCustomMessage(username, isWin, data) {
@@ -277,7 +285,7 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
     }
 
     // Profit Doubler (Shop Buff)
-    if (hasProfitDoubler && result.points > 100) {
+    if (hasProfitDoubler && result.points > RAGE_MODE_WIN_THRESHOLD) {
       result.points *= 2;
       shopBuffs.push('Profit x2');
     }
@@ -399,11 +407,11 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
 async function handleSlot(username, amountParam, url, env) {
   try {
 
-    // OPTIMIZED: Sanitize amountParam with single combined regex
+    // OPTIMIZED: Sanitize amountParam with pre-compiled regex patterns
     if (amountParam) {
       amountParam = amountParam
-        .replace(/[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u0000-\u001F\u007F-\u009F]+/g, '') // All invisible/control chars
-        .replace(/\s+/g, ' ') // Normalize spaces
+        .replace(INVISIBLE_CHARS_REGEX, '') // All invisible/control chars
+        .replace(NORMALIZE_SPACES_REGEX, ' ') // Normalize spaces
         .trim();
     }
 
@@ -551,7 +559,7 @@ async function handleSlot(username, amountParam, url, env) {
     // OPTIMIZED: Rage Mode inline updates (avoids redundant KV reads) + use calculateBuffTTL helper
     if (!isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
-      data.stack = Math.min((data.stack || 0) + 5, 50);
+      data.stack = Math.min((data.stack || 0) + RAGE_MODE_LOSS_STACK, RAGE_MODE_MAX_STACK);
       await Promise.all([
         env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
         resetStreakMultiplier(username, env)

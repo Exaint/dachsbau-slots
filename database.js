@@ -1,4 +1,4 @@
-import { MAX_BALANCE, BANK_USERNAME, BANK_START_BALANCE, DAILY_TTL_SECONDS, JACKPOT_CLAIM_TTL } from './constants.js';
+import { MAX_BALANCE, BANK_USERNAME, BANK_START_BALANCE, DAILY_TTL_SECONDS, JACKPOT_CLAIM_TTL, STARTING_BALANCE, STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, BUFF_TTL_BUFFER_SECONDS } from './constants.js';
 import { getCurrentMonth, getCurrentDate, getWeekStart } from './utils.js';
 
 // Balance Functions
@@ -7,14 +7,14 @@ async function getBalance(username, env) {
     const key = `user:${username.toLowerCase()}`;
     const value = await env.SLOTS_KV.get(key);
     if (value === null) {
-      await setBalance(username, 100, env);
-      return 100;
+      await setBalance(username, STARTING_BALANCE, env);
+      return STARTING_BALANCE;
     }
     const balance = parseInt(value, 10);
-    return isNaN(balance) ? 100 : Math.min(balance, MAX_BALANCE);
+    return isNaN(balance) ? STARTING_BALANCE : Math.min(balance, MAX_BALANCE);
   } catch (error) {
     console.error('getBalance Error:', error);
-    return 100;
+    return STARTING_BALANCE;
   }
 }
 
@@ -292,7 +292,7 @@ async function getStreakMultiplier(username, env) {
 async function incrementStreakMultiplier(username, env) {
   try {
     const current = await getStreakMultiplier(username, env);
-    const newMultiplier = Math.min(current + 0.1, 3.0); // Max 3.0x
+    const newMultiplier = Math.min(current + STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX);
     await env.SLOTS_KV.put(`streakmultiplier:${username.toLowerCase()}`, newMultiplier.toFixed(1));
     return newMultiplier;
   } catch (error) {
@@ -349,7 +349,7 @@ async function setUnlock(username, unlockKey, env) {
 async function activateBuff(username, buffKey, duration, env) {
   try {
     const expireAt = Date.now() + (duration * 1000);
-    await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, expireAt.toString(), { expirationTtl: duration + 60 });
+    await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, expireAt.toString(), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
     console.error('activateBuff Error:', error);
   }
@@ -371,7 +371,7 @@ async function activateBuffWithUses(username, buffKey, duration, uses, env) {
   try {
     const expireAt = Date.now() + (duration * 1000);
     const data = { expireAt, uses };
-    await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, JSON.stringify(data), { expirationTtl: duration + 60 });
+    await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
     console.error('activateBuffWithUses Error:', error);
   }
@@ -418,7 +418,7 @@ async function decrementBuffUses(username, buffKey, env, maxRetries = 3) {
       if (updatedData.uses <= 0) {
         await env.SLOTS_KV.delete(key);
       } else {
-        const ttl = Math.max(60, Math.floor((data.expireAt - Date.now()) / 1000) + 60);
+        const ttl = Math.max(BUFF_TTL_BUFFER_SECONDS, Math.floor((data.expireAt - Date.now()) / 1000) + BUFF_TTL_BUFFER_SECONDS);
         const metadata = { lastUpdate: Date.now(), attempt };
         await env.SLOTS_KV.put(key, JSON.stringify(updatedData), { expirationTtl: ttl, metadata });
       }
@@ -452,7 +452,7 @@ async function activateBuffWithStack(username, buffKey, duration, env) {
   try {
     const expireAt = Date.now() + (duration * 1000);
     const data = { expireAt, stack: 0 };
-    await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, JSON.stringify(data), { expirationTtl: duration + 60 });
+    await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
     console.error('activateBuffWithStack Error:', error);
   }

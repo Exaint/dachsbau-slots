@@ -100,7 +100,7 @@ export default {
           return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
         }
         if (maintenanceMode === 'true' && !isAdmin(cleanUsername)) {
-          return new Response(`@${cleanUsername} �� Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
+          return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
         }
       }
 

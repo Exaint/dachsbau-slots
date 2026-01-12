@@ -57,12 +57,12 @@ async function handleBalance(username, env) {
 
 
     if (totalCount === 0) {
-      return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰     `, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰`, { headers: RESPONSE_HEADERS });
     }
 
     const details = freeSpins.map(fs => `${fs.count}x ${fs.multiplier * 10}DT`).join(', ');
 
-    return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰 | 🎰 ${totalCount} Free Spins | Details: ${details}     `, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰 | 🎰 ${totalCount} Free Spins | Details: ${details}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleBalance Error:', error);
     return new Response(`@${username} ❌ Fehler beim Abrufen des Kontostands.`, { headers: RESPONSE_HEADERS });
@@ -144,7 +144,7 @@ async function handleDaily(username, env) {
     }
 
 
-    return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/Monat 📅 | Kontostand: ${newBalance}     `, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/Monat 📅 | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleDaily Error:', error);
     return new Response(`@${username} ❌ Fehler beim Daily Bonus.`, { headers: RESPONSE_HEADERS });

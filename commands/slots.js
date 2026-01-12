@@ -81,6 +81,15 @@ import {
 const INVISIBLE_CHARS_REGEX = /[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u0000-\u001F\u007F-\u009F]+/g;
 const NORMALIZE_SPACES_REGEX = /\s+/g;
 
+// Unlock prices for error messages (from SHOP_ITEMS)
+const UNLOCK_PRICES = {
+  20: 500,
+  30: 2000,
+  50: 2500,
+  100: 3250,
+  all: 4444
+};
+
 // Helper: Generiert Custom Message falls vorhanden
 function getCustomMessage(username, isWin, data) {
   const userMessages = CUSTOM_MESSAGES[username.toLowerCase()];
@@ -109,7 +118,7 @@ async function parseSpinAmount(username, amountParam, currentBalance, isFreeSpin
 
   if (lower === 'all') {
     if (!await hasUnlock(username, 'slots_all', env)) {
-      return { error: `@${username} ❌ !slots all nicht freigeschaltet! Weitere Infos: ${URLS.UNLOCK}` };
+      return { error: `@${username} ❌ !slots all nicht freigeschaltet! Du musst es für ${UNLOCK_PRICES.all} DachsTaler im Shop kaufen! Weitere Infos: ${URLS.UNLOCK}` };
     }
     if (currentBalance < BASE_SPIN_COST) {
       return { error: `@${username} ❌ Du brauchst mindestens ${BASE_SPIN_COST} DachsTaler für !slots all!` };
@@ -141,7 +150,7 @@ async function parseSpinAmount(username, amountParam, currentBalance, isFreeSpin
     if (await hasUnlock(username, UNLOCK_MAP[customAmount], env)) {
       return { spinCost: customAmount, multiplier: MULTIPLIER_MAP[customAmount] };
     }
-    return { error: `@${username} ❌ !slots ${customAmount} nicht freigeschaltet! Weitere Infos: ${URLS.UNLOCK}` };
+    return { error: `@${username} ❌ !slots ${customAmount} nicht freigeschaltet! Du musst es für ${UNLOCK_PRICES[customAmount]} DachsTaler im Shop kaufen! Weitere Infos: ${URLS.UNLOCK}` };
   }
 
   return { error: `@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all | Info: ${URLS.UNLOCK}` };

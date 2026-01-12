@@ -66,7 +66,6 @@ import {
   incrementStreakMultiplier,
   resetStreakMultiplier,
   getStreak,
-  resetStreak,
   updateStats,
   getPrestigeRank,
   updateBankBalance,
@@ -212,7 +211,10 @@ async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWild
 }
 
 // Helper: Apply multipliers and buffs to win result
+// Returns shopBuffs array for D2 message format
 async function applyMultipliersAndBuffs(username, result, multiplier, grid, env) {
+  const shopBuffs = []; // Track shop buffs separately for message
+
   // Award Free Spins
   if (result.freeSpins && result.freeSpins > 0) {
     try {
@@ -224,13 +226,13 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
 
   result.points = result.points * multiplier;
 
-  // Win Multiplier
+  // Win Multiplier (Shop Buff)
   if (result.points > 0 && await consumeWinMultiplier(username, env)) {
     result.points *= 2;
-    result.message += ' (⚡ 2x Win Boost!)';
+    shopBuffs.push('2x');
   }
 
-  // Symbol Boost
+  // Symbol Boost (Shop Buff)
   const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
   if (result.points > 0) {
     const uniqueMiddleSymbols = [...new Set(middle)];
@@ -249,7 +251,7 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
 
         if (hasMatch) {
           result.points *= 2;
-          result.message += ' (🔥 2x Boost!)';
+          shopBuffs.push('2x Boost');
           break;
         }
       }
@@ -257,6 +259,7 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
   }
 
   // OPTIMIZED: Golden Hour, Profit Doubler & Streak Multiplier in parallel
+  let streakMulti = 1.0;
   if (result.points > 0) {
     const [hasGoldenHour, hasProfitDoubler, currentStreakMulti] = await Promise.all([
       isBuffActive(username, 'golden_hour', env),
@@ -264,50 +267,50 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
       getStreakMultiplier(username, env)
     ]);
 
+    // Golden Hour (Shop Buff)
     if (hasGoldenHour) {
       result.points = Math.floor(result.points * 1.3);
-      result.message += ' (+30%)';
+      shopBuffs.push('+30%');
     }
 
+    // Profit Doubler (Shop Buff)
     if (hasProfitDoubler && result.points > 100) {
       result.points *= 2;
-      result.message += ' (📈 Profit x2!)';
+      shopBuffs.push('Profit x2');
     }
 
-    // Streak Multiplier
+    // Streak Multiplier (Natural bonus - tracked separately)
     if (currentStreakMulti > 1.0) {
       result.points = Math.floor(result.points * currentStreakMulti);
-      result.message += ` (🔥 ${currentStreakMulti.toFixed(1)}x Streak!)`;
+      streakMulti = currentStreakMulti;
     }
   }
+
+  return { shopBuffs, streakMulti };
 }
 
 // Helper: Calculate streak bonuses
+// Returns natural bonuses in D2 format
 async function calculateStreakBonuses(username, isWin, env) {
   const previousStreak = await getStreak(username, env);
 
+  const naturalBonuses = []; // Track natural bonuses for D2 format
   let streakBonus = 0;
-  let streakMessage = '';
   let comboBonus = 0;
-  let comboMessage = '';
   let lossWarningMessage = '';
   let shouldResetStreak = false;
 
   // Hot Streak
   if (isWin && previousStreak.wins + 1 === STREAK_THRESHOLD) {
     streakBonus += HOT_STREAK_BONUS;
-    streakMessage = ` 🔥 HOT STREAK! ${STREAK_THRESHOLD} Wins in Folge! +${HOT_STREAK_BONUS} DT Bonus!`;
+    naturalBonuses.push(`🔥 Hot Streak +${HOT_STREAK_BONUS}`);
     shouldResetStreak = true;
   }
 
   // Comeback King (can stack with Hot Streak if both conditions are met)
   if (isWin && previousStreak.losses >= STREAK_THRESHOLD) {
     streakBonus += COMEBACK_BONUS;
-    if (streakMessage) {
-      streakMessage += ` 👑 COMEBACK KING! +${COMEBACK_BONUS} DT!`;
-    } else {
-      streakMessage = ` 👑 COMEBACK KING! Nach ${STREAK_THRESHOLD} Verlusten gewonnen! +${COMEBACK_BONUS} DT Bonus!`;
-    }
+    naturalBonuses.push(`👑 Comeback +${COMEBACK_BONUS}`);
     shouldResetStreak = true;
   }
 
@@ -322,7 +325,7 @@ async function calculateStreakBonuses(username, isWin, env) {
   if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {
     comboBonus = COMBO_BONUSES[newStreak.wins] || 0;
     if (comboBonus > 0) {
-      comboMessage = ` 🎯 ${newStreak.wins}x Combo! +${comboBonus} DT!`;
+      naturalBonuses.push(`🎯 Combo +${comboBonus}`);
     }
   }
 
@@ -336,48 +339,52 @@ async function calculateStreakBonuses(username, isWin, env) {
     }
   }
 
-  return { streakBonus, streakMessage, comboBonus, comboMessage, lossWarningMessage, newStreak };
+  return { streakBonus, comboBonus, naturalBonuses, lossWarningMessage, newStreak };
 }
 
-// Helper: Build response message
-function buildResponseMessage(username, grid, result, spinCost, totalBonuses, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, streakMessage, comboMessage, lossWarningMessage) {
+// Helper: Build response message (D2 format)
+// Format: [ Grid ] Result! +X DT 💰 ║ Natural Bonuses ║ 🛒 Shop Buffs ║ Kontostand: X DT
+function buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage) {
   const rankSymbol = rank ? `${rank} ` : '';
   const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DT)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
   const middleRow = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ');
+
   const messageParts = [`@${username}`, rankSymbol, freeSpinPrefix, `[ ${middleRow} ]`];
 
+  // Free Spins won
   if (result.freeSpins && result.freeSpins > 0) {
-    messageParts.push(`║ ${result.message}`);
-  } else if (result.points > 0 || totalBonuses > 0) {
-    const totalWin = result.points + totalBonuses;
-    const netWin = totalWin - spinCost;
-    messageParts.push(`║ ${result.message}`);
-    if (result.points > 0) {
-      messageParts.push(`+${result.points}`);
-    }
+    messageParts.push(result.message);
+  }
+  // Win
+  else if (totalWin > 0) {
+    messageParts.push(`${result.message} +${totalWin} DT 💰`);
+
+    // Hourly Jackpot (special natural bonus)
     if (hourlyJackpotWon) {
-      messageParts.push(`⏰ HOURLY JACKPOT! +${HOURLY_JACKPOT_AMOUNT} DT!`);
+      naturalBonuses.unshift(`⏰ Jackpot +${HOURLY_JACKPOT_AMOUNT}`);
     }
-    if (streakMessage) {
-      messageParts.push(streakMessage);
+
+    // Streak Multiplier (natural bonus)
+    if (streakMulti > 1.0) {
+      naturalBonuses.push(`🔥 ${streakMulti.toFixed(1)}x Streak`);
     }
-    if (comboMessage) {
-      messageParts.push(comboMessage);
+
+    // Natural bonuses section
+    if (naturalBonuses.length > 0) {
+      messageParts.push(`║ ${naturalBonuses.join(' • ')}`);
     }
-    if (spinCost > 0) {
-      messageParts.push(`(-${spinCost}) = ${netWin >= 0 ? '+' : ''}${netWin} 💰`);
-    } else {
-      messageParts.push('💰');
-    }
-  } else {
-    if (spinCost > 0) {
-      messageParts.push(`║ ${result.message} -${spinCost} 💸`);
-    } else {
-      messageParts.push(`║ ${result.message}`);
+
+    // Shop buffs section
+    if (shopBuffs.length > 0) {
+      messageParts.push(`║ 🛒 ${shopBuffs.join(', ')}`);
     }
   }
+  // Loss
+  else {
+    messageParts.push(`${result.message} 💸`);
+  }
 
-  messageParts.push(`║ Kontostand: ${newBalance} DachsTaler 🦡`);
+  messageParts.push(`║ Kontostand: ${newBalance} DT`);
 
   if (lossWarningMessage) {
     messageParts.push(lossWarningMessage);
@@ -528,15 +535,14 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     // Apply multipliers and buffs to result
-    await applyMultipliersAndBuffs(username, result, multiplier, grid, env);
+    const { shopBuffs, streakMulti } = await applyMultipliersAndBuffs(username, result, multiplier, grid, env);
 
     // Calculate streak bonuses
     const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
     const streakBonusResult = await calculateStreakBonuses(username, isWin, env);
     const streakBonus = streakBonusResult.streakBonus;
-    const streakMessage = streakBonusResult.streakMessage;
     const comboBonus = streakBonusResult.comboBonus;
-    const comboMessage = streakBonusResult.comboMessage;
+    const naturalBonuses = streakBonusResult.naturalBonuses;
     let lossWarningMessage = streakBonusResult.lossWarningMessage;
 
     // OPTIMIZED: Rage Mode inline updates (avoids redundant KV reads) + use calculateBuffTTL helper
@@ -585,7 +591,7 @@ async function handleSlot(username, amountParam, url, env) {
         ]);
         const rankSymbol = rank ? `${rank} ` : '';
 
-        return new Response(`@${username} ${rankSymbol}[ ${grid[3]} ${grid[4]} ${grid[5]} ] ║ ${result.message} -${spinCost} (+${refund} Insurance) = -${spinCost - refund} 🛡️ ║ Kontostand: ${newBalanceWithRefund} DachsTaler (${insuranceCount - 1} Insurance übrig)`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} ${rankSymbol}[ ${grid[3]} ${grid[4]} ${grid[5]} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DT`, { headers: RESPONSE_HEADERS });
       }
     }
 
@@ -664,8 +670,9 @@ async function handleSlot(username, amountParam, url, env) {
       return new Response(`@${username} [ ${[grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DT`, { headers: RESPONSE_HEADERS });
     }
 
-    // Build response message
-    const message = buildResponseMessage(username, grid, result, spinCost, totalBonuses, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, streakMessage, comboMessage, lossWarningMessage);
+    // Build response message (D2 format)
+    const totalWin = result.points + totalBonuses;
+    const message = buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage);
     return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleSlot Error:', error);

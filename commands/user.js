@@ -10,8 +10,7 @@ import {
   MONTHLY_LOGIN_REWARDS,
   DAILY_AMOUNT,
   DAILY_BOOST_AMOUNT,
-  URLS,
-  BUFF_SYMBOLS_WITH_NAMES
+  URLS
 } from '../constants.js';
 import { sanitizeUsername, validateAmount, isLeaderboardBlocked } from '../utils.js';
 import {
@@ -35,6 +34,16 @@ import {
   getPrestigeRank,
   isBuffActive
 } from '../database.js';
+
+// Static: Timed buff definitions (avoid recreation per request)
+const TIMED_BUFF_KEYS = [
+  { key: 'happy_hour', name: 'Happy Hour', emoji: '⚡' },
+  { key: 'lucky_charm', name: 'Lucky Charm', emoji: '🍀' },
+  { key: 'golden_hour', name: 'Golden Hour', emoji: '✨' },
+  { key: 'profit_doubler', name: 'Profit Doubler', emoji: '📈' },
+  { key: 'star_magnet', name: 'Star Magnet', emoji: '⭐' },
+  { key: 'diamond_rush', name: 'Diamond Rush', emoji: '💎' }
+];
 
 async function handleBalance(username, env) {
   try {
@@ -145,18 +154,8 @@ async function handleBuffs(username, env) {
   try {
     const buffs = [];
 
-    // Timed Buffs (with expiry)
-    const timedBuffKeys = [
-      { key: 'happy_hour', name: 'Happy Hour', emoji: '⚡' },
-      { key: 'lucky_charm', name: 'Lucky Charm', emoji: '🍀' },
-      { key: 'golden_hour', name: 'Golden Hour', emoji: '✨' },
-      { key: 'profit_doubler', name: 'Profit Doubler', emoji: '📈' },
-      { key: 'star_magnet', name: 'Star Magnet', emoji: '⭐' },
-      { key: 'diamond_rush', name: 'Diamond Rush', emoji: '💎' }
-    ];
-
     // Check all timed buffs
-    const timedBuffPromises = timedBuffKeys.map(async buff => {
+    const timedBuffPromises = TIMED_BUFF_KEYS.map(async buff => {
       const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buff.key}`);
       if (!value) return null;
 

@@ -40,6 +40,14 @@ import {
 } from '../database.js';
 import { calculateWin } from './slots.js';
 
+// Static: Mystery Box item pool (avoid recreation per request)
+const MYSTERY_BOX_ITEMS = [
+  2, 3, 4, 5, 6, 7, 8,    // Symbol-Boosts (7)
+  9, 10,                   // Utility Items (2)
+  14, 20, 24,              // Timed Buffs Classic (3)
+  32, 33, 34, 35, 39       // Timed Buffs Premium (5)
+]; // Total: 17 Items (Stats Tracker, Unlocks, Prestige, Instants excluded)
+
 async function handleShop(username, item, env) {
   try {
     if (!item) {
@@ -299,13 +307,7 @@ async function buyShopItem(username, itemId, env) {
       ]);
 
       if (itemId === 16) { // Mystery Box
-        const mysteryItems = [
-          2, 3, 4, 5, 6, 7, 8,    // Symbol-Boosts (7)
-          9, 10,                   // Utility Items (2)
-          14, 20, 24,              // Timed Buffs Classic (3)
-          32, 33, 34, 35, 39       // Timed Buffs Premium (5)
-        ]; // Total: 17 Items (Stats Tracker, Unlocks, Prestige, Instants excluded)
-        const mysteryItemId = mysteryItems[secureRandomInt(0, mysteryItems.length - 1)];
+        const mysteryItemId = MYSTERY_BOX_ITEMS[secureRandomInt(0, MYSTERY_BOX_ITEMS.length - 1)];
         const mysteryResult = SHOP_ITEMS[mysteryItemId];
 
         try {

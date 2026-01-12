@@ -477,38 +477,6 @@ async function getBuffWithStack(username, buffKey, env) {
   }
 }
 
-// OPTIMIZED: Use data from getBuffWithStack to avoid redundant KV read
-async function incrementRageModeStack(username, env) {
-  try {
-    const buff = await getBuffWithStack(username, 'rage_mode', env);
-    if (buff.active && buff.data) {
-      const data = buff.data;
-      data.stack = Math.min((data.stack || 0) + 5, 50); // +5% per loss, max 50%
-
-      const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
-      await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl + 60 });
-    }
-  } catch (error) {
-    console.error('incrementRageModeStack Error:', error);
-  }
-}
-
-// OPTIMIZED: Use data from getBuffWithStack to avoid redundant KV read
-async function resetRageModeStack(username, env) {
-  try {
-    const buff = await getBuffWithStack(username, 'rage_mode', env);
-    if (buff.active && buff.data) {
-      const data = buff.data;
-      data.stack = 0;
-
-      const ttl = Math.floor((data.expireAt - Date.now()) / 1000);
-      await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: ttl + 60 });
-    }
-  } catch (error) {
-    console.error('resetRageModeStack Error:', error);
-  }
-}
-
 // Boosts
 async function addBoost(username, symbol, env) {
   try {
@@ -544,17 +512,6 @@ async function getMulliganCount(username, env) {
   }
 }
 
-async function decrementMulligan(username, env) {
-  try {
-    const current = await getMulliganCount(username, env);
-    if (current > 0) {
-      await env.SLOTS_KV.put(`mulligan:${username.toLowerCase()}`, (current - 1).toString());
-    }
-  } catch (error) {
-    console.error('decrementMulligan Error:', error);
-  }
-}
-
 // OPTIMIZED: Set mulligan directly when count is already known (avoids redundant KV read)
 async function setMulliganCount(username, count, env) {
   try {
@@ -585,17 +542,6 @@ async function getInsuranceCount(username, env) {
   } catch (error) {
     console.error('getInsuranceCount Error:', error);
     return 0;
-  }
-}
-
-async function decrementInsurance(username, env) {
-  try {
-    const current = await getInsuranceCount(username, env);
-    if (current > 0) {
-      await env.SLOTS_KV.put(`insurance:${username.toLowerCase()}`, (current - 1).toString());
-    }
-  } catch (error) {
-    console.error('decrementInsurance Error:', error);
   }
 }
 
@@ -835,34 +781,6 @@ async function getStreak(username, env) {
   }
 }
 
-async function updateStreak(username, isWin, env) {
-  try {
-    const streak = await getStreak(username, env);
-
-    if (isWin) {
-      streak.wins++;
-      streak.losses = 0;
-    } else {
-      streak.losses++;
-      streak.wins = 0;
-    }
-
-    await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(streak), { expirationTtl: 604800 }); // 7 days in seconds
-    return streak;
-  } catch (error) {
-    console.error('updateStreak Error:', error);
-    return { wins: 0, losses: 0 };
-  }
-}
-
-async function resetStreak(username, env) {
-  try {
-    await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify({ wins: 0, losses: 0 }));
-  } catch (error) {
-    console.error('resetStreak Error:', error);
-  }
-}
-
 // Stats
 async function getStats(username, env) {
   try {
@@ -1000,16 +918,12 @@ export {
   decrementBuffUses,
   activateBuffWithStack,
   getBuffWithStack,
-  incrementRageModeStack,
-  resetRageModeStack,
   addBoost,
   consumeBoost,
   getMulliganCount,
-  decrementMulligan,
   setMulliganCount,
   addInsurance,
   getInsuranceCount,
-  decrementInsurance,
   setInsuranceCount,
   getSpinBundlePurchases,
   incrementSpinBundlePurchases,
@@ -1021,8 +935,6 @@ export {
   addFreeSpinsWithMultiplier,
   consumeFreeSpinWithMultiplier,
   getStreak,
-  updateStreak,
-  resetStreak,
   getStats,
   updateStats,
   isBlacklisted,

@@ -1,4 +1,4 @@
-import { MAX_BALANCE, BANK_USERNAME, BANK_START_BALANCE } from './constants.js';
+import { MAX_BALANCE, BANK_USERNAME, BANK_START_BALANCE, DAILY_TTL_SECONDS, JACKPOT_CLAIM_TTL } from './constants.js';
 import { getCurrentMonth, getCurrentDate, getWeekStart } from './utils.js';
 
 // Balance Functions
@@ -79,7 +79,7 @@ async function getLastDaily(username, env) {
 
 async function setLastDaily(username, timestamp, env) {
   try {
-    await env.SLOTS_KV.put(`daily:${username.toLowerCase()}`, timestamp.toString(), { expirationTtl: 86400 + 3600 }); // 1 day + 1 hour buffer in seconds
+    await env.SLOTS_KV.put(`daily:${username.toLowerCase()}`, timestamp.toString(), { expirationTtl: DAILY_TTL_SECONDS });
   } catch (error) {
     console.error('setLastDaily Error:', error);
   }
@@ -878,7 +878,7 @@ async function checkAndClaimHourlyJackpot(env) {
   if (claimed) return false;
 
   // Claim jackpot (expires after 1 hour)
-  await env.SLOTS_KV.put(key, 'claimed', { expirationTtl: 3600 });
+  await env.SLOTS_KV.put(key, 'claimed', { expirationTtl: JACKPOT_CLAIM_TTL });
   return true;
 }
 

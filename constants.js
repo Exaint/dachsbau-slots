@@ -2,6 +2,8 @@
 const RESPONSE_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8' };
 const MS_PER_HOUR = 3600000;
 const MS_PER_MINUTE = 60000;
+const SECONDS_PER_HOUR = 3600;
+const SECONDS_PER_DAY = 86400;
 
 const MAX_BALANCE = 999999999;
 const MIN_TRANSFER = 1;
@@ -12,8 +14,11 @@ const BANK_USERNAME = 'dachsbank';
 const BANK_START_BALANCE = 444444;
 const BANK_KEY = `user:${BANK_USERNAME}`;
 
-// Leaderboard cache duration (5 minutes)
-const LEADERBOARD_CACHE_TTL = 300;
+// TTL Constants (in seconds)
+const LEADERBOARD_CACHE_TTL = 300; // 5 minutes
+const DAILY_TTL_SECONDS = SECONDS_PER_DAY + SECONDS_PER_HOUR; // 25 hours (1 day + buffer)
+const PEEK_TTL_SECONDS = SECONDS_PER_HOUR; // 1 hour
+const JACKPOT_CLAIM_TTL = SECONDS_PER_HOUR; // 1 hour
 
 // Daily Rewards
 const DAILY_AMOUNT = 50;
@@ -209,6 +214,8 @@ export {
   RESPONSE_HEADERS,
   MS_PER_HOUR,
   MS_PER_MINUTE,
+  SECONDS_PER_HOUR,
+  SECONDS_PER_DAY,
   MAX_BALANCE,
   MIN_TRANSFER,
   MAX_TRANSFER,
@@ -218,6 +225,9 @@ export {
   BANK_START_BALANCE,
   BANK_KEY,
   LEADERBOARD_CACHE_TTL,
+  DAILY_TTL_SECONDS,
+  PEEK_TTL_SECONDS,
+  JACKPOT_CLAIM_TTL,
   DEBUG_MODE,
   SYMBOL_WEIGHTS,
   TOTAL_WEIGHT,

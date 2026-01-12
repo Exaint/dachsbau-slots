@@ -12,7 +12,8 @@ import {
   REVERSE_CHAOS_MAX,
   DIAMOND_MINE_MIN_SPINS,
   DIAMOND_MINE_MAX_SPINS,
-  URLS
+  URLS,
+  PEEK_TTL_SECONDS
 } from '../constants.js';
 import { getWeightedSymbol, secureRandom, secureRandomInt } from '../utils.js';
 import {
@@ -264,7 +265,7 @@ async function buyShopItem(username, itemId, env) {
       }
 
       // Store the grid for the next spin
-      await env.SLOTS_KV.put(`peek:${username.toLowerCase()}`, JSON.stringify(peekGrid), { expirationTtl: 3600 });
+      await env.SLOTS_KV.put(`peek:${username.toLowerCase()}`, JSON.stringify(peekGrid), { expirationTtl: PEEK_TTL_SECONDS });
 
       // Calculate result to show prediction
       const peekResult = calculateWin(peekGrid);

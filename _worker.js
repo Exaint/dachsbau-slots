@@ -129,6 +129,7 @@ export default {
           if (lower === 'stats') return await handleStats(cleanUsername, env);
           if (lower === 'buffs') return await handleBuffs(cleanUsername, env);
           if (lower === 'bank') return await handleBank(cleanUsername, env);
+          if (lower === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
 
           // Admin commands with target only
           if (ADMIN_COMMANDS_TARGET[lower]) {

@@ -50,24 +50,47 @@ function validateAmount(amount, min = 1, max = 100000) {
   return parsed;
 }
 
-function getCurrentMonth() {
+// Helper to get date parts in German timezone (Europe/Berlin)
+function getGermanDateParts() {
   const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  const formatter = new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatter.formatToParts(now);
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  return { year, month, day };
+}
+
+function getCurrentMonth() {
+  const { year, month } = getGermanDateParts();
+  return `${year}-${month}`;
 }
 
 function getCurrentDate() {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+  const { year, month, day } = getGermanDateParts();
+  return `${year}-${month}-${day}`;
 }
 
 function getWeekStart() {
+  // Calculate days since Monday in German timezone
   const now = new Date();
-  const dayOfWeek = now.getUTCDay();
+  const germanDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+  const dayOfWeek = germanDate.getDay();
   const daysToMonday = (dayOfWeek + 6) % 7;
-  const monday = new Date(now);
-  monday.setUTCDate(now.getUTCDate() - daysToMonday);
-  monday.setUTCHours(0, 0, 0, 0);
-  return monday.toISOString().split('T')[0];
+
+  // Get Monday's date
+  const monday = new Date(germanDate);
+  monday.setDate(germanDate.getDate() - daysToMonday);
+
+  const year = monday.getFullYear();
+  const month = String(monday.getMonth() + 1).padStart(2, '0');
+  const day = String(monday.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function isLeaderboardBlocked(username) {

@@ -10,7 +10,8 @@ import {
   MONTHLY_LOGIN_REWARDS,
   DAILY_AMOUNT,
   DAILY_BOOST_AMOUNT,
-  URLS
+  URLS,
+  BUFF_SYMBOLS_WITH_NAMES
 } from '../constants.js';
 import { sanitizeUsername, validateAmount, isLeaderboardBlocked } from '../utils.js';
 import {
@@ -314,25 +315,41 @@ async function handleTransfer(username, target, amount, env) {
       return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DT 🏦`, { headers: RESPONSE_HEADERS });
     }
 
-    const [senderBalance, receiverBalance] = await Promise.all([
-      getBalance(username, env),
-      getBalance(cleanTarget, env)
-    ]);
+    // Atomic transfer with retry mechanism to prevent race conditions
+    const maxRetries = 3;
 
-    if (senderBalance < parsedAmount) {
-      return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderBalance}.`, { headers: RESPONSE_HEADERS });
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const [senderBalance, receiverBalance] = await Promise.all([
+        getBalance(username, env),
+        getBalance(cleanTarget, env)
+      ]);
+
+      if (senderBalance < parsedAmount) {
+        return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderBalance}.`, { headers: RESPONSE_HEADERS });
+      }
+
+      const newSenderBalance = senderBalance - parsedAmount;
+      const newReceiverBalance = Math.min(receiverBalance + parsedAmount, MAX_BALANCE);
+
+      // Write both balances
+      await Promise.all([
+        setBalance(username, newSenderBalance, env),
+        setBalance(cleanTarget, newReceiverBalance, env)
+      ]);
+
+      // Verify the write succeeded
+      const verifySender = await getBalance(username, env);
+      if (verifySender === newSenderBalance) {
+        return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸`, { headers: RESPONSE_HEADERS });
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+      }
     }
 
-    const newSenderBalance = senderBalance - parsedAmount;
-    const newReceiverBalance = Math.min(receiverBalance + parsedAmount, MAX_BALANCE);
-
-    await Promise.all([
-      setBalance(username, newSenderBalance, env),
-      setBalance(cleanTarget, newReceiverBalance, env)
-    ]);
-
-
-    return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸     `, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ❌ Transfer fehlgeschlagen, bitte versuche es erneut.`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleTransfer Error:', error);
     return new Response(`@${username} ❌ Fehler beim Transfer.`, { headers: RESPONSE_HEADERS });

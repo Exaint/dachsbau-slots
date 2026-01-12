@@ -106,7 +106,10 @@ async function parseSpinAmount(username, amountParam, currentBalance, isFreeSpin
     if (currentBalance < BASE_SPIN_COST) {
       return { error: `@${username} ❌ Du brauchst mindestens ${BASE_SPIN_COST} DachsTaler für !slots all!` };
     }
-    return { spinCost: currentBalance, multiplier: Math.floor(currentBalance / BASE_SPIN_COST) };
+    // Round down to nearest multiple of BASE_SPIN_COST to avoid wasting DT
+    const multiplier = Math.floor(currentBalance / BASE_SPIN_COST);
+    const spinCost = multiplier * BASE_SPIN_COST;
+    return { spinCost, multiplier };
   }
 
   const customAmount = parseInt(amountParam, 10);

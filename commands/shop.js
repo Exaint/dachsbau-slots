@@ -348,11 +348,10 @@ async function buyShopItem(username, itemId, env) {
       if (itemId === 31) { // Reverse Chaos
         const result = secureRandomInt(REVERSE_CHAOS_MIN, REVERSE_CHAOS_MAX);
         const newBalance = Math.max(0, Math.min(balance - item.price + result, MAX_BALANCE));
-        // Bank gets: item price minus the result won
-        const netBankChange = item.price - result;
+        // Bank adjustment: subtract the result won (price was already added above)
         await Promise.all([
           setBalance(username, newBalance, env),
-          updateBankBalance(netBankChange, env)
+          updateBankBalance(-result, env)
         ]);
         return new Response(`@${username} 🎲 Reverse Chaos! +${result} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
       }

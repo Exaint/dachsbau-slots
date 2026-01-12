@@ -525,13 +525,30 @@ async function setMulliganCount(username, count, env) {
   }
 }
 
-// Insurance
-async function addInsurance(username, count, env) {
-  try {
-    const current = await getInsuranceCount(username, env);
-    await env.SLOTS_KV.put(`insurance:${username.toLowerCase()}`, (current + count).toString());
-  } catch (error) {
-    console.error('addInsurance Error:', error);
+// Insurance - Atomic add with retry mechanism
+async function addInsurance(username, count, env, maxRetries = 3) {
+  const key = `insurance:${username.toLowerCase()}`;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const current = await getInsuranceCount(username, env);
+      const newCount = current + count;
+      await env.SLOTS_KV.put(key, newCount.toString());
+
+      // Verify the write succeeded
+      const verifyCount = await getInsuranceCount(username, env);
+      if (verifyCount === newCount) {
+        return;
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+      }
+    } catch (error) {
+      console.error(`addInsurance Error (attempt ${attempt + 1}):`, error);
+      if (attempt === maxRetries - 1) return;
+    }
   }
 }
 
@@ -578,13 +595,31 @@ async function getSpinBundlePurchases(username, env) {
   }
 }
 
-async function incrementSpinBundlePurchases(username, env) {
-  try {
-    const data = await getSpinBundlePurchases(username, env);
-    data.count++;
-    await env.SLOTS_KV.put(`bundle_purchases:${username.toLowerCase()}`, JSON.stringify(data));
-  } catch (error) {
-    console.error('incrementSpinBundlePurchases Error:', error);
+// Atomic increment with retry mechanism
+async function incrementSpinBundlePurchases(username, env, maxRetries = 3) {
+  const key = `bundle_purchases:${username.toLowerCase()}`;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const data = await getSpinBundlePurchases(username, env);
+      const expectedCount = data.count + 1;
+      data.count = expectedCount;
+      await env.SLOTS_KV.put(key, JSON.stringify(data));
+
+      // Verify the write succeeded
+      const verifyData = await getSpinBundlePurchases(username, env);
+      if (verifyData.count === expectedCount) {
+        return;
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+      }
+    } catch (error) {
+      console.error(`incrementSpinBundlePurchases Error (attempt ${attempt + 1}):`, error);
+      if (attempt === maxRetries - 1) return;
+    }
   }
 }
 
@@ -608,13 +643,31 @@ async function getDachsBoostPurchases(username, env) {
   }
 }
 
-async function incrementDachsBoostPurchases(username, env) {
-  try {
-    const data = await getDachsBoostPurchases(username, env);
-    data.count++;
-    await env.SLOTS_KV.put(`dachsboost_purchases:${username.toLowerCase()}`, JSON.stringify(data));
-  } catch (error) {
-    console.error('incrementDachsBoostPurchases Error:', error);
+// Atomic increment with retry mechanism
+async function incrementDachsBoostPurchases(username, env, maxRetries = 3) {
+  const key = `dachsboost_purchases:${username.toLowerCase()}`;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const data = await getDachsBoostPurchases(username, env);
+      const expectedCount = data.count + 1;
+      data.count = expectedCount;
+      await env.SLOTS_KV.put(key, JSON.stringify(data));
+
+      // Verify the write succeeded
+      const verifyData = await getDachsBoostPurchases(username, env);
+      if (verifyData.count === expectedCount) {
+        return;
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+      }
+    } catch (error) {
+      console.error(`incrementDachsBoostPurchases Error (attempt ${attempt + 1}):`, error);
+      if (attempt === maxRetries - 1) return;
+    }
   }
 }
 

@@ -13,7 +13,7 @@ import {
   URLS,
   BUFF_SYMBOLS_WITH_NAMES
 } from '../constants.js';
-import { sanitizeUsername, validateAmount, isLeaderboardBlocked } from '../utils.js';
+import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -133,7 +133,7 @@ async function handleDaily(username, env) {
     await Promise.all([
       setBalance(username, newBalance, env),
       setLastDaily(username, now, env),
-      isNewMilestone ? markMilestoneClaimed(username, newMonthlyLogin.days.length, env) : Promise.resolve()
+      isNewMilestone ? markMilestoneClaimed(username, newMonthlyLogin.days.length, env, newMonthlyLogin) : Promise.resolve()
     ]);
 
     const boostText = hasBoost ? ' (💎 Boosted!)' : '';
@@ -184,12 +184,18 @@ async function handleBuffs(username, env) {
       return null;
     });
 
-    // OPTIMIZED: Load ALL buff data in parallel, use static constant for symbols
+    // OPTIMIZED: Load ALL buff data in parallel with named destructuring
     const [
       timedResults,
       dachsLocator,
       rageMode,
-      ...otherResults
+      // Symbol boosts (7 items)
+      cherryBoost, lemonBoost, orangeBoost, grapeBoost, melonBoost, starBoost, dachsBoost,
+      // Other buffs
+      winMultiplier,
+      insuranceCount,
+      guaranteedPair,
+      wildCard
     ] = await Promise.all([
       Promise.all(timedBuffPromises),
       getBuffWithUses(username, 'dachs_locator', env),
@@ -219,30 +225,39 @@ async function handleBuffs(username, env) {
       buffs.push(`🔥 Rage Mode (${minutes}m, Stack: ${rageMode.stack}%)`);
     }
 
-    // Symbol Boosts (indices 0-6 in otherResults) - use static constant
-    BUFF_SYMBOLS_WITH_NAMES.forEach((s, i) => {
-      if (otherResults[i] === 'active') {
-        buffs.push(`${s.symbol} ${s.name}-Boost (1x)`);
+    // Symbol Boosts - named variables for clarity
+    const symbolBoosts = [
+      { boost: cherryBoost, symbol: '🍒', name: 'Kirschen' },
+      { boost: lemonBoost, symbol: '🍋', name: 'Zitronen' },
+      { boost: orangeBoost, symbol: '🍊', name: 'Orangen' },
+      { boost: grapeBoost, symbol: '🍇', name: 'Trauben' },
+      { boost: melonBoost, symbol: '🍉', name: 'Wassermelonen' },
+      { boost: starBoost, symbol: '⭐', name: 'Stern' },
+      { boost: dachsBoost, symbol: '🦡', name: 'Dachs' }
+    ];
+    symbolBoosts.forEach(({ boost, symbol, name }) => {
+      if (boost === 'active') {
+        buffs.push(`${symbol} ${name}-Boost (1x)`);
       }
     });
 
-    // Win Multiplier (index 7)
-    if (otherResults[7] === 'active') {
+    // Win Multiplier
+    if (winMultiplier === 'active') {
       buffs.push('⚡ Win Multiplier (1x)');
     }
 
-    // Insurance Pack (index 8)
-    if (otherResults[8] > 0) {
-      buffs.push(`🛡️ Insurance Pack (${otherResults[8]}x)`);
+    // Insurance Pack
+    if (insuranceCount > 0) {
+      buffs.push(`🛡️ Insurance Pack (${insuranceCount}x)`);
     }
 
-    // Guaranteed Pair (index 9)
-    if (otherResults[9]) {
+    // Guaranteed Pair
+    if (guaranteedPair) {
       buffs.push('🎯 Guaranteed Pair (1x)');
     }
 
-    // Wild Card (index 10)
-    if (otherResults[10]) {
+    // Wild Card
+    if (wildCard) {
       buffs.push('🃏 Wild Card (1x)');
     }
 
@@ -345,7 +360,7 @@ async function handleTransfer(username, target, amount, env) {
 
       // Verification failed, retry with backoff
       if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+        await exponentialBackoff(attempt);
       }
     }
 

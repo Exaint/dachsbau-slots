@@ -1,5 +1,5 @@
 import { MAX_BALANCE, BANK_USERNAME, BANK_START_BALANCE, DAILY_TTL_SECONDS, JACKPOT_CLAIM_TTL, STARTING_BALANCE, STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, BUFF_TTL_BUFFER_SECONDS } from './constants.js';
-import { getCurrentMonth, getCurrentDate, getWeekStart } from './utils.js';
+import { getCurrentMonth, getCurrentDate, getWeekStart, exponentialBackoff } from './utils.js';
 
 // Balance Functions
 async function getBalance(username, env) {
@@ -53,7 +53,7 @@ async function atomicBalanceUpdate(username, updateFn, maxRetries = 3, env) {
       // If verification failed, retry
       if (attempt < maxRetries - 1) {
         // Exponential backoff: wait 10ms, 20ms, 40ms
-        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+        await exponentialBackoff(attempt);
       }
     } catch (error) {
       console.error(`atomicBalanceUpdate Error (attempt ${attempt + 1}):`, error);
@@ -212,13 +212,14 @@ async function updateMonthlyLogin(username, env) {
   }
 }
 
-async function markMilestoneClaimed(username, milestone, env) {
+// OPTIMIZED: Accept monthlyLogin as parameter to avoid redundant KV read
+async function markMilestoneClaimed(username, milestone, env, monthlyLogin = null) {
   try {
-    const monthlyLogin = await getMonthlyLogin(username, env);
+    const data = monthlyLogin || await getMonthlyLogin(username, env);
 
-    if (!monthlyLogin.claimedMilestones.includes(milestone)) {
-      monthlyLogin.claimedMilestones.push(milestone);
-      await env.SLOTS_KV.put(`monthlylogin:${username.toLowerCase()}`, JSON.stringify(monthlyLogin));
+    if (!data.claimedMilestones.includes(milestone)) {
+      data.claimedMilestones.push(milestone);
+      await env.SLOTS_KV.put(`monthlylogin:${username.toLowerCase()}`, JSON.stringify(data));
     }
   } catch (error) {
     console.error('markMilestoneClaimed Error:', error);
@@ -438,7 +439,7 @@ async function decrementBuffUses(username, buffKey, env, maxRetries = 3) {
 
       // Verification failed, retry with backoff
       if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+        await exponentialBackoff(attempt);
       }
     } catch (error) {
       console.error(`decrementBuffUses Error (attempt ${attempt + 1}):`, error);
@@ -543,7 +544,7 @@ async function addInsurance(username, count, env, maxRetries = 3) {
 
       // Verification failed, retry with backoff
       if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+        await exponentialBackoff(attempt);
       }
     } catch (error) {
       console.error(`addInsurance Error (attempt ${attempt + 1}):`, error);
@@ -614,7 +615,7 @@ async function incrementSpinBundlePurchases(username, env, maxRetries = 3) {
 
       // Verification failed, retry with backoff
       if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+        await exponentialBackoff(attempt);
       }
     } catch (error) {
       console.error(`incrementSpinBundlePurchases Error (attempt ${attempt + 1}):`, error);
@@ -662,7 +663,7 @@ async function incrementDachsBoostPurchases(username, env, maxRetries = 3) {
 
       // Verification failed, retry with backoff
       if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+        await exponentialBackoff(attempt);
       }
     } catch (error) {
       console.error(`incrementDachsBoostPurchases Error (attempt ${attempt + 1}):`, error);
@@ -809,7 +810,7 @@ async function consumeFreeSpinWithMultiplier(username, env, maxRetries = 3) {
 
       // Verification failed, retry with backoff
       if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 10 * Math.pow(2, attempt)));
+        await exponentialBackoff(attempt);
       }
     } catch (error) {
       console.error(`consumeFreeSpinWithMultiplier Error (attempt ${attempt + 1}):`, error);

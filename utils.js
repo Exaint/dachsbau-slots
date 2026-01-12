@@ -108,6 +108,11 @@ function calculateBuffTTL(expireAt, minTTL = BUFF_TTL_BUFFER_SECONDS) {
   return Math.max(minTTL, Math.floor((expireAt - Date.now()) / 1000) + BUFF_TTL_BUFFER_SECONDS);
 }
 
+// OPTIMIZED: Helper for exponential backoff delay (avoids code duplication)
+function exponentialBackoff(attempt, baseMs = 10) {
+  return new Promise(resolve => setTimeout(resolve, baseMs * Math.pow(2, attempt)));
+}
+
 export {
   respond,
   secureRandom,
@@ -120,5 +125,6 @@ export {
   getCurrentDate,
   getWeekStart,
   isLeaderboardBlocked,
-  calculateBuffTTL
+  calculateBuffTTL,
+  exponentialBackoff
 };

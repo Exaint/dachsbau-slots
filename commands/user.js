@@ -36,6 +36,16 @@ import {
   isBuffActive
 } from '../database.js';
 
+// Helper: Get days in current month (German timezone)
+function getDaysInCurrentMonth() {
+  const now = new Date();
+  const germanDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+  const year = germanDate.getFullYear();
+  const month = germanDate.getMonth();
+  // Day 0 of next month = last day of current month
+  return new Date(year, month + 1, 0).getDate();
+}
+
 // Static: Timed buff definitions (avoid recreation per request)
 const TIMED_BUFF_KEYS = [
   { key: 'happy_hour', name: 'Happy Hour', emoji: '⚡' },
@@ -118,7 +128,8 @@ async function handleDaily(username, env) {
         const remainingHours = Math.floor(remainingMs / MS_PER_HOUR);
         const remainingMinutes = Math.floor((remainingMs % MS_PER_HOUR) / MS_PER_MINUTE);
 
-        return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${remainingHours}h ${remainingMinutes}m | Login-Tage diesen Monat: ${monthlyLogin.days.length} 📅`, { headers: RESPONSE_HEADERS });
+        const daysInMonth = getDaysInCurrentMonth();
+        return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${remainingHours}h ${remainingMinutes}m | Login-Tage: ${monthlyLogin.days.length}/${daysInMonth} 📅`, { headers: RESPONSE_HEADERS });
       }
     }
 
@@ -144,7 +155,8 @@ async function handleDaily(username, env) {
     }
 
 
-    return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/Monat 📅 | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
+    const daysInMonth = getDaysInCurrentMonth();
+    return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/${daysInMonth} 📅 | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleDaily Error:', error);
     return new Response(`@${username} ❌ Fehler beim Daily Bonus.`, { headers: RESPONSE_HEADERS });

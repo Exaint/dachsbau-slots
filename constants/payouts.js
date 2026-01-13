@@ -1,0 +1,54 @@
+/**
+ * Payout Constants - All win amounts and rewards
+ */
+
+// Daily Rewards
+export const DAILY_AMOUNT = 50;
+export const DAILY_BOOST_AMOUNT = 250;
+export const LOW_BALANCE_WARNING = 100;
+export const HOURLY_JACKPOT_AMOUNT = 100;
+
+// Dachs Payouts
+export const DACHS_TRIPLE_PAYOUT = 15000;
+export const DACHS_PAIR_PAYOUT = 2500;
+export const DACHS_SINGLE_PAYOUT = 100;
+export const DACHS_BASE_CHANCE = 1 / 150;
+
+// Symbol Payouts
+export const TRIPLE_PAYOUTS = { '⭐': 500, '🍉': 250, '🍇': 150, '🍊': 100, '🍋': 75, '🍒': 50 };
+export const PAIR_PAYOUTS = { '⭐': 50, '🍉': 25, '🍇': 15, '🍊': 10, '🍋': 8, '🍒': 5 };
+
+// Streak System
+export const STREAK_THRESHOLD = 5;
+export const HOT_STREAK_BONUS = 500;
+export const COMEBACK_BONUS = 150;
+export const STREAK_MULTIPLIER_INCREMENT = 0.1;
+export const STREAK_MULTIPLIER_MAX = 3.0;
+
+// Insurance
+export const INSURANCE_REFUND_RATE = 0.5;
+
+// Combo Bonuses
+export const COMBO_BONUSES = { 2: 10, 3: 30, 4: 100 };
+
+// Monthly Login Rewards
+export const MONTHLY_LOGIN_REWARDS = { 1: 50, 5: 150, 10: 400, 15: 750, 20: 1500 };
+
+// Chaos Spin
+export const CHAOS_SPIN_MIN = -300;
+export const CHAOS_SPIN_MAX = 700;
+export const REVERSE_CHAOS_MIN = 50;
+export const REVERSE_CHAOS_MAX = 200;
+
+// Diamond Mine
+export const DIAMOND_MINE_MIN_SPINS = 3;
+export const DIAMOND_MINE_MAX_SPINS = 5;
+
+// Rage Mode
+export const RAGE_MODE_LOSS_STACK = 5;
+export const RAGE_MODE_MAX_STACK = 100;
+export const RAGE_MODE_WIN_THRESHOLD = 50;
+
+// Unlock & Multiplier Maps
+export const UNLOCK_MAP = { 20: 'slots_20', 30: 'slots_30', 50: 'slots_50', 100: 'slots_100' };
+export const MULTIPLIER_MAP = { 10: 1, 20: 2, 30: 3, 50: 5, 100: 10 };

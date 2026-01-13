@@ -173,19 +173,25 @@ async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamon
   }
 
   // Normal generation - only 3 elements needed (the winning row)
+  // OPTIMIZED: Batch random calls to reduce crypto operations
   for (let i = 0; i < GRID_SIZE; i++) {
     if (secureRandom() < dachsChance) {
       grid.push('🦡');
     } else {
       let symbol = getWeightedSymbol();
-      if (hasStarMagnet && secureRandom() < BUFF_REROLL_CHANCE) {
-        const starRoll = secureRandom();
-        if (starRoll < SYMBOL_BOOST_CHANCE) symbol = '⭐';
+
+      // Only generate buff random values if buffs are active
+      if (hasStarMagnet || hasDiamondRush) {
+        const buffRoll = secureRandom();
+        const boostRoll = secureRandom();
+
+        if (hasStarMagnet && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
+          symbol = '⭐';
+        } else if (hasDiamondRush && symbol !== '💎' && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
+          symbol = '💎';
+        }
       }
-      if (hasDiamondRush && symbol !== '💎' && secureRandom() < BUFF_REROLL_CHANCE) {
-        const diamondRoll = secureRandom();
-        if (diamondRoll < SYMBOL_BOOST_CHANCE) symbol = '💎';
-      }
+
       grid.push(symbol);
     }
   }

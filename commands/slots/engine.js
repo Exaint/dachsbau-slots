@@ -66,7 +66,8 @@ async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamon
         const buffRoll = secureRandom();
         const boostRoll = secureRandom();
 
-        if (hasStarMagnet && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
+        // Star Magnet: Only replace if not already a star (consistent with Diamond Rush)
+        if (hasStarMagnet && symbol !== '⭐' && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
           symbol = '⭐';
         } else if (hasDiamondRush && symbol !== '💎' && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
           symbol = '💎';
@@ -93,11 +94,13 @@ async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWild
     const hasPair = (grid[0] === grid[1]) || (grid[1] === grid[2]) || (grid[0] === grid[2]);
 
     if (!hasPair) {
+      // Only consume token if it was actually used to create a pair
       const pairSymbol = GUARANTEED_PAIR_SYMBOLS[secureRandomInt(0, GUARANTEED_PAIR_SYMBOLS.length - 1)];
       grid[0] = pairSymbol;
       grid[1] = pairSymbol;
+      await consumeGuaranteedPair(username, env);
     }
-    await consumeGuaranteedPair(username, env);
+    // If already has pair, don't consume the token - save it for next spin
   }
 
   if (hasWildCardToken) {

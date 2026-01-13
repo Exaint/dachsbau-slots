@@ -53,6 +53,9 @@ const MYSTERY_BOX_ITEMS = [
   32, 33, 34, 35, 39       // Timed Buffs Premium (5)
 ]; // Total: 17 Items (Stats Tracker, Unlocks, Prestige, Instants excluded)
 
+// Dynamic shop item max (avoids hardcoded values)
+const SHOP_ITEM_MAX = Math.max(...Object.keys(SHOP_ITEMS).map(Number));
+
 async function handleShop(username, item, env) {
   try {
     if (!item) {
@@ -65,8 +68,8 @@ async function handleShop(username, item, env) {
     }
 
     const itemNumber = parseInt(parts[1], 10);
-    if (isNaN(itemNumber) || itemNumber < 1 || itemNumber > 39) {
-      return new Response(`@${username} ❌ Ungültige Item-Nummer! Nutze 1-39.`, { headers: RESPONSE_HEADERS });
+    if (isNaN(itemNumber) || itemNumber < 1 || itemNumber > SHOP_ITEM_MAX) {
+      return new Response(`@${username} ❌ Ungültige Item-Nummer! Nutze 1-${SHOP_ITEM_MAX}.`, { headers: RESPONSE_HEADERS });
     }
 
     return await buyShopItem(username, itemNumber, env);
@@ -251,21 +254,67 @@ async function buyShopItem(username, itemId, env) {
 
     if (item.type === 'peek') {
       // Generate and store the next spin for this user
+      // Load all relevant buffs to generate accurate peek grid
+      const [hasLuckyCharm, hasStarMagnet, hasDiamondRush, dachsLocator, rageMode] = await Promise.all([
+        isBuffActive(username, 'lucky_charm', env),
+        isBuffActive(username, 'star_magnet', env),
+        isBuffActive(username, 'diamond_rush', env),
+        env.SLOTS_KV.get(`buff:${lowerUsername}:dachs_locator`),
+        env.SLOTS_KV.get(`buff:${lowerUsername}:rage_mode`)
+      ]);
+
       await Promise.all([
         setBalance(username, balance - item.price, env),
         updateBankBalance(item.price, env)
       ]);
 
-      const hasLuckyCharm = await isBuffActive(username, 'lucky_charm', env);
-      const peekDachsChance = hasLuckyCharm ? DACHS_BASE_CHANCE * 2 : DACHS_BASE_CHANCE;
-      const peekGrid = [];
+      // Calculate Dachs chance with all buffs
+      let peekDachsChance = DACHS_BASE_CHANCE;
+      if (hasLuckyCharm) peekDachsChance *= 2;
+      if (dachsLocator) {
+        try {
+          const data = JSON.parse(dachsLocator);
+          if (Date.now() < data.expireAt && data.uses > 0) peekDachsChance *= 3;
+        } catch (e) { /* ignore parse errors */ }
+      }
+      if (rageMode) {
+        try {
+          const data = JSON.parse(rageMode);
+          if (Date.now() < data.expireAt && data.stack > 0) {
+            peekDachsChance *= (1 + data.stack / 100);
+          }
+        } catch (e) { /* ignore parse errors */ }
+      }
 
-      // Generate the peek grid (this will be the actual next spin)
+      const peekGrid = [];
+      const activeBuffs = [];
+      if (hasLuckyCharm) activeBuffs.push('🍀');
+      if (hasStarMagnet) activeBuffs.push('⭐');
+      if (hasDiamondRush) activeBuffs.push('💎');
+
+      // Generate the peek grid with all buff effects (matches actual spin generation)
       for (let i = 0; i < GRID_SIZE; i++) {
         if (secureRandom() < peekDachsChance) {
           peekGrid.push('🦡');
         } else {
-          peekGrid.push(getWeightedSymbol());
+          let symbol = getWeightedSymbol();
+
+          // Apply Star Magnet and Diamond Rush (same logic as engine.js)
+          if (hasStarMagnet || hasDiamondRush) {
+            const buffRoll = secureRandom();
+            const boostRoll = secureRandom();
+            // Import constants from constants.js
+            const BUFF_REROLL_CHANCE = 0.66;
+            const SYMBOL_BOOST_CHANCE = 0.33;
+
+            if (hasStarMagnet && symbol !== '⭐' && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
+              symbol = '⭐';
+            } else if (hasDiamondRush && symbol !== '💎' && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
+              symbol = '💎';
+            }
+          }
+
+          peekGrid.push(symbol);
         }
       }
 
@@ -275,9 +324,9 @@ async function buyShopItem(username, itemId, env) {
       // Calculate result to show prediction
       const peekResult = calculateWin(peekGrid);
       const willWin = peekResult.points > 0 || (peekResult.freeSpins && peekResult.freeSpins > 0);
-      const charmText = hasLuckyCharm ? ' (🍀 Lucky Charm aktiv!)' : '';
+      const buffText = activeBuffs.length > 0 ? ` (${activeBuffs.join('')} aktiv!)` : '';
 
-      return new Response(`@${username} 🔮 Peek Token! Dein nächster Spin wird ${willWin ? '✅ GEWINNEN' : '❌ VERLIEREN'}! 🔮${charmText} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} 🔮 Peek Token! Dein nächster Spin wird ${willWin ? '✅ GEWINNEN' : '❌ VERLIEREN'}! 🔮${buffText} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
     }
 
     if (item.type === 'instant') {

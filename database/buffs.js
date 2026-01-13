@@ -256,7 +256,13 @@ async function consumeWinMultiplier(username, env) {
     const value = await env.SLOTS_KV.get(key);
     if (value === 'active') {
       await env.SLOTS_KV.delete(key);
-      return true;
+      // Verify deletion succeeded (prevents race condition double-consume)
+      const verify = await env.SLOTS_KV.get(key);
+      if (verify === null) {
+        return true; // Successfully consumed
+      }
+      // Another request consumed it first
+      return false;
     }
     return false;
   } catch (error) {

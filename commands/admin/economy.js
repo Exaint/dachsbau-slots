@@ -2,7 +2,7 @@
  * Admin Economy Commands - Give, balance, buffs, stats
  */
 
-import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY, ALL_BUFF_KEYS, ALL_SYMBOLS } from '../../constants.js';
+import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY } from '../../constants.js';
 import { isAdmin, sanitizeUsername } from '../../utils.js';
 import {
   getBalance,
@@ -18,6 +18,9 @@ import {
   activateBuffWithUses,
   activateBuffWithStack
 } from '../../database.js';
+
+// Dynamic shop item max (avoids hardcoded values)
+const SHOP_ITEM_MAX = Math.max(...Object.keys(SHOP_ITEMS).map(Number));
 
 // Helper: Check admin permission
 function requireAdmin(username) {
@@ -145,7 +148,7 @@ async function handleGiveBuff(username, target, shopNumber, env) {
     const item = SHOP_ITEMS[itemId];
 
     if (!item) {
-      return new Response(`@${username} ❌ Ungültige Shopnummer! Nutze 1-39.`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ❌ Ungültige Shopnummer! Nutze 1-${SHOP_ITEM_MAX}.`, { headers: RESPONSE_HEADERS });
     }
 
     if (item.type === 'boost') {
@@ -199,7 +202,7 @@ async function handleRemoveBuff(username, target, shopNumber, env) {
     const item = SHOP_ITEMS[itemId];
 
     if (!item) {
-      return new Response(`@${username} ❌ Ungültige Shopnummer! Nutze 1-39.`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ❌ Ungültige Shopnummer! Nutze 1-${SHOP_ITEM_MAX}.`, { headers: RESPONSE_HEADERS });
     }
 
     if (item.type === 'boost') {

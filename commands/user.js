@@ -33,7 +33,8 @@ import {
   hasGuaranteedPair,
   hasWildCard,
   getPrestigeRank,
-  isBuffActive
+  isBuffActive,
+  hasAcceptedDisclaimer
 } from '../database.js';
 
 // Helper: Get days in current month (German timezone)
@@ -324,7 +325,7 @@ async function handleTransfer(username, target, amount, env) {
       return new Response(`@${username} ❌ Du kannst dir nicht selbst DachsTaler senden!`, { headers: RESPONSE_HEADERS });
     }
 
-    // Allow transfer to DachsBank
+    // Allow transfer to DachsBank (no disclaimer check needed)
     if (cleanTarget === BANK_USERNAME) {
       const senderBalance = await getBalance(username, env);
 
@@ -341,6 +342,12 @@ async function handleTransfer(username, target, amount, env) {
       ]);
 
       return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DachsTaler 🏦`, { headers: RESPONSE_HEADERS });
+    }
+
+    // Check if receiver has accepted disclaimer (has played before)
+    const receiverHasDisclaimer = await hasAcceptedDisclaimer(cleanTarget, env);
+    if (!receiverHasDisclaimer) {
+      return new Response(`@${username} ❌ @${cleanTarget} hat noch nie gespielt! Der Empfänger muss zuerst !slots spielen, um einen Account zu erstellen.`, { headers: RESPONSE_HEADERS });
     }
 
     // Atomic transfer with retry mechanism to prevent race conditions

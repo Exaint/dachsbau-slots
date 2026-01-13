@@ -23,6 +23,8 @@ async function updateBankBalance(amount, env) {
     return newBalance;
   } catch (error) {
     console.error('updateBankBalance Error:', error);
+    // Return current balance estimate on error (prevents crash when caller uses return value)
+    return BANK_START_BALANCE;
   }
 }
 

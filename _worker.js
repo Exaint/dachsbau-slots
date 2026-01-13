@@ -1,5 +1,5 @@
 import { RESPONSE_HEADERS, URLS } from './constants.js';
-import { sanitizeUsername, isAdmin } from './utils.js';
+import { sanitizeUsername, isAdmin, getAdminList } from './utils.js';
 import { isBlacklisted, setSelfBan } from './database.js';
 
 // User commands
@@ -98,9 +98,10 @@ export default {
 
           // OPTIMIZED: Skip security checks for safe read-only commands (saves 3 KV reads)
           if (!SAFE_COMMANDS.has(lower)) {
+            // Note: cleanUsername is already lowercase from sanitizeUsername()
             const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
               isBlacklisted(cleanUsername, env),
-              env.SLOTS_KV.get(`frozen:${cleanUsername.toLowerCase()}`),
+              env.SLOTS_KV.get(`frozen:${cleanUsername}`),
               env.SLOTS_KV.get('maintenance_mode')
             ]);
 
@@ -164,7 +165,8 @@ export default {
           }
           if (lower === 'selfban') {
             await setSelfBan(cleanUsername, env);
-            return new Response(`@${cleanUsername} ✅ Du wurdest vom Slots spielen ausgeschlossen. Nur Admins (exaint_, frechhdachs) können dich wieder freischalten. Wenn du Hilfe brauchst: ${URLS.INFO} 🦡`, { headers: RESPONSE_HEADERS });
+            const adminList = getAdminList().join(', ');
+            return new Response(`@${cleanUsername} ✅ Du wurdest vom Slots spielen ausgeschlossen. Nur Admins (${adminList}) können dich wieder freischalten. Wenn du Hilfe brauchst: ${URLS.INFO} 🦡`, { headers: RESPONSE_HEADERS });
           }
         }
 
@@ -177,9 +179,10 @@ export default {
       if (action === 'balance') return await handleBalance(cleanUsername, env);
 
       // Actions that modify state need security checks
+      // Note: cleanUsername is already lowercase from sanitizeUsername()
       const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
         isBlacklisted(cleanUsername, env),
-        env.SLOTS_KV.get(`frozen:${cleanUsername.toLowerCase()}`),
+        env.SLOTS_KV.get(`frozen:${cleanUsername}`),
         env.SLOTS_KV.get('maintenance_mode')
       ]);
 

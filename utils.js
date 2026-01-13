@@ -43,6 +43,11 @@ function isAdmin(username) {
   return ADMINS.has(username.toLowerCase());
 }
 
+// Helper function to get admin list as array (for display purposes)
+function getAdminList() {
+  return Array.from(ADMINS);
+}
+
 function sanitizeUsername(username) {
   if (!username || typeof username !== 'string') return null;
   const clean = username.trim().toLowerCase().replace(USERNAME_SANITIZE_REGEX, '');
@@ -126,6 +131,7 @@ export {
   secureRandomInt,
   getWeightedSymbol,
   isAdmin,
+  getAdminList,
   sanitizeUsername,
   validateAmount,
   getCurrentMonth,

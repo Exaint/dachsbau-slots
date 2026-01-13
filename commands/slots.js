@@ -238,27 +238,23 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
   }
 
   // Symbol Boost (Shop Buff)
-  // Grid is now [0, 1, 2] - direct access
+  // OPTIMIZED: Only check boosts for symbols that actually have a match (pair/triple)
   if (result.points > 0) {
-    const uniqueMiddleSymbols = [...new Set(grid)];
-    const boostChecks = await Promise.all(
-      uniqueMiddleSymbols.map(symbol =>
-        consumeBoost(username, symbol, env).then(hasBoost => ({ symbol, hasBoost }))
-      )
-    );
+    // Pre-compute which symbols have matches - only these can benefit from boost
+    const matchingSymbols = new Set();
+    if (grid[0] === grid[1]) matchingSymbols.add(grid[0]);
+    if (grid[1] === grid[2]) matchingSymbols.add(grid[1]);
+    if (grid[0] === grid[2]) matchingSymbols.add(grid[0]);
 
-    for (const { symbol, hasBoost } of boostChecks) {
-      if (hasBoost) {
-        const hasMatch = (grid[0] === symbol && grid[1] === symbol) ||
-          (grid[1] === symbol && grid[2] === symbol) ||
-          (grid[0] === symbol && grid[2] === symbol) ||
-          (grid[0] === symbol && grid[1] === symbol && grid[2] === symbol);
+    // Only check boosts for symbols with matches (reduces KV reads from ~7 to 1-2)
+    if (matchingSymbols.size > 0) {
+      const boostResults = await Promise.all(
+        Array.from(matchingSymbols).map(symbol => consumeBoost(username, symbol, env))
+      );
 
-        if (hasMatch) {
-          result.points *= 2;
-          shopBuffs.push('2x Boost');
-          break;
-        }
+      if (boostResults.some(hasBoost => hasBoost)) {
+        result.points *= 2;
+        shopBuffs.push('2x Boost');
       }
     }
   }

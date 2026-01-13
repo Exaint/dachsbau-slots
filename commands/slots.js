@@ -25,9 +25,6 @@ import {
   DACHS_SINGLE_PAYOUT,
   INSURANCE_REFUND_RATE,
   GRID_SIZE,
-  GRID_WIDTH,
-  MIDDLE_ROW_START,
-  MIDDLE_ROW_END,
   DEBUG_DACHS_PAIR_CHANCE,
   BUFF_REROLL_CHANCE,
   SYMBOL_BOOST_CHANCE,
@@ -166,21 +163,16 @@ async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamon
   if (DEBUG_MODE && lowerUsername === 'exaint_') {
     const roll = secureRandom();
     if (roll < DEBUG_DACHS_PAIR_CHANCE) {
-      const dachsPair = secureRandom() < 0.5 ? [MIDDLE_ROW_START, MIDDLE_ROW_START + 1] : [MIDDLE_ROW_START + 1, MIDDLE_ROW_END];
-
-      for (let i = MIDDLE_ROW_START; i <= MIDDLE_ROW_END; i++) {
-        grid[i] = dachsPair.includes(i) ? '🦡' : getWeightedSymbol();
-      }
-
-      for (let i = 0; i < GRID_WIDTH; i++) {
-        grid[i] = getWeightedSymbol();
-        grid[i + GRID_WIDTH * 2] = getWeightedSymbol();
+      // Generate grid with exactly 2 dachs (pair) - positions [0,1] or [1,2]
+      const dachsPair = secureRandom() < 0.5 ? [0, 1] : [1, 2];
+      for (let i = 0; i < GRID_SIZE; i++) {
+        grid.push(dachsPair.includes(i) ? '🦡' : getWeightedSymbol());
       }
       return grid;
     }
   }
 
-  // Normal generation
+  // Normal generation - only 3 elements needed (the winning row)
   for (let i = 0; i < GRID_SIZE; i++) {
     if (secureRandom() < dachsChance) {
       grid.push('🦡');
@@ -202,22 +194,22 @@ async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamon
 }
 
 // Helper: Apply special items to grid
+// Grid is now [0, 1, 2] instead of [3, 4, 5]
 async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWildCardToken, env) {
   if (hasGuaranteedPairToken) {
-    const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
-    const hasPair = (middle[0] === middle[1]) || (middle[1] === middle[2]) || (middle[0] === middle[2]);
+    const hasPair = (grid[0] === grid[1]) || (grid[1] === grid[2]) || (grid[0] === grid[2]);
 
     if (!hasPair) {
       // OPTIMIZED: Use static constant instead of recreating array
       const pairSymbol = GUARANTEED_PAIR_SYMBOLS[secureRandomInt(0, GUARANTEED_PAIR_SYMBOLS.length - 1)];
-      grid[MIDDLE_ROW_START] = pairSymbol;
-      grid[MIDDLE_ROW_START + 1] = pairSymbol;
+      grid[0] = pairSymbol;
+      grid[1] = pairSymbol;
     }
     await consumeGuaranteedPair(username, env);
   }
 
   if (hasWildCardToken) {
-    const wildPos = secureRandomInt(0, GRID_WIDTH - 1) + MIDDLE_ROW_START;
+    const wildPos = secureRandomInt(0, 2); // Position 0, 1, or 2
     grid[wildPos] = '🃏';
     await consumeWildCard(username, env);
   }
@@ -246,9 +238,9 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
   }
 
   // Symbol Boost (Shop Buff)
-  const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
+  // Grid is now [0, 1, 2] - direct access
   if (result.points > 0) {
-    const uniqueMiddleSymbols = [...new Set(middle)];
+    const uniqueMiddleSymbols = [...new Set(grid)];
     const boostChecks = await Promise.all(
       uniqueMiddleSymbols.map(symbol =>
         consumeBoost(username, symbol, env).then(hasBoost => ({ symbol, hasBoost }))
@@ -257,10 +249,10 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
 
     for (const { symbol, hasBoost } of boostChecks) {
       if (hasBoost) {
-        const hasMatch = (middle[0] === symbol && middle[1] === symbol) ||
-          (middle[1] === symbol && middle[2] === symbol) ||
-          (middle[0] === symbol && middle[2] === symbol) ||
-          (middle[0] === symbol && middle[1] === symbol && middle[2] === symbol);
+        const hasMatch = (grid[0] === symbol && grid[1] === symbol) ||
+          (grid[1] === symbol && grid[2] === symbol) ||
+          (grid[0] === symbol && grid[2] === symbol) ||
+          (grid[0] === symbol && grid[1] === symbol && grid[2] === symbol);
 
         if (hasMatch) {
           result.points *= 2;
@@ -361,7 +353,7 @@ async function calculateStreakBonuses(lowerUsername, username, isWin, env) {
 function buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage) {
   const rankSymbol = rank ? `${rank} ` : '';
   const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DachsTaler)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
-  const middleRow = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ');
+  const middleRow = grid.join(' '); // Grid is now [0, 1, 2]
 
   const messageParts = [`@${username}`, rankSymbol, freeSpinPrefix, `[ ${middleRow} ]`];
 
@@ -606,7 +598,7 @@ async function handleSlot(username, amountParam, url, env) {
         ]);
         const rankSymbol = rank ? `${rank} ` : '';
 
-        return new Response(`@${username} ${rankSymbol}[ ${grid[3]} ${grid[4]} ${grid[5]} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
       }
     }
 
@@ -678,11 +670,11 @@ async function handleSlot(username, amountParam, url, env) {
     const customMsg = getCustomMessage(lowerUsername, username, isCustomWin, {
       amount: isCustomWin ? totalWinAmount : spinCost,
       balance: newBalance,
-      grid: [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')
+      grid: grid.join(' ')
     });
 
     if (customMsg) {
-      return new Response(`@${username} [ ${[grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DachsTaler`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} [ ${grid.join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DachsTaler`, { headers: RESPONSE_HEADERS });
     }
 
     // Build response message (D2 format)
@@ -696,30 +688,30 @@ async function handleSlot(username, amountParam, url, env) {
 }
 
 function calculateWin(grid) {
-  const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
+  // Grid is now directly the winning row [0, 1, 2]
 
   // Count Wild Cards
-  const wildCount = middle.filter(s => s === '🃏').length;
+  const wildCount = grid.filter(s => s === '🃏').length;
   const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
 
   // Process wilds: Replace with best matching symbol
-  let processedMiddle = [...middle];
+  let processedGrid = [...grid];
   if (wildCount > 0) {
     // Find non-wild symbols
-    const nonWildSymbols = middle.filter(s => s !== '🃏');
+    const nonWildSymbols = grid.filter(s => s !== '🃏');
 
     if (nonWildSymbols.length === 0) {
       // All wilds → treat as best symbol (⭐)
-      processedMiddle = ['⭐', '⭐', '⭐'];
+      processedGrid = ['⭐', '⭐', '⭐'];
     } else if (wildCount === 2) {
       // 2 wilds + 1 symbol → make triple of that symbol
       const symbol = nonWildSymbols[0];
-      processedMiddle = [symbol, symbol, symbol];
+      processedGrid = [symbol, symbol, symbol];
     } else if (wildCount === 1) {
       // 1 wild → make best pair or triple
       if (nonWildSymbols[0] === nonWildSymbols[1]) {
         // Already a pair, wild makes triple
-        processedMiddle = [nonWildSymbols[0], nonWildSymbols[0], nonWildSymbols[0]];
+        processedGrid = [nonWildSymbols[0], nonWildSymbols[0], nonWildSymbols[0]];
       } else {
         // No pair, wild creates pair with HIGHER VALUE symbol
         const symbol1 = nonWildSymbols[0];
@@ -737,16 +729,16 @@ function calculateWin(grid) {
 
         // Use the symbol with higher payout for the pair
         if (value1 >= value2) {
-          processedMiddle = [symbol1, symbol1, symbol2];
+          processedGrid = [symbol1, symbol1, symbol2];
         } else {
-          processedMiddle = [symbol2, symbol2, symbol1];
+          processedGrid = [symbol2, symbol2, symbol1];
         }
       }
     }
   }
 
-  // Check Dachs (using processed middle)
-  const dachsCount = processedMiddle.filter(s => s === '🦡').length;
+  // Check Dachs (using processed grid)
+  const dachsCount = processedGrid.filter(s => s === '🦡').length;
   if (dachsCount === 3) {
     return { points: DACHS_TRIPLE_PAYOUT, message: '🔥🦡🔥 MEGAAA DACHS JACKPOT!!! 🔥🦡🔥 HOLY MOLY!!!' + wildSuffix };
   }
@@ -757,27 +749,27 @@ function calculateWin(grid) {
     return { points: DACHS_SINGLE_PAYOUT, message: '🦡 Dachs gesichtet! Nice!' + wildSuffix };
   }
 
-  // Check Diamonds (using ORIGINAL middle, not processed - wilds don't count for free spins)
-  if (middle[0] === '💎' && middle[1] === '💎' && middle[2] === '💎') {
+  // Check Diamonds (using ORIGINAL grid, not processed - wilds don't count for free spins)
+  if (grid[0] === '💎' && grid[1] === '💎' && grid[2] === '💎') {
     return { points: 0, message: '💎💎💎 DIAMANTEN JACKPOT! +5 FREE SPINS!', freeSpins: 5 };
   }
 
-  if ((middle[0] === '💎' && middle[1] === '💎' && middle[2] !== '💎' && middle[2] !== '🃏') ||
-    (middle[1] === '💎' && middle[2] === '💎' && middle[0] !== '💎' && middle[0] !== '🃏')) {
+  if ((grid[0] === '💎' && grid[1] === '💎' && grid[2] !== '💎' && grid[2] !== '🃏') ||
+    (grid[1] === '💎' && grid[2] === '💎' && grid[0] !== '💎' && grid[0] !== '🃏')) {
     return { points: 0, message: '💎💎 Diamanten! +1 FREE SPIN!', freeSpins: 1 };
   }
 
-  // Check Triples (using processed middle)
-  if (processedMiddle[0] === processedMiddle[1] && processedMiddle[1] === processedMiddle[2]) {
-    const symbol = processedMiddle[0];
+  // Check Triples (using processed grid)
+  if (processedGrid[0] === processedGrid[1] && processedGrid[1] === processedGrid[2]) {
+    const symbol = processedGrid[0];
     const points = TRIPLE_PAYOUTS[symbol] || 50;
     return { points, message: `Dreifach ${symbol}!${wildSuffix}` };
   }
 
-  // Check Pairs (using processed middle) - Only adjacent pairs count
-  if ((processedMiddle[0] === processedMiddle[1] && processedMiddle[0] !== processedMiddle[2]) ||
-    (processedMiddle[1] === processedMiddle[2] && processedMiddle[0] !== processedMiddle[1])) {
-    const symbol = processedMiddle[0] === processedMiddle[1] ? processedMiddle[0] : processedMiddle[1];
+  // Check Pairs (using processed grid) - Only adjacent pairs count
+  if ((processedGrid[0] === processedGrid[1] && processedGrid[0] !== processedGrid[2]) ||
+    (processedGrid[1] === processedGrid[2] && processedGrid[0] !== processedGrid[1])) {
+    const symbol = processedGrid[0] === processedGrid[1] ? processedGrid[0] : processedGrid[1];
     const points = PAIR_PAYOUTS[symbol] || 5;
     return { points, message: `Doppel ${symbol}!${wildSuffix}` };
   }

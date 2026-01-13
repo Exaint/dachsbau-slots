@@ -76,10 +76,17 @@ function getCurrentDate() {
   return `${year}-${month}-${day}`;
 }
 
+// OPTIMIZED: Cache for getWeekStart (recalculated every 60 seconds max)
+let weekStartCache = { value: null, expires: 0 };
+
 function getWeekStart() {
+  const now = Date.now();
+  if (weekStartCache.value && now < weekStartCache.expires) {
+    return weekStartCache.value;
+  }
+
   // Calculate days since Monday in German timezone
-  const now = new Date();
-  const germanDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+  const germanDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
   const dayOfWeek = germanDate.getDay();
   const daysToMonday = (dayOfWeek + 6) % 7;
 
@@ -90,7 +97,11 @@ function getWeekStart() {
   const year = monday.getFullYear();
   const month = String(monday.getMonth() + 1).padStart(2, '0');
   const day = String(monday.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const result = `${year}-${month}-${day}`;
+
+  // Cache for 60 seconds
+  weekStartCache = { value: result, expires: now + 60000 };
+  return result;
 }
 
 // OPTIMIZED: Static Set for O(1) lookup instead of Array.includes()

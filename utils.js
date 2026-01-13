@@ -1,4 +1,4 @@
-import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, RESPONSE_HEADERS, BUFF_TTL_BUFFER_SECONDS } from './constants.js';
+import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS } from './constants.js';
 import { ADMINS } from './config.js';
 
 // OPTIMIZED: Cached DateTimeFormat instances (avoid recreation per request)
@@ -11,11 +11,6 @@ const GERMAN_DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
 
 // OPTIMIZED: Pre-compiled regex patterns (avoid recompilation per request)
 const USERNAME_SANITIZE_REGEX = /[^a-z0-9_]/gi;
-
-// OPTIMIZED: Response helper to reduce code duplication (~80+ usages)
-function respond(message) {
-  return new Response(message, { headers: RESPONSE_HEADERS });
-}
 
 // Cryptographically secure random number generator (0 to 1, like Math.random but secure)
 function secureRandom() {
@@ -43,9 +38,9 @@ function getWeightedSymbol() {
 }
 
 // Helper function to check if user is admin (uses config.js)
+// OPTIMIZED: ADMINS is now a Set, uses .has() for O(1) lookup
 function isAdmin(username) {
-  const lowerUsername = username.toLowerCase();
-  return ADMINS.includes(lowerUsername);
+  return ADMINS.has(username.toLowerCase());
 }
 
 function sanitizeUsername(username) {
@@ -81,10 +76,17 @@ function getCurrentDate() {
   return `${year}-${month}-${day}`;
 }
 
+// OPTIMIZED: Cache for getWeekStart (recalculated every 60 seconds max)
+let weekStartCache = { value: null, expires: 0 };
+
 function getWeekStart() {
+  const now = Date.now();
+  if (weekStartCache.value && now < weekStartCache.expires) {
+    return weekStartCache.value;
+  }
+
   // Calculate days since Monday in German timezone
-  const now = new Date();
-  const germanDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+  const germanDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
   const dayOfWeek = germanDate.getDay();
   const daysToMonday = (dayOfWeek + 6) % 7;
 
@@ -95,12 +97,18 @@ function getWeekStart() {
   const year = monday.getFullYear();
   const month = String(monday.getMonth() + 1).padStart(2, '0');
   const day = String(monday.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const result = `${year}-${month}-${day}`;
+
+  // Cache for 60 seconds
+  weekStartCache = { value: result, expires: now + 60000 };
+  return result;
 }
 
+// OPTIMIZED: Static Set for O(1) lookup instead of Array.includes()
+const LEADERBOARD_BLOCKLIST = new Set(['dachsbank']);
+
 function isLeaderboardBlocked(username) {
-  const leaderboardBlocklist = ['dachsbank'];
-  return leaderboardBlocklist.includes(username.toLowerCase());
+  return LEADERBOARD_BLOCKLIST.has(username.toLowerCase());
 }
 
 // OPTIMIZED: Helper function to calculate TTL for buffs (avoids repeated inline calculation)
@@ -114,7 +122,6 @@ function exponentialBackoff(attempt, baseMs = 10) {
 }
 
 export {
-  respond,
   secureRandom,
   secureRandomInt,
   getWeightedSymbol,

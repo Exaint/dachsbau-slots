@@ -78,6 +78,7 @@ async function handleShop(username, item, env) {
 
 async function buyShopItem(username, itemId, env) {
   try {
+    const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once for all KV operations
     const item = SHOP_ITEMS[itemId];
 
     if (!item) {
@@ -181,7 +182,7 @@ async function buyShopItem(username, itemId, env) {
       // Check weekly limit for Dachs-Boost
       if (item.weeklyLimit) {
         // OPTIMIZED: Check existing boost AND weekly purchases in parallel
-        const boostKey = `boost:${username.toLowerCase()}:${item.symbol}`;
+        const boostKey = `boost:${lowerUsername}:${item.symbol}`;
         const [existingBoost, purchases] = await Promise.all([
           env.SLOTS_KV.get(boostKey),
           getDachsBoostPurchases(username, env)
@@ -245,7 +246,7 @@ async function buyShopItem(username, itemId, env) {
       ]);
 
       const remainingPurchases = WEEKLY_SPIN_BUNDLE_LIMIT - (purchases.count + 1);
-      return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DT) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Noch ${remainingPurchases} Käufe diese Woche möglich`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DachsTaler) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Noch ${remainingPurchases} Käufe diese Woche möglich`, { headers: RESPONSE_HEADERS });
     }
 
     if (item.type === 'peek') {
@@ -269,7 +270,7 @@ async function buyShopItem(username, itemId, env) {
       }
 
       // Store the grid for the next spin
-      await env.SLOTS_KV.put(`peek:${username.toLowerCase()}`, JSON.stringify(peekGrid), { expirationTtl: PEEK_TTL_SECONDS });
+      await env.SLOTS_KV.put(`peek:${lowerUsername}`, JSON.stringify(peekGrid), { expirationTtl: PEEK_TTL_SECONDS });
 
       // Calculate result to show prediction
       const peekResult = calculateWin(peekGrid);
@@ -396,4 +397,4 @@ function spinWheel() {
   return { result: '💸 💸 ⭐ 💰 🦡', message: 'Leider verloren!', prize: 0 };
 }
 
-export { handleShop, buyShopItem, spinWheel };
+export { handleShop, buyShopItem };

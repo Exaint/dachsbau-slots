@@ -168,10 +168,8 @@ const COMBO_BONUSES = {
 };
 
 // Grid configuration
-const GRID_SIZE = 9;
-const GRID_WIDTH = 3;
-const MIDDLE_ROW_START = 3;
-const MIDDLE_ROW_END = 5;
+// OPTIMIZED: Grid now only contains 3 elements (the winning row), not 9
+const GRID_SIZE = 3;
 
 // Debug mode configuration
 const DEBUG_DACHS_PAIR_CHANCE = 0.75; // 75% chance for 2 dachs in debug mode
@@ -278,9 +276,6 @@ export {
   MONTHLY_LOGIN_REWARDS,
   COMBO_BONUSES,
   GRID_SIZE,
-  GRID_WIDTH,
-  MIDDLE_ROW_START,
-  MIDDLE_ROW_END,
   DEBUG_DACHS_PAIR_CHANCE,
   CHAOS_SPIN_MIN,
   CHAOS_SPIN_MAX,

@@ -10,11 +10,12 @@
 // --------------------------------------------
 // Füge hier Twitch-Usernames hinzu die Admin-
 // Befehle nutzen dürfen (lowercase).
+// OPTIMIZED: Set for O(1) lookup instead of Array.includes()
 // --------------------------------------------
-const ADMINS = [
+const ADMINS = new Set([
   'exaint_',
   'frechhdachs'
-];
+]);
 
 // --------------------------------------------
 // CUSTOM WIN/LOSS MESSAGES

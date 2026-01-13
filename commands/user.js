@@ -36,6 +36,16 @@ import {
   isBuffActive
 } from '../database.js';
 
+// Helper: Get days in current month (German timezone)
+function getDaysInCurrentMonth() {
+  const now = new Date();
+  const germanDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+  const year = germanDate.getFullYear();
+  const month = germanDate.getMonth();
+  // Day 0 of next month = last day of current month
+  return new Date(year, month + 1, 0).getDate();
+}
+
 // Static: Timed buff definitions (avoid recreation per request)
 const TIMED_BUFF_KEYS = [
   { key: 'happy_hour', name: 'Happy Hour', emoji: '⚡' },
@@ -60,7 +70,7 @@ async function handleBalance(username, env) {
       return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰`, { headers: RESPONSE_HEADERS });
     }
 
-    const details = freeSpins.map(fs => `${fs.count}x ${fs.multiplier * 10}DT`).join(', ');
+    const details = freeSpins.map(fs => `${fs.count}x ${fs.multiplier * 10} DachsTaler`).join(', ');
 
     return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰 | 🎰 ${totalCount} Free Spins | Details: ${details}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -105,6 +115,7 @@ async function handleDaily(username, env) {
     // Check if daily was already claimed today (UTC day reset)
     const nowDate = new Date(now);
     const todayUTC = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
+    const daysInMonth = getDaysInCurrentMonth(); // Cache once at start
 
     if (lastDaily) {
       const lastDailyDate = new Date(lastDaily);
@@ -118,7 +129,7 @@ async function handleDaily(username, env) {
         const remainingHours = Math.floor(remainingMs / MS_PER_HOUR);
         const remainingMinutes = Math.floor((remainingMs % MS_PER_HOUR) / MS_PER_MINUTE);
 
-        return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${remainingHours}h ${remainingMinutes}m | Login-Tage diesen Monat: ${monthlyLogin.days.length} 📅`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${remainingHours}h ${remainingMinutes}m | Login-Tage: ${monthlyLogin.days.length}/${daysInMonth} 📅`, { headers: RESPONSE_HEADERS });
       }
     }
 
@@ -140,11 +151,10 @@ async function handleDaily(username, env) {
     let milestoneText = '';
 
     if (isNewMilestone) {
-      milestoneText = ` | 🎉 ${newMonthlyLogin.days.length} Tage Milestone: +${milestoneBonus} DT!`;
+      milestoneText = ` | 🎉 ${newMonthlyLogin.days.length} Tage Milestone: +${milestoneBonus} DachsTaler!`;
     }
 
-
-    return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/Monat 📅 | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/${daysInMonth} 📅 | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     console.error('handleDaily Error:', error);
     return new Response(`@${username} ❌ Fehler beim Daily Bonus.`, { headers: RESPONSE_HEADERS });
@@ -154,10 +164,11 @@ async function handleDaily(username, env) {
 async function handleBuffs(username, env) {
   try {
     const buffs = [];
+    const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once, use everywhere
 
     // Check all timed buffs
     const timedBuffPromises = TIMED_BUFF_KEYS.map(async buff => {
-      const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buff.key}`);
+      const value = await env.SLOTS_KV.get(`buff:${lowerUsername}:${buff.key}`);
       if (!value) return null;
 
       try {
@@ -200,10 +211,10 @@ async function handleBuffs(username, env) {
       Promise.all(timedBuffPromises),
       getBuffWithUses(username, 'dachs_locator', env),
       getBuffWithStack(username, 'rage_mode', env),
-      // Symbol boosts - use static constant
-      ...BUFF_SYMBOLS_WITH_NAMES.map(s => env.SLOTS_KV.get(`boost:${username.toLowerCase()}:${s.symbol}`)),
+      // Symbol boosts - use cached lowerUsername
+      ...BUFF_SYMBOLS_WITH_NAMES.map(s => env.SLOTS_KV.get(`boost:${lowerUsername}:${s.symbol}`)),
       // Win Multiplier
-      env.SLOTS_KV.get(`winmulti:${username.toLowerCase()}`),
+      env.SLOTS_KV.get(`winmulti:${lowerUsername}`),
       // Insurance, Guaranteed Pair, Wild Card
       getInsuranceCount(username, env),
       hasGuaranteedPair(username, env),
@@ -280,10 +291,10 @@ async function handleBank(username, env) {
     const balance = await getBankBalance(env);
 
     if (balance >= 0) {
-      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DT | Die Bank ist im Plus! 💰`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DachsTaler | Die Bank ist im Plus! 💰`, { headers: RESPONSE_HEADERS });
     } else {
       const deficit = Math.abs(balance);
-      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DT | Die Community hat die Bank um ${deficit.toLocaleString('de-DE')} DT geplündert! 🦡💸`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DachsTaler | Die Community hat die Bank um ${deficit.toLocaleString('de-DE')} DachsTaler geplündert! 🦡💸`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {
     console.error('handleBank Error:', error);
@@ -293,6 +304,8 @@ async function handleBank(username, env) {
 
 async function handleTransfer(username, target, amount, env) {
   try {
+    const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once
+
     if (!target) {
       return new Response(`@${username} ❌ Kein Ziel-User angegeben!`, { headers: RESPONSE_HEADERS });
     }
@@ -307,7 +320,7 @@ async function handleTransfer(username, target, amount, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    if (username.toLowerCase() === cleanTarget) {
+    if (lowerUsername === cleanTarget) {
       return new Response(`@${username} ❌ Du kannst dir nicht selbst DachsTaler senden!`, { headers: RESPONSE_HEADERS });
     }
 
@@ -327,7 +340,7 @@ async function handleTransfer(username, target, amount, env) {
         updateBankBalance(parsedAmount, env)
       ]);
 
-      return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DT 🏦`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DachsTaler 🏦`, { headers: RESPONSE_HEADERS });
     }
 
     // Atomic transfer with retry mechanism to prevent race conditions

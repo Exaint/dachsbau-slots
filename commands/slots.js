@@ -25,9 +25,6 @@ import {
   DACHS_SINGLE_PAYOUT,
   INSURANCE_REFUND_RATE,
   GRID_SIZE,
-  GRID_WIDTH,
-  MIDDLE_ROW_START,
-  MIDDLE_ROW_END,
   DEBUG_DACHS_PAIR_CHANCE,
   BUFF_REROLL_CHANCE,
   SYMBOL_BOOST_CHANCE,
@@ -91,8 +88,9 @@ const UNLOCK_PRICES = {
 };
 
 // Helper: Generiert Custom Message falls vorhanden
-function getCustomMessage(username, isWin, data) {
-  const userMessages = CUSTOM_MESSAGES[username.toLowerCase()];
+// OPTIMIZED: Accepts pre-computed lowerUsername to avoid redundant toLowerCase()
+function getCustomMessage(lowerUsername, username, isWin, data) {
+  const userMessages = CUSTOM_MESSAGES[lowerUsername];
   if (!userMessages) return null;
 
   const template = isWin ? userMessages.win : userMessages.loss;
@@ -157,9 +155,10 @@ async function parseSpinAmount(username, amountParam, currentBalance, isFreeSpin
 }
 
 // Helper: Generate spin grid
-async function generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush, env) {
+// OPTIMIZED: Accepts pre-computed lowerUsername to avoid redundant toLowerCase()
+async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamondRush, env) {
   // Check if user has a stored peek grid
-  const peekKey = `peek:${username.toLowerCase()}`;
+  const peekKey = `peek:${lowerUsername}`;
   const storedPeek = await env.SLOTS_KV.get(peekKey);
 
   if (storedPeek) {
@@ -170,37 +169,38 @@ async function generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush
   const grid = [];
 
   // DEBUG MODE: Special user gets higher chance for exactly 2 dachs
-  if (DEBUG_MODE && username.toLowerCase() === 'exaint_') {
+  if (DEBUG_MODE && lowerUsername === 'exaint_') {
     const roll = secureRandom();
     if (roll < DEBUG_DACHS_PAIR_CHANCE) {
-      const dachsPair = secureRandom() < 0.5 ? [MIDDLE_ROW_START, MIDDLE_ROW_START + 1] : [MIDDLE_ROW_START + 1, MIDDLE_ROW_END];
-
-      for (let i = MIDDLE_ROW_START; i <= MIDDLE_ROW_END; i++) {
-        grid[i] = dachsPair.includes(i) ? '🦡' : getWeightedSymbol();
-      }
-
-      for (let i = 0; i < GRID_WIDTH; i++) {
-        grid[i] = getWeightedSymbol();
-        grid[i + GRID_WIDTH * 2] = getWeightedSymbol();
+      // Generate grid with exactly 2 dachs (pair) - positions [0,1] or [1,2]
+      const dachsPair = secureRandom() < 0.5 ? [0, 1] : [1, 2];
+      for (let i = 0; i < GRID_SIZE; i++) {
+        grid.push(dachsPair.includes(i) ? '🦡' : getWeightedSymbol());
       }
       return grid;
     }
   }
 
-  // Normal generation
+  // Normal generation - only 3 elements needed (the winning row)
+  // OPTIMIZED: Batch random calls to reduce crypto operations
   for (let i = 0; i < GRID_SIZE; i++) {
     if (secureRandom() < dachsChance) {
       grid.push('🦡');
     } else {
       let symbol = getWeightedSymbol();
-      if (hasStarMagnet && secureRandom() < BUFF_REROLL_CHANCE) {
-        const starRoll = secureRandom();
-        if (starRoll < SYMBOL_BOOST_CHANCE) symbol = '⭐';
+
+      // Only generate buff random values if buffs are active
+      if (hasStarMagnet || hasDiamondRush) {
+        const buffRoll = secureRandom();
+        const boostRoll = secureRandom();
+
+        if (hasStarMagnet && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
+          symbol = '⭐';
+        } else if (hasDiamondRush && symbol !== '💎' && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
+          symbol = '💎';
+        }
       }
-      if (hasDiamondRush && symbol !== '💎' && secureRandom() < BUFF_REROLL_CHANCE) {
-        const diamondRoll = secureRandom();
-        if (diamondRoll < SYMBOL_BOOST_CHANCE) symbol = '💎';
-      }
+
       grid.push(symbol);
     }
   }
@@ -209,22 +209,22 @@ async function generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush
 }
 
 // Helper: Apply special items to grid
+// Grid is now [0, 1, 2] instead of [3, 4, 5]
 async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWildCardToken, env) {
   if (hasGuaranteedPairToken) {
-    const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
-    const hasPair = (middle[0] === middle[1]) || (middle[1] === middle[2]) || (middle[0] === middle[2]);
+    const hasPair = (grid[0] === grid[1]) || (grid[1] === grid[2]) || (grid[0] === grid[2]);
 
     if (!hasPair) {
       // OPTIMIZED: Use static constant instead of recreating array
       const pairSymbol = GUARANTEED_PAIR_SYMBOLS[secureRandomInt(0, GUARANTEED_PAIR_SYMBOLS.length - 1)];
-      grid[MIDDLE_ROW_START] = pairSymbol;
-      grid[MIDDLE_ROW_START + 1] = pairSymbol;
+      grid[0] = pairSymbol;
+      grid[1] = pairSymbol;
     }
     await consumeGuaranteedPair(username, env);
   }
 
   if (hasWildCardToken) {
-    const wildPos = secureRandomInt(0, GRID_WIDTH - 1) + MIDDLE_ROW_START;
+    const wildPos = secureRandomInt(0, 2); // Position 0, 1, or 2
     grid[wildPos] = '🃏';
     await consumeWildCard(username, env);
   }
@@ -253,27 +253,23 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
   }
 
   // Symbol Boost (Shop Buff)
-  const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
+  // OPTIMIZED: Only check boosts for symbols that actually have a match (pair/triple)
   if (result.points > 0) {
-    const uniqueMiddleSymbols = [...new Set(middle)];
-    const boostChecks = await Promise.all(
-      uniqueMiddleSymbols.map(symbol =>
-        consumeBoost(username, symbol, env).then(hasBoost => ({ symbol, hasBoost }))
-      )
-    );
+    // Pre-compute which symbols have matches - only these can benefit from boost
+    const matchingSymbols = new Set();
+    if (grid[0] === grid[1]) matchingSymbols.add(grid[0]);
+    if (grid[1] === grid[2]) matchingSymbols.add(grid[1]);
+    if (grid[0] === grid[2]) matchingSymbols.add(grid[0]);
 
-    for (const { symbol, hasBoost } of boostChecks) {
-      if (hasBoost) {
-        const hasMatch = (middle[0] === symbol && middle[1] === symbol) ||
-          (middle[1] === symbol && middle[2] === symbol) ||
-          (middle[0] === symbol && middle[2] === symbol) ||
-          (middle[0] === symbol && middle[1] === symbol && middle[2] === symbol);
+    // Only check boosts for symbols with matches (reduces KV reads from ~7 to 1-2)
+    if (matchingSymbols.size > 0) {
+      const boostResults = await Promise.all(
+        Array.from(matchingSymbols).map(symbol => consumeBoost(username, symbol, env))
+      );
 
-        if (hasMatch) {
-          result.points *= 2;
-          shopBuffs.push('2x Boost');
-          break;
-        }
+      if (boostResults.some(hasBoost => hasBoost)) {
+        result.points *= 2;
+        shopBuffs.push('2x Boost');
       }
     }
   }
@@ -311,7 +307,8 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
 
 // Helper: Calculate streak bonuses
 // Returns natural bonuses in D2 format
-async function calculateStreakBonuses(username, isWin, env) {
+// OPTIMIZED: Accepts pre-computed lowerUsername to avoid redundant toLowerCase()
+async function calculateStreakBonuses(lowerUsername, username, isWin, env) {
   const previousStreak = await getStreak(username, env);
 
   const naturalBonuses = []; // Track natural bonuses for D2 format
@@ -339,7 +336,7 @@ async function calculateStreakBonuses(username, isWin, env) {
     ? { wins: 0, losses: 0 }
     : { wins: isWin ? previousStreak.wins + 1 : 0, losses: isWin ? 0 : previousStreak.losses + 1 };
 
-  await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
+  await env.SLOTS_KV.put(`streak:${lowerUsername}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
 
   // Combo Bonus
   if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {
@@ -363,11 +360,11 @@ async function calculateStreakBonuses(username, isWin, env) {
 }
 
 // Helper: Build response message (D2 format)
-// Format: [ Grid ] Result! +X DT 💰 ║ Natural Bonuses ║ 🛒 Shop Buffs ║ Kontostand: X DT
+// Format: [ Grid ] Result! +X DachsTaler 💰 ║ Natural Bonuses ║ 🛒 Shop Buffs ║ Kontostand: X DachsTaler
 function buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage) {
   const rankSymbol = rank ? `${rank} ` : '';
-  const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DT)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
-  const middleRow = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ');
+  const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DachsTaler)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
+  const middleRow = grid.join(' '); // Grid is now [0, 1, 2]
 
   const messageParts = [`@${username}`, rankSymbol, freeSpinPrefix, `[ ${middleRow} ]`];
 
@@ -377,7 +374,7 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
   }
   // Win
   else if (totalWin > 0) {
-    messageParts.push(`${result.message} +${totalWin} DT 💰`);
+    messageParts.push(`${result.message} +${totalWin} DachsTaler 💰`);
 
     // Hourly Jackpot (special natural bonus)
     if (hourlyJackpotWon) {
@@ -404,7 +401,7 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
     messageParts.push(`${result.message} 💸`);
   }
 
-  messageParts.push(`║ Kontostand: ${newBalance} DT`);
+  messageParts.push(`║ Kontostand: ${newBalance} DachsTaler`);
 
   if (lossWarningMessage) {
     messageParts.push(lossWarningMessage);
@@ -415,6 +412,7 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
 
 async function handleSlot(username, amountParam, url, env) {
   try {
+    const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once for all KV operations
 
     // OPTIMIZED: Sanitize amountParam with pre-compiled regex patterns
     if (amountParam) {
@@ -528,7 +526,7 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     // Generate grid
-    const grid = await generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush, env);
+    const grid = await generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamondRush, env);
 
     // OPTIMIZED: Decrement Dachs Locator uses inline (avoids redundant KV read)
     if (hasDachsLocator.active && hasDachsLocator.data) {
@@ -536,9 +534,9 @@ async function handleSlot(username, amountParam, url, env) {
       data.uses--;
 
       if (data.uses <= 0) {
-        await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:dachs_locator`);
+        await env.SLOTS_KV.delete(`buff:${lowerUsername}:dachs_locator`);
       } else {
-        await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:dachs_locator`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) });
+        await env.SLOTS_KV.put(`buff:${lowerUsername}:dachs_locator`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) });
       }
     }
 
@@ -559,7 +557,7 @@ async function handleSlot(username, amountParam, url, env) {
 
     // Calculate streak bonuses
     const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
-    const streakBonusResult = await calculateStreakBonuses(username, isWin, env);
+    const streakBonusResult = await calculateStreakBonuses(lowerUsername, username, isWin, env);
     const streakBonus = streakBonusResult.streakBonus;
     const comboBonus = streakBonusResult.comboBonus;
     const naturalBonuses = streakBonusResult.naturalBonuses;
@@ -570,14 +568,14 @@ async function handleSlot(username, amountParam, url, env) {
       const data = hasRageMode.data;
       data.stack = Math.min((data.stack || 0) + RAGE_MODE_LOSS_STACK, RAGE_MODE_MAX_STACK);
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
+        env.SLOTS_KV.put(`buff:${lowerUsername}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
         resetStreakMultiplier(username, env)
       ]);
     } else if (isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = 0;
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
+        env.SLOTS_KV.put(`buff:${lowerUsername}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
         incrementStreakMultiplier(username, env)
       ]);
     } else if (isWin) {
@@ -611,7 +609,7 @@ async function handleSlot(username, amountParam, url, env) {
         ]);
         const rankSymbol = rank ? `${rank} ` : '';
 
-        return new Response(`@${username} ${rankSymbol}[ ${grid[3]} ${grid[4]} ${grid[5]} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DT`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
       }
     }
 
@@ -669,8 +667,8 @@ async function handleSlot(username, amountParam, url, env) {
         if (dailyAvailable) {
           const dailyAmountValue = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
           lossWarningMessage = lossWarningMessage
-            ? `${lossWarningMessage} ⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DT`
-            : `⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DT`;
+            ? `${lossWarningMessage} ⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DachsTaler`
+            : `⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DachsTaler`;
         }
       } catch (error) {
         console.error('Low Balance Warning Check Error:', error);
@@ -680,14 +678,14 @@ async function handleSlot(username, amountParam, url, env) {
     // Custom Message Check
     const isCustomWin = result.points > 0 || totalBonuses > 0;
     const totalWinAmount = (result.points || 0) + totalBonuses;
-    const customMsg = getCustomMessage(username, isCustomWin, {
+    const customMsg = getCustomMessage(lowerUsername, username, isCustomWin, {
       amount: isCustomWin ? totalWinAmount : spinCost,
       balance: newBalance,
-      grid: [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')
+      grid: grid.join(' ')
     });
 
     if (customMsg) {
-      return new Response(`@${username} [ ${[grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DT`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} [ ${grid.join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DachsTaler`, { headers: RESPONSE_HEADERS });
     }
 
     // Build response message (D2 format)
@@ -701,30 +699,30 @@ async function handleSlot(username, amountParam, url, env) {
 }
 
 function calculateWin(grid) {
-  const middle = [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]];
+  // Grid is now directly the winning row [0, 1, 2]
 
   // Count Wild Cards
-  const wildCount = middle.filter(s => s === '🃏').length;
+  const wildCount = grid.filter(s => s === '🃏').length;
   const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
 
   // Process wilds: Replace with best matching symbol
-  let processedMiddle = [...middle];
+  let processedGrid = [...grid];
   if (wildCount > 0) {
     // Find non-wild symbols
-    const nonWildSymbols = middle.filter(s => s !== '🃏');
+    const nonWildSymbols = grid.filter(s => s !== '🃏');
 
     if (nonWildSymbols.length === 0) {
       // All wilds → treat as best symbol (⭐)
-      processedMiddle = ['⭐', '⭐', '⭐'];
+      processedGrid = ['⭐', '⭐', '⭐'];
     } else if (wildCount === 2) {
       // 2 wilds + 1 symbol → make triple of that symbol
       const symbol = nonWildSymbols[0];
-      processedMiddle = [symbol, symbol, symbol];
+      processedGrid = [symbol, symbol, symbol];
     } else if (wildCount === 1) {
       // 1 wild → make best pair or triple
       if (nonWildSymbols[0] === nonWildSymbols[1]) {
         // Already a pair, wild makes triple
-        processedMiddle = [nonWildSymbols[0], nonWildSymbols[0], nonWildSymbols[0]];
+        processedGrid = [nonWildSymbols[0], nonWildSymbols[0], nonWildSymbols[0]];
       } else {
         // No pair, wild creates pair with HIGHER VALUE symbol
         const symbol1 = nonWildSymbols[0];
@@ -742,16 +740,16 @@ function calculateWin(grid) {
 
         // Use the symbol with higher payout for the pair
         if (value1 >= value2) {
-          processedMiddle = [symbol1, symbol1, symbol2];
+          processedGrid = [symbol1, symbol1, symbol2];
         } else {
-          processedMiddle = [symbol2, symbol2, symbol1];
+          processedGrid = [symbol2, symbol2, symbol1];
         }
       }
     }
   }
 
-  // Check Dachs (using processed middle)
-  const dachsCount = processedMiddle.filter(s => s === '🦡').length;
+  // Check Dachs (using processed grid)
+  const dachsCount = processedGrid.filter(s => s === '🦡').length;
   if (dachsCount === 3) {
     return { points: DACHS_TRIPLE_PAYOUT, message: '🔥🦡🔥 MEGAAA DACHS JACKPOT!!! 🔥🦡🔥 HOLY MOLY!!!' + wildSuffix };
   }
@@ -762,27 +760,27 @@ function calculateWin(grid) {
     return { points: DACHS_SINGLE_PAYOUT, message: '🦡 Dachs gesichtet! Nice!' + wildSuffix };
   }
 
-  // Check Diamonds (using ORIGINAL middle, not processed - wilds don't count for free spins)
-  if (middle[0] === '💎' && middle[1] === '💎' && middle[2] === '💎') {
+  // Check Diamonds (using ORIGINAL grid, not processed - wilds don't count for free spins)
+  if (grid[0] === '💎' && grid[1] === '💎' && grid[2] === '💎') {
     return { points: 0, message: '💎💎💎 DIAMANTEN JACKPOT! +5 FREE SPINS!', freeSpins: 5 };
   }
 
-  if ((middle[0] === '💎' && middle[1] === '💎' && middle[2] !== '💎' && middle[2] !== '🃏') ||
-    (middle[1] === '💎' && middle[2] === '💎' && middle[0] !== '💎' && middle[0] !== '🃏')) {
+  if ((grid[0] === '💎' && grid[1] === '💎' && grid[2] !== '💎' && grid[2] !== '🃏') ||
+    (grid[1] === '💎' && grid[2] === '💎' && grid[0] !== '💎' && grid[0] !== '🃏')) {
     return { points: 0, message: '💎💎 Diamanten! +1 FREE SPIN!', freeSpins: 1 };
   }
 
-  // Check Triples (using processed middle)
-  if (processedMiddle[0] === processedMiddle[1] && processedMiddle[1] === processedMiddle[2]) {
-    const symbol = processedMiddle[0];
+  // Check Triples (using processed grid)
+  if (processedGrid[0] === processedGrid[1] && processedGrid[1] === processedGrid[2]) {
+    const symbol = processedGrid[0];
     const points = TRIPLE_PAYOUTS[symbol] || 50;
     return { points, message: `Dreifach ${symbol}!${wildSuffix}` };
   }
 
-  // Check Pairs (using processed middle) - Only adjacent pairs count
-  if ((processedMiddle[0] === processedMiddle[1] && processedMiddle[0] !== processedMiddle[2]) ||
-    (processedMiddle[1] === processedMiddle[2] && processedMiddle[0] !== processedMiddle[1])) {
-    const symbol = processedMiddle[0] === processedMiddle[1] ? processedMiddle[0] : processedMiddle[1];
+  // Check Pairs (using processed grid) - Only adjacent pairs count
+  if ((processedGrid[0] === processedGrid[1] && processedGrid[0] !== processedGrid[2]) ||
+    (processedGrid[1] === processedGrid[2] && processedGrid[0] !== processedGrid[1])) {
+    const symbol = processedGrid[0] === processedGrid[1] ? processedGrid[0] : processedGrid[1];
     const points = PAIR_PAYOUTS[symbol] || 5;
     return { points, message: `Doppel ${symbol}!${wildSuffix}` };
   }

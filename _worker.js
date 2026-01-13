@@ -46,6 +46,9 @@ const LEADERBOARD_ALIASES = new Set(['lb', 'leaderboard', 'rank', 'ranking']);
 const BALANCE_ALIASES = new Set(['balance', 'konto']);
 const INFO_ALIASES = new Set(['info', 'help', 'commands']);
 
+// OPTIMIZED: Commands that don't need security checks (read-only info commands)
+const SAFE_COMMANDS = new Set(['stats', 'buffs', 'bank', ...LEADERBOARD_ALIASES, ...BALANCE_ALIASES, ...INFO_ALIASES]);
+
 // Admin commands that take (username, target, env)
 const ADMIN_COMMANDS_TARGET = {
   ban: handleBan,
@@ -85,25 +88,6 @@ export default {
         return new Response('Invalid username', { headers: RESPONSE_HEADERS });
       }
 
-      // OPTIMIZED: Parallelize security checks for faster response
-      if (action !== 'leaderboard') {
-        const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
-          isBlacklisted(cleanUsername, env),
-          env.SLOTS_KV.get(`frozen:${cleanUsername.toLowerCase()}`),
-          env.SLOTS_KV.get('maintenance_mode')
-        ]);
-
-        if (blacklisted) {
-          return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
-        }
-        if (isFrozen === 'true') {
-          return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
-        }
-        if (maintenanceMode === 'true' && !isAdmin(cleanUsername)) {
-          return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
-        }
-      }
-
       // Handle special slot commands
       if (action === 'slot') {
         const amountParam = url.searchParams.get('amount');
@@ -111,6 +95,25 @@ export default {
         // Check special commands
         if (amountParam) {
           const lower = amountParam.toLowerCase();
+
+          // OPTIMIZED: Skip security checks for safe read-only commands (saves 3 KV reads)
+          if (!SAFE_COMMANDS.has(lower)) {
+            const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
+              isBlacklisted(cleanUsername, env),
+              env.SLOTS_KV.get(`frozen:${cleanUsername.toLowerCase()}`),
+              env.SLOTS_KV.get('maintenance_mode')
+            ]);
+
+            if (blacklisted) {
+              return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
+            }
+            if (isFrozen === 'true') {
+              return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
+            }
+            if (maintenanceMode === 'true' && !isAdmin(cleanUsername)) {
+              return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
+            }
+          }
 
           // Detect !slots buy mistake
           if (lower === 'buy') {
@@ -168,12 +171,31 @@ export default {
         return await handleSlot(cleanUsername, amountParam, url, env);
       }
 
-      if (action === 'daily') return await handleDaily(cleanUsername, env);
-      if (action === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('amount'), env);
+      // Safe read-only actions (no security check needed)
       if (action === 'leaderboard') return await handleLeaderboard(env);
-      if (action === 'shop') return await handleShop(cleanUsername, url.searchParams.get('item'), env);
       if (action === 'stats') return await handleStats(cleanUsername, env);
       if (action === 'balance') return await handleBalance(cleanUsername, env);
+
+      // Actions that modify state need security checks
+      const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
+        isBlacklisted(cleanUsername, env),
+        env.SLOTS_KV.get(`frozen:${cleanUsername.toLowerCase()}`),
+        env.SLOTS_KV.get('maintenance_mode')
+      ]);
+
+      if (blacklisted) {
+        return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
+      }
+      if (isFrozen === 'true') {
+        return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
+      }
+      if (maintenanceMode === 'true' && !isAdmin(cleanUsername)) {
+        return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
+      }
+
+      if (action === 'daily') return await handleDaily(cleanUsername, env);
+      if (action === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('amount'), env);
+      if (action === 'shop') return await handleShop(cleanUsername, url.searchParams.get('item'), env);
 
       return new Response('Invalid action', { headers: RESPONSE_HEADERS });
     } catch (error) {

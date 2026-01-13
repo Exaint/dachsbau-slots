@@ -27,45 +27,6 @@ async function setBalance(username, balance, env) {
   }
 }
 
-// Atomic balance update with retry mechanism (for race condition prevention)
-async function atomicBalanceUpdate(username, updateFn, maxRetries = 3, env) {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      // Read current balance
-      const currentBalance = await getBalance(username, env);
-
-      // Calculate new balance using update function
-      const newBalance = updateFn(currentBalance);
-      const safeBalance = Math.max(0, Math.min(newBalance, MAX_BALANCE));
-
-      // Try to update with metadata check (simple optimistic lock)
-      const key = `user:${username.toLowerCase()}`;
-      const metadata = { lastUpdate: Date.now(), attempt };
-
-      await env.SLOTS_KV.put(key, safeBalance.toString(), { metadata });
-
-      // Verify the write succeeded by reading back
-      const verifyBalance = await getBalance(username, env);
-      if (verifyBalance === safeBalance) {
-        return { success: true, balance: safeBalance, attempts: attempt + 1 };
-      }
-
-      // If verification failed, retry
-      if (attempt < maxRetries - 1) {
-        // Exponential backoff: wait 10ms, 20ms, 40ms
-        await exponentialBackoff(attempt);
-      }
-    } catch (error) {
-      console.error(`atomicBalanceUpdate Error (attempt ${attempt + 1}):`, error);
-      if (attempt === maxRetries - 1) {
-        return { success: false, error, attempts: attempt + 1 };
-      }
-    }
-  }
-
-  return { success: false, error: 'Max retries reached', attempts: maxRetries };
-}
-
 // Daily Functions
 async function getLastDaily(username, env) {
   try {
@@ -493,7 +454,13 @@ async function consumeBoost(username, symbol, env) {
     const value = await env.SLOTS_KV.get(key);
     if (value === 'active') {
       await env.SLOTS_KV.delete(key);
-      return true;
+      // Verify deletion succeeded (prevents race condition double-consume)
+      const verify = await env.SLOTS_KV.get(key);
+      if (verify === null) {
+        return true; // Successfully consumed
+      }
+      // Another request consumed it first
+      return false;
     }
     return false;
   } catch (error) {
@@ -939,7 +906,6 @@ async function checkAndClaimHourlyJackpot(env) {
 export {
   getBalance,
   setBalance,
-  atomicBalanceUpdate,
   getLastDaily,
   setLastDaily,
   getLastSpin,

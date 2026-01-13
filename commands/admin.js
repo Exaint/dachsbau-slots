@@ -361,17 +361,13 @@ async function handleClearAllBuffs(username, target, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    // Delete all possible buffs (timed buffs)
-    const deletePromises = ALL_BUFF_KEYS.map(key => env.SLOTS_KV.delete(`buff:${cleanTarget}:${key}`));
-
-    // Delete all symbol boosts
-    ALL_SYMBOLS.forEach(symbol => {
-      deletePromises.push(env.SLOTS_KV.delete(`boost:${cleanTarget}:${symbol}`));
-    });
-
-    // Delete insurance and win multipliers
-    deletePromises.push(env.SLOTS_KV.delete(`insurance:${cleanTarget}`));
-    deletePromises.push(env.SLOTS_KV.delete(`winmulti:${cleanTarget}`));
+    // Delete all possible buffs (timed buffs, symbol boosts, insurance, win multipliers)
+    const deletePromises = [
+      ...ALL_BUFF_KEYS.map(key => env.SLOTS_KV.delete(`buff:${cleanTarget}:${key}`)),
+      ...ALL_SYMBOLS.map(symbol => env.SLOTS_KV.delete(`boost:${cleanTarget}:${symbol}`)),
+      env.SLOTS_KV.delete(`insurance:${cleanTarget}`),
+      env.SLOTS_KV.delete(`winmulti:${cleanTarget}`)
+    ];
 
     await Promise.all(deletePromises);
 

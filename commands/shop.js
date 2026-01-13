@@ -364,17 +364,17 @@ async function buyShopItem(username, itemId, env) {
       if (itemId === 36) { // Diamond Mine
         const freeSpinsAmount = secureRandomInt(DIAMOND_MINE_MIN_SPINS, DIAMOND_MINE_MAX_SPINS);
         await addFreeSpinsWithMultiplier(username, freeSpinsAmount, 1, env);
-        return new Response(`@${username} 💎 Diamond Mine! Du hast ${freeSpinsAmount} Free Spins gefunden! 💎 | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} 💎 Diamond Mine! Du hast ${freeSpinsAmount} Free Spins gefunden! 💎 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
       }
 
       if (itemId === 37) { // Guaranteed Pair
         await activateGuaranteedPair(username, env);
-        return new Response(`@${username} ✅ Guaranteed Pair aktiviert! Dein nächster Spin hat garantiert mindestens ein Pair! 🎯 | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} ✅ Guaranteed Pair aktiviert! Dein nächster Spin hat garantiert mindestens ein Pair! 🎯 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
       }
 
       if (itemId === 38) { // Wild Card
         await activateWildCard(username, env);
-        return new Response(`@${username} ✅ Wild Card aktiviert! Dein nächster Spin enthält ein 🃏 Wild Symbol! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} ✅ Wild Card aktiviert! Dein nächster Spin enthält ein 🃏 Wild Symbol! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
       }
     }
 

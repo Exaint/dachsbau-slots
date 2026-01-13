@@ -73,7 +73,7 @@ async function handleBan(username, target, env) {
     }
 
     // Add to blacklist in KV
-    await env.SLOTS_KV.put(`blacklist:${cleanTarget.toLowerCase()}`, 'true');
+    await env.SLOTS_KV.put(`blacklist:${cleanTarget}`, 'true');
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde vom Slots-Spiel ausgeschlossen. 🔨`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -98,7 +98,7 @@ async function handleUnban(username, target, env) {
 
     // Remove both blacklist and selfban
     await Promise.all([
-      env.SLOTS_KV.delete(`blacklist:${cleanTarget.toLowerCase()}`),
+      env.SLOTS_KV.delete(`blacklist:${cleanTarget}`),
       removeSelfBan(cleanTarget, env)
     ]);
 
@@ -126,8 +126,8 @@ async function handleReset(username, target, env) {
     // Reset balance and stats (not purchases/unlocks)
     await Promise.all([
       setBalance(cleanTarget, 0, env),
-      env.SLOTS_KV.delete(`stats:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`streak:${cleanTarget.toLowerCase()}`)
+      env.SLOTS_KV.delete(`stats:${cleanTarget}`),
+      env.SLOTS_KV.delete(`streak:${cleanTarget}`)
     ]);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde zurückgesetzt (Balance & Stats auf 0). 🔄`, { headers: RESPONSE_HEADERS });
@@ -151,7 +151,7 @@ async function handleFreeze(username, target, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    await env.SLOTS_KV.put(`frozen:${cleanTarget.toLowerCase()}`, 'true');
+    await env.SLOTS_KV.put(`frozen:${cleanTarget}`, 'true');
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde eingefroren. ❄️`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -174,7 +174,7 @@ async function handleUnfreeze(username, target, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    await env.SLOTS_KV.delete(`frozen:${cleanTarget.toLowerCase()}`);
+    await env.SLOTS_KV.delete(`frozen:${cleanTarget}`);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde aufgetaut. ✅`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -327,16 +327,16 @@ async function handleRemoveBuff(username, target, shopNumber, env) {
 
     // Remove buff based on type
     if (item.type === 'boost') {
-      await env.SLOTS_KV.delete(`boost:${cleanTarget.toLowerCase()}:${item.symbol}`);
+      await env.SLOTS_KV.delete(`boost:${cleanTarget}:${item.symbol}`);
       return new Response(`@${username} ✅ ${item.name} von @${cleanTarget} entfernt! 🗑️`, { headers: RESPONSE_HEADERS });
     } else if (item.type === 'timed' && item.buffKey) {
-      await env.SLOTS_KV.delete(`buff:${cleanTarget.toLowerCase()}:${item.buffKey}`);
+      await env.SLOTS_KV.delete(`buff:${cleanTarget}:${item.buffKey}`);
       return new Response(`@${username} ✅ ${item.name} von @${cleanTarget} entfernt! 🗑️`, { headers: RESPONSE_HEADERS });
     } else if (item.type === 'unlock') {
-      await env.SLOTS_KV.delete(`unlock:${cleanTarget.toLowerCase()}:${item.unlockKey}`);
+      await env.SLOTS_KV.delete(`unlock:${cleanTarget}:${item.unlockKey}`);
       return new Response(`@${username} ✅ ${item.name} von @${cleanTarget} entfernt! 🗑️`, { headers: RESPONSE_HEADERS });
     } else if (item.type === 'prestige') {
-      await env.SLOTS_KV.delete(`rank:${cleanTarget.toLowerCase()}`);
+      await env.SLOTS_KV.delete(`rank:${cleanTarget}`);
       return new Response(`@${username} ✅ Prestige-Rang von @${cleanTarget} entfernt! 🗑️`, { headers: RESPONSE_HEADERS });
     } else {
       return new Response(`@${username} ❌ Dieser Item-Typ kann nicht entfernt werden.`, { headers: RESPONSE_HEADERS });
@@ -362,16 +362,16 @@ async function handleClearAllBuffs(username, target, env) {
     }
 
     // Delete all possible buffs (timed buffs)
-    const deletePromises = ALL_BUFF_KEYS.map(key => env.SLOTS_KV.delete(`buff:${cleanTarget.toLowerCase()}:${key}`));
+    const deletePromises = ALL_BUFF_KEYS.map(key => env.SLOTS_KV.delete(`buff:${cleanTarget}:${key}`));
 
     // Delete all symbol boosts
     ALL_SYMBOLS.forEach(symbol => {
-      deletePromises.push(env.SLOTS_KV.delete(`boost:${cleanTarget.toLowerCase()}:${symbol}`));
+      deletePromises.push(env.SLOTS_KV.delete(`boost:${cleanTarget}:${symbol}`));
     });
 
     // Delete insurance and win multipliers
-    deletePromises.push(env.SLOTS_KV.delete(`insurance:${cleanTarget.toLowerCase()}`));
-    deletePromises.push(env.SLOTS_KV.delete(`winmulti:${cleanTarget.toLowerCase()}`));
+    deletePromises.push(env.SLOTS_KV.delete(`insurance:${cleanTarget}`));
+    deletePromises.push(env.SLOTS_KV.delete(`winmulti:${cleanTarget}`));
 
     await Promise.all(deletePromises);
 
@@ -424,7 +424,7 @@ async function handleGetDaily(username, target, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    const lastDaily = await env.SLOTS_KV.get(`daily:${cleanTarget.toLowerCase()}`);
+    const lastDaily = await env.SLOTS_KV.get(`daily:${cleanTarget}`);
 
     if (!lastDaily) {
       return new Response(`@${username} ℹ️ @${cleanTarget} hat noch nie Daily abgeholt.`, { headers: RESPONSE_HEADERS });
@@ -457,7 +457,7 @@ async function handleResetDaily(username, target, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    await env.SLOTS_KV.delete(`daily:${cleanTarget.toLowerCase()}`);
+    await env.SLOTS_KV.delete(`daily:${cleanTarget}`);
 
     return new Response(`@${username} ✅ Daily-Cooldown von @${cleanTarget} zurückgesetzt! Kann sofort abholen. 🎁`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -507,28 +507,28 @@ async function handleWipe(username, target, env) {
     const deletePromises = [
       // Balance & Stats
       setBalance(cleanTarget, 0, env),
-      env.SLOTS_KV.delete(`stats:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`streak:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`daily:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`rank:${cleanTarget.toLowerCase()}`),
+      env.SLOTS_KV.delete(`stats:${cleanTarget}`),
+      env.SLOTS_KV.delete(`streak:${cleanTarget}`),
+      env.SLOTS_KV.delete(`daily:${cleanTarget}`),
+      env.SLOTS_KV.delete(`rank:${cleanTarget}`),
 
       // Buffs
-      env.SLOTS_KV.delete(`insurance:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`winmulti:${cleanTarget.toLowerCase()}`),
+      env.SLOTS_KV.delete(`insurance:${cleanTarget}`),
+      env.SLOTS_KV.delete(`winmulti:${cleanTarget}`),
 
       // Bans
-      env.SLOTS_KV.delete(`blacklist:${cleanTarget.toLowerCase()}`),
-      env.SLOTS_KV.delete(`frozen:${cleanTarget.toLowerCase()}`)
+      env.SLOTS_KV.delete(`blacklist:${cleanTarget}`),
+      env.SLOTS_KV.delete(`frozen:${cleanTarget}`)
     ];
 
     // Delete all timed buffs
-    ALL_BUFF_KEYS.forEach(key => deletePromises.push(env.SLOTS_KV.delete(`buff:${cleanTarget.toLowerCase()}:${key}`)));
+    ALL_BUFF_KEYS.forEach(key => deletePromises.push(env.SLOTS_KV.delete(`buff:${cleanTarget}:${key}`)));
 
     // Delete all symbol boosts
-    ALL_SYMBOLS.forEach(symbol => deletePromises.push(env.SLOTS_KV.delete(`boost:${cleanTarget.toLowerCase()}:${symbol}`)));
+    ALL_SYMBOLS.forEach(symbol => deletePromises.push(env.SLOTS_KV.delete(`boost:${cleanTarget}:${symbol}`)));
 
     // Delete all unlocks
-    ALL_UNLOCK_KEYS.forEach(unlock => deletePromises.push(env.SLOTS_KV.delete(`unlock:${cleanTarget.toLowerCase()}:${unlock}`)));
+    ALL_UNLOCK_KEYS.forEach(unlock => deletePromises.push(env.SLOTS_KV.delete(`unlock:${cleanTarget}:${unlock}`)));
 
     await Promise.all(deletePromises);
 

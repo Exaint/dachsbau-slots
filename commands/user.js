@@ -164,10 +164,11 @@ async function handleDaily(username, env) {
 async function handleBuffs(username, env) {
   try {
     const buffs = [];
+    const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once, use everywhere
 
     // Check all timed buffs
     const timedBuffPromises = TIMED_BUFF_KEYS.map(async buff => {
-      const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buff.key}`);
+      const value = await env.SLOTS_KV.get(`buff:${lowerUsername}:${buff.key}`);
       if (!value) return null;
 
       try {
@@ -210,10 +211,10 @@ async function handleBuffs(username, env) {
       Promise.all(timedBuffPromises),
       getBuffWithUses(username, 'dachs_locator', env),
       getBuffWithStack(username, 'rage_mode', env),
-      // Symbol boosts - use static constant
-      ...BUFF_SYMBOLS_WITH_NAMES.map(s => env.SLOTS_KV.get(`boost:${username.toLowerCase()}:${s.symbol}`)),
+      // Symbol boosts - use cached lowerUsername
+      ...BUFF_SYMBOLS_WITH_NAMES.map(s => env.SLOTS_KV.get(`boost:${lowerUsername}:${s.symbol}`)),
       // Win Multiplier
-      env.SLOTS_KV.get(`winmulti:${username.toLowerCase()}`),
+      env.SLOTS_KV.get(`winmulti:${lowerUsername}`),
       // Insurance, Guaranteed Pair, Wild Card
       getInsuranceCount(username, env),
       hasGuaranteedPair(username, env),
@@ -303,6 +304,8 @@ async function handleBank(username, env) {
 
 async function handleTransfer(username, target, amount, env) {
   try {
+    const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once
+
     if (!target) {
       return new Response(`@${username} ❌ Kein Ziel-User angegeben!`, { headers: RESPONSE_HEADERS });
     }
@@ -317,7 +320,7 @@ async function handleTransfer(username, target, amount, env) {
       return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
     }
 
-    if (username.toLowerCase() === cleanTarget) {
+    if (lowerUsername === cleanTarget) {
       return new Response(`@${username} ❌ Du kannst dir nicht selbst DachsTaler senden!`, { headers: RESPONSE_HEADERS });
     }
 

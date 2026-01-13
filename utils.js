@@ -38,9 +38,9 @@ function getWeightedSymbol() {
 }
 
 // Helper function to check if user is admin (uses config.js)
+// OPTIMIZED: ADMINS is now a Set, uses .has() for O(1) lookup
 function isAdmin(username) {
-  const lowerUsername = username.toLowerCase();
-  return ADMINS.includes(lowerUsername);
+  return ADMINS.has(username.toLowerCase());
 }
 
 function sanitizeUsername(username) {
@@ -93,9 +93,11 @@ function getWeekStart() {
   return `${year}-${month}-${day}`;
 }
 
+// OPTIMIZED: Static Set for O(1) lookup instead of Array.includes()
+const LEADERBOARD_BLOCKLIST = new Set(['dachsbank']);
+
 function isLeaderboardBlocked(username) {
-  const leaderboardBlocklist = ['dachsbank'];
-  return leaderboardBlocklist.includes(username.toLowerCase());
+  return LEADERBOARD_BLOCKLIST.has(username.toLowerCase());
 }
 
 // OPTIMIZED: Helper function to calculate TTL for buffs (avoids repeated inline calculation)

@@ -82,8 +82,9 @@ const INVISIBLE_CHARS_REGEX = /[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u000
 const NORMALIZE_SPACES_REGEX = /\s+/g;
 
 // Helper: Generiert Custom Message falls vorhanden
-function getCustomMessage(username, isWin, data) {
-  const userMessages = CUSTOM_MESSAGES[username.toLowerCase()];
+// OPTIMIZED: Accepts pre-computed lowerUsername to avoid redundant toLowerCase()
+function getCustomMessage(lowerUsername, username, isWin, data) {
+  const userMessages = CUSTOM_MESSAGES[lowerUsername];
   if (!userMessages) return null;
 
   const template = isWin ? userMessages.win : userMessages.loss;
@@ -148,9 +149,10 @@ async function parseSpinAmount(username, amountParam, currentBalance, isFreeSpin
 }
 
 // Helper: Generate spin grid
-async function generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush, env) {
+// OPTIMIZED: Accepts pre-computed lowerUsername to avoid redundant toLowerCase()
+async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamondRush, env) {
   // Check if user has a stored peek grid
-  const peekKey = `peek:${username.toLowerCase()}`;
+  const peekKey = `peek:${lowerUsername}`;
   const storedPeek = await env.SLOTS_KV.get(peekKey);
 
   if (storedPeek) {
@@ -161,7 +163,7 @@ async function generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush
   const grid = [];
 
   // DEBUG MODE: Special user gets higher chance for exactly 2 dachs
-  if (DEBUG_MODE && username.toLowerCase() === 'exaint_') {
+  if (DEBUG_MODE && lowerUsername === 'exaint_') {
     const roll = secureRandom();
     if (roll < DEBUG_DACHS_PAIR_CHANCE) {
       const dachsPair = secureRandom() < 0.5 ? [MIDDLE_ROW_START, MIDDLE_ROW_START + 1] : [MIDDLE_ROW_START + 1, MIDDLE_ROW_END];
@@ -302,7 +304,8 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
 
 // Helper: Calculate streak bonuses
 // Returns natural bonuses in D2 format
-async function calculateStreakBonuses(username, isWin, env) {
+// OPTIMIZED: Accepts pre-computed lowerUsername to avoid redundant toLowerCase()
+async function calculateStreakBonuses(lowerUsername, username, isWin, env) {
   const previousStreak = await getStreak(username, env);
 
   const naturalBonuses = []; // Track natural bonuses for D2 format
@@ -330,7 +333,7 @@ async function calculateStreakBonuses(username, isWin, env) {
     ? { wins: 0, losses: 0 }
     : { wins: isWin ? previousStreak.wins + 1 : 0, losses: isWin ? 0 : previousStreak.losses + 1 };
 
-  await env.SLOTS_KV.put(`streak:${username.toLowerCase()}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
+  await env.SLOTS_KV.put(`streak:${lowerUsername}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
 
   // Combo Bonus
   if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {
@@ -406,6 +409,7 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
 
 async function handleSlot(username, amountParam, url, env) {
   try {
+    const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once for all KV operations
 
     // OPTIMIZED: Sanitize amountParam with pre-compiled regex patterns
     if (amountParam) {
@@ -519,7 +523,7 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     // Generate grid
-    const grid = await generateGrid(username, dachsChance, hasStarMagnet, hasDiamondRush, env);
+    const grid = await generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamondRush, env);
 
     // OPTIMIZED: Decrement Dachs Locator uses inline (avoids redundant KV read)
     if (hasDachsLocator.active && hasDachsLocator.data) {
@@ -527,9 +531,9 @@ async function handleSlot(username, amountParam, url, env) {
       data.uses--;
 
       if (data.uses <= 0) {
-        await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:dachs_locator`);
+        await env.SLOTS_KV.delete(`buff:${lowerUsername}:dachs_locator`);
       } else {
-        await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:dachs_locator`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) });
+        await env.SLOTS_KV.put(`buff:${lowerUsername}:dachs_locator`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) });
       }
     }
 
@@ -550,7 +554,7 @@ async function handleSlot(username, amountParam, url, env) {
 
     // Calculate streak bonuses
     const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
-    const streakBonusResult = await calculateStreakBonuses(username, isWin, env);
+    const streakBonusResult = await calculateStreakBonuses(lowerUsername, username, isWin, env);
     const streakBonus = streakBonusResult.streakBonus;
     const comboBonus = streakBonusResult.comboBonus;
     const naturalBonuses = streakBonusResult.naturalBonuses;
@@ -561,14 +565,14 @@ async function handleSlot(username, amountParam, url, env) {
       const data = hasRageMode.data;
       data.stack = Math.min((data.stack || 0) + RAGE_MODE_LOSS_STACK, RAGE_MODE_MAX_STACK);
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
+        env.SLOTS_KV.put(`buff:${lowerUsername}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
         resetStreakMultiplier(username, env)
       ]);
     } else if (isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = 0;
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${username.toLowerCase()}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
+        env.SLOTS_KV.put(`buff:${lowerUsername}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
         incrementStreakMultiplier(username, env)
       ]);
     } else if (isWin) {
@@ -671,7 +675,7 @@ async function handleSlot(username, amountParam, url, env) {
     // Custom Message Check
     const isCustomWin = result.points > 0 || totalBonuses > 0;
     const totalWinAmount = (result.points || 0) + totalBonuses;
-    const customMsg = getCustomMessage(username, isCustomWin, {
+    const customMsg = getCustomMessage(lowerUsername, username, isCustomWin, {
       amount: isCustomWin ? totalWinAmount : spinCost,
       balance: newBalance,
       grid: [grid[MIDDLE_ROW_START], grid[MIDDLE_ROW_START + 1], grid[MIDDLE_ROW_END]].join(' ')

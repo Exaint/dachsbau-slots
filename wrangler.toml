@@ -2,6 +2,10 @@ name = "dachsbau-slots-github"
 main = "_worker.js"
 compatibility_date = "2024-12-29"
 
+# OPTIMIZED: Smart Placement - Worker runs closer to KV data for lower latency
+[placement]
+mode = "smart"
+
 # Account ID (optional, aber empfohlen)
 account_id = "a532928aecc69ee43a6aafa158d4d788"
 

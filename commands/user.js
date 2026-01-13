@@ -397,6 +397,8 @@ async function handleLeaderboard(env) {
     }
 
     // Cache miss or expired - rebuild leaderboard
+    // Note: KV list returns max 1000 keys per call, but we only need top 5
+    // For large user bases, consider storing a pre-computed leaderboard
     const listResult = await env.SLOTS_KV.list({ prefix: 'user:' });
 
     if (!listResult.keys || listResult.keys.length === 0) {

@@ -437,7 +437,6 @@ Das Wild ersetzt **jedes Symbol** für den besten Outcome:
 | Command | Beschreibung |
 |:--------|:-------------|
 | `!slots givefreespins @user [Anzahl]` | Free Spins geben (1-100) |
-| `!slots givemulligan @user [Anzahl]` | Mulligans geben (1-50) |
 | `!slots giveinsurance @user [Anzahl]` | Insurance geben (1-100) |
 
 **Info & Debug:**

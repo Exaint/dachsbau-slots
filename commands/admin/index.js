@@ -27,7 +27,6 @@ export {
   handleGetDaily,
   handleResetDaily,
   handleGiveFreespins,
-  handleGiveMulligan,
   handleGiveInsurance,
   handleGetMonthlyLogin,
   handleResetWeeklyLimits,

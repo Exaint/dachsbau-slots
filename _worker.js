@@ -34,7 +34,6 @@ import {
   handleWipe,
   handleRemoveFromLB,
   handleGiveFreespins,
-  handleGiveMulligan,
   handleGiveInsurance,
   handleGetMonthlyLogin,
   handleResetWeeklyLimits,
@@ -77,7 +76,6 @@ const ADMIN_COMMANDS_AMOUNT = {
   givebuff: handleGiveBuff,
   removebuff: handleRemoveBuff,
   givefreespins: handleGiveFreespins,
-  givemulligan: handleGiveMulligan,
   giveinsurance: handleGiveInsurance
 };
 

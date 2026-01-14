@@ -21,8 +21,6 @@ import {
   getFreeSpins,
   activateGuaranteedPair,
   activateWildCard,
-  getMulliganCount,
-  setMulliganCount,
   getMonthlyLogin
 } from '../../database.js';
 
@@ -397,41 +395,6 @@ async function handleGiveFreespins(username, target, amount, env) {
   }
 }
 
-async function handleGiveMulligan(username, target, amount, env) {
-  try {
-    const adminCheck = requireAdmin(username);
-    if (adminCheck) return adminCheck;
-
-    if (!target) {
-      return new Response(`@${username} ❌ Nutze: !slots givemulligan @user [Anzahl]`, { headers: RESPONSE_HEADERS });
-    }
-
-    if (!amount) {
-      return new Response(`@${username} ❌ Nutze: !slots givemulligan @user [Anzahl]`, { headers: RESPONSE_HEADERS });
-    }
-
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
-
-    const parsedAmount = parseInt(amount, 10);
-    if (isNaN(parsedAmount) || parsedAmount < 1 || parsedAmount > 50) {
-      return new Response(`@${username} ❌ Ungültige Anzahl! (1-50)`, { headers: RESPONSE_HEADERS });
-    }
-
-    // Get current mulligan count and add
-    const currentCount = await getMulliganCount(cleanTarget, env);
-    const newCount = currentCount + parsedAmount;
-    await setMulliganCount(cleanTarget, newCount, env);
-
-    return new Response(`@${username} ✅ ${parsedAmount} Mulligans an @${cleanTarget} gegeben! (Gesamt: ${newCount}) 🔄🎁`, { headers: RESPONSE_HEADERS });
-  } catch (error) {
-    logError('handleGiveMulligan', error, { username, target, amount });
-    return new Response(`@${username} ❌ Fehler beim Geben der Mulligans.`, { headers: RESPONSE_HEADERS });
-  }
-}
-
 async function handleGiveInsurance(username, target, amount, env) {
   try {
     const adminCheck = requireAdmin(username);
@@ -551,7 +514,6 @@ export {
   handleGetDaily,
   handleResetDaily,
   handleGiveFreespins,
-  handleGiveMulligan,
   handleGiveInsurance,
   handleGetMonthlyLogin,
   handleResetWeeklyLimits,

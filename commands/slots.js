@@ -51,8 +51,6 @@ import {
   getBuffWithStack,
   consumeBoost,
   consumeWinMultiplier,
-  getMulliganCount,
-  setMulliganCount,
   getInsuranceCount,
   setInsuranceCount,
   getStreakMultiplier,
@@ -414,17 +412,9 @@ async function handleSlot(username, amountParam, url, env) {
       await resetStreakMultiplier(username, env);
     }
 
-    // Mulligan/Insurance
+    // Insurance (refund on loss)
     if (!isFreeSpinUsed && result.points === 0 && !result.freeSpins) {
-      const [mulliganCount, insuranceCount] = await Promise.all([
-        getMulliganCount(username, env),
-        getInsuranceCount(username, env)
-      ]);
-
-      if (mulliganCount > 0) {
-        await setMulliganCount(username, mulliganCount - 1, env);
-        return new Response(`@${username} 🔄 Mulligan! Du hast noch ${mulliganCount - 1} Re-Spins. Spin nochmal!`, { headers: RESPONSE_HEADERS });
-      }
+      const insuranceCount = await getInsuranceCount(username, env);
 
       if (insuranceCount > 0) {
         const refund = Math.floor(spinCost * INSURANCE_REFUND_RATE);

@@ -8,7 +8,7 @@
  *
  * Structure:
  * - core.js: Balance, Daily, Cooldown, Disclaimer, Selfban, Blacklist
- * - buffs.js: Timed buffs, Symbol boosts, Mulligan, Insurance, Win Multiplier
+ * - buffs.js: Timed buffs, Symbol boosts, Insurance, Win Multiplier
  * - items.js: Guaranteed Pair, Wild Card, Free Spins
  * - progression.js: Streaks, Stats, Monthly Login, Prestige, Unlocks
  * - shop.js: Weekly purchase limits (Spin Bundle, Dachs Boost)
@@ -42,8 +42,6 @@ export {
   getBuffWithStack,
   addBoost,
   consumeBoost,
-  getMulliganCount,
-  setMulliganCount,
   addInsurance,
   getInsuranceCount,
   setInsuranceCount,

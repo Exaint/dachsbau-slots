@@ -131,7 +131,6 @@ async function handleWipe(username, target, env) {
       env.SLOTS_KV.delete(`blacklist:${cleanTarget}`),
       env.SLOTS_KV.delete(`frozen:${cleanTarget}`),
       env.SLOTS_KV.delete(`freespins:${cleanTarget}`),
-      env.SLOTS_KV.delete(`mulligan:${cleanTarget}`),
       env.SLOTS_KV.delete(`guaranteedpair:${cleanTarget}`),
       env.SLOTS_KV.delete(`wildcard:${cleanTarget}`),
       env.SLOTS_KV.delete(`peek:${cleanTarget}`),

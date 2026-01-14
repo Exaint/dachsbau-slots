@@ -1,5 +1,5 @@
 /**
- * Buff System - Timed buffs, boosts, mulligan, insurance, win multiplier
+ * Buff System - Timed buffs, boosts, insurance, win multiplier
  */
 
 import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES, KV_ACTIVE } from '../constants.js';
@@ -181,30 +181,6 @@ async function consumeBoost(username, symbol, env) {
   }
 }
 
-// Mulligan
-async function getMulliganCount(username, env) {
-  try {
-    const value = await env.SLOTS_KV.get(`mulligan:${username.toLowerCase()}`);
-    return value ? parseInt(value, 10) : 0;
-  } catch (error) {
-    logError('getMulliganCount', error, { username });
-    return 0;
-  }
-}
-
-// OPTIMIZED: Set mulligan directly when count is already known (avoids redundant KV read)
-async function setMulliganCount(username, count, env) {
-  try {
-    if (count <= 0) {
-      await env.SLOTS_KV.delete(`mulligan:${username.toLowerCase()}`);
-    } else {
-      await env.SLOTS_KV.put(`mulligan:${username.toLowerCase()}`, count.toString());
-    }
-  } catch (error) {
-    logError('setMulliganCount', error, { username, count });
-  }
-}
-
 // Insurance - Atomic add with retry mechanism
 async function addInsurance(username, count, env, maxRetries = MAX_RETRIES) {
   const key = `insurance:${username.toLowerCase()}`;
@@ -295,8 +271,6 @@ export {
   getBuffWithStack,
   addBoost,
   consumeBoost,
-  getMulliganCount,
-  setMulliganCount,
   addInsurance,
   getInsuranceCount,
   setInsuranceCount,

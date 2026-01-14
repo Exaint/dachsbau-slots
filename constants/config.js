@@ -28,7 +28,6 @@ export const KV_PREFIX = {
   FREE_SPINS: 'freespins:',
   GUARANTEED_PAIR: 'guaranteedpair:',
   WILD_CARD: 'wildcard:',
-  MULLIGAN: 'mulligan:',
   INSURANCE: 'insurance:',
   WIN_MULTI: 'winmulti:',
   BUNDLE_PURCHASES: 'bundle_purchases:',

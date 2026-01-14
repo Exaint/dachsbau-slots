@@ -14,7 +14,8 @@ import {
   DAILY_AMOUNT,
   DAILY_BOOST_AMOUNT,
   URLS,
-  BUFF_SYMBOLS_WITH_NAMES
+  BUFF_SYMBOLS_WITH_NAMES,
+  MAX_RETRIES
 } from '../constants.js';
 import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, logError } from '../utils.js';
 import {
@@ -347,7 +348,7 @@ async function handleTransfer(username, target, amount, env) {
     }
 
     // Atomic transfer with retry mechanism to prevent race conditions
-    const maxRetries = 3;
+    const maxRetries = MAX_RETRIES;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const [senderBalance, receiverBalance] = await Promise.all([

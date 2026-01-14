@@ -27,7 +27,9 @@ import {
   WHEEL_GOLD_THRESHOLD,
   WHEEL_GOLD_PRIZE,
   WHEEL_STAR_THRESHOLD,
-  WHEEL_STAR_PRIZE
+  WHEEL_STAR_PRIZE,
+  SECONDS_PER_MINUTE,
+  SECONDS_PER_HOUR
 } from '../constants.js';
 import { getWeightedSymbol, secureRandom, secureRandomInt, logError } from '../utils.js';
 import {
@@ -69,7 +71,7 @@ async function handleShop(username, item, env) {
       return new Response(`@${username} Hier findest du den Slots Shop: ${URLS.SHOP} | Nutze: !shop buy [Nummer]`, { headers: RESPONSE_HEADERS });
     }
 
-    const parts = item.toLowerCase().split(' ');
+    const parts = item.toLowerCase().split(/\s+/);
     if (parts[0] !== 'buy' || !parts[1]) {
       return new Response(`@${username} ❌ Nutze: !shop buy [Nummer]`, { headers: RESPONSE_HEADERS });
     }
@@ -178,12 +180,12 @@ async function buyShopItem(username, itemId, env) {
         return new Response(`@${username} ✅ ${item.name} aktiviert für ${item.uses} Spins! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
       } else if (item.buffKey === 'rage_mode') {
         await activateBuffWithStack(username, item.buffKey, item.duration, env);
-        const minutes = Math.floor(item.duration / 60);
+        const minutes = Math.floor(item.duration / SECONDS_PER_MINUTE);
         return new Response(`@${username} ✅ ${item.name} aktiviert für ${minutes} Minuten! Verluste geben +5% Gewinn-Chance (bis 50%)! 🔥 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
       } else {
         await activateBuff(username, item.buffKey, item.duration, env);
-        const minutes = Math.floor(item.duration / 60);
-        const hours = item.duration >= 3600 ? Math.floor(item.duration / 3600) + 'h' : minutes + ' Minuten';
+        const minutes = Math.floor(item.duration / SECONDS_PER_MINUTE);
+        const hours = item.duration >= SECONDS_PER_HOUR ? Math.floor(item.duration / SECONDS_PER_HOUR) + 'h' : minutes + ' Minuten';
         return new Response(`@${username} ✅ ${item.name} aktiviert für ${hours}! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
       }
     }

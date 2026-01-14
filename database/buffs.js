@@ -2,7 +2,7 @@
  * Buff System - Timed buffs, boosts, mulligan, insurance, win multiplier
  */
 
-import { BUFF_TTL_BUFFER_SECONDS } from '../constants.js';
+import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES } from '../constants.js';
 import { exponentialBackoff, logError } from '../utils.js';
 
 // Buffs (timed)
@@ -71,7 +71,7 @@ async function getBuffWithUses(username, buffKey, env) {
 }
 
 // Atomic buff uses decrement with retry mechanism (prevents race conditions)
-async function decrementBuffUses(username, buffKey, env, maxRetries = 3) {
+async function decrementBuffUses(username, buffKey, env, maxRetries = MAX_RETRIES) {
   const key = `buff:${username.toLowerCase()}:${buffKey}`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -174,7 +174,7 @@ async function addBoost(username, symbol, env) {
   }
 }
 
-async function consumeBoost(username, symbol, env, maxRetries = 3) {
+async function consumeBoost(username, symbol, env, maxRetries = MAX_RETRIES) {
   const key = `boost:${username.toLowerCase()}:${symbol}`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -230,7 +230,7 @@ async function setMulliganCount(username, count, env) {
 }
 
 // Insurance - Atomic add with retry mechanism
-async function addInsurance(username, count, env, maxRetries = 3) {
+async function addInsurance(username, count, env, maxRetries = MAX_RETRIES) {
   const key = `insurance:${username.toLowerCase()}`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -288,7 +288,7 @@ async function addWinMultiplier(username, env) {
   }
 }
 
-async function consumeWinMultiplier(username, env, maxRetries = 3) {
+async function consumeWinMultiplier(username, env, maxRetries = MAX_RETRIES) {
   const key = `winmulti:${username.toLowerCase()}`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {

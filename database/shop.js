@@ -2,6 +2,7 @@
  * Shop System - Purchase tracking and limits
  */
 
+import { MAX_RETRIES } from '../constants.js';
 import { calculateWeekStart, exponentialBackoff, logError } from '../utils.js';
 
 // Spin Bundle Purchases
@@ -25,7 +26,7 @@ async function getSpinBundlePurchases(username, env) {
 }
 
 // Atomic increment with retry mechanism
-async function incrementSpinBundlePurchases(username, env, maxRetries = 3) {
+async function incrementSpinBundlePurchases(username, env, maxRetries = MAX_RETRIES) {
   const key = `bundle_purchases:${username.toLowerCase()}`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -73,7 +74,7 @@ async function getDachsBoostPurchases(username, env) {
 }
 
 // Atomic increment with retry mechanism
-async function incrementDachsBoostPurchases(username, env, maxRetries = 3) {
+async function incrementDachsBoostPurchases(username, env, maxRetries = MAX_RETRIES) {
   const key = `dachsboost_purchases:${username.toLowerCase()}`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {

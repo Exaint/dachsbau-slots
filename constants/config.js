@@ -54,8 +54,12 @@ export const FREE_SPIN_COST_THRESHOLD = 1000; // Min cost for free spin bonus me
 export const USERNAME_MIN_LENGTH = 1;
 export const USERNAME_MAX_LENGTH = 25;
 
-// Exponential Backoff
+// Retry Settings
+export const MAX_RETRIES = 3;
 export const EXPONENTIAL_BACKOFF_BASE_MS = 10;
+
+// Time Helper
+export const SECONDS_PER_MINUTE = 60;
 
 // URLs
 export const URLS = {

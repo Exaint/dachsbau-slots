@@ -2,7 +2,7 @@
  * Admin Economy Commands - Give, balance, buffs, stats
  */
 
-import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY, ALL_BUFF_KEYS, ALL_SYMBOLS } from '../../constants.js';
+import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY, ALL_BUFF_KEYS, ALL_SYMBOLS, MS_PER_HOUR, SECONDS_PER_DAY } from '../../constants.js';
 import { isAdmin, validateAndCleanTarget, logError } from '../../utils.js';
 import {
   getBalance,
@@ -278,8 +278,8 @@ async function handleGetDaily(username, target, env) {
     const lastTime = parseInt(lastDaily, 10);
     const now = Date.now();
     const timeSince = now - lastTime;
-    const hoursSince = Math.floor(timeSince / (1000 * 60 * 60));
-    const canClaim = timeSince >= 86400000;
+    const hoursSince = Math.floor(timeSince / MS_PER_HOUR);
+    const canClaim = timeSince >= SECONDS_PER_DAY * 1000;
 
     return new Response(`@${username} ℹ️ @${cleanTarget} Daily: Letzter Claim vor ${hoursSince}h | ${canClaim ? '✅ Kann abholen' : '❌ Muss warten'}`, { headers: RESPONSE_HEADERS });
   } catch (error) {

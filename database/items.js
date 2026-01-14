@@ -2,6 +2,7 @@
  * Items - Guaranteed Pair, Wild Card, Free Spins
  */
 
+import { MAX_RETRIES } from '../constants.js';
 import { exponentialBackoff, logError } from '../utils.js';
 
 // Guaranteed Pair
@@ -112,7 +113,7 @@ async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
 }
 
 // Atomic free spin consumption with retry mechanism (prevents race conditions)
-async function consumeFreeSpinWithMultiplier(username, env, maxRetries = 3) {
+async function consumeFreeSpinWithMultiplier(username, env, maxRetries = MAX_RETRIES) {
   const key = `freespins:${username.toLowerCase()}`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {

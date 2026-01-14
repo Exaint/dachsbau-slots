@@ -133,8 +133,9 @@ async function parseSpinAmount(username, amountParam, currentBalance, isFreeSpin
   return { error: `@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all | Info: ${URLS.UNLOCK}` };
 }
 
-// Helper: Apply multipliers and buffs to win result
-async function applyMultipliersAndBuffs(username, result, multiplier, grid, env) {
+// OPTIMIZED: Apply multipliers and buffs to win result (uses pre-loaded buff values)
+async function applyMultipliersAndBuffs(username, result, multiplier, grid, env, preloadedBuffs) {
+  const { hasGoldenHour, hasProfitDoubler, currentStreakMulti } = preloadedBuffs;
   const shopBuffs = [];
 
   // Award Free Spins
@@ -148,13 +149,13 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
 
   result.points = result.points * multiplier;
 
-  // Win Multiplier (Shop Buff)
+  // Win Multiplier (Shop Buff) - must consume, so still needs KV call
   if (result.points > 0 && await consumeWinMultiplier(username, env)) {
     result.points *= 2;
     shopBuffs.push('2x');
   }
 
-  // Symbol Boost - only check for matching symbols
+  // Symbol Boost - only check for matching symbols (must consume, so needs KV)
   if (result.points > 0) {
     const matchingSymbols = new Set();
     if (grid[0] === grid[1]) matchingSymbols.add(grid[0]);
@@ -172,15 +173,9 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
     }
   }
 
-  // Golden Hour, Profit Doubler & Streak Multiplier
+  // Golden Hour, Profit Doubler & Streak Multiplier (pre-loaded)
   let streakMulti = 1.0;
   if (result.points > 0) {
-    const [hasGoldenHour, hasProfitDoubler, currentStreakMulti] = await Promise.all([
-      isBuffActive(username, 'golden_hour', env),
-      isBuffActive(username, 'profit_doubler', env),
-      getStreakMultiplier(username, env)
-    ]);
-
     if (hasGoldenHour) {
       result.points = Math.floor(result.points * 1.3);
       shopBuffs.push('+30%');
@@ -198,9 +193,8 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
   return { shopBuffs, streakMulti };
 }
 
-// Helper: Calculate streak bonuses
-async function calculateStreakBonuses(lowerUsername, username, isWin, env) {
-  const previousStreak = await getStreak(username, env);
+// OPTIMIZED: Calculate streak bonuses (uses pre-loaded streak)
+async function calculateStreakBonuses(lowerUsername, username, isWin, previousStreak, env) {
   const naturalBonuses = [];
   let streakBonus = 0;
   let comboBonus = 0;
@@ -263,14 +257,45 @@ async function handleSlot(username, amountParam, url, env) {
 
     const now = Date.now();
 
-    // Initial parallel checks
-    const [selfBanData, hasAccepted, lastSpin, currentBalance, hasGuaranteedPairToken, hasWildCardToken] = await Promise.all([
+    // OPTIMIZED: Mega parallel initial load - all reads in one batch
+    const [
+      selfBanData,
+      hasAccepted,
+      lastSpin,
+      currentBalance,
+      hasGuaranteedPairToken,
+      hasWildCardToken,
+      freeSpinResult,
+      insuranceCount,
+      previousStreak,
+      hasStarMagnet,
+      hasDiamondRush,
+      hasLuckyCharm,
+      hasDachsLocator,
+      hasRageMode,
+      hasHappyHour,
+      hasGoldenHour,
+      hasProfitDoubler,
+      currentStreakMulti
+    ] = await Promise.all([
       isSelfBanned(username, env),
       hasAcceptedDisclaimer(username, env),
       getLastSpin(username, env),
       getBalance(username, env),
       hasGuaranteedPair(username, env),
-      hasWildCard(username, env)
+      hasWildCard(username, env),
+      consumeFreeSpinWithMultiplier(username, env).catch(err => { logError('handleSlot.consumeFreeSpin', err, { username }); return null; }),
+      getInsuranceCount(username, env),
+      getStreak(username, env),
+      isBuffActive(username, 'star_magnet', env),
+      isBuffActive(username, 'diamond_rush', env),
+      isBuffActive(username, 'lucky_charm', env),
+      getBuffWithUses(username, 'dachs_locator', env),
+      getBuffWithStack(username, 'rage_mode', env),
+      isBuffActive(username, 'happy_hour', env),
+      isBuffActive(username, 'golden_hour', env),
+      isBuffActive(username, 'profit_doubler', env),
+      getStreakMultiplier(username, env)
     ]);
 
     // Selfban Check
@@ -291,17 +316,12 @@ async function handleSlot(username, amountParam, url, env) {
       return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
     }
 
-    // Free Spins
+    // Free Spins (already loaded)
     let isFreeSpinUsed = false;
     let freeSpinMultiplier = 1;
-    try {
-      const freeSpinResult = await consumeFreeSpinWithMultiplier(username, env);
-      if (freeSpinResult && typeof freeSpinResult === 'object') {
-        isFreeSpinUsed = freeSpinResult.used === true;
-        freeSpinMultiplier = (typeof freeSpinResult.multiplier === 'number' && freeSpinResult.multiplier > 0) ? freeSpinResult.multiplier : 1;
-      }
-    } catch (freeSpinError) {
-      logError('handleSlot.consumeFreeSpin', freeSpinError, { username });
+    if (freeSpinResult && typeof freeSpinResult === 'object') {
+      isFreeSpinUsed = freeSpinResult.used === true;
+      freeSpinMultiplier = (typeof freeSpinResult.multiplier === 'number' && freeSpinResult.multiplier > 0) ? freeSpinResult.multiplier : 1;
     }
 
     // Parse spin amount
@@ -313,38 +333,14 @@ async function handleSlot(username, amountParam, url, env) {
     let spinCost = isFreeSpinUsed ? 0 : (spinAmountResult.spinCost || BASE_SPIN_COST);
     let multiplier = isFreeSpinUsed ? freeSpinMultiplier : (spinAmountResult.multiplier || 1);
 
-    // Happy Hour check
-    if (!isFreeSpinUsed && spinCost < FREE_SPIN_COST_THRESHOLD) {
-      const hasHappyHour = await isBuffActive(username, 'happy_hour', env);
-      if (hasHappyHour) {
-        spinCost = Math.floor(spinCost / 2);
-      }
+    // Happy Hour check (already loaded)
+    if (!isFreeSpinUsed && spinCost < FREE_SPIN_COST_THRESHOLD && hasHappyHour) {
+      spinCost = Math.floor(spinCost / 2);
     }
 
     // Balance check
     if (!isFreeSpinUsed && currentBalance < spinCost) {
       return new Response(`@${username} ❌ Nicht genug DachsTaler! Du brauchst ${spinCost} (Aktuell: ${currentBalance}) 🦡`, { headers: RESPONSE_HEADERS });
-    }
-
-    // Load buffs
-    let hasStarMagnet, hasDiamondRush, hasLuckyCharm, hasDachsLocator, hasRageMode;
-
-    if (isFreeSpinUsed) {
-      [hasStarMagnet, hasDiamondRush] = await Promise.all([
-        isBuffActive(username, 'star_magnet', env),
-        isBuffActive(username, 'diamond_rush', env)
-      ]);
-      hasLuckyCharm = false;
-      hasDachsLocator = { active: false, uses: 0 };
-      hasRageMode = { active: false, stack: 0 };
-    } else {
-      [hasStarMagnet, hasDiamondRush, hasLuckyCharm, hasDachsLocator, hasRageMode] = await Promise.all([
-        isBuffActive(username, 'star_magnet', env),
-        isBuffActive(username, 'diamond_rush', env),
-        isBuffActive(username, 'lucky_charm', env),
-        getBuffWithUses(username, 'dachs_locator', env),
-        getBuffWithStack(username, 'rage_mode', env)
-      ]);
     }
 
     // Calculate Dachs chance
@@ -382,12 +378,13 @@ async function handleSlot(username, amountParam, url, env) {
       hourlyJackpotWon = true;
     }
 
-    // Apply buffs
-    const { shopBuffs, streakMulti } = await applyMultipliersAndBuffs(username, result, multiplier, grid, env);
+    // OPTIMIZED: Apply buffs with pre-loaded values
+    const preloadedBuffs = { hasGoldenHour, hasProfitDoubler, currentStreakMulti };
+    const { shopBuffs, streakMulti } = await applyMultipliersAndBuffs(username, result, multiplier, grid, env, preloadedBuffs);
 
-    // Calculate streak bonuses
+    // OPTIMIZED: Calculate streak bonuses with pre-loaded streak
     const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
-    const streakBonusResult = await calculateStreakBonuses(lowerUsername, username, isWin, env);
+    const streakBonusResult = await calculateStreakBonuses(lowerUsername, username, isWin, previousStreak, env);
     const { streakBonus, comboBonus, naturalBonuses } = streakBonusResult;
     let lossWarningMessage = streakBonusResult.lossWarningMessage;
 
@@ -412,24 +409,20 @@ async function handleSlot(username, amountParam, url, env) {
       await resetStreakMultiplier(username, env);
     }
 
-    // Insurance (refund on loss)
-    if (!isFreeSpinUsed && result.points === 0 && !result.freeSpins) {
-      const insuranceCount = await getInsuranceCount(username, env);
+    // OPTIMIZED: Insurance check (pre-loaded insuranceCount)
+    if (!isFreeSpinUsed && result.points === 0 && !result.freeSpins && insuranceCount > 0) {
+      const refund = Math.floor(spinCost * INSURANCE_REFUND_RATE);
+      const newBalanceWithRefund = Math.max(0, Math.min(currentBalance - spinCost + refund, MAX_BALANCE));
 
-      if (insuranceCount > 0) {
-        const refund = Math.floor(spinCost * INSURANCE_REFUND_RATE);
-        const newBalanceWithRefund = Math.max(0, Math.min(currentBalance - spinCost + refund, MAX_BALANCE));
+      const [, , , rank] = await Promise.all([
+        setBalance(username, newBalanceWithRefund, env),
+        updateStats(username, false, result.points, spinCost, env),
+        setInsuranceCount(username, insuranceCount - 1, env),
+        getPrestigeRank(username, env)
+      ]);
+      const rankSymbol = rank ? `${rank} ` : '';
 
-        const [, , , rank] = await Promise.all([
-          setBalance(username, newBalanceWithRefund, env),
-          updateStats(username, false, result.points, spinCost, env),
-          setInsuranceCount(username, insuranceCount - 1, env),
-          getPrestigeRank(username, env)
-        ]);
-        const rankSymbol = rank ? `${rank} ` : '';
-
-        return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
-      }
+      return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
     }
 
     // Final balance calculation

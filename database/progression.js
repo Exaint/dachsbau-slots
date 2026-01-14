@@ -3,7 +3,7 @@
  */
 
 import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX } from '../constants.js';
-import { getCurrentMonth, getCurrentDate } from '../utils.js';
+import { getCurrentMonth, getCurrentDate, logError } from '../utils.js';
 
 // Streak Multiplier
 async function getStreakMultiplier(username, env) {
@@ -30,16 +30,18 @@ async function resetStreakMultiplier(username, env) {
   try {
     await env.SLOTS_KV.delete(`streakmultiplier:${username.toLowerCase()}`);
   } catch (error) {
-    console.error('resetStreakMultiplier Error:', error);
+    logError('resetStreakMultiplier', error, { username });
   }
 }
 
 // Prestige Rank
 async function getPrestigeRank(username, env) {
   try {
-    return await env.SLOTS_KV.get(`rank:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(`rank:${username.toLowerCase()}`);
+    // Return null for empty string or null (handles KV edge cases)
+    return value || null;
   } catch (error) {
-    console.error('getPrestigeRank Error:', error);
+    logError('getPrestigeRank', error, { username });
     return null;
   }
 }
@@ -48,7 +50,7 @@ async function setPrestigeRank(username, rank, env) {
   try {
     await env.SLOTS_KV.put(`rank:${username.toLowerCase()}`, rank);
   } catch (error) {
-    console.error('setPrestigeRank Error:', error);
+    logError('setPrestigeRank', error, { username, rank });
   }
 }
 
@@ -58,7 +60,7 @@ async function hasUnlock(username, unlockKey, env) {
     const value = await env.SLOTS_KV.get(`unlock:${username.toLowerCase()}:${unlockKey}`);
     return value === 'true';
   } catch (error) {
-    console.error('hasUnlock Error:', error);
+    logError('hasUnlock', error, { username, unlockKey });
     return false;
   }
 }
@@ -67,7 +69,7 @@ async function setUnlock(username, unlockKey, env) {
   try {
     await env.SLOTS_KV.put(`unlock:${username.toLowerCase()}:${unlockKey}`, 'true');
   } catch (error) {
-    console.error('setUnlock Error:', error);
+    logError('setUnlock', error, { username, unlockKey });
   }
 }
 
@@ -90,7 +92,7 @@ async function getMonthlyLogin(username, env) {
 
     return data;
   } catch (error) {
-    console.error('getMonthlyLogin Error:', error);
+    logError('getMonthlyLogin', error, { username });
     const currentMonth = getCurrentMonth();
     return { month: currentMonth, days: [], claimedMilestones: [] };
   }
@@ -110,7 +112,7 @@ async function updateMonthlyLogin(username, env) {
     await env.SLOTS_KV.put(`monthlylogin:${username.toLowerCase()}`, JSON.stringify(monthlyLogin));
     return monthlyLogin;
   } catch (error) {
-    console.error('updateMonthlyLogin Error:', error);
+    logError('updateMonthlyLogin', error, { username });
     const currentMonth = getCurrentMonth();
     return { month: currentMonth, days: [], claimedMilestones: [] };
   }
@@ -126,7 +128,7 @@ async function markMilestoneClaimed(username, milestone, env, monthlyLogin = nul
       await env.SLOTS_KV.put(`monthlylogin:${username.toLowerCase()}`, JSON.stringify(data));
     }
   } catch (error) {
-    console.error('markMilestoneClaimed Error:', error);
+    logError('markMilestoneClaimed', error, { username, milestone });
   }
 }
 
@@ -137,7 +139,7 @@ async function getStreak(username, env) {
     if (!value) return { wins: 0, losses: 0 };
     return JSON.parse(value);
   } catch (error) {
-    console.error('getStreak Error:', error);
+    logError('getStreak', error, { username });
     return { wins: 0, losses: 0 };
   }
 }
@@ -149,7 +151,7 @@ async function getStats(username, env) {
     if (!value) return { totalSpins: 0, wins: 0, biggestWin: 0, totalWon: 0, totalLost: 0 };
     return JSON.parse(value);
   } catch (error) {
-    console.error('getStats Error:', error);
+    logError('getStats', error, { username });
     return { totalSpins: 0, wins: 0, biggestWin: 0, totalWon: 0, totalLost: 0 };
   }
 }
@@ -167,7 +169,7 @@ async function updateStats(username, isWin, winAmount, lostAmount, env) {
     }
     await env.SLOTS_KV.put(`stats:${username.toLowerCase()}`, JSON.stringify(stats));
   } catch (error) {
-    console.error('updateStats Error:', error);
+    logError('updateStats', error, { username });
   }
 }
 

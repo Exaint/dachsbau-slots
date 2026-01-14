@@ -52,3 +52,15 @@ export const RAGE_MODE_WIN_THRESHOLD = 50;
 // Unlock & Multiplier Maps
 export const UNLOCK_MAP = { 20: 'slots_20', 30: 'slots_30', 50: 'slots_50', 100: 'slots_100' };
 export const MULTIPLIER_MAP = { 10: 1, 20: 2, 30: 3, 50: 5, 100: 10 };
+
+// Wheel Probabilities (percentages)
+export const WHEEL_JACKPOT_THRESHOLD = 1;        // < 1% for dachs category
+export const WHEEL_JACKPOT_CHANCE = 0.00032;    // Within dachs category: 0.032% for 5x DACHS JACKPOT
+export const WHEEL_DACHS_PRIZE = 500;           // Normal dachs prize
+export const WHEEL_JACKPOT_PRIZE = 100000;      // 5x DACHS JACKPOT prize
+export const WHEEL_DIAMOND_THRESHOLD = 5;       // < 5% for diamonds
+export const WHEEL_DIAMOND_PRIZE = 1000;
+export const WHEEL_GOLD_THRESHOLD = 20;         // < 20% for gold
+export const WHEEL_GOLD_PRIZE = 400;
+export const WHEEL_STAR_THRESHOLD = 50;         // < 50% for stars
+export const WHEEL_STAR_PRIZE = 200;

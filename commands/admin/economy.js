@@ -3,7 +3,7 @@
  */
 
 import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY, ALL_BUFF_KEYS, ALL_SYMBOLS } from '../../constants.js';
-import { isAdmin, sanitizeUsername } from '../../utils.js';
+import { isAdmin, validateAndCleanTarget, logError } from '../../utils.js';
 import {
   getBalance,
   setBalance,
@@ -32,11 +32,7 @@ async function handleGive(username, target, amount, env) {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
 
-    if (!target) {
-      return new Response(`@${username} ❌ Nutze: !slots give @user [Betrag]`, { headers: RESPONSE_HEADERS });
-    }
-
-    if (!amount) {
+    if (!target || !amount) {
       return new Response(`@${username} ❌ Nutze: !slots give @user [Betrag]`, { headers: RESPONSE_HEADERS });
     }
 
@@ -45,10 +41,9 @@ async function handleGive(username, target, amount, env) {
       return new Response(`@${username} ❌ Ungültiger Betrag! (1-${MAX_BALANCE})`, { headers: RESPONSE_HEADERS });
     }
 
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
+    const { error, cleanTarget } = validateAndCleanTarget(target);
+    if (error === 'missing') return new Response(`@${username} ❌ Nutze: !slots give @user [Betrag]`, { headers: RESPONSE_HEADERS });
+    if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     const currentBalance = await getBalance(cleanTarget, env);
     const newBalance = Math.min(currentBalance + parsedAmount, MAX_BALANCE);
@@ -56,7 +51,7 @@ async function handleGive(username, target, amount, env) {
 
     return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gutgeschrieben! Neuer Kontostand: ${newBalance} 🦡💰`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleGive Error:', error);
+    logError('handleGive', error, { username, target });
     return new Response(`@${username} ❌ Fehler beim Gutschreiben.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -70,10 +65,8 @@ async function handleSetBalance(username, target, amount, env) {
       return new Response(`@${username} ❌ Nutze: !slots setbalance @user [Betrag]`, { headers: RESPONSE_HEADERS });
     }
 
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
+    const { error, cleanTarget } = validateAndCleanTarget(target);
+    if (error) return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     const parsedAmount = parseInt(amount, 10);
     if (isNaN(parsedAmount) || parsedAmount < 0) {
@@ -85,7 +78,7 @@ async function handleSetBalance(username, target, amount, env) {
 
     return new Response(`@${username} ✅ Balance von @${cleanTarget} auf ${newBalance} DachsTaler gesetzt! 💰`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleSetBalance Error:', error);
+    logError('handleSetBalance', error, { username, target });
     return new Response(`@${username} ❌ Fehler beim Setzen der Balance.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -108,7 +101,7 @@ async function handleBankSet(username, amount, env) {
 
     return new Response(`@${username} ✅ DachsBank auf ${parsedAmount.toLocaleString('de-DE')} DachsTaler gesetzt! 🏦`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleBankSet Error:', error);
+    logError('handleBankSet', error, { username, amount });
     return new Response(`@${username} ❌ Fehler beim Setzen der Bank.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -122,7 +115,7 @@ async function handleBankReset(username, env) {
 
     return new Response(`@${username} ✅ DachsBank wurde auf 0 DachsTaler zurückgesetzt! 🏦`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleBankReset Error:', error);
+    logError('handleBankReset', error, { username });
     return new Response(`@${username} ❌ Fehler beim Zurücksetzen der Bank.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -136,10 +129,8 @@ async function handleGiveBuff(username, target, shopNumber, env) {
       return new Response(`@${username} ❌ Nutze: !slots givebuff @user [Shopnummer]`, { headers: RESPONSE_HEADERS });
     }
 
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
+    const { error, cleanTarget } = validateAndCleanTarget(target);
+    if (error) return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     const itemId = parseInt(shopNumber, 10);
     const item = SHOP_ITEMS[itemId];
@@ -176,7 +167,7 @@ async function handleGiveBuff(username, target, shopNumber, env) {
       return new Response(`@${username} ❌ Dieser Item-Typ kann nicht direkt gegeben werden. (Nutze für Instant-Items den Shop)`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {
-    console.error('handleGiveBuff Error:', error);
+    logError('handleGiveBuff', error, { username, target, shopNumber });
     return new Response(`@${username} ❌ Fehler beim Geben des Buffs.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -190,10 +181,8 @@ async function handleRemoveBuff(username, target, shopNumber, env) {
       return new Response(`@${username} ❌ Nutze: !slots removebuff @user [Shopnummer]`, { headers: RESPONSE_HEADERS });
     }
 
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
+    const { error, cleanTarget } = validateAndCleanTarget(target);
+    if (error) return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     const itemId = parseInt(shopNumber, 10);
     const item = SHOP_ITEMS[itemId];
@@ -218,7 +207,7 @@ async function handleRemoveBuff(username, target, shopNumber, env) {
       return new Response(`@${username} ❌ Dieser Item-Typ kann nicht entfernt werden.`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {
-    console.error('handleRemoveBuff Error:', error);
+    logError('handleRemoveBuff', error, { username, target, shopNumber });
     return new Response(`@${username} ❌ Fehler beim Entfernen des Buffs.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -228,14 +217,9 @@ async function handleClearAllBuffs(username, target, env) {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
 
-    if (!target) {
-      return new Response(`@${username} ❌ Nutze: !slots clearallbuffs @user`, { headers: RESPONSE_HEADERS });
-    }
-
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
+    const { error, cleanTarget } = validateAndCleanTarget(target);
+    if (error === 'missing') return new Response(`@${username} ❌ Nutze: !slots clearallbuffs @user`, { headers: RESPONSE_HEADERS });
+    if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     const deletePromises = [
       ...ALL_BUFF_KEYS.map(key => env.SLOTS_KV.delete(`buff:${cleanTarget}:${key}`)),
@@ -248,7 +232,7 @@ async function handleClearAllBuffs(username, target, env) {
 
     return new Response(`@${username} ✅ Alle Buffs von @${cleanTarget} entfernt! 🗑️`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleClearAllBuffs Error:', error);
+    logError('handleClearAllBuffs', error, { username, target });
     return new Response(`@${username} ❌ Fehler beim Entfernen aller Buffs.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -258,14 +242,9 @@ async function handleGetStats(username, target, env) {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
 
-    if (!target) {
-      return new Response(`@${username} ❌ Nutze: !slots getstats @user`, { headers: RESPONSE_HEADERS });
-    }
-
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
+    const { error, cleanTarget } = validateAndCleanTarget(target);
+    if (error === 'missing') return new Response(`@${username} ❌ Nutze: !slots getstats @user`, { headers: RESPONSE_HEADERS });
+    if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     const [balance, stats, streak] = await Promise.all([
       getBalance(cleanTarget, env),
@@ -276,7 +255,7 @@ async function handleGetStats(username, target, env) {
     const losses = stats.totalSpins - stats.wins;
     return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} DachsTaler | Wins: ${stats.wins} | Losses: ${losses} | Total: ${stats.totalSpins} | Streak: ${streak.wins}W ${streak.losses}L`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleGetStats Error:', error);
+    logError('handleGetStats', error, { username, target });
     return new Response(`@${username} ❌ Fehler beim Abrufen der Stats.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -286,14 +265,9 @@ async function handleGetDaily(username, target, env) {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
 
-    if (!target) {
-      return new Response(`@${username} ❌ Nutze: !slots getdaily @user`, { headers: RESPONSE_HEADERS });
-    }
-
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
+    const { error, cleanTarget } = validateAndCleanTarget(target);
+    if (error === 'missing') return new Response(`@${username} ❌ Nutze: !slots getdaily @user`, { headers: RESPONSE_HEADERS });
+    if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     const lastDaily = await env.SLOTS_KV.get(`daily:${cleanTarget}`);
 
@@ -309,7 +283,7 @@ async function handleGetDaily(username, target, env) {
 
     return new Response(`@${username} ℹ️ @${cleanTarget} Daily: Letzter Claim vor ${hoursSince}h | ${canClaim ? '✅ Kann abholen' : '❌ Muss warten'}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleGetDaily Error:', error);
+    logError('handleGetDaily', error, { username, target });
     return new Response(`@${username} ❌ Fehler beim Abrufen des Daily-Status.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -319,20 +293,15 @@ async function handleResetDaily(username, target, env) {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
 
-    if (!target) {
-      return new Response(`@${username} ❌ Nutze: !slots resetdaily @user`, { headers: RESPONSE_HEADERS });
-    }
-
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
+    const { error, cleanTarget } = validateAndCleanTarget(target);
+    if (error === 'missing') return new Response(`@${username} ❌ Nutze: !slots resetdaily @user`, { headers: RESPONSE_HEADERS });
+    if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     await env.SLOTS_KV.delete(`daily:${cleanTarget}`);
 
     return new Response(`@${username} ✅ Daily-Cooldown von @${cleanTarget} zurückgesetzt! Kann sofort abholen. 🎁`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleResetDaily Error:', error);
+    logError('handleResetDaily', error, { username, target });
     return new Response(`@${username} ❌ Fehler beim Zurücksetzen des Daily-Cooldowns.`, { headers: RESPONSE_HEADERS });
   }
 }

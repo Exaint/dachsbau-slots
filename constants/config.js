@@ -33,6 +33,7 @@ export const PEEK_TTL_SECONDS = SECONDS_PER_HOUR; // 1 hour
 export const JACKPOT_CLAIM_TTL = SECONDS_PER_HOUR; // 1 hour
 export const BUFF_TTL_BUFFER_SECONDS = 60;
 export const STREAK_TTL_SECONDS = 604800; // 7 days
+export const COOLDOWN_TTL_SECONDS = 60; // 2x cooldown time for safety margin
 
 // Debug Mode
 export const DEBUG_MODE = false;
@@ -48,6 +49,13 @@ export const JACKPOT_LUCKY_SECOND_DIVISOR = 60; // Seconds in minute for lucky s
 
 // Free Spin Settings
 export const FREE_SPIN_COST_THRESHOLD = 1000; // Min cost for free spin bonus message
+
+// Username Validation
+export const USERNAME_MIN_LENGTH = 1;
+export const USERNAME_MAX_LENGTH = 25;
+
+// Exponential Backoff
+export const EXPONENTIAL_BACKOFF_BASE_MS = 10;
 
 // URLs
 export const URLS = {

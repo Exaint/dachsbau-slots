@@ -2,14 +2,14 @@
  * Items - Guaranteed Pair, Wild Card, Free Spins
  */
 
-import { exponentialBackoff } from '../utils.js';
+import { exponentialBackoff, logError } from '../utils.js';
 
 // Guaranteed Pair
 async function activateGuaranteedPair(username, env) {
   try {
     await env.SLOTS_KV.put(`guaranteedpair:${username.toLowerCase()}`, 'active');
   } catch (error) {
-    console.error('activateGuaranteedPair Error:', error);
+    logError('activateGuaranteedPair', error, { username });
   }
 }
 
@@ -18,7 +18,7 @@ async function hasGuaranteedPair(username, env) {
     const value = await env.SLOTS_KV.get(`guaranteedpair:${username.toLowerCase()}`);
     return value === 'active';
   } catch (error) {
-    console.error('hasGuaranteedPair Error:', error);
+    logError('hasGuaranteedPair', error, { username });
     return false;
   }
 }
@@ -27,7 +27,7 @@ async function consumeGuaranteedPair(username, env) {
   try {
     await env.SLOTS_KV.delete(`guaranteedpair:${username.toLowerCase()}`);
   } catch (error) {
-    console.error('consumeGuaranteedPair Error:', error);
+    logError('consumeGuaranteedPair', error, { username });
   }
 }
 
@@ -36,7 +36,7 @@ async function activateWildCard(username, env) {
   try {
     await env.SLOTS_KV.put(`wildcard:${username.toLowerCase()}`, 'active');
   } catch (error) {
-    console.error('activateWildCard Error:', error);
+    logError('activateWildCard', error, { username });
   }
 }
 
@@ -45,7 +45,7 @@ async function hasWildCard(username, env) {
     const value = await env.SLOTS_KV.get(`wildcard:${username.toLowerCase()}`);
     return value === 'active';
   } catch (error) {
-    console.error('hasWildCard Error:', error);
+    logError('hasWildCard', error, { username });
     return false;
   }
 }
@@ -54,7 +54,7 @@ async function consumeWildCard(username, env) {
   try {
     await env.SLOTS_KV.delete(`wildcard:${username.toLowerCase()}`);
   } catch (error) {
-    console.error('consumeWildCard Error:', error);
+    logError('consumeWildCard', error, { username });
   }
 }
 
@@ -67,7 +67,7 @@ async function getFreeSpins(username, env) {
     const parsed = JSON.parse(value);
 
     if (!Array.isArray(parsed)) {
-      console.error('Invalid free spins structure (not array):', parsed);
+      logError('getFreeSpins.invalidStructure', new Error('Not an array'), { username, parsed });
       return [];
     }
 
@@ -82,7 +82,7 @@ async function getFreeSpins(username, env) {
 
     return valid;
   } catch (error) {
-    console.error('getFreeSpins Error:', error);
+    logError('getFreeSpins', error, { username });
     return [];
   }
 }
@@ -90,7 +90,7 @@ async function getFreeSpins(username, env) {
 async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
   try {
     if (typeof count !== 'number' || count <= 0 || typeof multiplier !== 'number' || multiplier <= 0) {
-      console.error('Invalid free spin parameters:', { count, multiplier });
+      logError('addFreeSpinsWithMultiplier.invalidParams', new Error('Invalid parameters'), { username, count, multiplier });
       return;
     }
 
@@ -107,7 +107,7 @@ async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
 
     await env.SLOTS_KV.put(`freespins:${username.toLowerCase()}`, JSON.stringify(freeSpins));
   } catch (error) {
-    console.error('addFreeSpinsWithMultiplier Error:', error);
+    logError('addFreeSpinsWithMultiplier', error, { username, count, multiplier });
   }
 }
 
@@ -130,17 +130,17 @@ async function consumeFreeSpinWithMultiplier(username, env, maxRetries = 3) {
 
       const lowestEntry = freeSpins[0];
       if (!lowestEntry || typeof lowestEntry !== 'object') {
-        console.error('Invalid lowest entry:', lowestEntry);
+        logError('consumeFreeSpinWithMultiplier.invalidEntry', new Error('Invalid lowest entry'), { username, lowestEntry });
         return { used: false, multiplier: 0 };
       }
 
       if (typeof lowestEntry.count !== 'number' || typeof lowestEntry.multiplier !== 'number') {
-        console.error('Invalid entry types:', lowestEntry);
+        logError('consumeFreeSpinWithMultiplier.invalidTypes', new Error('Invalid entry types'), { username, lowestEntry });
         return { used: false, multiplier: 0 };
       }
 
       if (lowestEntry.multiplier <= 0 || lowestEntry.count <= 0) {
-        console.error('Invalid entry values:', lowestEntry);
+        logError('consumeFreeSpinWithMultiplier.invalidValues', new Error('Invalid entry values'), { username, lowestEntry });
         return { used: false, multiplier: 0 };
       }
 
@@ -175,7 +175,7 @@ async function consumeFreeSpinWithMultiplier(username, env, maxRetries = 3) {
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      console.error(`consumeFreeSpinWithMultiplier Error (attempt ${attempt + 1}):`, error);
+      logError('consumeFreeSpinWithMultiplier', error, { username, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) {
         return { used: false, multiplier: 0 };
       }

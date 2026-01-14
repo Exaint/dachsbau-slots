@@ -1,4 +1,4 @@
-import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS } from './constants.js';
+import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS } from './constants.js';
 import { ADMINS } from './config.js';
 
 // OPTIMIZED: Cached DateTimeFormat instances (avoid recreation per request)
@@ -46,8 +46,26 @@ function isAdmin(username) {
 function sanitizeUsername(username) {
   if (!username || typeof username !== 'string') return null;
   const clean = username.trim().toLowerCase().replace(USERNAME_SANITIZE_REGEX, '');
-  if (clean.length < 1 || clean.length > 25) return null;
+  if (clean.length < USERNAME_MIN_LENGTH || clean.length > USERNAME_MAX_LENGTH) return null;
   return clean;
+}
+
+// Helper: Validate and clean target username for admin commands
+function validateAndCleanTarget(target) {
+  if (!target) return { error: 'missing', cleanTarget: null };
+  const cleanTarget = sanitizeUsername(target.replace('@', ''));
+  if (!cleanTarget) return { error: 'invalid', cleanTarget: null };
+  return { error: null, cleanTarget };
+}
+
+// Helper: Safe JSON parse with fallback
+function safeJsonParse(value, fallback = null) {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
 }
 
 function validateAmount(amount, min = 1, max = 100000) {
@@ -123,7 +141,7 @@ function calculateBuffTTL(expireAt, minTTL = BUFF_TTL_BUFFER_SECONDS) {
 }
 
 // OPTIMIZED: Helper for exponential backoff delay (avoids code duplication)
-function exponentialBackoff(attempt, baseMs = 10) {
+function exponentialBackoff(attempt, baseMs = EXPONENTIAL_BACKOFF_BASE_MS) {
   return new Promise(resolve => setTimeout(resolve, baseMs * Math.pow(2, attempt)));
 }
 
@@ -149,6 +167,8 @@ export {
   getWeightedSymbol,
   isAdmin,
   sanitizeUsername,
+  validateAndCleanTarget,
+  safeJsonParse,
   validateAmount,
   getCurrentMonth,
   getCurrentDate,

@@ -3,7 +3,7 @@
  */
 
 import { BUFF_TTL_BUFFER_SECONDS } from '../constants.js';
-import { exponentialBackoff } from '../utils.js';
+import { exponentialBackoff, logError } from '../utils.js';
 
 // Buffs (timed)
 async function activateBuff(username, buffKey, duration, env) {
@@ -11,7 +11,7 @@ async function activateBuff(username, buffKey, duration, env) {
     const expireAt = Date.now() + (duration * 1000);
     await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, expireAt.toString(), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
-    console.error('activateBuff Error:', error);
+    logError('activateBuff', error, { username, buffKey, duration });
   }
 }
 
@@ -21,7 +21,7 @@ async function isBuffActive(username, buffKey, env) {
     if (!value) return false;
     return Date.now() < parseInt(value, 10);
   } catch (error) {
-    console.error('isBuffActive Error:', error);
+    logError('isBuffActive', error, { username, buffKey });
     return false;
   }
 }
@@ -33,7 +33,7 @@ async function activateBuffWithUses(username, buffKey, duration, uses, env) {
     const data = { expireAt, uses };
     await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
-    console.error('activateBuffWithUses Error:', error);
+    logError('activateBuffWithUses', error, { username, buffKey, duration, uses });
   }
 }
 
@@ -65,7 +65,7 @@ async function getBuffWithUses(username, buffKey, env) {
 
     return { active: true, uses: data.uses, data };
   } catch (error) {
-    console.error('getBuffWithUses Error:', error);
+    logError('getBuffWithUses', error, { username, buffKey });
     return { active: false, uses: 0, data: null };
   }
 }
@@ -115,7 +115,7 @@ async function decrementBuffUses(username, buffKey, env, maxRetries = 3) {
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      console.error(`decrementBuffUses Error (attempt ${attempt + 1}):`, error);
+      logError('decrementBuffUses', error, { username, buffKey, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) return;
     }
   }
@@ -128,7 +128,7 @@ async function activateBuffWithStack(username, buffKey, duration, env) {
     const data = { expireAt, stack: 0 };
     await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
-    console.error('activateBuffWithStack Error:', error);
+    logError('activateBuffWithStack', error, { username, buffKey, duration });
   }
 }
 
@@ -160,7 +160,7 @@ async function getBuffWithStack(username, buffKey, env) {
 
     return { active: true, stack: typeof data.stack === 'number' ? data.stack : 0, data };
   } catch (error) {
-    console.error('getBuffWithStack Error:', error);
+    logError('getBuffWithStack', error, { username, buffKey });
     return { active: false, stack: 0, data: null };
   }
 }
@@ -170,7 +170,7 @@ async function addBoost(username, symbol, env) {
   try {
     await env.SLOTS_KV.put(`boost:${username.toLowerCase()}:${symbol}`, 'active');
   } catch (error) {
-    console.error('addBoost Error:', error);
+    logError('addBoost', error, { username, symbol });
   }
 }
 
@@ -197,7 +197,7 @@ async function consumeBoost(username, symbol, env, maxRetries = 3) {
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      console.error(`consumeBoost Error (attempt ${attempt + 1}):`, error);
+      logError('consumeBoost', error, { username, symbol, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) return false;
     }
   }
@@ -211,7 +211,7 @@ async function getMulliganCount(username, env) {
     const value = await env.SLOTS_KV.get(`mulligan:${username.toLowerCase()}`);
     return value ? parseInt(value, 10) : 0;
   } catch (error) {
-    console.error('getMulliganCount Error:', error);
+    logError('getMulliganCount', error, { username });
     return 0;
   }
 }
@@ -225,7 +225,7 @@ async function setMulliganCount(username, count, env) {
       await env.SLOTS_KV.put(`mulligan:${username.toLowerCase()}`, count.toString());
     }
   } catch (error) {
-    console.error('setMulliganCount Error:', error);
+    logError('setMulliganCount', error, { username, count });
   }
 }
 
@@ -250,7 +250,7 @@ async function addInsurance(username, count, env, maxRetries = 3) {
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      console.error(`addInsurance Error (attempt ${attempt + 1}):`, error);
+      logError('addInsurance', error, { username, count, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) return;
     }
   }
@@ -261,7 +261,7 @@ async function getInsuranceCount(username, env) {
     const value = await env.SLOTS_KV.get(`insurance:${username.toLowerCase()}`);
     return value ? parseInt(value, 10) : 0;
   } catch (error) {
-    console.error('getInsuranceCount Error:', error);
+    logError('getInsuranceCount', error, { username });
     return 0;
   }
 }
@@ -275,7 +275,7 @@ async function setInsuranceCount(username, count, env) {
       await env.SLOTS_KV.put(`insurance:${username.toLowerCase()}`, count.toString());
     }
   } catch (error) {
-    console.error('setInsuranceCount Error:', error);
+    logError('setInsuranceCount', error, { username, count });
   }
 }
 
@@ -284,7 +284,7 @@ async function addWinMultiplier(username, env) {
   try {
     await env.SLOTS_KV.put(`winmulti:${username.toLowerCase()}`, 'active');
   } catch (error) {
-    console.error('addWinMultiplier Error:', error);
+    logError('addWinMultiplier', error, { username });
   }
 }
 
@@ -311,7 +311,7 @@ async function consumeWinMultiplier(username, env, maxRetries = 3) {
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      console.error(`consumeWinMultiplier Error (attempt ${attempt + 1}):`, error);
+      logError('consumeWinMultiplier', error, { username, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) return false;
     }
   }

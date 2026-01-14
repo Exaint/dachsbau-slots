@@ -17,7 +17,17 @@ import {
   WEEKLY_DACHS_BOOST_LIMIT,
   WEEKLY_SPIN_BUNDLE_LIMIT,
   SPIN_BUNDLE_COUNT,
-  SPIN_BUNDLE_MULTIPLIER
+  SPIN_BUNDLE_MULTIPLIER,
+  WHEEL_JACKPOT_THRESHOLD,
+  WHEEL_JACKPOT_CHANCE,
+  WHEEL_DACHS_PRIZE,
+  WHEEL_JACKPOT_PRIZE,
+  WHEEL_DIAMOND_THRESHOLD,
+  WHEEL_DIAMOND_PRIZE,
+  WHEEL_GOLD_THRESHOLD,
+  WHEEL_GOLD_PRIZE,
+  WHEEL_STAR_THRESHOLD,
+  WHEEL_STAR_PRIZE
 } from '../constants.js';
 import { getWeightedSymbol, secureRandom, secureRandomInt, logError } from '../utils.js';
 import {
@@ -71,7 +81,7 @@ async function handleShop(username, item, env) {
 
     return await buyShopItem(username, itemNumber, env);
   } catch (error) {
-    console.error('handleShop Error:', error);
+    logError('handleShop', error, { username, item });
     return new Response(`@${username} ❌ Fehler beim Shop-Kauf.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -385,20 +395,20 @@ async function buyShopItem(username, itemId, env) {
 
     return new Response(`@${username} ✅ ${item.name} gekauft! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('buyShopItem Error:', error);
+    logError('buyShopItem', error, { username, itemId });
     return new Response(`@${username} ❌ Fehler beim Item-Kauf.`, { headers: RESPONSE_HEADERS });
   }
 }
 
 function spinWheel() {
   const rand = secureRandom() * 100;
-  if (rand < 1) {
-    if (secureRandom() < 0.00032) return { result: '🦡 🦡 🦡 🦡 🦡', message: '🔥 5x DACHS JACKPOT! 🔥', prize: 100000 };
-    return { result: '🦡 🦡 💎 ⭐ 💰', message: 'Dachse!', prize: 500 };
+  if (rand < WHEEL_JACKPOT_THRESHOLD) {
+    if (secureRandom() < WHEEL_JACKPOT_CHANCE) return { result: '🦡 🦡 🦡 🦡 🦡', message: '🔥 5x DACHS JACKPOT! 🔥', prize: WHEEL_JACKPOT_PRIZE };
+    return { result: '🦡 🦡 💎 ⭐ 💰', message: 'Dachse!', prize: WHEEL_DACHS_PRIZE };
   }
-  if (rand < 5) return { result: '💎 💎 💎 ⭐ 💰', message: 'Diamanten!', prize: 1000 };
-  if (rand < 20) return { result: '💰 💰 💰 ⭐ 💸', message: 'Gold!', prize: 400 };
-  if (rand < 50) return { result: '⭐ ⭐ ⭐ 💰 💸', message: 'Sterne!', prize: 200 };
+  if (rand < WHEEL_DIAMOND_THRESHOLD) return { result: '💎 💎 💎 ⭐ 💰', message: 'Diamanten!', prize: WHEEL_DIAMOND_PRIZE };
+  if (rand < WHEEL_GOLD_THRESHOLD) return { result: '💰 💰 💰 ⭐ 💸', message: 'Gold!', prize: WHEEL_GOLD_PRIZE };
+  if (rand < WHEEL_STAR_THRESHOLD) return { result: '⭐ ⭐ ⭐ 💰 💸', message: 'Sterne!', prize: WHEEL_STAR_PRIZE };
   return { result: '💸 💸 ⭐ 💰 🦡', message: 'Leider verloren!', prize: 0 };
 }
 

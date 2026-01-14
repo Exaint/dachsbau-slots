@@ -2,7 +2,7 @@
  * Shop System - Purchase tracking and limits
  */
 
-import { calculateWeekStart, exponentialBackoff } from '../utils.js';
+import { calculateWeekStart, exponentialBackoff, logError } from '../utils.js';
 
 // Spin Bundle Purchases
 async function getSpinBundlePurchases(username, env) {
@@ -19,7 +19,7 @@ async function getSpinBundlePurchases(username, env) {
 
     return data;
   } catch (error) {
-    console.error('getSpinBundlePurchases Error:', error);
+    logError('getSpinBundlePurchases', error, { username });
     return { count: 0, weekStart: calculateWeekStart() };
   }
 }
@@ -46,7 +46,7 @@ async function incrementSpinBundlePurchases(username, env, maxRetries = 3) {
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      console.error(`incrementSpinBundlePurchases Error (attempt ${attempt + 1}):`, error);
+      logError('incrementSpinBundlePurchases', error, { username, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) return;
     }
   }
@@ -67,7 +67,7 @@ async function getDachsBoostPurchases(username, env) {
 
     return data;
   } catch (error) {
-    console.error('getDachsBoostPurchases Error:', error);
+    logError('getDachsBoostPurchases', error, { username });
     return { count: 0, weekStart: calculateWeekStart() };
   }
 }
@@ -94,7 +94,7 @@ async function incrementDachsBoostPurchases(username, env, maxRetries = 3) {
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      console.error(`incrementDachsBoostPurchases Error (attempt ${attempt + 1}):`, error);
+      logError('incrementDachsBoostPurchases', error, { username, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) return;
     }
   }

@@ -16,7 +16,7 @@ import {
   URLS,
   BUFF_SYMBOLS_WITH_NAMES
 } from '../constants.js';
-import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff } from '../utils.js';
+import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, logError } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -77,7 +77,7 @@ async function handleBalance(username, env) {
 
     return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰 | 🎰 ${totalCount} Free Spins | Details: ${details}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleBalance Error:', error);
+    logError('handleBalance', error, { username });
     return new Response(`@${username} ❌ Fehler beim Abrufen des Kontostands.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -98,7 +98,7 @@ async function handleStats(username, env) {
 
     return new Response(`@${username} 📊 Stats: ${stats.totalSpins} Spins | ${stats.wins} Wins (${winRate}%) | Größter Gewinn: ${stats.biggestWin} | Total: ${stats.totalWon - stats.totalLost >= 0 ? '+' : ''}${stats.totalWon - stats.totalLost}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleStats Error:', error);
+    logError('handleStats', error, { username });
     return new Response(`@${username} ❌ Fehler beim Abrufen der Stats.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -159,7 +159,7 @@ async function handleDaily(username, env) {
 
     return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/${daysInMonth} 📅 | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleDaily Error:', error);
+    logError('handleDaily', error, { username });
     return new Response(`@${username} ❌ Fehler beim Daily Bonus.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -284,7 +284,7 @@ async function handleBuffs(username, env) {
     return new Response(`@${username} 🔥 Deine aktiven Buffs: ${buffList}`, { headers: RESPONSE_HEADERS });
 
   } catch (error) {
-    console.error('handleBuffs Error:', error);
+    logError('handleBuffs', error, { username });
     return new Response(`@${username} ❌ Fehler beim Abrufen der Buffs.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -300,7 +300,7 @@ async function handleBank(username, env) {
       return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DachsTaler | Die Community hat die Bank um ${deficit.toLocaleString('de-DE')} DachsTaler geplündert! 🦡💸`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {
-    console.error('handleBank Error:', error);
+    logError('handleBank', error);
     return new Response(`@${username} ❌ Fehler beim Abrufen der DachsBank.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -382,7 +382,7 @@ async function handleTransfer(username, target, amount, env) {
 
     return new Response(`@${username} ❌ Transfer fehlgeschlagen, bitte versuche es erneut.`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleTransfer Error:', error);
+    logError('handleTransfer', error, { username, target, amount });
     return new Response(`@${username} ❌ Fehler beim Transfer.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -460,7 +460,7 @@ async function handleLeaderboard(env) {
 
     return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleLeaderboard Error:', error);
+    logError('handleLeaderboard', error);
     return new Response(`🏆 Leaderboard: Fehler beim Laden.`, { headers: RESPONSE_HEADERS });
   }
 }

@@ -1,5 +1,5 @@
 import { RESPONSE_HEADERS, URLS } from './constants.js';
-import { sanitizeUsername, isAdmin } from './utils.js';
+import { sanitizeUsername, isAdmin, logError } from './utils.js';
 import { isBlacklisted, setSelfBan } from './database.js';
 
 // User commands
@@ -209,7 +209,7 @@ export default {
 
       return new Response('Invalid action', { headers: RESPONSE_HEADERS });
     } catch (error) {
-      console.error('Worker Error:', error);
+      logError('Worker', error);
       return new Response('Ein Fehler ist aufgetreten. Bitte versuche es später erneut.', { headers: RESPONSE_HEADERS });
     }
   }

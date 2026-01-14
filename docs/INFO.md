@@ -429,16 +429,26 @@ Das Wild ersetzt **jedes Symbol** für den besten Outcome:
 **Buff-Verwaltung:**
 | Command | Beschreibung |
 |:--------|:-------------|
-| `!slots givebuff @user [Shopnr]` | Item/Buff geben |
+| `!slots givebuff @user [Shopnr]` | Item/Buff geben (inkl. #37 Guaranteed Pair, #38 Wild Card) |
 | `!slots removebuff @user [Shopnr]` | Buff entfernen |
 | `!slots clearallbuffs @user` | Alle Buffs entfernen |
+
+**Items verschenken:**
+| Command | Beschreibung |
+|:--------|:-------------|
+| `!slots givefreespins @user [Anzahl]` | Free Spins geben (1-100) |
+| `!slots givemulligan @user [Anzahl]` | Mulligans geben (1-50) |
+| `!slots giveinsurance @user [Anzahl]` | Insurance geben (1-100) |
 
 **Info & Debug:**
 | Command | Beschreibung |
 |:--------|:-------------|
 | `!slots getstats @user` | Stats eines Users anzeigen |
 | `!slots getdaily @user` | Daily-Status prüfen |
+| `!slots getmonthlylogin @user` | Monthly Login Status (Tage, Milestones) |
 | `!slots resetdaily @user` | Daily-Cooldown zurücksetzen |
+| `!slots resetweeklylimits @user` | Wöchentliche Kauflimits zurücksetzen |
+| `!slots givewinmulti @user` | Win Multiplier (2x) geben |
 
 **System:**
 | Command | Beschreibung |

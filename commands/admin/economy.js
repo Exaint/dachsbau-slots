@@ -16,7 +16,14 @@ import {
   addWinMultiplier,
   activateBuff,
   activateBuffWithUses,
-  activateBuffWithStack
+  activateBuffWithStack,
+  addFreeSpinsWithMultiplier,
+  getFreeSpins,
+  activateGuaranteedPair,
+  activateWildCard,
+  getMulliganCount,
+  setMulliganCount,
+  getMonthlyLogin
 } from '../../database.js';
 
 // Dynamic shop item max (avoids hardcoded values)
@@ -175,8 +182,21 @@ async function handleGiveBuff(username, target, shopNumber, env) {
     } else if (item.type === 'prestige') {
       await setPrestigeRank(cleanTarget, item.rank, env);
       return new Response(`@${username} ✅ ${item.name} an @${cleanTarget} vergeben! 🎁`, { headers: RESPONSE_HEADERS });
+    } else if (item.type === 'instant') {
+      // Handle specific instant items that can be gifted
+      if (itemId === 37) {
+        // Guaranteed Pair
+        await activateGuaranteedPair(cleanTarget, env);
+        return new Response(`@${username} ✅ ${item.name} an @${cleanTarget} gegeben! 🎁`, { headers: RESPONSE_HEADERS });
+      } else if (itemId === 38) {
+        // Wild Card
+        await activateWildCard(cleanTarget, env);
+        return new Response(`@${username} ✅ ${item.name} an @${cleanTarget} gegeben! 🎁`, { headers: RESPONSE_HEADERS });
+      } else {
+        return new Response(`@${username} ❌ Dieses Instant-Item kann nicht verschenkt werden (wird sofort ausgeführt).`, { headers: RESPONSE_HEADERS });
+      }
     } else {
-      return new Response(`@${username} ❌ Dieser Item-Typ kann nicht direkt gegeben werden. (Nutze für Instant-Items den Shop)`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ❌ Dieser Item-Typ kann nicht direkt gegeben werden.`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {
     logError('handleGiveBuff', error, { username, target, buffArg });
@@ -340,6 +360,185 @@ async function handleResetDaily(username, target, env) {
   }
 }
 
+async function handleGiveFreespins(username, target, amount, env) {
+  try {
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
+
+    if (!target) {
+      return new Response(`@${username} ❌ Nutze: !slots givefreespins @user [Anzahl]`, { headers: RESPONSE_HEADERS });
+    }
+
+    if (!amount) {
+      return new Response(`@${username} ❌ Nutze: !slots givefreespins @user [Anzahl]`, { headers: RESPONSE_HEADERS });
+    }
+
+    const cleanTarget = sanitizeUsername(target.replace('@', ''));
+    if (!cleanTarget) {
+      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
+    }
+
+    const parsedAmount = parseInt(amount, 10);
+    if (isNaN(parsedAmount) || parsedAmount < 1 || parsedAmount > 100) {
+      return new Response(`@${username} ❌ Ungültige Anzahl! (1-100)`, { headers: RESPONSE_HEADERS });
+    }
+
+    // Add freespins with 1x multiplier (standard freespins)
+    await addFreeSpinsWithMultiplier(cleanTarget, parsedAmount, 1, env);
+
+    // Get total freespins for confirmation
+    const totalSpins = await getFreeSpins(cleanTarget, env);
+    const totalCount = totalSpins.reduce((sum, fs) => sum + fs.count, 0);
+
+    return new Response(`@${username} ✅ ${parsedAmount} Freespins an @${cleanTarget} gegeben! (Gesamt: ${totalCount}) 🎰🎁`, { headers: RESPONSE_HEADERS });
+  } catch (error) {
+    logError('handleGiveFreespins', error, { username, target, amount });
+    return new Response(`@${username} ❌ Fehler beim Geben der Freespins.`, { headers: RESPONSE_HEADERS });
+  }
+}
+
+async function handleGiveMulligan(username, target, amount, env) {
+  try {
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
+
+    if (!target) {
+      return new Response(`@${username} ❌ Nutze: !slots givemulligan @user [Anzahl]`, { headers: RESPONSE_HEADERS });
+    }
+
+    if (!amount) {
+      return new Response(`@${username} ❌ Nutze: !slots givemulligan @user [Anzahl]`, { headers: RESPONSE_HEADERS });
+    }
+
+    const cleanTarget = sanitizeUsername(target.replace('@', ''));
+    if (!cleanTarget) {
+      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
+    }
+
+    const parsedAmount = parseInt(amount, 10);
+    if (isNaN(parsedAmount) || parsedAmount < 1 || parsedAmount > 50) {
+      return new Response(`@${username} ❌ Ungültige Anzahl! (1-50)`, { headers: RESPONSE_HEADERS });
+    }
+
+    // Get current mulligan count and add
+    const currentCount = await getMulliganCount(cleanTarget, env);
+    const newCount = currentCount + parsedAmount;
+    await setMulliganCount(cleanTarget, newCount, env);
+
+    return new Response(`@${username} ✅ ${parsedAmount} Mulligans an @${cleanTarget} gegeben! (Gesamt: ${newCount}) 🔄🎁`, { headers: RESPONSE_HEADERS });
+  } catch (error) {
+    logError('handleGiveMulligan', error, { username, target, amount });
+    return new Response(`@${username} ❌ Fehler beim Geben der Mulligans.`, { headers: RESPONSE_HEADERS });
+  }
+}
+
+async function handleGiveInsurance(username, target, amount, env) {
+  try {
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
+
+    if (!target) {
+      return new Response(`@${username} ❌ Nutze: !slots giveinsurance @user [Anzahl]`, { headers: RESPONSE_HEADERS });
+    }
+
+    if (!amount) {
+      return new Response(`@${username} ❌ Nutze: !slots giveinsurance @user [Anzahl]`, { headers: RESPONSE_HEADERS });
+    }
+
+    const cleanTarget = sanitizeUsername(target.replace('@', ''));
+    if (!cleanTarget) {
+      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
+    }
+
+    const parsedAmount = parseInt(amount, 10);
+    if (isNaN(parsedAmount) || parsedAmount < 1 || parsedAmount > 100) {
+      return new Response(`@${username} ❌ Ungültige Anzahl! (1-100)`, { headers: RESPONSE_HEADERS });
+    }
+
+    await addInsurance(cleanTarget, parsedAmount, env);
+
+    return new Response(`@${username} ✅ ${parsedAmount} Insurance an @${cleanTarget} gegeben! 🛡️🎁`, { headers: RESPONSE_HEADERS });
+  } catch (error) {
+    logError('handleGiveInsurance', error, { username, target, amount });
+    return new Response(`@${username} ❌ Fehler beim Geben der Insurance.`, { headers: RESPONSE_HEADERS });
+  }
+}
+
+async function handleGetMonthlyLogin(username, target, env) {
+  try {
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
+
+    if (!target) {
+      return new Response(`@${username} ❌ Nutze: !slots getmonthlylogin @user`, { headers: RESPONSE_HEADERS });
+    }
+
+    const cleanTarget = sanitizeUsername(target.replace('@', ''));
+    if (!cleanTarget) {
+      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
+    }
+
+    const monthlyLogin = await getMonthlyLogin(cleanTarget, env);
+    const daysCount = monthlyLogin.days.length;
+    const milestonesCount = monthlyLogin.claimedMilestones.length;
+
+    return new Response(`@${username} 📅 @${cleanTarget} Monthly Login: ${daysCount} Tage | Monat: ${monthlyLogin.month} | Milestones: ${milestonesCount}/5`, { headers: RESPONSE_HEADERS });
+  } catch (error) {
+    logError('handleGetMonthlyLogin', error, { username, target });
+    return new Response(`@${username} ❌ Fehler beim Abrufen des Monthly Login Status.`, { headers: RESPONSE_HEADERS });
+  }
+}
+
+async function handleResetWeeklyLimits(username, target, env) {
+  try {
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
+
+    if (!target) {
+      return new Response(`@${username} ❌ Nutze: !slots resetweeklylimits @user`, { headers: RESPONSE_HEADERS });
+    }
+
+    const cleanTarget = sanitizeUsername(target.replace('@', ''));
+    if (!cleanTarget) {
+      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
+    }
+
+    // Reset both weekly purchase limits
+    await Promise.all([
+      env.SLOTS_KV.delete(`bundle_purchases:${cleanTarget}`),
+      env.SLOTS_KV.delete(`dachsboost_purchases:${cleanTarget}`)
+    ]);
+
+    return new Response(`@${username} ✅ Wöchentliche Kauflimits von @${cleanTarget} zurückgesetzt! (Spin Bundle & Dachs-Boost) 🔄`, { headers: RESPONSE_HEADERS });
+  } catch (error) {
+    logError('handleResetWeeklyLimits', error, { username, target });
+    return new Response(`@${username} ❌ Fehler beim Zurücksetzen der Limits.`, { headers: RESPONSE_HEADERS });
+  }
+}
+
+async function handleGiveWinMulti(username, target, env) {
+  try {
+    const adminCheck = requireAdmin(username);
+    if (adminCheck) return adminCheck;
+
+    if (!target) {
+      return new Response(`@${username} ❌ Nutze: !slots givewinmulti @user`, { headers: RESPONSE_HEADERS });
+    }
+
+    const cleanTarget = sanitizeUsername(target.replace('@', ''));
+    if (!cleanTarget) {
+      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
+    }
+
+    await addWinMultiplier(cleanTarget, env);
+
+    return new Response(`@${username} ✅ Win Multiplier (2x) an @${cleanTarget} gegeben! 🎁`, { headers: RESPONSE_HEADERS });
+  } catch (error) {
+    logError('handleGiveWinMulti', error, { username, target });
+    return new Response(`@${username} ❌ Fehler beim Geben des Win Multipliers.`, { headers: RESPONSE_HEADERS });
+  }
+}
+
 export {
   handleGive,
   handleSetBalance,
@@ -350,5 +549,11 @@ export {
   handleClearAllBuffs,
   handleGetStats,
   handleGetDaily,
-  handleResetDaily
+  handleResetDaily,
+  handleGiveFreespins,
+  handleGiveMulligan,
+  handleGiveInsurance,
+  handleGetMonthlyLogin,
+  handleResetWeeklyLimits,
+  handleGiveWinMulti
 };

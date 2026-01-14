@@ -32,7 +32,13 @@ import {
   handleResetDaily,
   handleMaintenance,
   handleWipe,
-  handleRemoveFromLB
+  handleRemoveFromLB,
+  handleGiveFreespins,
+  handleGiveMulligan,
+  handleGiveInsurance,
+  handleGetMonthlyLogin,
+  handleResetWeeklyLimits,
+  handleGiveWinMulti
 } from './commands/admin.js';
 
 // Slots commands
@@ -69,7 +75,17 @@ const ADMIN_COMMANDS_AMOUNT = {
   give: handleGive,
   setbalance: handleSetBalance,
   givebuff: handleGiveBuff,
-  removebuff: handleRemoveBuff
+  removebuff: handleRemoveBuff,
+  givefreespins: handleGiveFreespins,
+  givemulligan: handleGiveMulligan,
+  giveinsurance: handleGiveInsurance
+};
+
+// Admin commands that take (username, target, env) - target only, no amount
+const ADMIN_COMMANDS_TARGET_ONLY = {
+  getmonthlylogin: handleGetMonthlyLogin,
+  resetweeklylimits: handleResetWeeklyLimits,
+  givewinmulti: handleGiveWinMulti
 };
 
 export default {
@@ -143,6 +159,11 @@ export default {
           // Admin commands with target and amount
           if (ADMIN_COMMANDS_AMOUNT[lower]) {
             return await ADMIN_COMMANDS_AMOUNT[lower](cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
+          }
+
+          // Admin commands with target only (no amount)
+          if (ADMIN_COMMANDS_TARGET_ONLY[lower]) {
+            return await ADMIN_COMMANDS_TARGET_ONLY[lower](cleanUsername, url.searchParams.get('target'), env);
           }
 
           // Special admin commands with unique signatures

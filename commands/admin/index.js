@@ -25,5 +25,11 @@ export {
   handleClearAllBuffs,
   handleGetStats,
   handleGetDaily,
-  handleResetDaily
+  handleResetDaily,
+  handleGiveFreespins,
+  handleGiveMulligan,
+  handleGiveInsurance,
+  handleGetMonthlyLogin,
+  handleResetWeeklyLimits,
+  handleGiveWinMulti
 } from './economy.js';

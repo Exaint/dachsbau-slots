@@ -1,5 +1,5 @@
-import { RESPONSE_HEADERS, URLS } from './constants.js';
-import { sanitizeUsername, isAdmin, getAdminList } from './utils.js';
+import { RESPONSE_HEADERS, URLS, KV_TRUE } from './constants.js';
+import { sanitizeUsername, isAdmin, getAdminList, logError } from './utils.js';
 import { isBlacklisted, setSelfBan } from './database.js';
 
 // User commands
@@ -108,10 +108,10 @@ export default {
             if (blacklisted) {
               return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
             }
-            if (isFrozen === 'true') {
+            if (isFrozen === KV_TRUE) {
               return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
             }
-            if (maintenanceMode === 'true' && !isAdmin(cleanUsername)) {
+            if (maintenanceMode === KV_TRUE && !isAdmin(cleanUsername)) {
               return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
             }
           }
@@ -189,10 +189,10 @@ export default {
       if (blacklisted) {
         return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
       }
-      if (isFrozen === 'true') {
+      if (isFrozen === KV_TRUE) {
         return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
       }
-      if (maintenanceMode === 'true' && !isAdmin(cleanUsername)) {
+      if (maintenanceMode === KV_TRUE && !isAdmin(cleanUsername)) {
         return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
       }
 
@@ -202,7 +202,7 @@ export default {
 
       return new Response('Invalid action', { headers: RESPONSE_HEADERS });
     } catch (error) {
-      console.error('Worker Error:', error);
+      logError('Worker', error);
       return new Response('Ein Fehler ist aufgetreten. Bitte versuche es später erneut.', { headers: RESPONSE_HEADERS });
     }
   }

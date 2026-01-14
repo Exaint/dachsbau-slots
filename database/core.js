@@ -2,7 +2,7 @@
  * Core Database Functions - Balance, Daily, Cooldown, Disclaimer, Selfban
  */
 
-import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE, COOLDOWN_TTL_SECONDS } from '../constants.js';
+import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE, COOLDOWN_TTL_SECONDS, KV_TRUE, KV_ACCEPTED } from '../constants.js';
 import { logError } from '../utils.js';
 
 // Balance Functions
@@ -73,7 +73,7 @@ async function setLastSpin(username, timestamp, env) {
 async function hasAcceptedDisclaimer(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`disclaimer:${username.toLowerCase()}`);
-    return value === 'accepted';
+    return value === KV_ACCEPTED;
   } catch (error) {
     logError('hasAcceptedDisclaimer', error, { username });
     return false;
@@ -82,7 +82,7 @@ async function hasAcceptedDisclaimer(username, env) {
 
 async function setDisclaimerAccepted(username, env) {
   try {
-    await env.SLOTS_KV.put(`disclaimer:${username.toLowerCase()}`, 'accepted');
+    await env.SLOTS_KV.put(`disclaimer:${username.toLowerCase()}`, KV_ACCEPTED);
   } catch (error) {
     logError('setDisclaimerAccepted', error, { username });
   }
@@ -135,7 +135,7 @@ async function removeSelfBan(username, env) {
 async function isBlacklisted(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`blacklist:${username.toLowerCase()}`);
-    return value === 'true';
+    return value === KV_TRUE;
   } catch (error) {
     logError('isBlacklisted', error, { username });
     return false;

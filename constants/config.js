@@ -4,6 +4,40 @@
 
 export const RESPONSE_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8' };
 
+// KV String Booleans (KV stores strings, not booleans)
+export const KV_TRUE = 'true';
+export const KV_ACTIVE = 'active';
+export const KV_ACCEPTED = 'accepted';
+
+// KV Key Prefixes (centralized for easy refactoring)
+export const KV_PREFIX = {
+  USER: 'user:',
+  BUFF: 'buff:',
+  BOOST: 'boost:',
+  DAILY: 'daily:',
+  COOLDOWN: 'cooldown:',
+  DISCLAIMER: 'disclaimer:',
+  SELFBAN: 'selfban:',
+  BLACKLIST: 'blacklist:',
+  FROZEN: 'frozen:',
+  STATS: 'stats:',
+  STREAK: 'streak:',
+  RANK: 'rank:',
+  UNLOCK: 'unlock:',
+  MONTHLY_LOGIN: 'monthly_login:',
+  FREE_SPINS: 'freespins:',
+  GUARANTEED_PAIR: 'guaranteedpair:',
+  WILD_CARD: 'wildcard:',
+  MULLIGAN: 'mulligan:',
+  INSURANCE: 'insurance:',
+  WIN_MULTI: 'winmulti:',
+  BUNDLE_PURCHASES: 'bundle_purchases:',
+  DACHS_BOOST_PURCHASES: 'dachsboost_purchases:',
+  PEEK: 'peek:',
+  JACKPOT: 'jackpot:',
+  LEADERBOARD_BLOCKED: 'lb_blocked:'
+};
+
 // Time Constants
 export const MS_PER_HOUR = 3600000;
 export const MS_PER_MINUTE = 60000;

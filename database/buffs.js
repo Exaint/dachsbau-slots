@@ -2,7 +2,7 @@
  * Buff System - Timed buffs, boosts, mulligan, insurance, win multiplier
  */
 
-import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES } from '../constants.js';
+import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES, KV_ACTIVE } from '../constants.js';
 import { exponentialBackoff, logError } from '../utils.js';
 
 // Buffs (timed)
@@ -168,7 +168,7 @@ async function getBuffWithStack(username, buffKey, env) {
 // Boosts (symbol-specific)
 async function addBoost(username, symbol, env) {
   try {
-    await env.SLOTS_KV.put(`boost:${username.toLowerCase()}:${symbol}`, 'active');
+    await env.SLOTS_KV.put(`boost:${username.toLowerCase()}:${symbol}`, KV_ACTIVE);
   } catch (error) {
     logError('addBoost', error, { username, symbol });
   }
@@ -180,7 +180,7 @@ async function consumeBoost(username, symbol, env, maxRetries = MAX_RETRIES) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const value = await env.SLOTS_KV.get(key);
-      if (value !== 'active') {
+      if (value !== KV_ACTIVE) {
         return false; // Not active, nothing to consume
       }
 
@@ -282,7 +282,7 @@ async function setInsuranceCount(username, count, env) {
 // Win Multiplier
 async function addWinMultiplier(username, env) {
   try {
-    await env.SLOTS_KV.put(`winmulti:${username.toLowerCase()}`, 'active');
+    await env.SLOTS_KV.put(`winmulti:${username.toLowerCase()}`, KV_ACTIVE);
   } catch (error) {
     logError('addWinMultiplier', error, { username });
   }
@@ -294,7 +294,7 @@ async function consumeWinMultiplier(username, env, maxRetries = MAX_RETRIES) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const value = await env.SLOTS_KV.get(key);
-      if (value !== 'active') {
+      if (value !== KV_ACTIVE) {
         return false; // Not active, nothing to consume
       }
 

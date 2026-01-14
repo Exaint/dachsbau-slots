@@ -1,4 +1,4 @@
-import { RESPONSE_HEADERS, URLS } from './constants.js';
+import { RESPONSE_HEADERS, URLS, KV_TRUE } from './constants.js';
 import { sanitizeUsername, isAdmin, logError } from './utils.js';
 import { isBlacklisted, setSelfBan } from './database.js';
 
@@ -114,10 +114,10 @@ export default {
             if (blacklisted) {
               return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
             }
-            if (isFrozen === 'true') {
+            if (isFrozen === KV_TRUE) {
               return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
             }
-            if (maintenanceMode === 'true' && !isAdmin(cleanUsername)) {
+            if (maintenanceMode === KV_TRUE && !isAdmin(cleanUsername)) {
               return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
             }
           }
@@ -202,10 +202,10 @@ export default {
       if (blacklisted) {
         return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
       }
-      if (isFrozen === 'true') {
+      if (isFrozen === KV_TRUE) {
         return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
       }
-      if (maintenanceMode === 'true' && !isAdmin(cleanUsername)) {
+      if (maintenanceMode === KV_TRUE && !isAdmin(cleanUsername)) {
         return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
       }
 

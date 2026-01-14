@@ -2,13 +2,13 @@
  * Items - Guaranteed Pair, Wild Card, Free Spins
  */
 
-import { MAX_RETRIES } from '../constants.js';
+import { MAX_RETRIES, KV_ACTIVE } from '../constants.js';
 import { exponentialBackoff, logError } from '../utils.js';
 
 // Guaranteed Pair
 async function activateGuaranteedPair(username, env) {
   try {
-    await env.SLOTS_KV.put(`guaranteedpair:${username.toLowerCase()}`, 'active');
+    await env.SLOTS_KV.put(`guaranteedpair:${username.toLowerCase()}`, KV_ACTIVE);
   } catch (error) {
     logError('activateGuaranteedPair', error, { username });
   }
@@ -17,7 +17,7 @@ async function activateGuaranteedPair(username, env) {
 async function hasGuaranteedPair(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`guaranteedpair:${username.toLowerCase()}`);
-    return value === 'active';
+    return value === KV_ACTIVE;
   } catch (error) {
     logError('hasGuaranteedPair', error, { username });
     return false;
@@ -35,7 +35,7 @@ async function consumeGuaranteedPair(username, env) {
 // Wild Card
 async function activateWildCard(username, env) {
   try {
-    await env.SLOTS_KV.put(`wildcard:${username.toLowerCase()}`, 'active');
+    await env.SLOTS_KV.put(`wildcard:${username.toLowerCase()}`, KV_ACTIVE);
   } catch (error) {
     logError('activateWildCard', error, { username });
   }
@@ -44,7 +44,7 @@ async function activateWildCard(username, env) {
 async function hasWildCard(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`wildcard:${username.toLowerCase()}`);
-    return value === 'active';
+    return value === KV_ACTIVE;
   } catch (error) {
     logError('hasWildCard', error, { username });
     return false;

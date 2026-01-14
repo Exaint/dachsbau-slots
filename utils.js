@@ -1,4 +1,4 @@
-import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS } from './constants.js';
+import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS, MS_PER_HOUR, MS_PER_MINUTE, RESPONSE_HEADERS, MAX_RETRIES } from './constants.js';
 import { ADMINS } from './config.js';
 
 // OPTIMIZED: Cached DateTimeFormat instances (avoid recreation per request)
@@ -56,6 +56,21 @@ function validateAndCleanTarget(target) {
   const cleanTarget = sanitizeUsername(target.replace('@', ''));
   if (!cleanTarget) return { error: 'invalid', cleanTarget: null };
   return { error: null, cleanTarget };
+}
+
+// Helper: Combined admin check with target validation (reduces boilerplate in admin commands)
+function requireAdminWithTarget(username, target, usageHint = '') {
+  if (!isAdmin(username)) {
+    return { valid: false, response: createErrorResponse(username, 'Du hast keine Berechtigung für diesen Command!') };
+  }
+  const { error, cleanTarget } = validateAndCleanTarget(target);
+  if (error === 'missing') {
+    return { valid: false, response: createErrorResponse(username, usageHint || 'Target fehlt!') };
+  }
+  if (error === 'invalid') {
+    return { valid: false, response: createErrorResponse(username, 'Ungültiger Username!') };
+  }
+  return { valid: true, cleanTarget };
 }
 
 // Helper: Safe JSON parse with fallback
@@ -145,10 +160,49 @@ function exponentialBackoff(attempt, baseMs = EXPONENTIAL_BACKOFF_BASE_MS) {
   return new Promise(resolve => setTimeout(resolve, baseMs * Math.pow(2, attempt)));
 }
 
+/**
+ * Generic atomic KV operation with retry mechanism
+ * @param {Object} env - Cloudflare environment with SLOTS_KV
+ * @param {string} key - KV key to operate on
+ * @param {Function} operation - async (currentValue) => { newValue, result }
+ *   - currentValue: current KV value (string or null)
+ *   - returns: { newValue: string|null (null to delete), result: any (returned on success) }
+ * @param {Function} verify - async (expectedValue) => boolean - verification function
+ * @param {number} maxRetries - max retry attempts
+ * @returns {Promise<{success: boolean, result: any}>}
+ */
+async function atomicKvUpdate(env, key, operation, verify, maxRetries = MAX_RETRIES) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const currentValue = await env.SLOTS_KV.get(key);
+      const { newValue, result, options } = await operation(currentValue);
+
+      if (newValue === null) {
+        await env.SLOTS_KV.delete(key);
+      } else {
+        await env.SLOTS_KV.put(key, newValue, options || {});
+      }
+
+      if (await verify(newValue)) {
+        return { success: true, result };
+      }
+
+      if (attempt < maxRetries - 1) {
+        await exponentialBackoff(attempt);
+      }
+    } catch (error) {
+      if (attempt === maxRetries - 1) {
+        return { success: false, result: null, error };
+      }
+    }
+  }
+  return { success: false, result: null };
+}
+
 // Format remaining time in hours and minutes
 function formatTimeRemaining(ms) {
-  const hours = Math.floor(ms / 3600000); // MS_PER_HOUR
-  const minutes = Math.floor((ms % 3600000) / 60000); // MS_PER_MINUTE
+  const hours = Math.floor(ms / MS_PER_HOUR);
+  const minutes = Math.floor((ms % MS_PER_HOUR) / MS_PER_MINUTE);
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
@@ -166,9 +220,19 @@ function logError(context, error, extra = {}) {
   console.error(JSON.stringify(logEntry));
 }
 
-// Create standardized error response
-function createErrorResponse(username, message, headers) {
-  return new Response(`@${username} ❌ ${message}`, { headers });
+// Create standardized error response (uses RESPONSE_HEADERS by default)
+function createErrorResponse(username, message) {
+  return new Response(`@${username} ❌ ${message}`, { headers: RESPONSE_HEADERS });
+}
+
+// Create standardized success response
+function createSuccessResponse(username, message) {
+  return new Response(`@${username} ✅ ${message}`, { headers: RESPONSE_HEADERS });
+}
+
+// Create standardized info response
+function createInfoResponse(username, message) {
+  return new Response(`@${username} ℹ️ ${message}`, { headers: RESPONSE_HEADERS });
 }
 
 export {
@@ -178,6 +242,7 @@ export {
   isAdmin,
   sanitizeUsername,
   validateAndCleanTarget,
+  requireAdminWithTarget,
   safeJsonParse,
   validateAmount,
   getCurrentMonth,
@@ -189,5 +254,8 @@ export {
   exponentialBackoff,
   formatTimeRemaining,
   logError,
-  createErrorResponse
+  createErrorResponse,
+  createSuccessResponse,
+  createInfoResponse,
+  atomicKvUpdate
 };

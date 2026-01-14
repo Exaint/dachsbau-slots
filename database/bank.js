@@ -3,6 +3,7 @@
  */
 
 import { BANK_USERNAME, BANK_START_BALANCE, JACKPOT_CLAIM_TTL } from '../constants.js';
+import { logError } from '../utils.js';
 
 // DachsBank Helper Functions
 async function updateBankBalance(amount, env) {
@@ -22,7 +23,7 @@ async function updateBankBalance(amount, env) {
 
     return newBalance;
   } catch (error) {
-    console.error('updateBankBalance Error:', error);
+    logError('updateBankBalance', error, { amount });
     // Return current balance estimate on error (prevents crash when caller uses return value)
     return BANK_START_BALANCE;
   }
@@ -40,7 +41,7 @@ async function getBankBalance(env) {
 
     return parseInt(bankBalance, 10);
   } catch (error) {
-    console.error('getBankBalance Error:', error);
+    logError('getBankBalance', error);
     return BANK_START_BALANCE;
   }
 }

@@ -142,7 +142,20 @@ export default {
           // OPTIMIZED: Use static command maps for O(1) lookup
           if (LEADERBOARD_ALIASES.has(lower)) return await handleLeaderboard(env);
           if (BALANCE_ALIASES.has(lower)) return await handleBalance(cleanUsername, env);
-          if (INFO_ALIASES.has(lower)) return new Response(`@${cleanUsername} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS });
+          if (INFO_ALIASES.has(lower)) {
+            // Check for target parameter (like disclaimer command)
+            const targetParam = url.searchParams.get('target');
+            let finalTarget = cleanUsername;
+
+            if (targetParam) {
+              const cleanTarget = sanitizeUsername(targetParam.replace('@', ''));
+              if (cleanTarget) {
+                finalTarget = cleanTarget;
+              }
+            }
+
+            return new Response(`@${finalTarget} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS });
+          }
           if (lower === 'daily') return await handleDaily(cleanUsername, env);
           if (lower === 'stats') return await handleStats(cleanUsername, env);
           if (lower === 'buffs') return await handleBuffs(cleanUsername, env);

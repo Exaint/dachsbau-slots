@@ -29,7 +29,8 @@ import {
   WHEEL_STAR_THRESHOLD,
   WHEEL_STAR_PRIZE,
   SECONDS_PER_MINUTE,
-  SECONDS_PER_HOUR
+  SECONDS_PER_HOUR,
+  KV_ACTIVE
 } from '../constants.js';
 import { getWeightedSymbol, secureRandom, secureRandomInt, logError } from '../utils.js';
 import {
@@ -203,7 +204,7 @@ async function buyShopItem(username, itemId, env) {
           getDachsBoostPurchases(username, env)
         ]);
 
-        if (existingBoost === 'active') {
+        if (existingBoost === KV_ACTIVE) {
           return new Response(`@${username} ❌ Du hast bereits einen aktiven ${item.name}! Nutze ihn erst, bevor du einen neuen kaufst.`, { headers: RESPONSE_HEADERS });
         }
 

@@ -13,7 +13,8 @@ import {
   DAILY_BOOST_AMOUNT,
   URLS,
   BUFF_SYMBOLS_WITH_NAMES,
-  MAX_RETRIES
+  MAX_RETRIES,
+  KV_ACTIVE
 } from '../constants.js';
 import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError } from '../utils.js';
 import {
@@ -237,13 +238,13 @@ async function handleBuffs(username, env) {
       { boost: dachsBoost, symbol: '🦡', name: 'Dachs' }
     ];
     symbolBoosts.forEach(({ boost, symbol, name }) => {
-      if (boost === 'active') {
+      if (boost === KV_ACTIVE) {
         buffs.push(`${symbol} ${name}-Boost (1x)`);
       }
     });
 
     // Win Multiplier
-    if (winMultiplier === 'active') {
+    if (winMultiplier === KV_ACTIVE) {
       buffs.push('⚡ Win Multiplier (1x)');
     }
 

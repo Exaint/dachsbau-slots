@@ -2,7 +2,7 @@
  * Progression System - Streaks, Stats, Monthly Login, Prestige, Unlocks
  */
 
-import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX } from '../constants.js';
+import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, KV_TRUE } from '../constants.js';
 import { getCurrentMonth, getCurrentDate, logError } from '../utils.js';
 
 // Streak Multiplier
@@ -58,7 +58,7 @@ async function setPrestigeRank(username, rank, env) {
 async function hasUnlock(username, unlockKey, env) {
   try {
     const value = await env.SLOTS_KV.get(`unlock:${username.toLowerCase()}:${unlockKey}`);
-    return value === 'true';
+    return value === KV_TRUE;
   } catch (error) {
     logError('hasUnlock', error, { username, unlockKey });
     return false;

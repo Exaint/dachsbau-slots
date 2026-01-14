@@ -17,9 +17,21 @@ import {
   WEEKLY_DACHS_BOOST_LIMIT,
   WEEKLY_SPIN_BUNDLE_LIMIT,
   SPIN_BUNDLE_COUNT,
-  SPIN_BUNDLE_MULTIPLIER
+  SPIN_BUNDLE_MULTIPLIER,
+  WHEEL_JACKPOT_THRESHOLD,
+  WHEEL_JACKPOT_CHANCE,
+  WHEEL_DACHS_PRIZE,
+  WHEEL_JACKPOT_PRIZE,
+  WHEEL_DIAMOND_THRESHOLD,
+  WHEEL_DIAMOND_PRIZE,
+  WHEEL_GOLD_THRESHOLD,
+  WHEEL_GOLD_PRIZE,
+  WHEEL_STAR_THRESHOLD,
+  WHEEL_STAR_PRIZE,
+  SECONDS_PER_MINUTE,
+  SECONDS_PER_HOUR
 } from '../constants.js';
-import { getWeightedSymbol, secureRandom, secureRandomInt } from '../utils.js';
+import { getWeightedSymbol, secureRandom, secureRandomInt, logError } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -62,7 +74,7 @@ async function handleShop(username, item, env) {
       return new Response(`@${username} Hier findest du den Slots Shop: ${URLS.SHOP} | Nutze: !shop buy [Nummer]`, { headers: RESPONSE_HEADERS });
     }
 
-    const parts = item.toLowerCase().split(' ');
+    const parts = item.toLowerCase().split(/\s+/);
     if (parts[0] !== 'buy' || !parts[1]) {
       return new Response(`@${username} ❌ Nutze: !shop buy [Nummer]`, { headers: RESPONSE_HEADERS });
     }
@@ -74,7 +86,7 @@ async function handleShop(username, item, env) {
 
     return await buyShopItem(username, itemNumber, env);
   } catch (error) {
-    console.error('handleShop Error:', error);
+    logError('handleShop', error, { username, item });
     return new Response(`@${username} ❌ Fehler beim Shop-Kauf.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -171,12 +183,12 @@ async function buyShopItem(username, itemId, env) {
         return new Response(`@${username} ✅ ${item.name} aktiviert für ${item.uses} Spins! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
       } else if (item.buffKey === 'rage_mode') {
         await activateBuffWithStack(username, item.buffKey, item.duration, env);
-        const minutes = Math.floor(item.duration / 60);
+        const minutes = Math.floor(item.duration / SECONDS_PER_MINUTE);
         return new Response(`@${username} ✅ ${item.name} aktiviert für ${minutes} Minuten! Verluste geben +5% Gewinn-Chance (bis 50%)! 🔥 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
       } else {
         await activateBuff(username, item.buffKey, item.duration, env);
-        const minutes = Math.floor(item.duration / 60);
-        const hours = item.duration >= 3600 ? Math.floor(item.duration / 3600) + 'h' : minutes + ' Minuten';
+        const minutes = Math.floor(item.duration / SECONDS_PER_MINUTE);
+        const hours = item.duration >= SECONDS_PER_HOUR ? Math.floor(item.duration / SECONDS_PER_HOUR) + 'h' : minutes + ' Minuten';
         return new Response(`@${username} ✅ ${item.name} aktiviert für ${hours}! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
       }
     }
@@ -383,14 +395,19 @@ async function buyShopItem(username, itemId, env) {
           }
         } catch (activationError) {
           // Rollback: Refund the balance and reverse bank update if item activation failed
-          console.error('Mystery Box activation failed, rolling back:', activationError);
+          logError('MysteryBox.activation', activationError, { username, mysteryItemId, mysteryItemName: mysteryResult.name });
           try {
             await Promise.all([
               setBalance(username, balance, env),
               updateBankBalance(-item.price, env) // Reverse the bank update
             ]);
+            // Verify rollback succeeded
+            const verifyBalance = await getBalance(username, env);
+            if (verifyBalance !== balance) {
+              logError('MysteryBox.rollback.verify', new Error('Balance mismatch after rollback'), { username, expected: balance, actual: verifyBalance });
+            }
           } catch (rollbackError) {
-            console.error('CRITICAL: Mystery Box rollback failed!', rollbackError);
+            logError('MysteryBox.rollback.CRITICAL', rollbackError, { username, originalBalance: balance, itemPrice: item.price });
             // At this point, manual intervention may be needed
           }
           return new Response(`@${username} ❌ Mystery Box Fehler! Dein Einsatz wurde zurückerstattet.`, { headers: RESPONSE_HEADERS });
@@ -429,20 +446,20 @@ async function buyShopItem(username, itemId, env) {
 
     return new Response(`@${username} ✅ ${item.name} gekauft! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('buyShopItem Error:', error);
+    logError('buyShopItem', error, { username, itemId });
     return new Response(`@${username} ❌ Fehler beim Item-Kauf.`, { headers: RESPONSE_HEADERS });
   }
 }
 
 function spinWheel() {
   const rand = secureRandom() * 100;
-  if (rand < 1) {
-    if (secureRandom() < 0.00032) return { result: '🦡 🦡 🦡 🦡 🦡', message: '🔥 5x DACHS JACKPOT! 🔥', prize: 100000 };
-    return { result: '🦡 🦡 💎 ⭐ 💰', message: 'Dachse!', prize: 500 };
+  if (rand < WHEEL_JACKPOT_THRESHOLD) {
+    if (secureRandom() < WHEEL_JACKPOT_CHANCE) return { result: '🦡 🦡 🦡 🦡 🦡', message: '🔥 5x DACHS JACKPOT! 🔥', prize: WHEEL_JACKPOT_PRIZE };
+    return { result: '🦡 🦡 💎 ⭐ 💰', message: 'Dachse!', prize: WHEEL_DACHS_PRIZE };
   }
-  if (rand < 5) return { result: '💎 💎 💎 ⭐ 💰', message: 'Diamanten!', prize: 1000 };
-  if (rand < 20) return { result: '💰 💰 💰 ⭐ 💸', message: 'Gold!', prize: 400 };
-  if (rand < 50) return { result: '⭐ ⭐ ⭐ 💰 💸', message: 'Sterne!', prize: 200 };
+  if (rand < WHEEL_DIAMOND_THRESHOLD) return { result: '💎 💎 💎 ⭐ 💰', message: 'Diamanten!', prize: WHEEL_DIAMOND_PRIZE };
+  if (rand < WHEEL_GOLD_THRESHOLD) return { result: '💰 💰 💰 ⭐ 💸', message: 'Gold!', prize: WHEEL_GOLD_PRIZE };
+  if (rand < WHEEL_STAR_THRESHOLD) return { result: '⭐ ⭐ ⭐ 💰 💸', message: 'Sterne!', prize: WHEEL_STAR_PRIZE };
   return { result: '💸 💸 ⭐ 💰 🦡', message: 'Leider verloren!', prize: 0 };
 }
 

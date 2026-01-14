@@ -2,7 +2,8 @@
  * Core Database Functions - Balance, Daily, Cooldown, Disclaimer, Selfban
  */
 
-import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE } from '../constants.js';
+import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE, COOLDOWN_TTL_SECONDS, KV_TRUE, KV_ACCEPTED } from '../constants.js';
+import { logError } from '../utils.js';
 
 // Balance Functions
 async function getBalance(username, env) {
@@ -16,7 +17,7 @@ async function getBalance(username, env) {
     const balance = parseInt(value, 10);
     return isNaN(balance) ? STARTING_BALANCE : Math.min(balance, MAX_BALANCE);
   } catch (error) {
-    console.error('getBalance Error:', error);
+    logError('getBalance', error, { username });
     return STARTING_BALANCE;
   }
 }
@@ -26,7 +27,7 @@ async function setBalance(username, balance, env) {
     const safeBalance = Math.max(0, Math.min(balance, MAX_BALANCE));
     await env.SLOTS_KV.put(`user:${username.toLowerCase()}`, safeBalance.toString());
   } catch (error) {
-    console.error('setBalance Error:', error);
+    logError('setBalance', error, { username, balance });
   }
 }
 
@@ -36,7 +37,7 @@ async function getLastDaily(username, env) {
     const value = await env.SLOTS_KV.get(`daily:${username.toLowerCase()}`);
     return value ? parseInt(value, 10) : null;
   } catch (error) {
-    console.error('getLastDaily Error:', error);
+    logError('getLastDaily', error, { username });
     return null;
   }
 }
@@ -45,7 +46,7 @@ async function setLastDaily(username, timestamp, env) {
   try {
     await env.SLOTS_KV.put(`daily:${username.toLowerCase()}`, timestamp.toString(), { expirationTtl: DAILY_TTL_SECONDS });
   } catch (error) {
-    console.error('setLastDaily Error:', error);
+    logError('setLastDaily', error, { username });
   }
 }
 
@@ -55,17 +56,16 @@ async function getLastSpin(username, env) {
     const value = await env.SLOTS_KV.get(`cooldown:${username.toLowerCase()}`);
     return value ? parseInt(value, 10) : null;
   } catch (error) {
-    console.error('getLastSpin Error:', error);
+    logError('getLastSpin', error, { username });
     return null;
   }
 }
 
 async function setLastSpin(username, timestamp, env) {
   try {
-    // Auto-expire after 60 seconds (2x cooldown time for safety)
-    await env.SLOTS_KV.put(`cooldown:${username.toLowerCase()}`, timestamp.toString(), { expirationTtl: 60 });
+    await env.SLOTS_KV.put(`cooldown:${username.toLowerCase()}`, timestamp.toString(), { expirationTtl: COOLDOWN_TTL_SECONDS });
   } catch (error) {
-    console.error('setLastSpin Error:', error);
+    logError('setLastSpin', error, { username });
   }
 }
 
@@ -73,18 +73,18 @@ async function setLastSpin(username, timestamp, env) {
 async function hasAcceptedDisclaimer(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`disclaimer:${username.toLowerCase()}`);
-    return value === 'accepted';
+    return value === KV_ACCEPTED;
   } catch (error) {
-    console.error('hasAcceptedDisclaimer Error:', error);
+    logError('hasAcceptedDisclaimer', error, { username });
     return false;
   }
 }
 
 async function setDisclaimerAccepted(username, env) {
   try {
-    await env.SLOTS_KV.put(`disclaimer:${username.toLowerCase()}`, 'accepted');
+    await env.SLOTS_KV.put(`disclaimer:${username.toLowerCase()}`, KV_ACCEPTED);
   } catch (error) {
-    console.error('setDisclaimerAccepted Error:', error);
+    logError('setDisclaimerAccepted', error, { username });
   }
 }
 
@@ -95,7 +95,7 @@ async function isSelfBanned(username, env) {
     if (!value) return null;
     return JSON.parse(value); // Returns { timestamp, date }
   } catch (error) {
-    console.error('isSelfBanned Error:', error);
+    logError('isSelfBanned', error, { username });
     return null;
   }
 }
@@ -119,7 +119,7 @@ async function setSelfBan(username, env) {
 
     await env.SLOTS_KV.put(`selfban:${username.toLowerCase()}`, JSON.stringify(banData));
   } catch (error) {
-    console.error('setSelfBan Error:', error);
+    logError('setSelfBan', error, { username });
   }
 }
 
@@ -127,7 +127,7 @@ async function removeSelfBan(username, env) {
   try {
     await env.SLOTS_KV.delete(`selfban:${username.toLowerCase()}`);
   } catch (error) {
-    console.error('removeSelfBan Error:', error);
+    logError('removeSelfBan', error, { username });
   }
 }
 
@@ -135,9 +135,9 @@ async function removeSelfBan(username, env) {
 async function isBlacklisted(username, env) {
   try {
     const value = await env.SLOTS_KV.get(`blacklist:${username.toLowerCase()}`);
-    return value === 'true';
+    return value === KV_TRUE;
   } catch (error) {
-    console.error('isBlacklisted Error:', error);
+    logError('isBlacklisted', error, { username });
     return false;
   }
 }

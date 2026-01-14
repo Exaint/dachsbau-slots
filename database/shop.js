@@ -2,13 +2,14 @@
  * Shop System - Purchase tracking and limits
  */
 
-import { getWeekStart, exponentialBackoff } from '../utils.js';
+import { MAX_RETRIES } from '../constants.js';
+import { calculateWeekStart, exponentialBackoff, logError } from '../utils.js';
 
 // Spin Bundle Purchases
 async function getSpinBundlePurchases(username, env) {
   try {
-    // OPTIMIZED: Cache getWeekStart() result to avoid multiple Date calculations
-    const currentWeekStart = getWeekStart();
+    // Always use fresh week calculation for limit checks (no cache)
+    const currentWeekStart = calculateWeekStart();
     const value = await env.SLOTS_KV.get(`bundle_purchases:${username.toLowerCase()}`);
     if (!value) return { count: 0, weekStart: currentWeekStart };
     const data = JSON.parse(value);
@@ -19,13 +20,13 @@ async function getSpinBundlePurchases(username, env) {
 
     return data;
   } catch (error) {
-    console.error('getSpinBundlePurchases Error:', error);
-    return { count: 0, weekStart: getWeekStart() };
+    logError('getSpinBundlePurchases', error, { username });
+    return { count: 0, weekStart: calculateWeekStart() };
   }
 }
 
 // Atomic increment with retry mechanism
-async function incrementSpinBundlePurchases(username, env, maxRetries = 3) {
+async function incrementSpinBundlePurchases(username, env, maxRetries = MAX_RETRIES) {
   const key = `bundle_purchases:${username.toLowerCase()}`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -46,7 +47,7 @@ async function incrementSpinBundlePurchases(username, env, maxRetries = 3) {
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      console.error(`incrementSpinBundlePurchases Error (attempt ${attempt + 1}):`, error);
+      logError('incrementSpinBundlePurchases', error, { username, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) return;
     }
   }
@@ -55,8 +56,8 @@ async function incrementSpinBundlePurchases(username, env, maxRetries = 3) {
 // Dachs Boost Purchases
 async function getDachsBoostPurchases(username, env) {
   try {
-    // OPTIMIZED: Cache getWeekStart() result to avoid multiple Date calculations
-    const currentWeekStart = getWeekStart();
+    // Always use fresh week calculation for limit checks (no cache)
+    const currentWeekStart = calculateWeekStart();
     const value = await env.SLOTS_KV.get(`dachsboost_purchases:${username.toLowerCase()}`);
     if (!value) return { count: 0, weekStart: currentWeekStart };
     const data = JSON.parse(value);
@@ -67,13 +68,13 @@ async function getDachsBoostPurchases(username, env) {
 
     return data;
   } catch (error) {
-    console.error('getDachsBoostPurchases Error:', error);
-    return { count: 0, weekStart: getWeekStart() };
+    logError('getDachsBoostPurchases', error, { username });
+    return { count: 0, weekStart: calculateWeekStart() };
   }
 }
 
 // Atomic increment with retry mechanism
-async function incrementDachsBoostPurchases(username, env, maxRetries = 3) {
+async function incrementDachsBoostPurchases(username, env, maxRetries = MAX_RETRIES) {
   const key = `dachsboost_purchases:${username.toLowerCase()}`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -94,7 +95,7 @@ async function incrementDachsBoostPurchases(username, env, maxRetries = 3) {
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      console.error(`incrementDachsBoostPurchases Error (attempt ${attempt + 1}):`, error);
+      logError('incrementDachsBoostPurchases', error, { username, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) return;
     }
   }

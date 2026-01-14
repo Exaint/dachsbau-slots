@@ -1,19 +1,21 @@
 import {
   RESPONSE_HEADERS,
   MAX_BALANCE,
-  MS_PER_HOUR,
-  MS_PER_MINUTE,
   MIN_TRANSFER,
   MAX_TRANSFER,
   BANK_USERNAME,
   LEADERBOARD_CACHE_TTL,
+  LEADERBOARD_LIMIT,
+  LEADERBOARD_BATCH_SIZE,
+  LEADERBOARD_MIN_USERS,
   MONTHLY_LOGIN_REWARDS,
   DAILY_AMOUNT,
   DAILY_BOOST_AMOUNT,
   URLS,
-  BUFF_SYMBOLS_WITH_NAMES
+  BUFF_SYMBOLS_WITH_NAMES,
+  MAX_RETRIES
 } from '../constants.js';
-import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff } from '../utils.js';
+import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -75,7 +77,7 @@ async function handleBalance(username, env) {
 
     return new Response(`@${username}, dein Kontostand: ${balance} DachsTaler 🦡💰 | 🎰 ${totalCount} Free Spins | Details: ${details}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleBalance Error:', error);
+    logError('handleBalance', error, { username });
     return new Response(`@${username} ❌ Fehler beim Abrufen des Kontostands.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -96,7 +98,7 @@ async function handleStats(username, env) {
 
     return new Response(`@${username} 📊 Stats: ${stats.totalSpins} Spins | ${stats.wins} Wins (${winRate}%) | Größter Gewinn: ${stats.biggestWin} | Total: ${stats.totalWon - stats.totalLost >= 0 ? '+' : ''}${stats.totalWon - stats.totalLost}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleStats Error:', error);
+    logError('handleStats', error, { username });
     return new Response(`@${username} ❌ Fehler beim Abrufen der Stats.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -127,10 +129,8 @@ async function handleDaily(username, env) {
         const tomorrow = new Date(todayUTC);
         tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
         const remainingMs = tomorrow.getTime() - now;
-        const remainingHours = Math.floor(remainingMs / MS_PER_HOUR);
-        const remainingMinutes = Math.floor((remainingMs % MS_PER_HOUR) / MS_PER_MINUTE);
 
-        return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${remainingHours}h ${remainingMinutes}m | Login-Tage: ${monthlyLogin.days.length}/${daysInMonth} 📅`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${formatTimeRemaining(remainingMs)} | Login-Tage: ${monthlyLogin.days.length}/${daysInMonth} 📅`, { headers: RESPONSE_HEADERS });
       }
     }
 
@@ -157,7 +157,7 @@ async function handleDaily(username, env) {
 
     return new Response(`@${username} 🎁 Daily Bonus erhalten! +${totalBonus} DachsTaler${boostText}${milestoneText} 🦡 | Login-Tage: ${newMonthlyLogin.days.length}/${daysInMonth} 📅 | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleDaily Error:', error);
+    logError('handleDaily', error, { username });
     return new Response(`@${username} ❌ Fehler beim Daily Bonus.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -177,17 +177,7 @@ async function handleBuffs(username, env) {
         const remaining = expireAt - Date.now();
 
         if (remaining > 0) {
-          const hours = Math.floor(remaining / MS_PER_HOUR);
-          const minutes = Math.floor((remaining % MS_PER_HOUR) / MS_PER_MINUTE);
-
-          let timeStr;
-          if (hours > 0) {
-            timeStr = `${hours}h ${minutes}m`;
-          } else {
-            timeStr = `${minutes}m`;
-          }
-
-          return `${buff.emoji} ${buff.name} (${timeStr})`;
+          return `${buff.emoji} ${buff.name} (${formatTimeRemaining(remaining)})`;
         }
       } catch (e) {
         // Might be JSON (buffs with uses/stack)
@@ -233,8 +223,7 @@ async function handleBuffs(username, env) {
     // Rage Mode
     if (rageMode.active && rageMode.data) {
       const remaining = rageMode.data.expireAt - Date.now();
-      const minutes = Math.floor(remaining / MS_PER_MINUTE);
-      buffs.push(`🔥 Rage Mode (${minutes}m, Stack: ${rageMode.stack}%)`);
+      buffs.push(`🔥 Rage Mode (${formatTimeRemaining(remaining)}, Stack: ${rageMode.stack}%)`);
     }
 
     // Symbol Boosts - named variables for clarity
@@ -282,7 +271,7 @@ async function handleBuffs(username, env) {
     return new Response(`@${username} 🔥 Deine aktiven Buffs: ${buffList}`, { headers: RESPONSE_HEADERS });
 
   } catch (error) {
-    console.error('handleBuffs Error:', error);
+    logError('handleBuffs', error, { username });
     return new Response(`@${username} ❌ Fehler beim Abrufen der Buffs.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -298,7 +287,7 @@ async function handleBank(username, env) {
       return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DachsTaler | Die Community hat die Bank um ${deficit.toLocaleString('de-DE')} DachsTaler geplündert! 🦡💸`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {
-    console.error('handleBank Error:', error);
+    logError('handleBank', error);
     return new Response(`@${username} ❌ Fehler beim Abrufen der DachsBank.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -351,7 +340,7 @@ async function handleTransfer(username, target, amount, env) {
     }
 
     // Atomic transfer with retry mechanism to prevent race conditions
-    const maxRetries = 3;
+    const maxRetries = MAX_RETRIES;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const [senderBalance, receiverBalance] = await Promise.all([
@@ -386,7 +375,7 @@ async function handleTransfer(username, target, amount, env) {
 
     return new Response(`@${username} ❌ Transfer fehlgeschlagen, bitte versuche es erneut.`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleTransfer Error:', error);
+    logError('handleTransfer', error, { username, target, amount });
     return new Response(`@${username} ❌ Fehler beim Transfer.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -396,47 +385,63 @@ async function handleLeaderboard(env) {
     // Try to get cached leaderboard
     const cached = await env.SLOTS_KV.get('leaderboard:cache');
     if (cached) {
-      const cachedData = JSON.parse(cached);
-      // Check if cache is still valid (less than 5 minutes old)
-      if (Date.now() - cachedData.timestamp < LEADERBOARD_CACHE_TTL * 1000) {
-        return new Response(cachedData.message, { headers: RESPONSE_HEADERS });
+      try {
+        const cachedData = JSON.parse(cached);
+        // Validate cache structure and check if still valid
+        if (cachedData.timestamp && cachedData.message &&
+            Date.now() - cachedData.timestamp < LEADERBOARD_CACHE_TTL * 1000) {
+          return new Response(cachedData.message, { headers: RESPONSE_HEADERS });
+        }
+      } catch {
+        // Invalid cache, continue to rebuild
       }
     }
 
     // Cache miss or expired - rebuild leaderboard
-    // Note: KV list returns max 1000 keys per call, but we only need top 5
-    // For large user bases, consider storing a pre-computed leaderboard
-    const listResult = await env.SLOTS_KV.list({ prefix: 'user:' });
+    const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
 
     if (!listResult.keys || listResult.keys.length === 0) {
       return new Response(`🏆 Leaderboard: Noch keine Spieler vorhanden!`, { headers: RESPONSE_HEADERS });
     }
 
-    const users = [];
-    const balancePromises = [];
-    const usernames = [];
-
-    for (const key of listResult.keys) {
+    // Filter blocked users first, then batch KV reads
+    const validKeys = listResult.keys.filter(key => {
       const username = key.name.replace('user:', '');
-      if (isLeaderboardBlocked(username)) continue;
+      return !isLeaderboardBlocked(username);
+    });
 
-      usernames.push(username);
-      balancePromises.push(env.SLOTS_KV.get(key.name));
-    }
+    // Batch reads in chunks for better performance
+    const users = [];
 
-    const balances = await Promise.all(balancePromises);
+    for (let i = 0; i < validKeys.length; i += LEADERBOARD_BATCH_SIZE) {
+      const batch = validKeys.slice(i, i + LEADERBOARD_BATCH_SIZE);
+      const balances = await Promise.all(
+        batch.map(key => env.SLOTS_KV.get(key.name))
+      );
 
-    for (let i = 0; i < usernames.length; i++) {
-      if (balances[i]) {
-        users.push({ username: usernames[i], balance: parseInt(balances[i], 10) });
+      for (let j = 0; j < batch.length; j++) {
+        if (balances[j]) {
+          const balance = parseInt(balances[j], 10);
+          if (!isNaN(balance) && balance > 0) {
+            users.push({
+              username: batch[j].name.replace('user:', ''),
+              balance
+            });
+          }
+        }
       }
+
+      // Early exit if we have enough high-balance users
+      if (users.length >= LEADERBOARD_MIN_USERS) break;
     }
 
     users.sort((a, b) => b.balance - a.balance);
     const top5 = users.slice(0, 5);
 
     const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-    const leaderboardText = top5.map((user, index) => `${medals[index]} ${user.username}: ${user.balance} DachsTaler`).join(' ║ ');
+    const leaderboardText = top5.map((user, index) =>
+      `${medals[index]} ${user.username}: ${user.balance.toLocaleString('de-DE')} DachsTaler`
+    ).join(' ║ ');
 
     const message = `🏆 Top 5 Leaderboard: ${leaderboardText}`;
 
@@ -448,7 +453,7 @@ async function handleLeaderboard(env) {
 
     return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleLeaderboard Error:', error);
+    logError('handleLeaderboard', error);
     return new Response(`🏆 Leaderboard: Fehler beim Laden.`, { headers: RESPONSE_HEADERS });
   }
 }

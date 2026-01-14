@@ -27,9 +27,10 @@ import {
   RAGE_MODE_LOSS_STACK,
   RAGE_MODE_MAX_STACK,
   RAGE_MODE_WIN_THRESHOLD,
-  BUFF_TTL_BUFFER_SECONDS
+  BUFF_TTL_BUFFER_SECONDS,
+  FREE_SPIN_COST_THRESHOLD
 } from '../constants.js';
-import { calculateBuffTTL } from '../utils.js';
+import { calculateBuffTTL, logError } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
 import {
   getBalance,
@@ -143,7 +144,7 @@ async function applyMultipliersAndBuffs(username, result, multiplier, grid, env)
     try {
       await addFreeSpinsWithMultiplier(username, result.freeSpins, multiplier, env);
     } catch (error) {
-      console.error('Add Free Spins Error:', error);
+      logError('applyMultipliersAndBuffs.addFreeSpins', error, { username, freeSpins: result.freeSpins, multiplier });
     }
   }
 
@@ -302,7 +303,7 @@ async function handleSlot(username, amountParam, url, env) {
         freeSpinMultiplier = (typeof freeSpinResult.multiplier === 'number' && freeSpinResult.multiplier > 0) ? freeSpinResult.multiplier : 1;
       }
     } catch (freeSpinError) {
-      console.error('Free Spin Consumption Error:', freeSpinError);
+      logError('handleSlot.consumeFreeSpin', freeSpinError, { username });
     }
 
     // Parse spin amount
@@ -315,7 +316,7 @@ async function handleSlot(username, amountParam, url, env) {
     let multiplier = isFreeSpinUsed ? freeSpinMultiplier : (spinAmountResult.multiplier || 1);
 
     // Happy Hour check
-    if (!isFreeSpinUsed && spinCost < 1000) {
+    if (!isFreeSpinUsed && spinCost < FREE_SPIN_COST_THRESHOLD) {
       const hasHappyHour = await isBuffActive(username, 'happy_hour', env);
       if (hasHappyHour) {
         spinCost = Math.floor(spinCost / 2);
@@ -468,7 +469,7 @@ async function handleSlot(username, amountParam, url, env) {
         remainingCount = remainingFreeSpins.reduce((sum, fs) => sum + (fs.count || 0), 0);
       }
     } catch (error) {
-      console.error('Get Remaining Free Spins Error:', error);
+      logError('handleSlot.getRemainingFreeSpins', error, { username });
     }
 
     // Low Balance Warning
@@ -496,7 +497,7 @@ async function handleSlot(username, amountParam, url, env) {
             : `⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DachsTaler`;
         }
       } catch (error) {
-        console.error('Low Balance Warning Check Error:', error);
+        logError('handleSlot.lowBalanceWarning', error, { username, newBalance });
       }
     }
 
@@ -518,7 +519,7 @@ async function handleSlot(username, amountParam, url, env) {
     const message = buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage);
     return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    console.error('handleSlot Error:', error);
+    logError('handleSlot', error, { username, amountParam });
     return new Response(`@${username} ❌ Fehler beim Spin.`, { headers: RESPONSE_HEADERS });
   }
 }

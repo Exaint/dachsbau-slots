@@ -96,8 +96,9 @@ async function handleStats(username, env) {
     }
 
     const winRate = stats.totalSpins > 0 ? ((stats.wins / stats.totalSpins) * 100).toFixed(1) : 0;
+    const netProfit = stats.totalWon - stats.totalLost;
 
-    return new Response(`@${username} 📊 Stats: ${stats.totalSpins} Spins | ${stats.wins} Wins (${winRate}%) | Größter Gewinn: ${stats.biggestWin} | Total: ${stats.totalWon - stats.totalLost >= 0 ? '+' : ''}${stats.totalWon - stats.totalLost}`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} 📊 Stats: ${stats.totalSpins} Spins | ${stats.wins} Wins (${winRate}%) | Größter Gewinn: ${stats.biggestWin} | Gewonnen: ${stats.totalWon.toLocaleString('de-DE')} | Ausgegeben: ${stats.totalLost.toLocaleString('de-DE')} | Bilanz: ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('de-DE')}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     logError('handleStats', error, { username });
     return new Response(`@${username} ❌ Fehler beim Abrufen der Stats.`, { headers: RESPONSE_HEADERS });

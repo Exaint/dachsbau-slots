@@ -295,7 +295,8 @@ async function handleGetStats(username, target, env) {
     ]);
 
     const losses = stats.totalSpins - stats.wins;
-    return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} DachsTaler | Wins: ${stats.wins} | Losses: ${losses} | Total: ${stats.totalSpins} | Streak: ${streak.wins}W ${streak.losses}L`, { headers: RESPONSE_HEADERS });
+    const netProfit = stats.totalWon - stats.totalLost;
+    return new Response(`@${username} 📊 Stats @${cleanTarget}: Balance: ${balance} | Wins: ${stats.wins} | Losses: ${losses} | Total: ${stats.totalSpins} | Gewonnen: ${stats.totalWon.toLocaleString('de-DE')} | Ausgegeben: ${stats.totalLost.toLocaleString('de-DE')} | Bilanz: ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('de-DE')} | Streak: ${streak.wins}W ${streak.losses}L`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     logError('handleGetStats', error, { username, target });
     return new Response(`@${username} ❌ Fehler beim Abrufen der Stats.`, { headers: RESPONSE_HEADERS });

@@ -1,8 +1,6 @@
 import {
   RESPONSE_HEADERS,
   MAX_BALANCE,
-  MS_PER_HOUR,
-  MS_PER_MINUTE,
   MIN_TRANSFER,
   MAX_TRANSFER,
   BANK_USERNAME,
@@ -17,7 +15,7 @@ import {
   BUFF_SYMBOLS_WITH_NAMES,
   MAX_RETRIES
 } from '../constants.js';
-import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, logError } from '../utils.js';
+import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -130,10 +128,8 @@ async function handleDaily(username, env) {
         const tomorrow = new Date(todayUTC);
         tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
         const remainingMs = tomorrow.getTime() - now;
-        const remainingHours = Math.floor(remainingMs / MS_PER_HOUR);
-        const remainingMinutes = Math.floor((remainingMs % MS_PER_HOUR) / MS_PER_MINUTE);
 
-        return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${remainingHours}h ${remainingMinutes}m | Login-Tage: ${monthlyLogin.days.length}/${daysInMonth} 📅`, { headers: RESPONSE_HEADERS });
+        return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${formatTimeRemaining(remainingMs)} | Login-Tage: ${monthlyLogin.days.length}/${daysInMonth} 📅`, { headers: RESPONSE_HEADERS });
       }
     }
 
@@ -180,17 +176,7 @@ async function handleBuffs(username, env) {
         const remaining = expireAt - Date.now();
 
         if (remaining > 0) {
-          const hours = Math.floor(remaining / MS_PER_HOUR);
-          const minutes = Math.floor((remaining % MS_PER_HOUR) / MS_PER_MINUTE);
-
-          let timeStr;
-          if (hours > 0) {
-            timeStr = `${hours}h ${minutes}m`;
-          } else {
-            timeStr = `${minutes}m`;
-          }
-
-          return `${buff.emoji} ${buff.name} (${timeStr})`;
+          return `${buff.emoji} ${buff.name} (${formatTimeRemaining(remaining)})`;
         }
       } catch (e) {
         // Might be JSON (buffs with uses/stack)
@@ -236,8 +222,7 @@ async function handleBuffs(username, env) {
     // Rage Mode
     if (rageMode.active && rageMode.data) {
       const remaining = rageMode.data.expireAt - Date.now();
-      const minutes = Math.floor(remaining / MS_PER_MINUTE);
-      buffs.push(`🔥 Rage Mode (${minutes}m, Stack: ${rageMode.stack}%)`);
+      buffs.push(`🔥 Rage Mode (${formatTimeRemaining(remaining)}, Stack: ${rageMode.stack}%)`);
     }
 
     // Symbol Boosts - named variables for clarity

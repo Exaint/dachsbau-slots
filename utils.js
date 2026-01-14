@@ -145,6 +145,16 @@ function exponentialBackoff(attempt, baseMs = EXPONENTIAL_BACKOFF_BASE_MS) {
   return new Promise(resolve => setTimeout(resolve, baseMs * Math.pow(2, attempt)));
 }
 
+// Format remaining time in hours and minutes
+function formatTimeRemaining(ms) {
+  const hours = Math.floor(ms / 3600000); // MS_PER_HOUR
+  const minutes = Math.floor((ms % 3600000) / 60000); // MS_PER_MINUTE
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
 // Structured error logging with context
 function logError(context, error, extra = {}) {
   const logEntry = {
@@ -177,6 +187,7 @@ export {
   isLeaderboardBlocked,
   calculateBuffTTL,
   exponentialBackoff,
+  formatTimeRemaining,
   logError,
   createErrorResponse
 };

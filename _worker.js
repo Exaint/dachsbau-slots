@@ -61,7 +61,14 @@ const ADMIN_COMMANDS_TARGET = {
   getdaily: handleGetDaily,
   resetdaily: handleResetDaily,
   wipe: handleWipe,
-  removefromlb: handleRemoveFromLB
+  removefromlb: handleRemoveFromLB,
+  bankset: handleBankSet,
+  maintenance: handleMaintenance
+};
+
+// Admin commands without target (username, env only)
+const ADMIN_COMMANDS_NO_TARGET = {
+  bankreset: handleBankReset
 };
 
 // Admin commands that take (username, target, amount, env)
@@ -135,8 +142,7 @@ export default {
           if (lower === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
 
           // Admin commands - centralized permission check
-          const isAdminCommand = ADMIN_COMMANDS_TARGET[lower] || ADMIN_COMMANDS_AMOUNT[lower] ||
-                                 lower === 'bankset' || lower === 'bankreset' || lower === 'maintenance';
+          const isAdminCommand = ADMIN_COMMANDS_TARGET[lower] || ADMIN_COMMANDS_AMOUNT[lower] || ADMIN_COMMANDS_NO_TARGET[lower];
 
           if (isAdminCommand) {
             if (!isAdmin(cleanUsername)) {
@@ -153,10 +159,10 @@ export default {
               return await ADMIN_COMMANDS_AMOUNT[lower](cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
             }
 
-            // Special admin commands with unique signatures
-            if (lower === 'bankset') return await handleBankSet(cleanUsername, url.searchParams.get('target'), env);
-            if (lower === 'bankreset') return await handleBankReset(cleanUsername, env);
-            if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target'), env);
+            // Admin commands without target
+            if (ADMIN_COMMANDS_NO_TARGET[lower]) {
+              return await ADMIN_COMMANDS_NO_TARGET[lower](cleanUsername, env);
+            }
           }
           if (lower === 'disclaimer') {
             // For disclaimer, check the target parameter (which is $(2) in Fossabot)

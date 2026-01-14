@@ -32,7 +32,7 @@ export const DAILY_TTL_SECONDS = SECONDS_PER_DAY + SECONDS_PER_HOUR; // 25 hours
 export const PEEK_TTL_SECONDS = SECONDS_PER_HOUR; // 1 hour
 export const JACKPOT_CLAIM_TTL = SECONDS_PER_HOUR; // 1 hour
 export const BUFF_TTL_BUFFER_SECONDS = 60;
-export const STREAK_TTL_SECONDS = 604800; // 7 days
+export const STREAK_TTL_SECONDS = SECONDS_PER_DAY * 7; // 7 days
 export const COOLDOWN_TTL_SECONDS = 60; // 2x cooldown time for safety margin
 
 // Debug Mode

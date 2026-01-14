@@ -76,6 +76,24 @@ function getCurrentDate() {
   return `${year}-${month}-${day}`;
 }
 
+// Calculate week start (Monday) in German timezone - always fresh
+function calculateWeekStart() {
+  // Use Intl.DateTimeFormat for reliable timezone handling
+  const { year, month, day } = getGermanDateParts();
+  const germanDate = new Date(`${year}-${month}-${day}T12:00:00`);
+  const dayOfWeek = germanDate.getDay();
+  const daysToMonday = (dayOfWeek + 6) % 7;
+
+  // Get Monday's date
+  const monday = new Date(germanDate);
+  monday.setDate(germanDate.getDate() - daysToMonday);
+
+  const mondayYear = monday.getFullYear();
+  const mondayMonth = String(monday.getMonth() + 1).padStart(2, '0');
+  const mondayDay = String(monday.getDate()).padStart(2, '0');
+  return `${mondayYear}-${mondayMonth}-${mondayDay}`;
+}
+
 // OPTIMIZED: Cache for getWeekStart (recalculated every 60 seconds max)
 let weekStartCache = { value: null, expires: 0 };
 
@@ -85,19 +103,7 @@ function getWeekStart() {
     return weekStartCache.value;
   }
 
-  // Calculate days since Monday in German timezone
-  const germanDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
-  const dayOfWeek = germanDate.getDay();
-  const daysToMonday = (dayOfWeek + 6) % 7;
-
-  // Get Monday's date
-  const monday = new Date(germanDate);
-  monday.setDate(germanDate.getDate() - daysToMonday);
-
-  const year = monday.getFullYear();
-  const month = String(monday.getMonth() + 1).padStart(2, '0');
-  const day = String(monday.getDate()).padStart(2, '0');
-  const result = `${year}-${month}-${day}`;
+  const result = calculateWeekStart();
 
   // Cache for 60 seconds
   weekStartCache = { value: result, expires: now + 60000 };
@@ -121,6 +127,22 @@ function exponentialBackoff(attempt, baseMs = 10) {
   return new Promise(resolve => setTimeout(resolve, baseMs * Math.pow(2, attempt)));
 }
 
+// Structured error logging with context
+function logError(context, error, extra = {}) {
+  const logEntry = {
+    context,
+    message: error?.message || String(error),
+    timestamp: new Date().toISOString(),
+    ...extra
+  };
+  console.error(JSON.stringify(logEntry));
+}
+
+// Create standardized error response
+function createErrorResponse(username, message, headers) {
+  return new Response(`@${username} ❌ ${message}`, { headers });
+}
+
 export {
   secureRandom,
   secureRandomInt,
@@ -131,7 +153,10 @@ export {
   getCurrentMonth,
   getCurrentDate,
   getWeekStart,
+  calculateWeekStart,
   isLeaderboardBlocked,
   calculateBuffTTL,
-  exponentialBackoff
+  exponentialBackoff,
+  logError,
+  createErrorResponse
 };

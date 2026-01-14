@@ -2,13 +2,13 @@
  * Shop System - Purchase tracking and limits
  */
 
-import { getWeekStart, exponentialBackoff } from '../utils.js';
+import { calculateWeekStart, exponentialBackoff } from '../utils.js';
 
 // Spin Bundle Purchases
 async function getSpinBundlePurchases(username, env) {
   try {
-    // OPTIMIZED: Cache getWeekStart() result to avoid multiple Date calculations
-    const currentWeekStart = getWeekStart();
+    // Always use fresh week calculation for limit checks (no cache)
+    const currentWeekStart = calculateWeekStart();
     const value = await env.SLOTS_KV.get(`bundle_purchases:${username.toLowerCase()}`);
     if (!value) return { count: 0, weekStart: currentWeekStart };
     const data = JSON.parse(value);
@@ -20,7 +20,7 @@ async function getSpinBundlePurchases(username, env) {
     return data;
   } catch (error) {
     console.error('getSpinBundlePurchases Error:', error);
-    return { count: 0, weekStart: getWeekStart() };
+    return { count: 0, weekStart: calculateWeekStart() };
   }
 }
 
@@ -55,8 +55,8 @@ async function incrementSpinBundlePurchases(username, env, maxRetries = 3) {
 // Dachs Boost Purchases
 async function getDachsBoostPurchases(username, env) {
   try {
-    // OPTIMIZED: Cache getWeekStart() result to avoid multiple Date calculations
-    const currentWeekStart = getWeekStart();
+    // Always use fresh week calculation for limit checks (no cache)
+    const currentWeekStart = calculateWeekStart();
     const value = await env.SLOTS_KV.get(`dachsboost_purchases:${username.toLowerCase()}`);
     if (!value) return { count: 0, weekStart: currentWeekStart };
     const data = JSON.parse(value);
@@ -68,7 +68,7 @@ async function getDachsBoostPurchases(username, env) {
     return data;
   } catch (error) {
     console.error('getDachsBoostPurchases Error:', error);
-    return { count: 0, weekStart: getWeekStart() };
+    return { count: 0, weekStart: calculateWeekStart() };
   }
 }
 

@@ -134,20 +134,30 @@ export default {
           if (lower === 'bank') return await handleBank(cleanUsername, env);
           if (lower === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
 
-          // Admin commands with target only
-          if (ADMIN_COMMANDS_TARGET[lower]) {
-            return await ADMIN_COMMANDS_TARGET[lower](cleanUsername, url.searchParams.get('target'), env);
-          }
+          // Admin commands - centralized permission check
+          const isAdminCommand = ADMIN_COMMANDS_TARGET[lower] || ADMIN_COMMANDS_AMOUNT[lower] ||
+                                 lower === 'bankset' || lower === 'bankreset' || lower === 'maintenance';
 
-          // Admin commands with target and amount
-          if (ADMIN_COMMANDS_AMOUNT[lower]) {
-            return await ADMIN_COMMANDS_AMOUNT[lower](cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
-          }
+          if (isAdminCommand) {
+            if (!isAdmin(cleanUsername)) {
+              return new Response(`@${cleanUsername} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
+            }
 
-          // Special admin commands with unique signatures
-          if (lower === 'bankset') return await handleBankSet(cleanUsername, url.searchParams.get('target'), env);
-          if (lower === 'bankreset') return await handleBankReset(cleanUsername, env);
-          if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target'), env);
+            // Admin commands with target only
+            if (ADMIN_COMMANDS_TARGET[lower]) {
+              return await ADMIN_COMMANDS_TARGET[lower](cleanUsername, url.searchParams.get('target'), env);
+            }
+
+            // Admin commands with target and amount
+            if (ADMIN_COMMANDS_AMOUNT[lower]) {
+              return await ADMIN_COMMANDS_AMOUNT[lower](cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
+            }
+
+            // Special admin commands with unique signatures
+            if (lower === 'bankset') return await handleBankSet(cleanUsername, url.searchParams.get('target'), env);
+            if (lower === 'bankreset') return await handleBankReset(cleanUsername, env);
+            if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target'), env);
+          }
           if (lower === 'disclaimer') {
             // For disclaimer, check the target parameter (which is $(2) in Fossabot)
             const targetParam = url.searchParams.get('target');

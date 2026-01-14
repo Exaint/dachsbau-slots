@@ -1,5 +1,18 @@
 /**
- * Database Index - Re-exports all database functions
+ * Database Module Index
+ *
+ * This module provides all database operations for the Dachsbau Slots game.
+ * All functions interact with Cloudflare KV storage.
+ *
+ * @module database
+ *
+ * Structure:
+ * - core.js: Balance, Daily, Cooldown, Disclaimer, Selfban, Blacklist
+ * - buffs.js: Timed buffs, Symbol boosts, Mulligan, Insurance, Win Multiplier
+ * - items.js: Guaranteed Pair, Wild Card, Free Spins
+ * - progression.js: Streaks, Stats, Monthly Login, Prestige, Unlocks
+ * - shop.js: Weekly purchase limits (Spin Bundle, Dachs Boost)
+ * - bank.js: DachsBank balance, Hourly Jackpot
  */
 
 // Core functions

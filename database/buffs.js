@@ -43,7 +43,21 @@ async function getBuffWithUses(username, buffKey, env) {
     const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buffKey}`);
     if (!value) return { active: false, uses: 0, data: null };
 
-    const data = JSON.parse(value);
+    let data;
+    try {
+      data = JSON.parse(value);
+    } catch {
+      // Corrupted data, clean up
+      await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      return { active: false, uses: 0, data: null };
+    }
+
+    // Validate data structure
+    if (!data || typeof data.expireAt !== 'number' || typeof data.uses !== 'number') {
+      await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      return { active: false, uses: 0, data: null };
+    }
+
     if (Date.now() >= data.expireAt || data.uses <= 0) {
       await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
       return { active: false, uses: 0, data: null };
@@ -124,13 +138,27 @@ async function getBuffWithStack(username, buffKey, env) {
     const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buffKey}`);
     if (!value) return { active: false, stack: 0, data: null };
 
-    const data = JSON.parse(value);
+    let data;
+    try {
+      data = JSON.parse(value);
+    } catch {
+      // Corrupted data, clean up
+      await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      return { active: false, stack: 0, data: null };
+    }
+
+    // Validate data structure
+    if (!data || typeof data.expireAt !== 'number') {
+      await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      return { active: false, stack: 0, data: null };
+    }
+
     if (Date.now() >= data.expireAt) {
       await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
       return { active: false, stack: 0, data: null };
     }
 
-    return { active: true, stack: data.stack || 0, data };
+    return { active: true, stack: typeof data.stack === 'number' ? data.stack : 0, data };
   } catch (error) {
     console.error('getBuffWithStack Error:', error);
     return { active: false, stack: 0, data: null };
@@ -146,25 +174,35 @@ async function addBoost(username, symbol, env) {
   }
 }
 
-async function consumeBoost(username, symbol, env) {
-  try {
-    const key = `boost:${username.toLowerCase()}:${symbol}`;
-    const value = await env.SLOTS_KV.get(key);
-    if (value === 'active') {
+async function consumeBoost(username, symbol, env, maxRetries = 3) {
+  const key = `boost:${username.toLowerCase()}:${symbol}`;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const value = await env.SLOTS_KV.get(key);
+      if (value !== 'active') {
+        return false; // Not active, nothing to consume
+      }
+
       await env.SLOTS_KV.delete(key);
-      // Verify deletion succeeded (prevents race condition double-consume)
+
+      // Verify deletion succeeded
       const verify = await env.SLOTS_KV.get(key);
       if (verify === null) {
         return true; // Successfully consumed
       }
-      // Another request consumed it first
-      return false;
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await exponentialBackoff(attempt);
+      }
+    } catch (error) {
+      console.error(`consumeBoost Error (attempt ${attempt + 1}):`, error);
+      if (attempt === maxRetries - 1) return false;
     }
-    return false;
-  } catch (error) {
-    console.error('consumeBoost Error:', error);
-    return false;
   }
+
+  return false; // All retries failed
 }
 
 // Mulligan

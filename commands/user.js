@@ -7,6 +7,9 @@ import {
   MAX_TRANSFER,
   BANK_USERNAME,
   LEADERBOARD_CACHE_TTL,
+  LEADERBOARD_LIMIT,
+  LEADERBOARD_BATCH_SIZE,
+  LEADERBOARD_MIN_USERS,
   MONTHLY_LOGIN_REWARDS,
   DAILY_AMOUNT,
   DAILY_BOOST_AMOUNT,
@@ -389,47 +392,63 @@ async function handleLeaderboard(env) {
     // Try to get cached leaderboard
     const cached = await env.SLOTS_KV.get('leaderboard:cache');
     if (cached) {
-      const cachedData = JSON.parse(cached);
-      // Check if cache is still valid (less than 5 minutes old)
-      if (Date.now() - cachedData.timestamp < LEADERBOARD_CACHE_TTL * 1000) {
-        return new Response(cachedData.message, { headers: RESPONSE_HEADERS });
+      try {
+        const cachedData = JSON.parse(cached);
+        // Validate cache structure and check if still valid
+        if (cachedData.timestamp && cachedData.message &&
+            Date.now() - cachedData.timestamp < LEADERBOARD_CACHE_TTL * 1000) {
+          return new Response(cachedData.message, { headers: RESPONSE_HEADERS });
+        }
+      } catch {
+        // Invalid cache, continue to rebuild
       }
     }
 
     // Cache miss or expired - rebuild leaderboard
-    // Note: KV list returns max 1000 keys per call, but we only need top 5
-    // For large user bases, consider storing a pre-computed leaderboard
-    const listResult = await env.SLOTS_KV.list({ prefix: 'user:' });
+    const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
 
     if (!listResult.keys || listResult.keys.length === 0) {
       return new Response(`🏆 Leaderboard: Noch keine Spieler vorhanden!`, { headers: RESPONSE_HEADERS });
     }
 
-    const users = [];
-    const balancePromises = [];
-    const usernames = [];
-
-    for (const key of listResult.keys) {
+    // Filter blocked users first, then batch KV reads
+    const validKeys = listResult.keys.filter(key => {
       const username = key.name.replace('user:', '');
-      if (isLeaderboardBlocked(username)) continue;
+      return !isLeaderboardBlocked(username);
+    });
 
-      usernames.push(username);
-      balancePromises.push(env.SLOTS_KV.get(key.name));
-    }
+    // Batch reads in chunks for better performance
+    const users = [];
 
-    const balances = await Promise.all(balancePromises);
+    for (let i = 0; i < validKeys.length; i += LEADERBOARD_BATCH_SIZE) {
+      const batch = validKeys.slice(i, i + LEADERBOARD_BATCH_SIZE);
+      const balances = await Promise.all(
+        batch.map(key => env.SLOTS_KV.get(key.name))
+      );
 
-    for (let i = 0; i < usernames.length; i++) {
-      if (balances[i]) {
-        users.push({ username: usernames[i], balance: parseInt(balances[i], 10) });
+      for (let j = 0; j < batch.length; j++) {
+        if (balances[j]) {
+          const balance = parseInt(balances[j], 10);
+          if (!isNaN(balance) && balance > 0) {
+            users.push({
+              username: batch[j].name.replace('user:', ''),
+              balance
+            });
+          }
+        }
       }
+
+      // Early exit if we have enough high-balance users
+      if (users.length >= LEADERBOARD_MIN_USERS) break;
     }
 
     users.sort((a, b) => b.balance - a.balance);
     const top5 = users.slice(0, 5);
 
     const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-    const leaderboardText = top5.map((user, index) => `${medals[index]} ${user.username}: ${user.balance} DachsTaler`).join(' ║ ');
+    const leaderboardText = top5.map((user, index) =>
+      `${medals[index]} ${user.username}: ${user.balance.toLocaleString('de-DE')} DachsTaler`
+    ).join(' ║ ');
 
     const message = `🏆 Top 5 Leaderboard: ${leaderboardText}`;
 

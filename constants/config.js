@@ -38,6 +38,17 @@ export const STREAK_TTL_SECONDS = 604800; // 7 days
 export const DEBUG_MODE = false;
 export const DEBUG_DACHS_PAIR_CHANCE = 0.75;
 
+// Leaderboard Settings
+export const LEADERBOARD_LIMIT = 500; // Max users to fetch
+export const LEADERBOARD_BATCH_SIZE = 50; // KV reads per batch
+export const LEADERBOARD_MIN_USERS = 100; // Early exit threshold
+
+// Jackpot Settings
+export const JACKPOT_LUCKY_SECOND_DIVISOR = 60; // Seconds in minute for lucky second calc
+
+// Free Spin Settings
+export const FREE_SPIN_COST_THRESHOLD = 1000; // Min cost for free spin bonus message
+
 // URLs
 export const URLS = {
   INFO: 'https://git.new/DachsbauSlotInfos',

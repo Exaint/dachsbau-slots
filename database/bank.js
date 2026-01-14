@@ -2,7 +2,7 @@
  * Bank System - DachsBank balance and Hourly Jackpot
  */
 
-import { BANK_USERNAME, BANK_START_BALANCE, JACKPOT_CLAIM_TTL } from '../constants.js';
+import { BANK_USERNAME, BANK_START_BALANCE, JACKPOT_CLAIM_TTL, JACKPOT_LUCKY_SECOND_DIVISOR } from '../constants.js';
 
 // DachsBank Helper Functions
 async function updateBankBalance(amount, env) {
@@ -51,7 +51,7 @@ async function checkAndClaimHourlyJackpot(env) {
   const currentDay = now.getUTCDate();
   const currentMonth = now.getUTCMonth();
   const seed = currentDay * 100 + currentMonth * 10 + currentHour;
-  const luckySecond = seed % 60;
+  const luckySecond = seed % JACKPOT_LUCKY_SECOND_DIVISOR;
 
   if (currentSecond !== luckySecond) return false;
 

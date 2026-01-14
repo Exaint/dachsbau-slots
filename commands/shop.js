@@ -19,7 +19,7 @@ import {
   SPIN_BUNDLE_COUNT,
   SPIN_BUNDLE_MULTIPLIER
 } from '../constants.js';
-import { getWeightedSymbol, secureRandom, secureRandomInt } from '../utils.js';
+import { getWeightedSymbol, secureRandom, secureRandomInt, logError } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -334,14 +334,19 @@ async function buyShopItem(username, itemId, env) {
           }
         } catch (activationError) {
           // Rollback: Refund the balance and reverse bank update if item activation failed
-          console.error('Mystery Box activation failed, rolling back:', activationError);
+          logError('MysteryBox.activation', activationError, { username, mysteryItemId, mysteryItemName: mysteryResult.name });
           try {
             await Promise.all([
               setBalance(username, balance, env),
               updateBankBalance(-item.price, env) // Reverse the bank update
             ]);
+            // Verify rollback succeeded
+            const verifyBalance = await getBalance(username, env);
+            if (verifyBalance !== balance) {
+              logError('MysteryBox.rollback.verify', new Error('Balance mismatch after rollback'), { username, expected: balance, actual: verifyBalance });
+            }
           } catch (rollbackError) {
-            console.error('CRITICAL: Mystery Box rollback failed!', rollbackError);
+            logError('MysteryBox.rollback.CRITICAL', rollbackError, { username, originalBalance: balance, itemPrice: item.price });
             // At this point, manual intervention may be needed
           }
           return new Response(`@${username} ❌ Mystery Box Fehler! Dein Einsatz wurde zurückerstattet.`, { headers: RESPONSE_HEADERS });

@@ -288,19 +288,35 @@ async function addWinMultiplier(username, env) {
   }
 }
 
-async function consumeWinMultiplier(username, env) {
-  try {
-    const key = `winmulti:${username.toLowerCase()}`;
-    const value = await env.SLOTS_KV.get(key);
-    if (value === 'active') {
+async function consumeWinMultiplier(username, env, maxRetries = 3) {
+  const key = `winmulti:${username.toLowerCase()}`;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const value = await env.SLOTS_KV.get(key);
+      if (value !== 'active') {
+        return false; // Not active, nothing to consume
+      }
+
       await env.SLOTS_KV.delete(key);
-      return true;
+
+      // Verify deletion succeeded
+      const verify = await env.SLOTS_KV.get(key);
+      if (verify === null) {
+        return true; // Successfully consumed
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await exponentialBackoff(attempt);
+      }
+    } catch (error) {
+      console.error(`consumeWinMultiplier Error (attempt ${attempt + 1}):`, error);
+      if (attempt === maxRetries - 1) return false;
     }
-    return false;
-  } catch (error) {
-    console.error('consumeWinMultiplier Error:', error);
-    return false;
   }
+
+  return false; // All retries failed
 }
 
 export {

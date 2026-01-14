@@ -27,7 +27,8 @@ import {
   RAGE_MODE_LOSS_STACK,
   RAGE_MODE_MAX_STACK,
   RAGE_MODE_WIN_THRESHOLD,
-  BUFF_TTL_BUFFER_SECONDS
+  BUFF_TTL_BUFFER_SECONDS,
+  FREE_SPIN_COST_THRESHOLD
 } from '../constants.js';
 import { calculateBuffTTL } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
@@ -315,7 +316,7 @@ async function handleSlot(username, amountParam, url, env) {
     let multiplier = isFreeSpinUsed ? freeSpinMultiplier : (spinAmountResult.multiplier || 1);
 
     // Happy Hour check
-    if (!isFreeSpinUsed && spinCost < 1000) {
+    if (!isFreeSpinUsed && spinCost < FREE_SPIN_COST_THRESHOLD) {
       const hasHappyHour = await isBuffActive(username, 'happy_hour', env);
       if (hasHappyHour) {
         spinCost = Math.floor(spinCost / 2);

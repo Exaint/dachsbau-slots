@@ -276,7 +276,10 @@ async function handleSlot(username, amountParam, url, env) {
       hasHappyHour,
       hasGoldenHour,
       hasProfitDoubler,
-      currentStreakMulti
+      currentStreakMulti,
+      prestigeRank,
+      lastDaily,
+      hasDailyBoost
     ] = await Promise.all([
       isSelfBanned(username, env),
       hasAcceptedDisclaimer(username, env),
@@ -295,7 +298,10 @@ async function handleSlot(username, amountParam, url, env) {
       isBuffActive(username, 'happy_hour', env),
       isBuffActive(username, 'golden_hour', env),
       isBuffActive(username, 'profit_doubler', env),
-      getStreakMultiplier(username, env)
+      getStreakMultiplier(username, env),
+      getPrestigeRank(username, env),
+      getLastDaily(username, env),
+      hasUnlock(username, 'daily_boost', env)
     ]);
 
     // Selfban Check
@@ -409,18 +415,17 @@ async function handleSlot(username, amountParam, url, env) {
       await resetStreakMultiplier(username, env);
     }
 
-    // OPTIMIZED: Insurance check (pre-loaded insuranceCount)
+    // OPTIMIZED: Insurance check (pre-loaded insuranceCount and prestigeRank)
     if (!isFreeSpinUsed && result.points === 0 && !result.freeSpins && insuranceCount > 0) {
       const refund = Math.floor(spinCost * INSURANCE_REFUND_RATE);
       const newBalanceWithRefund = Math.max(0, Math.min(currentBalance - spinCost + refund, MAX_BALANCE));
 
-      const [, , , rank] = await Promise.all([
+      await Promise.all([
         setBalance(username, newBalanceWithRefund, env),
         updateStats(username, false, result.points, spinCost, env),
-        setInsuranceCount(username, insuranceCount - 1, env),
-        getPrestigeRank(username, env)
+        setInsuranceCount(username, insuranceCount - 1, env)
       ]);
-      const rankSymbol = rank ? `${rank} ` : '';
+      const rankSymbol = prestigeRank ? `${prestigeRank} ` : '';
 
       return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
     }
@@ -429,12 +434,11 @@ async function handleSlot(username, amountParam, url, env) {
     const totalBonuses = streakBonus + comboBonus;
     const newBalance = Math.max(0, Math.min(currentBalance - spinCost + result.points + totalBonuses, MAX_BALANCE));
 
-    // Final updates
+    // OPTIMIZED: Final updates (prestigeRank already pre-loaded)
     const finalUpdates = [
       setBalance(username, newBalance, env),
       updateStats(username, result.points > 0, result.points, spinCost, env),
       setLastSpin(username, now, env),
-      getPrestigeRank(username, env),
       getFreeSpins(username, env)
     ];
 
@@ -443,8 +447,8 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     const results = await Promise.all(finalUpdates);
-    const rank = results[3];
-    const remainingFreeSpins = results[4];
+    const rank = prestigeRank; // Pre-loaded
+    const remainingFreeSpins = results[3];
 
     let remainingCount = 0;
     try {
@@ -455,32 +459,23 @@ async function handleSlot(username, amountParam, url, env) {
       logError('handleSlot.getRemainingFreeSpins', error, { username });
     }
 
-    // Low Balance Warning
+    // OPTIMIZED: Low Balance Warning (lastDaily and hasDailyBoost pre-loaded)
     if (newBalance < LOW_BALANCE_WARNING) {
-      try {
-        const [lastDaily, hasBoost] = await Promise.all([
-          getLastDaily(username, env),
-          hasUnlock(username, 'daily_boost', env)
-        ]);
+      const nowDate = new Date(now);
+      const todayUTC = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
 
-        const nowDate = new Date(now);
-        const todayUTC = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
+      let dailyAvailable = !lastDaily;
+      if (lastDaily) {
+        const lastDailyDate = new Date(lastDaily);
+        const lastDailyUTC = Date.UTC(lastDailyDate.getUTCFullYear(), lastDailyDate.getUTCMonth(), lastDailyDate.getUTCDate());
+        dailyAvailable = todayUTC !== lastDailyUTC;
+      }
 
-        let dailyAvailable = !lastDaily;
-        if (lastDaily) {
-          const lastDailyDate = new Date(lastDaily);
-          const lastDailyUTC = Date.UTC(lastDailyDate.getUTCFullYear(), lastDailyDate.getUTCMonth(), lastDailyDate.getUTCDate());
-          dailyAvailable = todayUTC !== lastDailyUTC;
-        }
-
-        if (dailyAvailable) {
-          const dailyAmountValue = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
-          lossWarningMessage = lossWarningMessage
-            ? `${lossWarningMessage} ⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DachsTaler`
-            : `⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DachsTaler`;
-        }
-      } catch (error) {
-        logError('handleSlot.lowBalanceWarning', error, { username, newBalance });
+      if (dailyAvailable) {
+        const dailyAmountValue = hasDailyBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
+        lossWarningMessage = lossWarningMessage
+          ? `${lossWarningMessage} ⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DachsTaler`
+          : `⚠️ Niedriger Kontostand! Nutze !slots daily für +${dailyAmountValue} DachsTaler`;
       }
     }
 

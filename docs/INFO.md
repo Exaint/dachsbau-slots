@@ -17,9 +17,9 @@
 | Navigation | |
 |:-----------|:-----------|
 | [⚠️ Disclaimer](#-disclaimer) | [🚀 Schnellstart](#-schnellstart) |
-| [📋 Commands](#-commands) | [💎 Gewinne & Chancen](#-gewinne--chancen) |
-| [🛒 Shop-Übersicht](#-shop-übersicht) | [🏦 DachsBank](#-dachsbank) |
-| [❓ FAQ](#-faq) | [📜 Changelog](#-changelog) |
+| [⚠️ Wichtig zu wissen](#️-wichtig-zu-wissen) | [📋 Commands](#-commands) |
+| [💎 Gewinne & Chancen](#-gewinne--chancen) | [🛒 Shop-Übersicht](#-shop-übersicht) |
+| [🏦 DachsBank](#-dachsbank) | [❓ FAQ](#-faq) |
 
 ---
 
@@ -59,7 +59,46 @@ Du wirst sofort vom Spielen ausgeschlossen. **Nur Admins** (exaint_, frechhdachs
 | **2. Daily holen** | `!slots daily` | +50 DachsTaler alle 24 Stunden |
 | **3. Shop checken** | `!shop` | Power-Ups & Unlocks kaufen |
 
-> 💡 **Tipp:** Schreibe zwischen zwei `!slots` immer eine andere Nachricht (Fossabot-Limit)
+---
+
+## ⚠️ Wichtig zu wissen
+
+> **Diese Infos solltest du kennen, bevor du loslegst!**
+
+### 💰 Einsatz & Kosten
+
+| Info | Wert |
+|:-----|:-----|
+| **Mindesteinsatz** | 10 DachsTaler pro Spin |
+| **Startguthaben** | 100 DachsTaler (für neue Spieler) |
+| **Bei 0 DachsTaler** | Warte auf `!slots daily` (+50) oder bitte um Transfer |
+
+### ⏱️ Cooldowns
+
+| Command | Cooldown |
+|:--------|:---------|
+| `!slots` / `!slots [Einsatz]` | **30 Sekunden** |
+| `!slots daily` | **24 Stunden** (UTC Mitternacht) |
+| Alle anderen Commands | Kein Cooldown |
+
+### 🤖 Fossabot-Besonderheiten
+
+| Regel | Erklärung |
+|:------|:----------|
+| **Keine doppelten Nachrichten** | Schreibe zwischen zwei `!slots` immer eine andere Nachricht! Fossabot ignoriert identische aufeinanderfolgende Befehle. |
+| **Keine Leerzeichen nach @** | `!transfer @user 100` ✅ nicht `!transfer @ user 100` ❌ |
+| **Groß/Kleinschreibung egal** | `!SLOTS`, `!Slots`, `!slots` funktionieren alle |
+
+### 🎰 Höhere Einsätze
+
+> Höhere Einsätze (`!slots 20/30/50/100/all`) müssen **zuerst freigeschaltet** werden!
+
+Kaufe die Unlocks im Shop in dieser Reihenfolge:
+1. `!shop buy 13` → `!slots 20` (500 DT)
+2. `!shop buy 19` → `!slots 30` (2.000 DT)
+3. `!shop buy 21` → `!slots 50` (2.500 DT)
+4. `!shop buy 23` → `!slots 100` (3.250 DT)
+5. `!shop buy 25` → `!slots all` (4.444 DT)
 
 ---
 

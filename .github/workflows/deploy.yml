@@ -20,7 +20,7 @@ jobs:
           node-version: '20'
 
       - name: Install Wrangler
-        run: npm install -g wrangler@3
+        run: npm install -g wrangler
 
       - name: Deploy to Cloudflare Workers
         env:

@@ -1,6 +1,6 @@
 import { RESPONSE_HEADERS, URLS, KV_TRUE } from './constants.js';
 import { sanitizeUsername, isAdmin, getAdminList, logError } from './utils.js';
-import { isBlacklisted, setSelfBan } from './database.js';
+import { isBlacklisted, setSelfBan, hasAcceptedDisclaimer, setDisclaimerAccepted } from './database.js';
 
 // User commands
 import {
@@ -199,6 +199,15 @@ export default {
             await setSelfBan(cleanUsername, env);
             const adminList = getAdminList().join(', ');
             return new Response(`@${cleanUsername} ✅ Du wurdest vom Slots spielen ausgeschlossen. Nur Admins (${adminList}) können dich wieder freischalten. Wenn du Hilfe brauchst: ${URLS.INFO} 🦡`, { headers: RESPONSE_HEADERS });
+          }
+          if (lower === 'accept') {
+            // Accept disclaimer and start playing
+            const alreadyAccepted = await hasAcceptedDisclaimer(cleanUsername, env);
+            if (alreadyAccepted) {
+              return new Response(`@${cleanUsername} ✅ Du hast den Disclaimer bereits akzeptiert! Nutze einfach !slots zum Spielen 🎰`, { headers: RESPONSE_HEADERS });
+            }
+            await setDisclaimerAccepted(cleanUsername, env);
+            return new Response(`@${cleanUsername} ✅ Disclaimer akzeptiert! Du startest mit 100 DachsTaler. Viel Spaß beim Spielen! 🦡🎰 Nutze !slots zum Spinnen!`, { headers: RESPONSE_HEADERS });
           }
         }
 

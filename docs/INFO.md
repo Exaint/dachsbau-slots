@@ -55,9 +55,10 @@ Du wirst sofort vom Spielen ausgeschlossen. **Nur Admins** (exaint_, frechhdachs
 
 | Schritt | Command | Was passiert? |
 |:--------|:--------|:--------------|
-| **1. Spielen** | `!slots` | Dein erster Spin! Du startest mit 100 DachsTaler |
-| **2. Daily holen** | `!slots daily` | +50 DachsTaler alle 24 Stunden |
-| **3. Shop checken** | `!shop` | Power-Ups & Unlocks kaufen |
+| **1. Starten** | `!slots` | Zeigt Willkommensnachricht & Disclaimer |
+| **2. Akzeptieren** | `!slots accept` | Disclaimer akzeptieren, Account erstellen (100 DT) |
+| **3. Spielen** | `!slots` | Dein erster Spin! |
+| **4. Daily holen** | `!slots daily` | +50 DachsTaler alle 24 Stunden |
 
 ---
 

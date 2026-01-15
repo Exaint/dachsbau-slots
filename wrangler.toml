@@ -16,12 +16,8 @@ kv_namespaces = [
   { binding = "SLOTS_KV", id = "69477a8fb2aa400d9da5496bf6d52ef7" }
 ]
 
-[observability]
-[observability.logs]
-enabled = true
-head_sampling_rate = 1
-invocation_logs = true
-persist = true
+# Observability / Logging
+observability = { logs = { enabled = true, head_sampling_rate = 1, invocation_logs = true } }
 
 # Optional: Custom Domain
 # routes = [

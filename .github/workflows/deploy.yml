@@ -31,5 +31,4 @@ jobs:
           # Fix KV binding (Wrangler bug workaround)
           curl -X PATCH "https://api.cloudflare.com/client/v4/accounts/a532928aecc69ee43a6aafa158d4d788/workers/scripts/dachsbau-slots-github/settings" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"bindings":[{"type":"kv_namespace","name":"SLOTS_KV","namespace_id":"69477a8fb2aa400d9da5496bf6d52ef7"}]}'
+            -F 'settings={"bindings":[{"type":"kv_namespace","name":"SLOTS_KV","namespace_id":"69477a8fb2aa400d9da5496bf6d52ef7"}]}'

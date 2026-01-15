@@ -1,6 +1,6 @@
 /**
  * Configuration Constants - Core settings and limits
- * @version 1.1
+ * @version 1.2
  */
 
 export const RESPONSE_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8' };

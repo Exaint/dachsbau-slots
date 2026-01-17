@@ -597,22 +597,46 @@ async function incrementAchievementCounter(achievementId, env) {
 
 /**
  * Get global achievement statistics (how many players have each achievement)
+ * Calculates live from player data for accuracy
  */
 async function getAchievementStats(env) {
   try {
-    // Get total player count
-    const playerList = await env.SLOTS_KV.list({ prefix: 'user:', limit: 1000 });
-    const totalPlayers = playerList.keys ? playerList.keys.filter(k => k.name !== 'user:dachsbank').length : 0;
+    // Get all achievement records
+    const achievementList = await env.SLOTS_KV.list({ prefix: 'achievements:', limit: 1000 });
+    const achievementKeys = achievementList.keys || [];
 
-    // Get counts for all achievements
+    // Initialize counts
     const achievementIds = Object.values(ACHIEVEMENTS).map(a => a.id);
     const counts = {};
-
-    // Batch fetch achievement counts
     for (const id of achievementIds) {
-      const key = `achievement_count:${id}`;
-      const value = await env.SLOTS_KV.get(key);
-      counts[id] = parseInt(value, 10) || 0;
+      counts[id] = 0;
+    }
+
+    // Count achievements from all players
+    const totalPlayers = achievementKeys.length;
+
+    // Fetch all player achievement data in parallel (batch of 10 for performance)
+    const batchSize = 10;
+    for (let i = 0; i < achievementKeys.length; i += batchSize) {
+      const batch = achievementKeys.slice(i, i + batchSize);
+      const promises = batch.map(k => env.SLOTS_KV.get(k.name));
+      const results = await Promise.all(promises);
+
+      for (const data of results) {
+        if (!data) continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.unlockedAt) {
+            for (const achievementId of Object.keys(parsed.unlockedAt)) {
+              if (counts[achievementId] !== undefined) {
+                counts[achievementId]++;
+              }
+            }
+          }
+        } catch {
+          // Skip invalid data
+        }
+      }
     }
 
     return {

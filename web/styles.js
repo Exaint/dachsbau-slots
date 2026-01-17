@@ -5,6 +5,7 @@
 
 export const CSS = `
 :root {
+  /* Dark theme (default) */
   --bg-primary: #0e0e10;
   --bg-secondary: #18181b;
   --bg-tertiary: #1f1f23;
@@ -30,6 +31,18 @@ export const CSS = `
   --cat-special: #e040fb;
 }
 
+/* Light theme */
+[data-theme="light"] {
+  --bg-primary: #f7f7f8;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #efeff1;
+  --bg-card: #e5e5e8;
+  --text-primary: #0e0e10;
+  --text-secondary: #53535f;
+  --text-muted: #848494;
+  --border: #d2d2d7;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -42,6 +55,27 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   line-height: 1.5;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease-out;
 }
 
 .container {
@@ -188,6 +222,14 @@ body {
   border-radius: 8px;
   padding: 16px;
   text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: fadeIn 0.4s ease-out;
+  animation-fill-mode: both;
+}
+
+.stat-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .stat-value {
@@ -236,6 +278,43 @@ body {
   transition: width 0.3s ease;
 }
 
+/* Achievement Filter */
+.achievement-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-right: 4px;
+}
+
+.filter-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
 /* Achievement Categories */
 .categories {
   display: flex;
@@ -248,6 +327,8 @@ body {
   border-radius: 12px;
   border: 1px solid var(--border);
   overflow: hidden;
+  animation: fadeIn 0.4s ease-out;
+  animation-fill-mode: both;
 }
 
 .category-header {
@@ -312,20 +393,32 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  animation: fadeIn 0.3s ease-out;
+  animation-fill-mode: both;
 }
 
 .achievement:hover {
   transform: translateX(4px);
+  background: var(--bg-card);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .achievement.unlocked {
   border-left: 3px solid var(--success);
 }
 
+.achievement.unlocked:hover {
+  box-shadow: 0 4px 12px rgba(0, 245, 147, 0.15);
+}
+
 .achievement.locked {
   opacity: 0.6;
   border-left: 3px solid var(--border);
+}
+
+.achievement.locked:hover {
+  opacity: 0.8;
 }
 
 .achievement.hidden {
@@ -410,11 +503,14 @@ body {
   gap: 16px;
   padding: 14px 16px;
   border-radius: 8px;
-  transition: background 0.2s;
+  transition: background 0.2s ease, transform 0.2s ease;
+  animation: slideIn 0.3s ease-out;
+  animation-fill-mode: both;
 }
 
 .leaderboard-item:hover {
   background: var(--bg-tertiary);
+  transform: translateX(4px);
 }
 
 .leaderboard-rank {
@@ -512,6 +608,36 @@ body {
 .footer-link:hover {
   color: var(--dachs-gold);
   text-decoration: underline;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  transform: scale(1.05);
+}
+
+.theme-toggle-icon {
+  font-size: 1rem;
+  transition: transform 0.3s ease;
+}
+
+.theme-toggle:hover .theme-toggle-icon {
+  transform: rotate(20deg);
 }
 
 /* Navigation Bar (inline in header) */
@@ -686,7 +812,105 @@ body {
   font-size: 0.9rem;
 }
 
-/* Symbol Table */
+/* Section Intro */
+.section-intro {
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  font-size: 0.95rem;
+}
+
+/* Symbol Grid */
+.symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.symbol-card {
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  border: 1px solid var(--border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: fadeIn 0.4s ease-out;
+  animation-fill-mode: both;
+}
+
+.symbol-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.symbol-card.jackpot {
+  border-color: var(--dachs-gold);
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(255, 215, 0, 0.1) 100%);
+}
+
+.symbol-card.special {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(145, 71, 255, 0.1) 100%);
+}
+
+.symbol-icon {
+  font-size: 3rem;
+  margin-bottom: 8px;
+}
+
+.symbol-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+}
+
+.symbol-rarity {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.symbol-card.jackpot .symbol-rarity {
+  color: var(--dachs-gold);
+  font-weight: 600;
+}
+
+.symbol-card.special .symbol-rarity {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.symbol-wins {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.win-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  background: var(--bg-card);
+  border-radius: 4px;
+}
+
+.win-combo {
+  letter-spacing: -2px;
+}
+
+.win-amount {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.win-amount.gold {
+  color: var(--dachs-gold);
+}
+
+/* Legacy Symbol Table (kept for compatibility) */
 .symbol-table {
   display: flex;
   flex-direction: column;

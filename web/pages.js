@@ -245,6 +245,15 @@ function baseTemplate(title, content, activePage = '') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)} - Dachsbau Slots</title>
   <style>${CSS}</style>
+  <script>
+    // Theme handling - check localStorage, default to dark
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
 </head>
 <body>
   <header class="header">
@@ -261,6 +270,10 @@ function baseTemplate(title, content, activePage = '') {
         <input type="text" name="user" placeholder="Spielername..." class="search-input" required>
         <button type="submit" class="btn">Suchen</button>
       </form>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Theme wechseln">
+        <span class="theme-toggle-icon">🌙</span>
+        <span class="theme-toggle-label">Dark</span>
+      </button>
     </div>
   </header>
   <main class="container">
@@ -270,6 +283,74 @@ function baseTemplate(title, content, activePage = '') {
   <footer class="footer">
     <p>Dachsbau Slots - Made by Exaint für <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener" class="footer-link">@frechhdachs</a></p>
   </footer>
+  <script>
+    // Theme toggle function
+    function toggleTheme() {
+      const html = document.documentElement;
+      const currentTheme = html.getAttribute('data-theme');
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+      if (newTheme === 'light') {
+        html.setAttribute('data-theme', 'light');
+      } else {
+        html.removeAttribute('data-theme');
+      }
+
+      localStorage.setItem('theme', newTheme);
+      updateThemeButton(newTheme);
+    }
+
+    function updateThemeButton(theme) {
+      const icon = document.querySelector('.theme-toggle-icon');
+      const label = document.querySelector('.theme-toggle-label');
+      if (icon && label) {
+        icon.textContent = theme === 'light' ? '☀️' : '🌙';
+        label.textContent = theme === 'light' ? 'Light' : 'Dark';
+      }
+    }
+
+    // Update button on load
+    document.addEventListener('DOMContentLoaded', function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      updateThemeButton(theme);
+
+      // Achievement filter functionality
+      const filterBtns = document.querySelectorAll('.filter-btn');
+      if (filterBtns.length > 0) {
+        filterBtns.forEach(btn => {
+          btn.addEventListener('click', function() {
+            const filter = this.dataset.filter;
+
+            // Update active button
+            filterBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            // Filter achievements
+            const achievements = document.querySelectorAll('.achievement');
+            achievements.forEach(ach => {
+              const isUnlocked = ach.classList.contains('unlocked');
+              const isLocked = ach.classList.contains('locked');
+
+              if (filter === 'all') {
+                ach.style.display = '';
+              } else if (filter === 'unlocked') {
+                ach.style.display = isUnlocked ? '' : 'none';
+              } else if (filter === 'locked') {
+                ach.style.display = isLocked ? '' : 'none';
+              }
+            });
+
+            // Hide empty categories
+            const categories = document.querySelectorAll('.category');
+            categories.forEach(cat => {
+              const visibleAchievements = cat.querySelectorAll('.achievement:not([style*="display: none"])');
+              cat.style.display = visibleAchievements.length > 0 ? '' : 'none';
+            });
+          });
+        });
+      }
+    });
+  </script>
 </body>
 </html>`;
 }
@@ -428,6 +509,12 @@ function renderProfilePage(data) {
         </div>
       </div>
     </div>
+    <div class="achievement-filter">
+      <span class="filter-label">Filter:</span>
+      <button class="filter-btn active" data-filter="all">Alle</button>
+      <button class="filter-btn" data-filter="unlocked">Freigeschaltet</button>
+      <button class="filter-btn" data-filter="locked">Gesperrt</button>
+    </div>
     <div class="categories">
       ${categoriesHtml}
     </div>
@@ -583,51 +670,79 @@ function renderInfoPage() {
 
       <section class="content-section">
         <h2>💎 Gewinne & Symbole</h2>
-        <div class="symbol-table">
-          <div class="symbol-row header">
-            <span>Symbol</span>
-            <span>Triple</span>
-            <span>Pair</span>
+        <p class="section-intro">Je höher das Symbol in der Liste, desto wertvoller! Der Dachs ist das seltenste und wertvollste Symbol.</p>
+        <div class="symbol-grid">
+          <div class="symbol-card jackpot">
+            <div class="symbol-icon">🦡</div>
+            <div class="symbol-name">Dachs</div>
+            <div class="symbol-rarity">JACKPOT</div>
+            <div class="symbol-wins">
+              <div class="win-row"><span class="win-combo">🦡🦡🦡</span><span class="win-amount gold">15.000 DT</span></div>
+              <div class="win-row"><span class="win-combo">🦡🦡</span><span class="win-amount">2.500 DT</span></div>
+            </div>
           </div>
-          <div class="symbol-row">
-            <span>🦡 Dachs</span>
-            <span class="gold">15.000 DT</span>
-            <span>2.500 DT</span>
+          <div class="symbol-card special">
+            <div class="symbol-icon">💎</div>
+            <div class="symbol-name">Diamant</div>
+            <div class="symbol-rarity">FREE SPINS</div>
+            <div class="symbol-wins">
+              <div class="win-row"><span class="win-combo">💎💎💎</span><span class="win-amount">5 Free Spins</span></div>
+              <div class="win-row"><span class="win-combo">💎💎</span><span class="win-amount">1 Free Spin</span></div>
+            </div>
           </div>
-          <div class="symbol-row">
-            <span>💎 Diamant</span>
-            <span>5 Free Spins</span>
-            <span>1 Free Spin</span>
+          <div class="symbol-card">
+            <div class="symbol-icon">⭐</div>
+            <div class="symbol-name">Stern</div>
+            <div class="symbol-rarity">Sehr selten</div>
+            <div class="symbol-wins">
+              <div class="win-row"><span class="win-combo">⭐⭐⭐</span><span class="win-amount">500 DT</span></div>
+              <div class="win-row"><span class="win-combo">⭐⭐</span><span class="win-amount">50 DT</span></div>
+            </div>
           </div>
-          <div class="symbol-row">
-            <span>⭐ Stern</span>
-            <span>500 DT</span>
-            <span>50 DT</span>
+          <div class="symbol-card">
+            <div class="symbol-icon">🍉</div>
+            <div class="symbol-name">Melone</div>
+            <div class="symbol-rarity">Selten</div>
+            <div class="symbol-wins">
+              <div class="win-row"><span class="win-combo">🍉🍉🍉</span><span class="win-amount">250 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍉🍉</span><span class="win-amount">25 DT</span></div>
+            </div>
           </div>
-          <div class="symbol-row">
-            <span>🍉 Melone</span>
-            <span>250 DT</span>
-            <span>25 DT</span>
+          <div class="symbol-card">
+            <div class="symbol-icon">🍇</div>
+            <div class="symbol-name">Trauben</div>
+            <div class="symbol-rarity">Ungewöhnlich</div>
+            <div class="symbol-wins">
+              <div class="win-row"><span class="win-combo">🍇🍇🍇</span><span class="win-amount">150 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍇🍇</span><span class="win-amount">15 DT</span></div>
+            </div>
           </div>
-          <div class="symbol-row">
-            <span>🍇 Trauben</span>
-            <span>150 DT</span>
-            <span>15 DT</span>
+          <div class="symbol-card">
+            <div class="symbol-icon">🍊</div>
+            <div class="symbol-name">Orange</div>
+            <div class="symbol-rarity">Gewöhnlich</div>
+            <div class="symbol-wins">
+              <div class="win-row"><span class="win-combo">🍊🍊🍊</span><span class="win-amount">100 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍊🍊</span><span class="win-amount">10 DT</span></div>
+            </div>
           </div>
-          <div class="symbol-row">
-            <span>🍊 Orange</span>
-            <span>100 DT</span>
-            <span>10 DT</span>
+          <div class="symbol-card">
+            <div class="symbol-icon">🍋</div>
+            <div class="symbol-name">Zitrone</div>
+            <div class="symbol-rarity">Gewöhnlich</div>
+            <div class="symbol-wins">
+              <div class="win-row"><span class="win-combo">🍋🍋🍋</span><span class="win-amount">75 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍋🍋</span><span class="win-amount">8 DT</span></div>
+            </div>
           </div>
-          <div class="symbol-row">
-            <span>🍋 Zitrone</span>
-            <span>75 DT</span>
-            <span>8 DT</span>
-          </div>
-          <div class="symbol-row">
-            <span>🍒 Kirsche</span>
-            <span>50 DT</span>
-            <span>5 DT</span>
+          <div class="symbol-card">
+            <div class="symbol-icon">🍒</div>
+            <div class="symbol-name">Kirsche</div>
+            <div class="symbol-rarity">Häufig</div>
+            <div class="symbol-wins">
+              <div class="win-row"><span class="win-combo">🍒🍒🍒</span><span class="win-amount">50 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍒🍒</span><span class="win-amount">5 DT</span></div>
+            </div>
           </div>
         </div>
       </section>

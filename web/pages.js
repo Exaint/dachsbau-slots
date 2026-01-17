@@ -251,8 +251,11 @@ function baseTemplate(title, content, activePage = '') {
     <div class="header-content">
       <a href="?page=home" class="logo">
         <span class="logo-emoji">🦡</span>
-        <span>Dachsbau Slots</span>
+        <span class="logo-text">Dachsbau Slots</span>
       </a>
+      <nav class="nav-bar">
+        ${navHtml}
+      </nav>
       <form class="search-form" action="" method="get">
         <input type="hidden" name="page" value="profile">
         <input type="text" name="user" placeholder="Spielername..." class="search-input" required>
@@ -260,11 +263,6 @@ function baseTemplate(title, content, activePage = '') {
       </form>
     </div>
   </header>
-  <nav class="nav-bar">
-    <div class="nav-content">
-      ${navHtml}
-    </div>
-  </nav>
   <main class="container">
     ${DISCLAIMER_HTML}
     ${content}
@@ -403,9 +401,13 @@ function renderProfilePage(data) {
     `;
   }).join('');
 
+  // Generate avatar: Use DiceBear API for consistent avatars based on username
+  const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username)}&backgroundColor=9147ff`;
+
   const content = `
     <div class="profile-header">
       <div class="profile-name">
+        <img src="${avatarUrl}" alt="${escapeHtml(username)}" class="profile-avatar">
         ${escapeHtml(username)}
         ${rank ? `<span class="profile-rank">${escapeHtml(rank)}</span>` : ''}
       </div>

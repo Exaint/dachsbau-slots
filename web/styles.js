@@ -45,7 +45,7 @@ body {
 }
 
 .container {
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 20px;
 }
@@ -59,14 +59,12 @@ body {
 }
 
 .header-content {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 0 20px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
+  gap: 24px;
 }
 
 .logo {
@@ -154,6 +152,14 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  object-fit: cover;
 }
 
 .profile-rank {
@@ -502,40 +508,32 @@ body {
   text-decoration: underline;
 }
 
-/* Navigation Bar */
+/* Navigation Bar (inline in header) */
 .nav-bar {
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 0;
-}
-
-.nav-content {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 20px;
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
+  gap: 4px;
+  flex: 1;
 }
 
 .nav-item {
-  padding: 12px 16px;
+  padding: 8px 12px;
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
-  border-bottom: 2px solid transparent;
-  transition: color 0.2s, border-color 0.2s;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
 }
 
 .nav-item:hover {
   color: var(--text-primary);
+  background: var(--bg-tertiary);
 }
 
 .nav-item.active {
   color: var(--accent);
-  border-bottom-color: var(--accent);
+  background: var(--bg-tertiary);
 }
 
 /* Disclaimer */
@@ -854,6 +852,27 @@ body {
 }
 
 /* Responsive */
+@media (max-width: 768px) {
+  .header-content {
+    flex-wrap: wrap;
+  }
+
+  .nav-bar {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .logo .logo-text {
+    display: none;
+  }
+
+  .search-form {
+    flex: 1;
+  }
+}
+
 @media (max-width: 600px) {
   .header-content {
     flex-direction: column;
@@ -861,6 +880,15 @@ body {
   }
 
   .logo {
+    justify-content: center;
+  }
+
+  .logo .logo-text {
+    display: inline;
+  }
+
+  .nav-bar {
+    flex-wrap: wrap;
     justify-content: center;
   }
 
@@ -882,6 +910,11 @@ body {
 
   .profile-stats {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .profile-avatar {
+    width: 40px;
+    height: 40px;
   }
 
   .achievement {

@@ -591,7 +591,7 @@ function renderProfilePage(data) {
       <div class="profile-name">
         ${escapeHtml(username)}
         ${badgeHtml}
-        ${rank ? `<span class="profile-rank">${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
+        ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
       </div>
       ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
       ${statsHtml}

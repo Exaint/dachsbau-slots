@@ -4,7 +4,7 @@
  */
 
 import { CSS } from './styles.js';
-import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer } from '../database.js';
+import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive } from '../database.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
 import { logError } from '../utils.js';
 
@@ -26,6 +26,15 @@ const CATEGORY_NAMES = {
   [ACHIEVEMENT_CATEGORIES.DEDICATION]: 'Hingabe',
   [ACHIEVEMENT_CATEGORIES.SHOPPING]: 'Shopping',
   [ACHIEVEMENT_CATEGORIES.SPECIAL]: 'Spezial'
+};
+
+// Prestige rank names for display
+const PRESTIGE_RANK_NAMES = {
+  '🥉': 'Bronze',
+  '🥈': 'Silber',
+  '🥇': 'Gold',
+  '💎': 'Diamant',
+  '👑': 'Legende'
 };
 
 /**
@@ -78,10 +87,11 @@ async function handleProfilePage(url, env) {
   }
 
   // Fetch remaining data in parallel (balance already fetched above)
-  const [rank, stats, achievementData] = await Promise.all([
+  const [rank, stats, achievementData, lastActive] = await Promise.all([
     getPrestigeRank(username, env),
     getStats(username, env),
-    getPlayerAchievements(username, env)
+    getPlayerAchievements(username, env),
+    getLastActive(username, env)
   ]);
 
   const allAchievements = getAllAchievements();
@@ -125,7 +135,8 @@ async function handleProfilePage(url, env) {
     stats,
     achievements,
     byCategory,
-    pendingRewards: achievementData.pendingRewards
+    pendingRewards: achievementData.pendingRewards,
+    lastActive
   }));
 }
 
@@ -349,6 +360,69 @@ function baseTemplate(title, content, activePage = '') {
           });
         });
       }
+
+      // Search suggestions functionality
+      const searchInputs = document.querySelectorAll('.search-input');
+      searchInputs.forEach(input => {
+        let suggestionsContainer = null;
+        let debounceTimer = null;
+
+        // Create suggestions container
+        const wrapper = document.createElement('div');
+        wrapper.className = 'search-wrapper';
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+
+        suggestionsContainer = document.createElement('div');
+        suggestionsContainer.className = 'search-suggestions';
+        wrapper.appendChild(suggestionsContainer);
+
+        input.addEventListener('input', function() {
+          const query = this.value.trim();
+
+          clearTimeout(debounceTimer);
+          if (query.length < 2) {
+            suggestionsContainer.innerHTML = '';
+            suggestionsContainer.style.display = 'none';
+            return;
+          }
+
+          debounceTimer = setTimeout(async () => {
+            try {
+              const response = await fetch('?api=search&q=' + encodeURIComponent(query));
+              const data = await response.json();
+
+              if (data.players && data.players.length > 0) {
+                suggestionsContainer.innerHTML = data.players.map(player =>
+                  '<div class="suggestion-item" data-username="' + player + '">' + player + '</div>'
+                ).join('');
+                suggestionsContainer.style.display = 'block';
+              } else {
+                suggestionsContainer.innerHTML = '';
+                suggestionsContainer.style.display = 'none';
+              }
+            } catch (e) {
+              suggestionsContainer.style.display = 'none';
+            }
+          }, 200);
+        });
+
+        // Handle suggestion click
+        suggestionsContainer.addEventListener('click', function(e) {
+          if (e.target.classList.contains('suggestion-item')) {
+            input.value = e.target.dataset.username;
+            suggestionsContainer.style.display = 'none';
+            input.closest('form').submit();
+          }
+        });
+
+        // Hide suggestions on blur
+        input.addEventListener('blur', function() {
+          setTimeout(() => {
+            suggestionsContainer.style.display = 'none';
+          }, 200);
+        });
+      });
     });
   </script>
 </body>
@@ -388,11 +462,32 @@ function renderHomePage(errorMessage = null) {
  * Profile page
  */
 function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, pendingRewards } = data;
+  const { username, balance, rank, stats, achievements, byCategory, pendingRewards, lastActive } = data;
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
   const progressPercent = Math.round((unlockedCount / totalCount) * 100);
+
+  // Format last active time
+  const formatLastActive = (timestamp) => {
+    if (!timestamp) return null;
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'Gerade eben';
+    if (minutes < 60) return `Vor ${minutes} Minute${minutes !== 1 ? 'n' : ''}`;
+    if (hours < 24) return `Vor ${hours} Stunde${hours !== 1 ? 'n' : ''}`;
+    if (days < 7) return `Vor ${days} Tag${days !== 1 ? 'en' : ''}`;
+
+    // Format as date for older entries
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const lastActiveText = formatLastActive(lastActive);
 
   // Stats display
   const statsHtml = `
@@ -496,8 +591,9 @@ function renderProfilePage(data) {
       <div class="profile-name">
         ${escapeHtml(username)}
         ${badgeHtml}
-        ${rank ? `<span class="profile-rank">${escapeHtml(rank)}</span>` : ''}
+        ${rank ? `<span class="profile-rank">${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
       </div>
+      ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
       ${statsHtml}
       <div class="achievement-summary">
         <div class="achievement-count">

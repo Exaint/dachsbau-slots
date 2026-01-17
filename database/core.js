@@ -142,6 +142,25 @@ async function isBlacklisted(username, env) {
   }
 }
 
+// Last Active tracking
+async function getLastActive(username, env) {
+  try {
+    const value = await env.SLOTS_KV.get(`lastActive:${username.toLowerCase()}`);
+    return value ? parseInt(value, 10) : null;
+  } catch (error) {
+    logError('getLastActive', error, { username });
+    return null;
+  }
+}
+
+async function setLastActive(username, env) {
+  try {
+    await env.SLOTS_KV.put(`lastActive:${username.toLowerCase()}`, Date.now().toString());
+  } catch (error) {
+    logError('setLastActive', error, { username });
+  }
+}
+
 export {
   getBalance,
   setBalance,
@@ -154,5 +173,7 @@ export {
   isSelfBanned,
   setSelfBan,
   removeSelfBan,
-  isBlacklisted
+  isBlacklisted,
+  getLastActive,
+  setLastActive
 };

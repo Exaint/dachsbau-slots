@@ -145,6 +145,45 @@ body {
   color: var(--text-muted);
 }
 
+/* Search Suggestions */
+.search-wrapper {
+  position: relative;
+}
+
+.search-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-top: 4px;
+  z-index: 100;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.suggestion-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.suggestion-item:first-child {
+  border-radius: 6px 6px 0 0;
+}
+
+.suggestion-item:last-child {
+  border-radius: 0 0 6px 6px;
+}
+
 .btn {
   background: var(--accent);
   color: white;
@@ -200,6 +239,12 @@ body {
   font-weight: 500;
   color: var(--accent);
   margin-left: 8px;
+}
+
+.profile-last-active {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
 }
 
 .profile-rank {
@@ -898,7 +943,7 @@ body {
 }
 
 .win-combo {
-  letter-spacing: -2px;
+  letter-spacing: 2px;
 }
 
 .win-amount {

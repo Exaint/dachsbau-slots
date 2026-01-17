@@ -55,6 +55,7 @@ import {
   hasAcceptedDisclaimer,
   setDisclaimerAccepted,
   isSelfBanned,
+  setLastActive,
   hasGuaranteedPair,
   hasWildCard,
   getFreeSpins,
@@ -573,6 +574,7 @@ async function handleSlot(username, amountParam, url, env) {
       setBalance(username, newBalance, env),
       updateStats(username, result.points > 0, result.points, spinCost, env),
       setLastSpin(username, now, env),
+      setLastActive(username, env),
       getFreeSpins(username, env)
     ];
 
@@ -582,7 +584,7 @@ async function handleSlot(username, amountParam, url, env) {
 
     const results = await Promise.all(finalUpdates);
     const rank = prestigeRank; // Pre-loaded
-    const remainingFreeSpins = results[3];
+    const remainingFreeSpins = results[4]; // Index shifted due to setLastActive
 
     let remainingCount = 0;
     try {

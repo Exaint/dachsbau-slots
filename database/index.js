@@ -28,7 +28,9 @@ export {
   isSelfBanned,
   setSelfBan,
   removeSelfBan,
-  isBlacklisted
+  isBlacklisted,
+  getLastActive,
+  setLastActive
 } from './core.js';
 
 // Buff system

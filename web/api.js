@@ -26,6 +26,8 @@ export async function handleApi(api, url, env) {
         return await handleProfileApi(username, env);
       case 'leaderboard':
         return await handleLeaderboardApi(env);
+      case 'search':
+        return await handleSearchApi(url.searchParams.get('q'), env);
       default:
         return jsonResponse({ error: 'Unknown API endpoint' }, 404);
     }
@@ -231,6 +233,41 @@ function getStatKeyForAchievement(achievementId) {
     'shop_100': 'shopPurchases'
   };
   return mapping[achievementId] || null;
+}
+
+/**
+ * Search for players by username prefix
+ */
+async function handleSearchApi(query, env) {
+  if (!query || query.length < 2) {
+    return jsonResponse({ players: [] });
+  }
+
+  const searchQuery = query.toLowerCase();
+  const SEARCH_LIMIT = 500;
+
+  try {
+    const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: SEARCH_LIMIT });
+
+    if (!listResult.keys || listResult.keys.length === 0) {
+      return jsonResponse({ players: [] });
+    }
+
+    // Filter usernames that match the search query
+    const matches = [];
+    for (const key of listResult.keys) {
+      const username = key.name.replace('user:', '');
+      if (username.toLowerCase().startsWith(searchQuery) && username.toLowerCase() !== 'dachsbank') {
+        matches.push(username);
+        if (matches.length >= 10) break; // Limit to 10 suggestions
+      }
+    }
+
+    return jsonResponse({ players: matches });
+  } catch (error) {
+    logError('handleSearchApi', error, { query });
+    return jsonResponse({ players: [] });
+  }
 }
 
 /**

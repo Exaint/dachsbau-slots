@@ -154,12 +154,18 @@ body {
   gap: 12px;
 }
 
-.profile-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: 2px solid var(--accent);
-  object-fit: cover;
+.profile-badge {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+
+.profile-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--accent);
+  margin-left: 8px;
 }
 
 .profile-rank {
@@ -912,9 +918,11 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .profile-avatar {
-    width: 40px;
-    height: 40px;
+  .profile-title {
+    display: block;
+    margin-left: 0;
+    margin-top: 4px;
+    font-size: 0.8rem;
   }
 
   .achievement {

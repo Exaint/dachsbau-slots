@@ -401,14 +401,17 @@ function renderProfilePage(data) {
     `;
   }).join('');
 
-  // Generate avatar: Use DiceBear API for consistent avatars based on username
-  const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(username)}&backgroundColor=9147ff`;
+  // Special badge for exaint_ (Lead-Mod / Admin)
+  const isAdmin = username.toLowerCase() === 'exaint_';
+  const adminBadgeHtml = isAdmin
+    ? `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Mod" class="profile-badge" title="Lead-Mod"><span class="profile-title">Head-Mod / Dachsbau-Slots Admin</span>`
+    : '';
 
   const content = `
     <div class="profile-header">
       <div class="profile-name">
-        <img src="${avatarUrl}" alt="${escapeHtml(username)}" class="profile-avatar">
         ${escapeHtml(username)}
+        ${adminBadgeHtml}
         ${rank ? `<span class="profile-rank">${escapeHtml(rank)}</span>` : ''}
       </div>
       ${statsHtml}

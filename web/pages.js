@@ -5,7 +5,7 @@
 
 import { CSS } from './styles.js';
 import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer } from '../database.js';
-import { getAllAchievements, ACHIEVEMENT_CATEGORIES } from '../constants.js';
+import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
 import { logError } from '../utils.js';
 
 const CATEGORY_ICONS = {
@@ -40,6 +40,12 @@ export async function handleWebPage(page, url, env) {
         return await handleProfilePage(url, env);
       case 'leaderboard':
         return await handleLeaderboardPage(env);
+      case 'info':
+        return htmlResponse(renderInfoPage());
+      case 'shop':
+        return htmlResponse(renderShopPage());
+      case 'changelog':
+        return htmlResponse(renderChangelogPage());
       default:
         return htmlResponse(renderNotFoundPage());
     }
@@ -144,9 +150,11 @@ async function handleLeaderboardPage(env) {
       for (let j = 0; j < batch.length; j++) {
         if (balances[j]) {
           const balance = parseInt(balances[j], 10);
-          if (!isNaN(balance) && balance > 0) {
+          const username = batch[j].name.replace('user:', '');
+          // Filter out DachsBank (not a real player)
+          if (!isNaN(balance) && balance > 0 && username.toLowerCase() !== 'dachsbank') {
             users.push({
-              username: batch[j].name.replace('user:', ''),
+              username,
               balance
             });
           }
@@ -193,12 +201,38 @@ function getStatKeyForAchievement(achievementId) {
   return mapping[achievementId] || null;
 }
 
+// ==================== DISCLAIMER ====================
+
+const DISCLAIMER_HTML = `
+<div class="disclaimer">
+  <div class="disclaimer-icon">⚠️</div>
+  <div class="disclaimer-content">
+    <p><strong>Dachsbau Slots ist ein reines Unterhaltungsspiel.</strong> Es werden keine echten Geldbetraege verwendet.</p>
+    <p><strong>DachsTaler (DT)</strong> sind eine rein virtuelle Waehrung ohne jeglichen realen Geldwert. Sie koennen nicht in echtes Geld umgetauscht werden.</p>
+    <p>Die Streamerin <strong>frechhdachs</strong> distanziert sich ausdruecklich von echtem Gluecksspiel und uebernimmt keine Haftung. Spiel lieber hier im Dachsbau - du kannst nicht ins Minus rutschen! 🦡</p>
+  </div>
+</div>
+`;
+
 // ==================== HTML RENDERERS ====================
 
 /**
- * Base HTML template
+ * Base HTML template with navigation
  */
-function baseTemplate(title, content) {
+function baseTemplate(title, content, activePage = '') {
+  const navItems = [
+    { page: 'home', label: 'Start', icon: '🏠' },
+    { page: 'info', label: 'Info', icon: 'ℹ️' },
+    { page: 'shop', label: 'Shop', icon: '🛒' },
+    { page: 'changelog', label: 'Changelog', icon: '📜' },
+    { page: 'leaderboard', label: 'Leaderboard', icon: '🏆' }
+  ];
+
+  const navHtml = navItems.map(item => {
+    const isActive = activePage === item.page ? ' active' : '';
+    return `<a href="?page=${item.page}" class="nav-item${isActive}">${item.icon} ${item.label}</a>`;
+  }).join('');
+
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -221,11 +255,17 @@ function baseTemplate(title, content) {
       </form>
     </div>
   </header>
+  <nav class="nav-bar">
+    <div class="nav-content">
+      ${navHtml}
+    </div>
+  </nav>
   <main class="container">
+    ${DISCLAIMER_HTML}
     ${content}
   </main>
   <footer class="footer">
-    <p>Dachsbau Slots - Ein Twitch Chat Spiel</p>
+    <p>Dachsbau Slots - Made by Exaint fuer <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener" class="footer-link">@frechhdachs</a></p>
   </footer>
 </body>
 </html>`;
@@ -257,7 +297,7 @@ function renderHomePage(errorMessage = null) {
     </div>
   `;
 
-  return baseTemplate('Home', content);
+  return baseTemplate('Home', content, 'home');
 }
 
 /**
@@ -380,7 +420,7 @@ function renderProfilePage(data) {
     </div>
   `;
 
-  return baseTemplate(`${username}'s Profil`, content);
+  return baseTemplate(`${username}'s Profil`, content, 'profile');
 }
 
 /**
@@ -417,7 +457,348 @@ function renderLeaderboardPage(players) {
     </div>
   `;
 
-  return baseTemplate('Leaderboard', content);
+  return baseTemplate('Leaderboard', content, 'leaderboard');
+}
+
+/**
+ * Info page
+ */
+function renderInfoPage() {
+  const content = `
+    <div class="content-page">
+      <h1 class="page-title">ℹ️ Info & Commands</h1>
+
+      <section class="content-section">
+        <h2>🚀 Schnellstart</h2>
+        <div class="info-table">
+          <div class="info-row">
+            <span class="info-step">1. Starten</span>
+            <code>!slots</code>
+            <span>Zeigt Willkommensnachricht & Disclaimer</span>
+          </div>
+          <div class="info-row">
+            <span class="info-step">2. Akzeptieren</span>
+            <code>!slots accept</code>
+            <span>Disclaimer akzeptieren, Account erstellen (100 DT)</span>
+          </div>
+          <div class="info-row">
+            <span class="info-step">3. Spielen</span>
+            <code>!slots</code>
+            <span>Dein erster Spin!</span>
+          </div>
+          <div class="info-row">
+            <span class="info-step">4. Daily holen</span>
+            <code>!slots daily</code>
+            <span>+50 DachsTaler alle 24 Stunden</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section">
+        <h2>📋 Haupt-Commands</h2>
+        <div class="command-list">
+          <div class="command-item">
+            <code>!slots</code>
+            <span>Spin fuer 10 DachsTaler (30 Sek Cooldown)</span>
+          </div>
+          <div class="command-item">
+            <code>!slots [20/30/50/100/all]</code>
+            <span>Hoehere Einsaetze (benoetigtt Unlock)</span>
+          </div>
+          <div class="command-item">
+            <code>!slots daily</code>
+            <span>Taeglicher Bonus (+50 DachsTaler)</span>
+          </div>
+          <div class="command-item">
+            <code>!slots balance</code>
+            <span>Kontostand & Free Spins anzeigen</span>
+          </div>
+          <div class="command-item">
+            <code>!slots buffs</code>
+            <span>Alle aktiven Buffs anzeigen</span>
+          </div>
+          <div class="command-item">
+            <code>!slots lb</code>
+            <span>Top 5 Leaderboard</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section">
+        <h2>🛒 Shop & Transfer</h2>
+        <div class="command-list">
+          <div class="command-item">
+            <code>!shop</code>
+            <span>Shop-Link anzeigen</span>
+          </div>
+          <div class="command-item">
+            <code>!shop buy [Nr]</code>
+            <span>Item kaufen (z.B. !shop buy 38)</span>
+          </div>
+          <div class="command-item">
+            <code>!transfer @user [Betrag]</code>
+            <span>DachsTaler senden (1-100.000)</span>
+          </div>
+          <div class="command-item">
+            <code>!transfer @dachsbank [Betrag]</code>
+            <span>An Bank spenden</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section">
+        <h2>⚔️ Duell-Commands</h2>
+        <div class="command-list">
+          <div class="command-item">
+            <code>!slots duel @user [Betrag]</code>
+            <span>Fordere jemanden zum Duell heraus (min. 100 DT)</span>
+          </div>
+          <div class="command-item">
+            <code>!slots duelaccept</code>
+            <span>Nimm eine Herausforderung an</span>
+          </div>
+          <div class="command-item">
+            <code>!slots dueldecline</code>
+            <span>Lehne eine Herausforderung ab</span>
+          </div>
+          <div class="command-item">
+            <code>!slots duelopt out/in</code>
+            <span>Duelle deaktivieren/aktivieren</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section">
+        <h2>💎 Gewinne & Symbole</h2>
+        <div class="symbol-table">
+          <div class="symbol-row header">
+            <span>Symbol</span>
+            <span>Triple</span>
+            <span>Pair</span>
+          </div>
+          <div class="symbol-row">
+            <span>🦡 Dachs</span>
+            <span class="gold">15.000 DT</span>
+            <span>2.500 DT</span>
+          </div>
+          <div class="symbol-row">
+            <span>💎 Diamant</span>
+            <span>5 Free Spins</span>
+            <span>1 Free Spin</span>
+          </div>
+          <div class="symbol-row">
+            <span>⭐ Stern</span>
+            <span>500 DT</span>
+            <span>50 DT</span>
+          </div>
+          <div class="symbol-row">
+            <span>🍉 Melone</span>
+            <span>250 DT</span>
+            <span>25 DT</span>
+          </div>
+          <div class="symbol-row">
+            <span>🍇 Trauben</span>
+            <span>150 DT</span>
+            <span>15 DT</span>
+          </div>
+          <div class="symbol-row">
+            <span>🍊 Orange</span>
+            <span>100 DT</span>
+            <span>10 DT</span>
+          </div>
+          <div class="symbol-row">
+            <span>🍋 Zitrone</span>
+            <span>75 DT</span>
+            <span>8 DT</span>
+          </div>
+          <div class="symbol-row">
+            <span>🍒 Kirsche</span>
+            <span>50 DT</span>
+            <span>5 DT</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section">
+        <h2>📞 Hilfe bei Gluecksspielproblemen</h2>
+        <div class="help-table">
+          <div class="help-row">
+            <span>🇩🇪 Deutschland</span>
+            <span>0800 - 1 37 27 00</span>
+            <a href="https://check-dein-spiel.de" target="_blank" rel="noopener">check-dein-spiel.de</a>
+          </div>
+          <div class="help-row">
+            <span>🇦🇹 Oesterreich</span>
+            <span>0800 - 20 20 11</span>
+            <a href="https://spielsuchthilfe.at" target="_blank" rel="noopener">spielsuchthilfe.at</a>
+          </div>
+          <div class="help-row">
+            <span>🇨🇭 Schweiz</span>
+            <span>0800 - 040 080</span>
+            <a href="https://sos-spielsucht.ch" target="_blank" rel="noopener">sos-spielsucht.ch</a>
+          </div>
+        </div>
+        <p style="margin-top: 16px; color: var(--text-secondary);">
+          Du kannst dich jederzeit mit <code>!slots selfban</code> selbst vom Spielen ausschliessen.
+          Nur Admins koennen den Selfban wieder aufheben.
+        </p>
+      </section>
+    </div>
+  `;
+
+  return baseTemplate('Info & Commands', content, 'info');
+}
+
+/**
+ * Shop page
+ */
+function renderShopPage() {
+  // Group items by type
+  const itemsByType = {
+    instant: [],
+    boost: [],
+    timed: [],
+    uses: [],
+    unlock: [],
+    prestige: []
+  };
+
+  Object.entries(SHOP_ITEMS).forEach(([id, item]) => {
+    const type = item.type || 'instant';
+    if (itemsByType[type]) {
+      itemsByType[type].push({ id: parseInt(id, 10), ...item });
+    }
+  });
+
+  const renderItemGroup = (title, icon, items) => {
+    if (items.length === 0) return '';
+
+    const itemsHtml = items.map(item => `
+      <div class="shop-item">
+        <div class="shop-item-header">
+          <span class="shop-item-id">#${item.id}</span>
+          <span class="shop-item-name">${escapeHtml(item.name)}</span>
+          <span class="shop-item-price">${formatNumber(item.price)} DT</span>
+        </div>
+        <div class="shop-item-command">!shop buy ${item.id}</div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="shop-category">
+        <h3 class="shop-category-title">${icon} ${title}</h3>
+        <div class="shop-items">
+          ${itemsHtml}
+        </div>
+      </div>
+    `;
+  };
+
+  const content = `
+    <div class="content-page">
+      <h1 class="page-title">🛒 Shop</h1>
+      <p class="page-subtitle">Kaufe Items mit <code>!shop buy [Nummer]</code> im Twitch Chat</p>
+
+      ${renderItemGroup('Instant Items', '⚡', itemsByType.instant)}
+      ${renderItemGroup('Symbol-Boosts', '🔥', itemsByType.boost)}
+      ${renderItemGroup('Timed Buffs', '⏰', itemsByType.timed)}
+      ${renderItemGroup('Uses Items', '🔢', itemsByType.uses)}
+      ${renderItemGroup('Unlocks', '🔓', itemsByType.unlock)}
+      ${renderItemGroup('Prestige Raenge', '👑', itemsByType.prestige)}
+    </div>
+  `;
+
+  return baseTemplate('Shop', content, 'shop');
+}
+
+/**
+ * Changelog page
+ */
+function renderChangelogPage() {
+  const content = `
+    <div class="content-page">
+      <h1 class="page-title">📜 Changelog</h1>
+      <p class="page-subtitle">Aktuelle Version: 1.6.0 - "Duell-System"</p>
+
+      <section class="changelog-entry">
+        <h2>Version 1.6.0 - "Duell-System" <span class="changelog-date">17. Januar 2026</span></h2>
+        <div class="changelog-content">
+          <h3>⚔️ Neues Feature: Duell-System</h3>
+          <ul>
+            <li>Fordere andere Spieler zum direkten Slot-Duell heraus</li>
+            <li>Faire 1v1 Battles ohne Buffs oder Items</li>
+            <li>Mindesteinsatz: 100 DachsTaler</li>
+            <li>60 Sekunden Zeit zum Antworten</li>
+          </ul>
+          <h3>🎮 Neue Commands</h3>
+          <ul>
+            <li><code>!slots duel @user [Betrag]</code> - Duell starten</li>
+            <li><code>!slots duelaccept</code> - Annehmen</li>
+            <li><code>!slots dueldecline</code> - Ablehnen</li>
+            <li><code>!slots duelopt out/in</code> - Opt-Out</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="changelog-entry">
+        <h2>Version 1.5.3 - "Bug Fixes" <span class="changelog-date">6. Januar 2026</span></h2>
+        <div class="changelog-content">
+          <ul>
+            <li>Bank-Balance bei Random-Reward-Items korrigiert</li>
+            <li>Mystery Box Rollback bei Fehlern</li>
+            <li>Balance-Protection gegen negative Werte</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="changelog-entry">
+        <h2>Version 1.5.0 - "Modular Architecture" <span class="changelog-date">5. Januar 2026</span></h2>
+        <div class="changelog-content">
+          <ul>
+            <li>40-50% schnellere Response-Zeit</li>
+            <li>Modulares Code-System</li>
+            <li>Optimierte KV-Operationen</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="changelog-entry">
+        <h2>Version 1.4.0 - "Winter Update" <span class="changelog-date">27. Dezember 2025</span></h2>
+        <div class="changelog-content">
+          <ul>
+            <li>Streak Multiplier System (kostenlos!)</li>
+            <li>Wild Card System (Item #38)</li>
+            <li>Guaranteed Pair (Item #37)</li>
+            <li>Diamond Rush (Item #39)</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="changelog-entry">
+        <h2>Version 1.3.0 - "Monthly Login Update" <span class="changelog-date">26. Dezember 2025</span></h2>
+        <div class="changelog-content">
+          <ul>
+            <li>Monthly Login System mit Milestone-Boni</li>
+            <li>Bis zu 3.250 DT extra pro Monat</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="changelog-entry">
+        <h2>Version 1.0.0 - "Initial Release" <span class="changelog-date">21. Dezember 2025</span></h2>
+        <div class="changelog-content">
+          <ul>
+            <li>Slot Machine mit 3x3 Grid</li>
+            <li>DachsTaler Waehrung</li>
+            <li>Shop-System mit 30+ Items</li>
+            <li>Prestige-Raenge</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  `;
+
+  return baseTemplate('Changelog', content, 'changelog');
 }
 
 /**

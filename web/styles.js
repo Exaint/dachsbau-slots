@@ -492,6 +492,367 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.footer-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  color: var(--dachs-gold);
+  text-decoration: underline;
+}
+
+/* Navigation Bar */
+.nav-bar {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.nav-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.nav-item {
+  padding: 12px 16px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.nav-item:hover {
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Disclaimer */
+.disclaimer {
+  background: var(--bg-secondary);
+  border: 1px solid var(--warning);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.disclaimer-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.disclaimer-content {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.disclaimer-content p {
+  margin-bottom: 8px;
+}
+
+.disclaimer-content p:last-child {
+  margin-bottom: 0;
+}
+
+.disclaimer-content strong {
+  color: var(--text-primary);
+}
+
+/* Content Pages */
+.content-page {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 24px;
+}
+
+.page-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.page-subtitle {
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.page-subtitle code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.content-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.content-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.content-section h2 {
+  font-size: 1.3rem;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.content-section h3 {
+  font-size: 1.1rem;
+  margin: 16px 0 12px;
+  color: var(--text-secondary);
+}
+
+/* Info Table */
+.info-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: 120px 150px 1fr;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  align-items: center;
+}
+
+.info-step {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.info-row code {
+  background: var(--bg-card);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+/* Command List */
+.command-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.command-item {
+  display: flex;
+  gap: 16px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  align-items: center;
+}
+
+.command-item code {
+  background: var(--bg-card);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  min-width: 200px;
+}
+
+.command-item span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Symbol Table */
+.symbol-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.symbol-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.symbol-row.header {
+  background: var(--bg-card);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.symbol-row .gold {
+  color: var(--dachs-gold);
+  font-weight: 600;
+}
+
+/* Help Table */
+.help-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.help-row {
+  display: grid;
+  grid-template-columns: 140px 160px 1fr;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  align-items: center;
+}
+
+.help-row a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.help-row a:hover {
+  text-decoration: underline;
+}
+
+/* Shop */
+.shop-category {
+  margin-bottom: 24px;
+}
+
+.shop-category:last-child {
+  margin-bottom: 0;
+}
+
+.shop-category-title {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.shop-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shop-item {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 12px 16px;
+}
+
+.shop-item-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.shop-item-id {
+  background: var(--bg-card);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.shop-item-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.shop-item-price {
+  color: var(--dachs-gold);
+  font-weight: 600;
+}
+
+.shop-item-command {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+/* Changelog */
+.changelog-entry {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.changelog-entry:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.changelog-entry h2 {
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.changelog-date {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.changelog-content {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.changelog-content h3 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+  color: var(--text-primary);
+}
+
+.changelog-content ul {
+  margin: 0 0 16px 20px;
+  color: var(--text-secondary);
+}
+
+.changelog-content ul:last-child {
+  margin-bottom: 0;
+}
+
+.changelog-content li {
+  margin-bottom: 4px;
+}
+
+.changelog-content code {
+  background: var(--bg-card);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .header-content {

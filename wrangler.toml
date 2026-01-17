@@ -33,4 +33,4 @@ invocation_logs = true
 # Optional: Custom Limits (meistens nicht nötig)
 # limits = { cpu_ms = 50 }
 
-# Test: Worker renamed to dachsbau-slots
+# Worker renamed to dachsbau-slots (v2)

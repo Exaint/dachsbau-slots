@@ -74,8 +74,55 @@ body {
   50% { transform: scale(1.05); }
 }
 
+@keyframes confettiFall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes celebratePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+  50% { transform: scale(1.02); box-shadow: 0 0 30px 10px rgba(255, 215, 0, 0.2); }
+}
+
 .fade-in {
   animation: fadeIn 0.4s ease-out;
+}
+
+/* Confetti */
+.confetti-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  animation: confettiFall 4s linear forwards;
+}
+
+.profile-header.complete {
+  animation: celebratePulse 2s ease-in-out infinite;
+  border-color: var(--dachs-gold);
+}
+
+.complete-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, var(--dachs-gold), #ffaa00);
+  color: #000;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: 12px;
 }
 
 .container {
@@ -494,6 +541,20 @@ body {
 .achievement-desc {
   font-size: 0.85rem;
   color: var(--text-secondary);
+}
+
+.achievement-rarity {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.achievement-rarity::before {
+  content: '👥';
+  font-size: 0.7rem;
 }
 
 .achievement-reward {

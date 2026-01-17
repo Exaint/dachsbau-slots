@@ -109,5 +109,6 @@ export {
   checkBigWinAchievements,
   getPendingRewards,
   claimPendingRewards,
-  getUnlockedAchievementCount
+  getUnlockedAchievementCount,
+  getAchievementStats
 } from './achievements.js';

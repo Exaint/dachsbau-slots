@@ -4,7 +4,7 @@
  */
 
 import { CSS } from './styles.js';
-import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive } from '../database.js';
+import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats } from '../database.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
 import { logError } from '../utils.js';
 
@@ -87,16 +87,18 @@ async function handleProfilePage(url, env) {
   }
 
   // Fetch remaining data in parallel (balance already fetched above)
-  const [rank, stats, achievementData, lastActive] = await Promise.all([
+  const [rank, stats, achievementData, lastActive, achievementStats] = await Promise.all([
     getPrestigeRank(username, env),
     getStats(username, env),
     getPlayerAchievements(username, env),
-    getLastActive(username, env)
+    getLastActive(username, env),
+    getAchievementStats(env)
   ]);
 
   const allAchievements = getAllAchievements();
 
-  // Build achievements with unlock status
+  // Build achievements with unlock status and rarity
+  const { totalPlayers, counts } = achievementStats;
   const achievements = allAchievements.map(ach => {
     const unlocked = !!achievementData.unlockedAt[ach.id];
     const unlockedAt = achievementData.unlockedAt[ach.id] || null;
@@ -114,11 +116,20 @@ async function handleProfilePage(url, env) {
       }
     }
 
+    // Calculate rarity percentage
+    const unlockCount = counts[ach.id] || 0;
+    const rarityPercent = totalPlayers > 0 ? Math.round((unlockCount / totalPlayers) * 100) : 0;
+
     return {
       ...ach,
       unlocked,
       unlockedAt,
-      progress
+      progress,
+      rarity: {
+        percent: rarityPercent,
+        count: unlockCount,
+        total: totalPlayers
+      }
     };
   });
 
@@ -423,6 +434,31 @@ function baseTemplate(title, content, activePage = '') {
           }, 200);
         });
       });
+
+      // Confetti effect for 100% completion
+      const confettiContainer = document.getElementById('confetti');
+      if (confettiContainer) {
+        const colors = ['#ffd700', '#ff6b9d', '#00f593', '#9147ff', '#00bfff', '#ff7f50'];
+        const shapes = ['■', '●', '▲', '★', '♦'];
+
+        for (let i = 0; i < 100; i++) {
+          const confetti = document.createElement('div');
+          confetti.className = 'confetti';
+          confetti.style.left = Math.random() * 100 + '%';
+          confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+          confetti.style.animationDelay = Math.random() * 3 + 's';
+          confetti.style.animationDuration = (3 + Math.random() * 2) + 's';
+          confetti.textContent = shapes[Math.floor(Math.random() * shapes.length)];
+          confetti.style.fontSize = (8 + Math.random() * 12) + 'px';
+          confetti.style.color = colors[Math.floor(Math.random() * colors.length)];
+          confettiContainer.appendChild(confetti);
+        }
+
+        // Remove confetti after animation
+        setTimeout(() => {
+          confettiContainer.remove();
+        }, 6000);
+      }
     });
   </script>
 </body>
@@ -554,12 +590,18 @@ function renderProfilePage(data) {
         `;
       }
 
+      // Rarity display
+      const rarityHtml = ach.rarity && ach.rarity.total > 0
+        ? `<div class="achievement-rarity">${ach.rarity.percent}% der Spieler</div>`
+        : '';
+
       return `
         <div class="achievement ${statusClass}">
           <div class="achievement-icon">${icon}</div>
           <div class="achievement-info">
             <div class="achievement-name">${escapeHtml(ach.name)}</div>
             <div class="achievement-desc">${escapeHtml(ach.description)}</div>
+            ${rarityHtml}
           </div>
           ${ach.reward ? `<div class="achievement-reward">+${formatNumber(ach.reward)} DT</div>` : ''}
           ${progressHtml}
@@ -594,11 +636,16 @@ function renderProfilePage(data) {
     badgeHtml = `<img src="https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1" alt="Broadcaster" class="profile-badge" title="Broadcaster"><span class="profile-title">Streamerin / Dachsbau-Slots Admin</span>`;
   }
 
+  const isComplete = progressPercent === 100;
+  const completeBadgeHtml = isComplete ? '<span class="complete-badge">🏆 100% Complete!</span>' : '';
+
   const content = `
-    <div class="profile-header">
+    ${isComplete ? '<div class="confetti-container" id="confetti"></div>' : ''}
+    <div class="profile-header${isComplete ? ' complete' : ''}">
       <div class="profile-name">
         ${escapeHtml(username)}
         ${badgeHtml}
+        ${completeBadgeHtml}
         ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
       </div>
       ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}

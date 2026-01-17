@@ -250,7 +250,11 @@ async function unlockAchievement(username, achievementId, env, existingData = nu
       data.pendingRewards = (data.pendingRewards || 0) + reward;
     }
 
-    await savePlayerAchievements(username, data, env);
+    // Save player achievements and increment global counter in parallel
+    await Promise.all([
+      savePlayerAchievements(username, data, env),
+      incrementAchievementCounter(achievementId, env)
+    ]);
 
     return {
       unlocked: true,
@@ -402,6 +406,7 @@ async function checkBalanceAchievements(username, newBalance, env) {
     ];
 
     // Special: Lucky 777
+    const counterPromises = [];
     if (newBalance === 777 && !data.unlockedAt[ACHIEVEMENTS.LUCKY_777.id]) {
       data.unlockedAt[ACHIEVEMENTS.LUCKY_777.id] = Date.now();
       const reward = ACHIEVEMENTS_REWARDS_ENABLED ? (ACHIEVEMENTS.LUCKY_777.reward || 0) : 0;
@@ -409,6 +414,7 @@ async function checkBalanceAchievements(username, newBalance, env) {
         data.pendingRewards = (data.pendingRewards || 0) + ACHIEVEMENTS.LUCKY_777.reward;
       }
       unlockedAchievements.push({ achievement: ACHIEVEMENTS.LUCKY_777, reward });
+      counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.LUCKY_777.id, env));
     }
 
     for (const { id, threshold } of balanceAchievements) {
@@ -421,12 +427,16 @@ async function checkBalanceAchievements(username, newBalance, env) {
             data.pendingRewards = (data.pendingRewards || 0) + achievement.reward;
           }
           unlockedAchievements.push({ achievement, reward });
+          counterPromises.push(incrementAchievementCounter(id, env));
         }
       }
     }
 
     if (unlockedAchievements.length > 0) {
-      await savePlayerAchievements(username, data, env);
+      await Promise.all([
+        savePlayerAchievements(username, data, env),
+        ...counterPromises
+      ]);
     }
 
     return unlockedAchievements;
@@ -456,6 +466,7 @@ async function checkBigWinAchievements(username, winAmount, env) {
       { id: 'big_win_10000', threshold: 10000 }
     ];
 
+    const counterPromises = [];
     for (const { id, threshold } of bigWinAchievements) {
       if (winAmount >= threshold && !data.unlockedAt[id]) {
         const achievement = getAchievementById(id);
@@ -466,12 +477,16 @@ async function checkBigWinAchievements(username, winAmount, env) {
             data.pendingRewards = (data.pendingRewards || 0) + achievement.reward;
           }
           unlockedAchievements.push({ achievement, reward });
+          counterPromises.push(incrementAchievementCounter(id, env));
         }
       }
     }
 
     if (unlockedAchievements.length > 0 || winAmount > (data.stats.biggestWin || 0)) {
-      await savePlayerAchievements(username, data, env);
+      await Promise.all([
+        savePlayerAchievements(username, data, env),
+        ...counterPromises
+      ]);
     }
 
     return unlockedAchievements;
@@ -562,6 +577,54 @@ function getTripleKey(symbol) {
   return mapping[symbol] || null;
 }
 
+// ============================================
+// Global Achievement Statistics (for Rarity)
+// ============================================
+
+/**
+ * Increment global counter when an achievement is unlocked
+ */
+async function incrementAchievementCounter(achievementId, env) {
+  try {
+    const key = `achievement_count:${achievementId}`;
+    const current = await env.SLOTS_KV.get(key);
+    const newCount = (parseInt(current, 10) || 0) + 1;
+    await env.SLOTS_KV.put(key, newCount.toString());
+  } catch (error) {
+    logError('incrementAchievementCounter', error, { achievementId });
+  }
+}
+
+/**
+ * Get global achievement statistics (how many players have each achievement)
+ */
+async function getAchievementStats(env) {
+  try {
+    // Get total player count
+    const playerList = await env.SLOTS_KV.list({ prefix: 'user:', limit: 1000 });
+    const totalPlayers = playerList.keys ? playerList.keys.filter(k => k.name !== 'user:dachsbank').length : 0;
+
+    // Get counts for all achievements
+    const achievementIds = Object.values(ACHIEVEMENTS).map(a => a.id);
+    const counts = {};
+
+    // Batch fetch achievement counts
+    for (const id of achievementIds) {
+      const key = `achievement_count:${id}`;
+      const value = await env.SLOTS_KV.get(key);
+      counts[id] = parseInt(value, 10) || 0;
+    }
+
+    return {
+      totalPlayers,
+      counts
+    };
+  } catch (error) {
+    logError('getAchievementStats', error);
+    return { totalPlayers: 0, counts: {} };
+  }
+}
+
 export {
   getPlayerAchievements,
   savePlayerAchievements,
@@ -574,5 +637,6 @@ export {
   checkBigWinAchievements,
   getPendingRewards,
   claimPendingRewards,
-  getUnlockedAchievementCount
+  getUnlockedAchievementCount,
+  getAchievementStats
 };

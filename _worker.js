@@ -2,6 +2,10 @@ import { RESPONSE_HEADERS, URLS, KV_TRUE } from './constants.js';
 import { sanitizeUsername, isAdmin, getAdminList, logError } from './utils.js';
 import { isBlacklisted, setSelfBan, hasAcceptedDisclaimer, setDisclaimerAccepted } from './database.js';
 
+// Web pages and API
+import { handleWebPage } from './web/pages.js';
+import { handleApi } from './web/api.js';
+
 // User commands
 import {
   handleBalance,
@@ -93,12 +97,26 @@ export default {
   async fetch(request, env) {
     try {
       const url = new URL(request.url);
-      const action = url.searchParams.get('action') || 'slot';
-      const username = url.searchParams.get('user') || 'Spieler';
 
       if (!env.SLOTS_KV) {
         return new Response('KV not configured', { headers: RESPONSE_HEADERS });
       }
+
+      // Web pages (HTML)
+      const page = url.searchParams.get('page');
+      if (page) {
+        return await handleWebPage(page, url, env);
+      }
+
+      // API endpoints (JSON)
+      const api = url.searchParams.get('api');
+      if (api) {
+        return await handleApi(api, url, env);
+      }
+
+      // Twitch bot commands (existing logic)
+      const action = url.searchParams.get('action') || 'slot';
+      const username = url.searchParams.get('user') || 'Spieler';
 
       const cleanUsername = sanitizeUsername(username);
       if (!cleanUsername) {

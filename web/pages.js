@@ -633,7 +633,7 @@ function renderInfoPage() {
       </section>
 
       <section class="content-section">
-        <h2>📞 Hilfe bei Gluecksspielproblemen</h2>
+        <h2>📞 Hilfe bei Glücksspielproblemen</h2>
         <div class="help-table">
           <div class="help-row">
             <span>🇩🇪 Deutschland</span>

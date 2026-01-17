@@ -207,9 +207,9 @@ const DISCLAIMER_HTML = `
 <div class="disclaimer">
   <div class="disclaimer-icon">⚠️</div>
   <div class="disclaimer-content">
-    <p><strong>Dachsbau Slots ist ein reines Unterhaltungsspiel.</strong> Es werden keine echten Geldbetraege verwendet.</p>
-    <p><strong>DachsTaler (DT)</strong> sind eine rein virtuelle Waehrung ohne jeglichen realen Geldwert. Sie koennen nicht in echtes Geld umgetauscht werden.</p>
-    <p>Die Streamerin <strong>frechhdachs</strong> distanziert sich ausdruecklich von echtem Gluecksspiel und uebernimmt keine Haftung. Spiel lieber hier im Dachsbau - du kannst nicht ins Minus rutschen! 🦡</p>
+    <p><strong>Dachsbau Slots ist ein reines Unterhaltungsspiel.</strong> Es werden keine echten Geldbeträge verwendet.</p>
+    <p><strong>DachsTaler (DT)</strong> sind eine rein virtuelle Währung ohne jeglichen realen Geldwert. Sie können nicht in echtes Geld umgetauscht werden.</p>
+    <p>Die Streamerin <strong>frechhdachs</strong> distanziert sich ausdrücklich von echtem Glücksspiel und übernimmt keine Haftung. Spiel lieber hier im Dachsbau - du kannst nicht ins Minus rutschen! 🦡</p>
   </div>
 </div>
 `;

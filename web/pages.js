@@ -506,7 +506,15 @@ function renderProfilePage(data) {
       </div>
       <div class="stat-box">
         <div class="stat-value">${formatNumber(stats.biggestWin || 0)}</div>
-        <div class="stat-label">Bester Gewinn</div>
+        <div class="stat-label">Höchster Gewinn</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(stats.totalWon || 0)}</div>
+        <div class="stat-label">Gesamt gewonnen</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(stats.totalLost || 0)}</div>
+        <div class="stat-label">Gesamt verloren</div>
       </div>
     </div>
   `;

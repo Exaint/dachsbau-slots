@@ -265,7 +265,7 @@ function baseTemplate(title, content, activePage = '') {
     ${content}
   </main>
   <footer class="footer">
-    <p>Dachsbau Slots - Made by Exaint fuer <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener" class="footer-link">@frechhdachs</a></p>
+    <p>Dachsbau Slots - Made by Exaint für <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener" class="footer-link">@frechhdachs</a></p>
   </footer>
 </body>
 </html>`;

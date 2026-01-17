@@ -14,7 +14,8 @@ import {
   URLS,
   BUFF_SYMBOLS_WITH_NAMES,
   MAX_RETRIES,
-  KV_ACTIVE
+  KV_ACTIVE,
+  ACHIEVEMENTS
 } from '../constants.js';
 import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError } from '../utils.js';
 import {
@@ -37,8 +38,50 @@ import {
   hasWildCard,
   getPrestigeRank,
   isBuffActive,
-  hasAcceptedDisclaimer
+  hasAcceptedDisclaimer,
+  checkAndUnlockAchievement,
+  updateAchievementStat
 } from '../database.js';
+
+/**
+ * Track daily claim achievements (fire-and-forget)
+ */
+async function trackDailyAchievements(username, monthlyDays, env) {
+  try {
+    const promises = [];
+
+    // FIRST_DAILY
+    promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_DAILY.id, env));
+
+    // Track dailysClaimed for DAILY_7/14/21/28 achievements
+    // Note: We pass monthlyDays as the new total (not increment), so we update to that value
+    // But updateAchievementStat expects an increment, so we track milestone via the monthly login count
+    promises.push(updateAchievementStat(username, 'dailysClaimed', 1, env));
+
+    await Promise.all(promises);
+  } catch (error) {
+    logError('trackDailyAchievements', error, { username, monthlyDays });
+  }
+}
+
+/**
+ * Track transfer achievements (fire-and-forget)
+ */
+async function trackTransferAchievements(username, amount, env) {
+  try {
+    const promises = [];
+
+    // FIRST_TRANSFER
+    promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_TRANSFER.id, env));
+
+    // Track totalTransferred for TRANSFER_1000/10000 achievements
+    promises.push(updateAchievementStat(username, 'totalTransferred', amount, env));
+
+    await Promise.all(promises);
+  } catch (error) {
+    logError('trackTransferAchievements', error, { username, amount });
+  }
+}
 
 // Helper: Get days in current month (German timezone)
 function getDaysInCurrentMonth() {
@@ -149,6 +192,9 @@ async function handleDaily(username, env) {
       setLastDaily(username, now, env),
       isNewMilestone ? markMilestoneClaimed(username, newMonthlyLogin.days.length, env, newMonthlyLogin) : Promise.resolve()
     ]);
+
+    // Fire-and-forget achievement tracking
+    trackDailyAchievements(username, newMonthlyLogin.days.length, env);
 
     const boostText = hasBoost ? ' (💎 Boosted!)' : '';
     let milestoneText = '';
@@ -332,6 +378,9 @@ async function handleTransfer(username, target, amount, env) {
         updateBankBalance(parsedAmount, env)
       ]);
 
+      // Fire-and-forget achievement tracking (bank donations count as transfers)
+      trackTransferAchievements(username, parsedAmount, env);
+
       return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DachsTaler 🏦`, { headers: RESPONSE_HEADERS });
     }
 
@@ -366,6 +415,8 @@ async function handleTransfer(username, target, amount, env) {
       // Verify the write succeeded
       const verifySender = await getBalance(username, env);
       if (verifySender === newSenderBalance) {
+        // Fire-and-forget achievement tracking
+        trackTransferAchievements(username, parsedAmount, env);
         return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸`, { headers: RESPONSE_HEADERS });
       }
 

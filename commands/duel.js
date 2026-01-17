@@ -24,10 +24,34 @@
  * 4. On decline/timeout: Challenge expires
  */
 
-import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE } from '../constants.js';
-import { getBalance, setBalance } from '../database.js';
+import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
+import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStat } from '../database.js';
 import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
+
+/**
+ * Track duel achievements (fire-and-forget)
+ * @param {string} player - Player username
+ * @param {boolean} isWinner - Whether this player won
+ * @param {object} env - Environment with KV binding
+ */
+async function trackDuelAchievements(player, isWinner, env) {
+  try {
+    const promises = [];
+
+    // Both players get FIRST_DUEL
+    promises.push(checkAndUnlockAchievement(player, ACHIEVEMENTS.FIRST_DUEL.id, env));
+
+    // Only winners get duel win stats tracked
+    if (isWinner) {
+      promises.push(updateAchievementStat(player, 'duelsWon', 1, env));
+    }
+
+    await Promise.all(promises);
+  } catch (error) {
+    logError('trackDuelAchievements', error, { player, isWinner });
+  }
+}
 
 /**
  * Generate a fair duel grid (no buffs, no peek, no special items)
@@ -202,6 +226,9 @@ async function handleDuelAccept(username, env) {
         setBalance(username, targetBalance - duel.amount, env)
       ]);
       resultMessage = `🏆 @${duel.challenger} GEWINNT ${pot} DachsTaler!`;
+      // Fire-and-forget achievement tracking
+      trackDuelAchievements(duel.challenger, true, env);
+      trackDuelAchievements(username, false, env);
     } else if (targetScore.score > challengerScore.score) {
       // Target wins
       await Promise.all([
@@ -209,9 +236,15 @@ async function handleDuelAccept(username, env) {
         setBalance(username, targetBalance + duel.amount, env)
       ]);
       resultMessage = `🏆 @${username} GEWINNT ${pot} DachsTaler!`;
+      // Fire-and-forget achievement tracking
+      trackDuelAchievements(username, true, env);
+      trackDuelAchievements(duel.challenger, false, env);
     } else {
-      // True tie - return bets
+      // True tie - return bets (both participated, neither won)
       resultMessage = `🤝 UNENTSCHIEDEN! Beide behalten ihren Einsatz.`;
+      // Fire-and-forget achievement tracking (both get participation, no winner)
+      trackDuelAchievements(duel.challenger, false, env);
+      trackDuelAchievements(username, false, env);
     }
 
     // Build response

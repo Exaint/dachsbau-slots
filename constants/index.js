@@ -123,3 +123,14 @@ export {
   SPIN_BUNDLE_COUNT,
   SPIN_BUNDLE_MULTIPLIER
 } from './shop.js';
+
+// Achievements
+export {
+  ACHIEVEMENTS,
+  ACHIEVEMENTS_REWARDS_ENABLED,
+  ACHIEVEMENT_CATEGORIES,
+  getAchievementById,
+  getAchievementsByCategory,
+  getVisibleAchievements,
+  getAllAchievements
+} from './achievements.js';

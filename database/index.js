@@ -93,3 +93,19 @@ export {
   getBankBalance,
   checkAndClaimHourlyJackpot
 } from './bank.js';
+
+// Achievements
+export {
+  getPlayerAchievements,
+  savePlayerAchievements,
+  hasAchievement,
+  unlockAchievement,
+  updateAchievementStat,
+  markTripleCollected,
+  checkAndUnlockAchievement,
+  checkBalanceAchievements,
+  checkBigWinAchievements,
+  getPendingRewards,
+  claimPendingRewards,
+  getUnlockedAchievementCount
+} from './achievements.js';

@@ -76,8 +76,14 @@ import {
   getPrestigeRank,
   updateBankBalance,
   checkAndClaimHourlyJackpot,
-  getLastDaily
+  getLastDaily,
+  updateAchievementStat,
+  markTripleCollected,
+  checkAndUnlockAchievement,
+  checkBalanceAchievements,
+  checkBigWinAchievements
 } from '../database.js';
+import { ACHIEVEMENTS } from '../constants.js';
 
 // Engine functions
 import { generateGrid, applySpecialItems, calculateWin, buildResponseMessage } from './slots/engine.js';
@@ -88,6 +94,95 @@ const NORMALIZE_SPACES_REGEX = /\s+/g;
 
 // Unlock prices for error messages
 const UNLOCK_PRICES = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
+
+// Achievement tracking (fire-and-forget, non-blocking)
+async function trackSlotAchievements(username, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env) {
+  try {
+    const promises = [];
+
+    // FIRST_SPIN (tracked via totalSpins stat)
+    promises.push(updateAchievementStat(username, 'totalSpins', 1, env));
+
+    // Win tracking
+    if (result.points > 0) {
+      promises.push(updateAchievementStat(username, 'wins', 1, env));
+
+      // FIRST_WIN
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_WIN.id, env));
+
+      // Big win achievements
+      promises.push(checkBigWinAchievements(username, result.points, env));
+
+      // FREE_SPIN_WIN
+      if (isFreeSpinUsed) {
+        promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FREE_SPIN_WIN.id, env));
+      }
+
+      // SLOTS_ALL_WIN
+      if (isAllIn) {
+        promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.SLOTS_ALL_WIN.id, env));
+      }
+
+      // WILD_CARD_WIN
+      if (hasWildCardToken && grid.includes('🃏')) {
+        promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.WILD_CARD_WIN.id, env));
+      }
+    }
+
+    // Triple tracking
+    if (grid[0] === grid[1] && grid[1] === grid[2] && grid[0] !== '🃏') {
+      promises.push(markTripleCollected(username, grid[0], env));
+    }
+
+    // Dachs tracking
+    if (grid.includes('🦡')) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_DACHS.id, env));
+      const dachsCount = grid.filter(s => s === '🦡').length;
+      if (dachsCount === 2) {
+        promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DACHS_PAIR.id, env));
+      }
+    }
+
+    // Balance achievements
+    promises.push(checkBalanceAchievements(username, newBalance, env));
+
+    // ZERO_HERO (win with 0 balance before spin)
+    if (result.points > 0 && newBalance === result.points) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.ZERO_HERO.id, env));
+    }
+
+    // INSURANCE_SAVE
+    if (insuranceUsed) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.INSURANCE_SAVE.id, env));
+    }
+
+    // HOURLY_JACKPOT
+    if (hourlyJackpotWon) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.HOURLY_JACKPOT.id, env));
+    }
+
+    // HOT_STREAK
+    if (hotStreakTriggered) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.HOT_STREAK.id, env));
+    }
+
+    // COMEBACK_KING
+    if (comebackTriggered) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.COMEBACK_KING.id, env));
+    }
+
+    // PERFECT_TIMING (midnight UTC)
+    const nowUTC = new Date();
+    if (nowUTC.getUTCHours() === 0 && nowUTC.getUTCMinutes() === 0) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.PERFECT_TIMING.id, env));
+    }
+
+    await Promise.all(promises);
+  } catch (error) {
+    // Silently fail - achievements should never break the game
+    logError('trackSlotAchievements', error, { username });
+  }
+}
 
 // Helper: Get custom message for special users
 function getCustomMessage(lowerUsername, username, isWin, data) {
@@ -425,6 +520,11 @@ async function handleSlot(username, amountParam, url, env) {
     const { streakBonus, comboBonus, naturalBonuses } = streakBonusResult;
     let lossWarningMessage = streakBonusResult.lossWarningMessage;
 
+    // Track streak triggers for achievements
+    const hotStreakTriggered = isWin && previousStreak.wins + 1 === STREAK_THRESHOLD;
+    const comebackTriggered = isWin && previousStreak.losses >= STREAK_THRESHOLD;
+    const isAllIn = amountParam && amountParam.toLowerCase() === 'all';
+
     // Rage Mode updates
     if (!isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
@@ -457,6 +557,9 @@ async function handleSlot(username, amountParam, url, env) {
         setInsuranceCount(username, insuranceCount - 1, env)
       ]);
       const rankSymbol = prestigeRank ? `${prestigeRank} ` : '';
+
+      // Fire-and-forget achievement tracking (insurance used)
+      trackSlotAchievements(username, grid, result, newBalanceWithRefund, isFreeSpinUsed, isAllIn, hasWildCardToken, true, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env);
 
       return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
     }
@@ -518,6 +621,9 @@ async function handleSlot(username, amountParam, url, env) {
       balance: newBalance,
       grid: grid.join(' ')
     });
+
+    // Fire-and-forget achievement tracking
+    trackSlotAchievements(username, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env);
 
     if (customMsg) {
       return new Response(`@${username} [ ${grid.join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DachsTaler`, { headers: RESPONSE_HEADERS });

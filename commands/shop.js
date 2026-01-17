@@ -73,8 +73,13 @@ import {
   activateGuaranteedPair,
   activateWildCard,
   updateBankBalance,
-  isBuffActive
+  isBuffActive,
+  updateAchievementStat,
+  checkAndUnlockAchievement,
+  getPlayerAchievements,
+  savePlayerAchievements
 } from '../database.js';
+import { ACHIEVEMENTS } from '../constants.js';
 import { calculateWin } from './slots.js';
 
 // Static: Mystery Box item pool (avoid recreation per request)
@@ -87,6 +92,51 @@ const MYSTERY_BOX_ITEMS = [
 
 // Dynamic shop item max (avoids hardcoded values)
 const SHOP_ITEM_MAX = Math.max(...Object.keys(SHOP_ITEMS).map(Number));
+
+// Achievement tracking for shop purchases (fire-and-forget)
+async function trackShopAchievements(username, itemId, item, extraData, env) {
+  try {
+    const promises = [];
+
+    // Track shop purchase stat
+    promises.push(updateAchievementStat(username, 'shopPurchases', 1, env));
+
+    // FIRST_PURCHASE
+    promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_PURCHASE.id, env));
+
+    // Check for UNLOCK_ALL_SLOTS when buying an unlock
+    if (item.type === 'unlock') {
+      // Check if all slot unlocks are now owned
+      const data = await getPlayerAchievements(username, env);
+      if (!data.unlockedAt[ACHIEVEMENTS.UNLOCK_ALL_SLOTS.id]) {
+        const [has20, has30, has50, has100, hasAll] = await Promise.all([
+          hasUnlock(username, 'slots_20', env),
+          hasUnlock(username, 'slots_30', env),
+          hasUnlock(username, 'slots_50', env),
+          hasUnlock(username, 'slots_100', env),
+          hasUnlock(username, 'slots_all', env)
+        ]);
+        if (has20 && has30 && has50 && has100 && hasAll) {
+          promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.UNLOCK_ALL_SLOTS.id, env));
+        }
+      }
+    }
+
+    // CHAOS_SPIN_BIG (Chaos Spin with 1000+ win)
+    if (itemId === 11 && extraData && extraData.chaosResult >= 1000) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.CHAOS_SPIN_BIG.id, env));
+    }
+
+    // WHEEL_JACKPOT (5x Dachs Jackpot)
+    if (itemId === 12 && extraData && extraData.wheelJackpot) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.WHEEL_JACKPOT.id, env));
+    }
+
+    await Promise.all(promises);
+  } catch (error) {
+    logError('trackShopAchievements', error, { username, itemId });
+  }
+}
 
 // ============================================================================
 // ITEM TYPE HANDLERS - Strategy Pattern
@@ -115,6 +165,9 @@ async function handlePrestigeItem(username, item, itemId, balance, currentRank, 
   ]);
   await updateBankBalance(item.price, env);
 
+  // Fire-and-forget achievement tracking
+  trackShopAchievements(username, itemId, item, null, env);
+
   return new Response(`@${username} ✅ ${item.name} gekauft! Dein Rang: ${item.rank} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
@@ -132,6 +185,9 @@ async function handleUnlockItem(username, item, itemId, balance, hasPrerequisite
     setBalance(username, balance - item.price, env),
     updateBankBalance(item.price, env)
   ]);
+
+  // Fire-and-forget achievement tracking
+  trackShopAchievements(username, itemId, item, null, env);
 
   return new Response(`@${username} ✅ ${item.name} freigeschaltet! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
@@ -319,6 +375,8 @@ async function handleInstantItem(username, item, itemId, balance, env) {
       setBalance(username, Math.max(0, newBalance), env),
       updateBankBalance(netBankChange, env)
     ]);
+    // Fire-and-forget achievement tracking
+    trackShopAchievements(username, itemId, item, { chaosResult: result }, env);
     return new Response(`@${username} 🎲 Chaos Spin! ${result >= 0 ? '+' : ''}${result} DachsTaler! | Kontostand: ${Math.max(0, newBalance)}`, { headers: RESPONSE_HEADERS });
   }
 
@@ -331,6 +389,9 @@ async function handleInstantItem(username, item, itemId, balance, env) {
       setBalance(username, newBalance, env),
       updateBankBalance(netBankChange, env)
     ]);
+    // Fire-and-forget achievement tracking (wheelJackpot = 5x Dachs)
+    const isWheelJackpot = wheel.prize === WHEEL_JACKPOT_PRIZE;
+    trackShopAchievements(username, itemId, item, { wheelJackpot: isWheelJackpot }, env);
     const netResult = wheel.prize - item.price;
     return new Response(`@${username} 🎡 [ ${wheel.result} ] ${wheel.message} ${netResult >= 0 ? '+' : ''}${netResult} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   }
@@ -343,7 +404,10 @@ async function handleInstantItem(username, item, itemId, balance, env) {
 
   // Mystery Box (ID 16)
   if (itemId === 16) {
-    return await handleMysteryBox(username, item, balance, env);
+    const response = await handleMysteryBox(username, item, balance, env);
+    // Track achievement only if mystery box succeeded (doesn't contain error message)
+    trackShopAchievements(username, itemId, item, null, env);
+    return response;
   }
 
   // Reverse Chaos (ID 31)
@@ -354,6 +418,8 @@ async function handleInstantItem(username, item, itemId, balance, env) {
       setBalance(username, newBalance, env),
       updateBankBalance(-result, env)
     ]);
+    // Fire-and-forget achievement tracking
+    trackShopAchievements(username, itemId, item, null, env);
     return new Response(`@${username} 🎲 Reverse Chaos! +${result} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   }
 
@@ -361,18 +427,24 @@ async function handleInstantItem(username, item, itemId, balance, env) {
   if (itemId === 36) {
     const freeSpinsAmount = secureRandomInt(DIAMOND_MINE_MIN_SPINS, DIAMOND_MINE_MAX_SPINS);
     await addFreeSpinsWithMultiplier(username, freeSpinsAmount, 1, env);
+    // Fire-and-forget achievement tracking
+    trackShopAchievements(username, itemId, item, null, env);
     return new Response(`@${username} 💎 Diamond Mine! Du hast ${freeSpinsAmount} Free Spins gefunden! 💎 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
   // Guaranteed Pair (ID 37)
   if (itemId === 37) {
     await activateGuaranteedPair(username, env);
+    // Fire-and-forget achievement tracking
+    trackShopAchievements(username, itemId, item, null, env);
     return new Response(`@${username} ✅ Guaranteed Pair aktiviert! Dein nächster Spin hat garantiert mindestens ein Pair! 🎯 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
   // Wild Card (ID 38)
   if (itemId === 38) {
     await activateWildCard(username, env);
+    // Fire-and-forget achievement tracking
+    trackShopAchievements(username, itemId, item, null, env);
     return new Response(`@${username} ✅ Wild Card aktiviert! Dein nächster Spin enthält ein 🃏 Wild Symbol! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
@@ -505,6 +577,7 @@ async function buyShopItem(username, itemId, env) {
     }
 
     // Delegate to type-specific handlers
+    // Note: prestige and unlock handlers track achievements internally after successful purchase
     if (item.type === 'prestige') {
       return await handlePrestigeItem(username, item, itemId, balance, currentRank, env);
     }
@@ -516,7 +589,13 @@ async function buyShopItem(username, itemId, env) {
     // Use handler map for remaining types
     const handler = ITEM_TYPE_HANDLERS[item.type];
     if (handler) {
-      return await handler(username, item, itemId, balance, env);
+      const response = await handler(username, item, itemId, balance, env);
+      // Fire-and-forget achievement tracking for non-instant types
+      // (instant types handle their own tracking with extraData)
+      if (item.type !== 'instant') {
+        trackShopAchievements(username, itemId, item, null, env);
+      }
+      return response;
     }
 
     // Fallback for unknown types

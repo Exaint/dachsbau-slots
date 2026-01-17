@@ -1,5 +1,23 @@
 /**
  * Buff System - Timed buffs, boosts, insurance, win multiplier
+ *
+ * ARCHITECTURE NOTES (for future coding sessions):
+ * ================================================
+ * BUFF TYPES:
+ * - Simple timed buffs: Store expireAt timestamp (e.g., lucky_charm, golden_hour)
+ * - Buffs with uses: Store { expireAt, uses } (e.g., dachs_locator)
+ * - Buffs with stack: Store { expireAt, stack } (e.g., rage_mode)
+ * - One-time items: Store 'active' string (e.g., boosts, win_multiplier)
+ *
+ * RACE CONDITION PREVENTION:
+ * - consumeBoost/consumeWinMultiplier: Delete + verify pattern
+ * - addInsurance: Retry with exponential backoff + verification
+ * - decrementBuffUses: Retry with verification after each attempt
+ *
+ * ERROR HANDLING:
+ * - All functions return safe defaults on error (false, 0, null)
+ * - Expired buff cleanup errors are logged but don't fail reads
+ * - Corrupted JSON data triggers cleanup and returns inactive
  */
 
 import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES, KV_ACTIVE } from '../constants.js';
@@ -58,8 +76,14 @@ async function getBuffWithUses(username, buffKey, env) {
       return { active: false, uses: 0, data: null };
     }
 
+    // BUG FIX: Handle delete errors gracefully - log but don't fail the read
     if (Date.now() >= data.expireAt || data.uses <= 0) {
-      await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      try {
+        await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      } catch (deleteError) {
+        // Log error but still return inactive - the buff is expired anyway
+        logError('getBuffWithUses.cleanup', deleteError, { username, buffKey });
+      }
       return { active: false, uses: 0, data: null };
     }
 
@@ -139,8 +163,13 @@ async function getBuffWithStack(username, buffKey, env) {
     if (!value) return { active: false, stack: 0, data: null };
 
     const data = JSON.parse(value);
+    // BUG FIX: Handle delete errors gracefully - log but don't fail the read
     if (Date.now() >= data.expireAt) {
-      await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      try {
+        await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      } catch (deleteError) {
+        logError('getBuffWithStack.cleanup', deleteError, { username, buffKey });
+      }
       return { active: false, stack: 0, data: null };
     }
 

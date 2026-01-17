@@ -401,17 +401,20 @@ function renderProfilePage(data) {
     `;
   }).join('');
 
-  // Special badge for exaint_ (Lead-Mod / Admin)
-  const isAdmin = username.toLowerCase() === 'exaint_';
-  const adminBadgeHtml = isAdmin
-    ? `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Mod" class="profile-badge" title="Lead-Mod"><span class="profile-title">Head-Mod / Dachsbau-Slots Admin</span>`
-    : '';
+  // Special badges for admins
+  const lowerUsername = username.toLowerCase();
+  let badgeHtml = '';
+  if (lowerUsername === 'exaint_') {
+    badgeHtml = `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Mod" class="profile-badge" title="Lead-Mod"><span class="profile-title">Head-Mod / Dachsbau-Slots Admin</span>`;
+  } else if (lowerUsername === 'frechhdachs') {
+    badgeHtml = `<img src="https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1" alt="Broadcaster" class="profile-badge" title="Broadcaster"><span class="profile-title">Streamerin / Dachsbau-Slots Admin</span>`;
+  }
 
   const content = `
     <div class="profile-header">
       <div class="profile-name">
         ${escapeHtml(username)}
-        ${adminBadgeHtml}
+        ${badgeHtml}
         ${rank ? `<span class="profile-rank">${escapeHtml(rank)}</span>` : ''}
       </div>
       ${statsHtml}

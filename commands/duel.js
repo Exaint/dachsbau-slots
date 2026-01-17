@@ -144,7 +144,7 @@ async function handleDuel(username, args, env) {
       return `@${username} Fehler beim Erstellen der Herausforderung. Bitte versuche es erneut.`;
     }
 
-    return `⚔️ @${username} fordert @${targetArg} zu einem Duell heraus! Einsatz: ${amountArg} DachsTaler | @${targetArg} schreibe !duelaccept oder !dueldecline (${DUEL_TIMEOUT_SECONDS}s)`;
+    return `⚔️ @${username} fordert @${targetArg} zu einem Duell heraus! Einsatz: ${amountArg} DachsTaler | @${targetArg} schreibe !slots duelaccept oder !slots dueldecline (${DUEL_TIMEOUT_SECONDS}s)`;
   } catch (error) {
     logError('handleDuel', error, { username, args });
     return `@${username} Fehler beim Duell. Bitte versuche es erneut.`;
@@ -266,7 +266,7 @@ async function handleDuelOpt(username, args, env) {
       await setDuelOptOut(username, false, env);
       return `@${username} ✅ Duelle aktiviert. Du kannst wieder herausgefordert werden!`;
     } else {
-      return `@${username} Verwendung: !duelopt out (deaktivieren) oder !duelopt in (aktivieren)`;
+      return `@${username} Verwendung: !slots duelopt out (deaktivieren) oder !slots duelopt in (aktivieren)`;
     }
   } catch (error) {
     logError('handleDuelOpt', error, { username, args });

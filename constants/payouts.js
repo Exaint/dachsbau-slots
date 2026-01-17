@@ -18,6 +18,9 @@ export const DACHS_BASE_CHANCE = 1 / 150;
 export const TRIPLE_PAYOUTS = { '⭐': 500, '🍉': 250, '🍇': 150, '🍊': 100, '🍋': 75, '🍒': 50 };
 export const PAIR_PAYOUTS = { '⭐': 50, '🍉': 25, '🍇': 15, '🍊': 10, '🍋': 8, '🍒': 5 };
 
+// Duell Symbol Values (half of pair payouts, used for tiebreaker)
+export const DUEL_SYMBOL_VALUES = { '🦡': 500, '💎': 100, '⭐': 25, '🍉': 13, '🍇': 8, '🍊': 5, '🍋': 4, '🍒': 3 };
+
 // Streak System
 export const STREAK_THRESHOLD = 5;
 export const HOT_STREAK_BONUS = 500;

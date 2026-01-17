@@ -46,6 +46,9 @@ import { handleSlot } from './commands/slots.js';
 // Shop commands
 import { handleShop } from './commands/shop.js';
 
+// Duel commands
+import { handleDuel, handleDuelAccept, handleDuelDecline, handleDuelOpt } from './commands/duel.js';
+
 // OPTIMIZED: Static command maps at module level (avoid recreation per request)
 const LEADERBOARD_ALIASES = new Set(['lb', 'leaderboard', 'rank', 'ranking']);
 const BALANCE_ALIASES = new Set(['balance', 'konto']);
@@ -208,6 +211,25 @@ export default {
             }
             await setDisclaimerAccepted(cleanUsername, env);
             return new Response(`@${cleanUsername} ✅ Disclaimer akzeptiert! Du startest mit 100 DachsTaler. Viel Spaß beim Spielen! 🦡🎰 Nutze !slots zum Spinnen!`, { headers: RESPONSE_HEADERS });
+          }
+
+          // Duel commands
+          if (lower === 'duel') {
+            const target = url.searchParams.get('target');
+            const amount = url.searchParams.get('giveamount');
+            const args = [target, amount].filter(Boolean);
+            return new Response(await handleDuel(cleanUsername, args, env), { headers: RESPONSE_HEADERS });
+          }
+          if (lower === 'duelaccept') {
+            return new Response(await handleDuelAccept(cleanUsername, env), { headers: RESPONSE_HEADERS });
+          }
+          if (lower === 'dueldecline') {
+            return new Response(await handleDuelDecline(cleanUsername, env), { headers: RESPONSE_HEADERS });
+          }
+          if (lower === 'duelopt') {
+            const target = url.searchParams.get('target');
+            const args = target ? [target] : [];
+            return new Response(await handleDuelOpt(cleanUsername, args, env), { headers: RESPONSE_HEADERS });
           }
         }
 

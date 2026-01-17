@@ -6,7 +6,7 @@
 
 [![Shop](https://img.shields.io/badge/🛒_Shop-Items_&_Preise-00D9FF?style=flat-square)](https://git.new/DachsbauSlotsShop) [![Changelog](https://img.shields.io/badge/📜_Changelog-Updates-8B5CF6?style=flat-square)](https://gist.github.com/Exaint/288b8a2707aa41b01d440ee4f207a831) [![Discord](https://img.shields.io/badge/💬_Discord-Dachsbau-5865F2?style=flat-square)](https://discord.gg/dachsbau)
 
-**Version 1.5.0** • Letztes Update: 5. Januar 2026 
+**Version 1.6.0** • Letztes Update: 17. Januar 2026 
 
 </div>
 
@@ -18,8 +18,9 @@
 |:-----------|:-----------|
 | [⚠️ Disclaimer](#-disclaimer) | [🚀 Schnellstart](#-schnellstart) |
 | [⚠️ Wichtig zu wissen](#️-wichtig-zu-wissen) | [📋 Commands](#-commands) |
-| [💎 Gewinne & Chancen](#-gewinne--chancen) | [🛒 Shop-Übersicht](#-shop-übersicht) |
-| [🏦 DachsBank](#-dachsbank) | [❓ FAQ](#-faq) |
+| [💎 Gewinne & Chancen](#-gewinne--chancen) | [⚔️ Duell-System](#️-duell-system) |
+| [🛒 Shop-Übersicht](#-shop-übersicht) | [🏦 DachsBank](#-dachsbank) |
+| [❓ FAQ](#-faq) | |
 
 ---
 
@@ -134,6 +135,16 @@ Kaufe die Unlocks im Shop in dieser Reihenfolge:
 | `!slots info / help / commands` | Link zu diesem Dokument | – |
 | `!slots disclaimer` | Glücksspiel-Warnung | – |
 | `!slots selfban` | Selbstausschluss | – |
+
+### Duell-Commands
+
+| Command | Beschreibung |
+|:--------|:-------------|
+| `!slots duel @user [Betrag]` | Fordere jemanden zum Duell heraus |
+| `!slots duelaccept` | Nimm eine Herausforderung an |
+| `!slots dueldecline` | Lehne eine Herausforderung ab |
+| `!slots duelopt out` | Deaktiviere Duelle für dich |
+| `!slots duelopt in` | Aktiviere Duelle wieder |
 
 ---
 
@@ -257,6 +268,90 @@ Jeder Gewinn in Folge erhöht deinen Multiplier automatisch:
 **Hourly Jackpot:** Zufällige "Lucky Second" pro Stunde = +100 DachsTaler ⏰
 
 </details>
+
+---
+
+## ⚔️ Duell-System
+
+> **NEU!** Fordere andere Spieler zum direkten Slot-Duell heraus!
+
+### So funktioniert's
+
+**1. Herausfordern**
+```
+!slots duel @spieler 500
+```
+Du forderst `@spieler` zu einem Duell um 500 DachsTaler heraus.
+
+**2. Annehmen oder Ablehnen**
+
+Der herausgeforderte Spieler hat **60 Sekunden** Zeit zu reagieren:
+- `!slots duelaccept` → Duell beginnt!
+- `!slots dueldecline` → Herausforderung abgelehnt
+
+**3. Duell-Ablauf**
+
+Beide Spieler spinnen gleichzeitig – **ohne Buffs, ohne Items**. Ein faires 1v1!
+
+```
+⚔️ DUELL ⚔️ @spieler1 [ 🍒 🍒 🍊 ] Doppel 🍒! vs @spieler2 [ 🍇 🍉 🍋 ] 24 Punkte | 🏆 @spieler1 GEWINNT 1000 DachsTaler!
+```
+
+### Regeln
+
+| Regel | Beschreibung |
+|:------|:-------------|
+| **Mindesteinsatz** | 100 DachsTaler |
+| **Maximaleinsatz** | Unbegrenzt (solange beide genug haben) |
+| **Buffs/Items** | Deaktiviert – faire Kämpfe! |
+| **Timeout** | 60 Sekunden zum Antworten |
+| **Eine Herausforderung** | Du kannst nur eine aktive Herausforderung haben |
+
+### Wer gewinnt?
+
+Die Gewinnstufen entscheiden:
+
+| Stufe | Beschreibung |
+|:------|:-------------|
+| **🥇 Triple** | 3 gleiche Symbole schlägt alles |
+| **🥈 Paar** | 2 gleiche Symbole schlägt Einzelne |
+| **🥉 Punkte** | Bei Gleichstand zählt die Symbolsumme |
+
+**Symbol-Werte für Tiebreaker:**
+
+| Symbol | Punkte |
+|:-------|-------:|
+| 🦡 Dachs | 500 |
+| 💎 Diamant | 100 |
+| ⭐ Stern | 25 |
+| 🍉 Melone | 13 |
+| 🍇 Trauben | 8 |
+| 🍊 Orange | 5 |
+| 🍋 Zitrone | 4 |
+| 🍒 Kirsche | 3 |
+
+**Beispiel:** `[ 🍒 🍉 ⭐ ]` = 3 + 13 + 25 = **41 Punkte**
+
+### Opt-Out
+
+Du möchtest nicht herausgefordert werden?
+
+```
+!slots duelopt out
+```
+
+Um wieder Duelle zu aktivieren:
+
+```
+!slots duelopt in
+```
+
+### Tipps
+
+- 💡 **Kein Risiko:** Dein Einsatz wird erst abgezogen wenn das Duell stattfindet
+- 💡 **Fair:** Beide müssen den Betrag haben, sonst kein Duell
+- 💡 **Balance prüfen:** `!slots balance` vor dem Duell checken
+- 💡 **Community-Spaß:** Perfekt für Rivalitäten im Chat! 🎮
 
 ---
 
@@ -437,12 +532,12 @@ Das Wild ersetzt **jedes Symbol** für den besten Outcome:
 
 ## 📜 Changelog
 
-### Version 1.4.4 – "DachsBank System" *(30.12.2025)*
+### Version 1.6.0 – "Duell-System" *(17.01.2026)*
 
-- 🏦 **DachsBank** – Virtuelles Casino-Konto
-- 💰 **!slots bank** – Kontostand anzeigen
-- 🎁 **Spenden** – `!transfer @dachsbank`
-- ⚡ **Performance** – Buff-Loading optimiert
+- ⚔️ **Duell-System** – Fordere andere Spieler heraus!
+- 🎮 **`!slots duel @user [Betrag]`** – Starte ein Duell
+- ✅ **`!slots duelaccept/dueldecline`** – Annehmen/Ablehnen
+- 🚫 **`!slots duelopt`** – Opt-Out für Duelle
 
 > 📜 [Vollständiger Changelog](https://gist.github.com/Exaint/288b8a2707aa41b01d440ee4f207a831)
 

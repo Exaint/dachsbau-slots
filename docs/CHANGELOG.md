@@ -1,7 +1,7 @@
 # 🦡 DACHSBAU SLOTS - CHANGELOG 📋
 
-> **Aktuelle Version:** 1.5.3 - "Bug Fixes & Code Quality"
-> **Letztes Update:** 6. Januar 2026
+> **Aktuelle Version:** 1.6.0 - "Duell-System"
+> **Letztes Update:** 17. Januar 2026
 
 ---
 
@@ -48,7 +48,113 @@ Du kannst dich jederzeit selbst vom Spielen ausschließen:
 ---
 
 <details open>
-<summary>🆕 Version 1.5.3 - "Bug Fixes & Code Quality" (6. Januar 2026)</summary>
+<summary>🆕 Version 1.6.0 - "Duell-System" (17. Januar 2026)</summary>
+
+### ⚔️ Neues Feature: Duell-System
+
+**Fordere andere Spieler zum direkten Slot-Duell heraus!**
+
+Das neue Duell-System ermöglicht faire 1v1 Slot-Battles zwischen Spielern. Beide spinnen gleichzeitig ohne Buffs oder Items – nur Glück entscheidet!
+
+---
+
+### 🎮 Neue Commands
+
+| Command | Beschreibung |
+|---------|--------------|
+| `!slots duel @user [Betrag]` | Fordere jemanden zum Duell heraus (min. 100 DT) |
+| `!slots duelaccept` | Nimm eine Duell-Herausforderung an |
+| `!slots dueldecline` | Lehne eine Duell-Herausforderung ab |
+| `!slots duelopt out` | Deaktiviere Duelle für dich |
+| `!slots duelopt in` | Aktiviere Duelle wieder |
+
+---
+
+### 📋 Duell-Regeln
+
+| Regel | Wert |
+|-------|------|
+| **Mindesteinsatz** | 100 DachsTaler |
+| **Maximaleinsatz** | Unbegrenzt |
+| **Timeout** | 60 Sekunden zum Antworten |
+| **Buffs/Items** | Deaktiviert (faire Kämpfe!) |
+| **Aktive Herausforderungen** | Max. 1 pro Spieler |
+
+---
+
+### 🏆 Gewinn-Logik
+
+**Gewinner wird durch Gewinn-Stufen bestimmt:**
+
+1. **Triple** (3 gleiche) schlägt alles
+2. **Paar** (2 gleiche) schlägt Einzelne
+3. **Punktsumme** entscheidet bei Gleichstand
+
+**Symbol-Werte für Tiebreaker:**
+
+| Symbol | Punkte |
+|--------|--------|
+| 🦡 Dachs | 500 |
+| 💎 Diamant | 100 |
+| ⭐ Stern | 25 |
+| 🍉 Melone | 13 |
+| 🍇 Trauben | 8 |
+| 🍊 Orange | 5 |
+| 🍋 Zitrone | 4 |
+| 🍒 Kirsche | 3 |
+
+---
+
+### 🔒 Opt-Out System
+
+Spieler können sich von Duellen ausschließen:
+
+- `!slots duelopt out` → Keine Herausforderungen mehr erhalten
+- `!slots duelopt in` → Wieder herausforderbar sein
+- Status wird in KV gespeichert (`duel_optout:username`)
+
+---
+
+### 🛡️ Sicherheitsfeatures
+
+**Race Condition Prevention:**
+- Atomares Accept mit Delete + Verify Pattern
+- Verhindert doppeltes Akzeptieren bei gleichzeitigen Requests
+
+**Balance-Checks:**
+- Beide Spieler müssen genug DachsTaler haben
+- Re-Check beim Accept (Balance kann sich geändert haben)
+
+**Timeout-System:**
+- Herausforderungen laufen nach 60 Sekunden automatisch ab
+- KV-Einträge haben TTL für automatische Bereinigung
+
+---
+
+### 📁 Neue Dateien
+
+| Datei | Beschreibung |
+|-------|--------------|
+| `database/duels.js` | KV-Operationen für Duell-System |
+| `commands/duel.js` | Command-Handler für alle Duell-Commands |
+
+---
+
+### 📊 Zusammenfassung
+
+| Kategorie | Änderung |
+|-----------|----------|
+| ✨ Features | 1 (Komplettes Duell-System) |
+| 🎮 Commands | 5 neue Commands |
+| 📁 Dateien | 2 neue Dateien |
+| 🔧 Konstanten | 6 neue (DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, etc.) |
+
+</details>
+
+---
+
+<details>
+<summary>📦 Version 1.5.3 - "Bug Fixes & Code Quality" (6. Januar 2026)</summary>
 
 ### 🔧 Bug Fixes
 

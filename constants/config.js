@@ -35,7 +35,9 @@ export const KV_PREFIX = {
   DACHS_BOOST_PURCHASES: 'dachsboost_purchases:',
   PEEK: 'peek:',
   JACKPOT: 'jackpot:',
-  LEADERBOARD_BLOCKED: 'lb_blocked:'
+  LEADERBOARD_BLOCKED: 'lb_blocked:',
+  DUEL: 'duel:',
+  DUEL_OPTOUT: 'duel_optout:'
 };
 
 // Time Constants
@@ -94,6 +96,11 @@ export const EXPONENTIAL_BACKOFF_BASE_MS = 10;
 
 // Time Helper
 export const SECONDS_PER_MINUTE = 60;
+
+// Duell Settings
+export const DUEL_MIN_AMOUNT = 100;
+export const DUEL_TIMEOUT_SECONDS = 60;
+export const DUEL_COOLDOWN_SECONDS = 30;
 
 // URLs
 export const URLS = {

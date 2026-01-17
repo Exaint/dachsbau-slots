@@ -6,7 +6,7 @@
 
 [![Info](https://img.shields.io/badge/ℹ️_Info-Commands_&_Regeln-00D9FF?style=flat-square)](https://git.new/DachsbauSlotInfos) [![Changelog](https://img.shields.io/badge/📜_Changelog-Updates-8B5CF6?style=flat-square)](https://gist.github.com/Exaint/288b8a2707aa41b01d440ee4f207a831) [![Discord](https://img.shields.io/badge/💬_Discord-Dachsbau-5865F2?style=flat-square)](https://discord.gg/dachsbau)
 
-**Version 1.5.0** • Letztes Update: 5. Januar 2026
+**Version 1.6.0** • Letztes Update: 17. Januar 2026
 
 </div>
 

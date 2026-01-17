@@ -43,9 +43,12 @@ async function handleAchievementsApi(username, env) {
     return jsonResponse({ error: 'Username required' }, 400);
   }
 
-  // Check if user exists
-  const hasPlayed = await hasAcceptedDisclaimer(username, env);
-  if (!hasPlayed) {
+  // Check if user exists (check both disclaimer AND balance for legacy players)
+  const [hasDisclaimer, balance] = await Promise.all([
+    hasAcceptedDisclaimer(username, env),
+    getBalance(username, env)
+  ]);
+  if (!hasDisclaimer && balance <= 0) {
     return jsonResponse({ error: 'Player not found', username }, 404);
   }
 
@@ -114,18 +117,19 @@ async function handleProfileApi(username, env) {
     return jsonResponse({ error: 'Username required' }, 400);
   }
 
-  // Check if user exists
-  const hasPlayed = await hasAcceptedDisclaimer(username, env);
-  if (!hasPlayed) {
-    return jsonResponse({ error: 'Player not found', username }, 404);
-  }
-
-  const [balance, rank, stats, achievementData] = await Promise.all([
+  // Check if user exists and fetch data in parallel
+  const [hasDisclaimer, balance, rank, stats, achievementData] = await Promise.all([
+    hasAcceptedDisclaimer(username, env),
     getBalance(username, env),
     getPrestigeRank(username, env),
     getStats(username, env),
     getPlayerAchievements(username, env)
   ]);
+
+  // User exists if they accepted disclaimer OR have a balance (legacy players)
+  if (!hasDisclaimer && balance <= 0) {
+    return jsonResponse({ error: 'Player not found', username }, 404);
+  }
 
   const allAchievements = getAllAchievements();
   const unlockedCount = Object.keys(achievementData.unlockedAt).length;

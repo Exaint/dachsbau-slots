@@ -65,15 +65,20 @@ async function handleProfilePage(url, env) {
     return htmlResponse(renderHomePage('Bitte gib einen Spielernamen ein.'));
   }
 
-  // Check if user exists
-  const hasPlayed = await hasAcceptedDisclaimer(username, env);
-  if (!hasPlayed) {
+  // Check if user exists (check both disclaimer AND balance for legacy players)
+  const [hasDisclaimer, balance] = await Promise.all([
+    hasAcceptedDisclaimer(username, env),
+    getBalance(username, env)
+  ]);
+
+  // User exists if they accepted disclaimer OR have a balance (legacy players)
+  const userExists = hasDisclaimer || balance > 0;
+  if (!userExists) {
     return htmlResponse(renderNotFoundPage(username));
   }
 
-  // Fetch all data in parallel
-  const [balance, rank, stats, achievementData] = await Promise.all([
-    getBalance(username, env),
+  // Fetch remaining data in parallel (balance already fetched above)
+  const [rank, stats, achievementData] = await Promise.all([
     getPrestigeRank(username, env),
     getStats(username, env),
     getPlayerAchievements(username, env)

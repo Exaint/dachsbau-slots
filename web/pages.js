@@ -4,7 +4,7 @@
  */
 
 import { CSS } from './styles.js';
-import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats } from '../database.js';
+import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned } from '../database.js';
 import { isDuelOptedOut } from '../database/duels.js';
 import { getTwitchProfileData, getUserRole } from './twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
@@ -95,13 +95,14 @@ async function handleProfilePage(url, env) {
   }
 
   // Fetch remaining data in parallel (balance already fetched above)
-  const [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, twitchData] = await Promise.all([
+  const [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, twitchData] = await Promise.all([
     getPrestigeRank(username, env),
     getStats(username, env),
     getPlayerAchievements(username, env),
     getLastActive(username, env),
     getAchievementStats(env),
     isDuelOptedOut(username, env),
+    isSelfBanned(username, env),
     getTwitchProfileData(username, env)
   ]);
 
@@ -159,6 +160,7 @@ async function handleProfilePage(url, env) {
     pendingRewards: achievementData.pendingRewards,
     lastActive,
     duelOptOut,
+    selfBanned,
     twitchData
   }));
 }
@@ -681,7 +683,7 @@ const ROLE_BADGES = {
  * Profile page
  */
 function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, twitchData } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, twitchData } = data;
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
@@ -845,7 +847,7 @@ function renderProfilePage(data) {
   // Special admin overrides
   if (lowerUsername === 'exaint_') {
     roleBadgeHtml = `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Mod" class="profile-badge" title="Lead-Mod">`;
-    roleTitle = 'Head-Mod / Dachsbau-Slots Admin';
+    roleTitle = 'Lead-Mod / Dachsbau-Slots Admin';
   } else if (lowerUsername === 'frechhdachs') {
     roleBadgeHtml = `<img src="${ROLE_BADGES.broadcaster.icon}" alt="Broadcaster" class="profile-badge" title="Broadcaster">`;
     roleTitle = 'Streamerin / Dachsbau-Slots Admin';
@@ -873,6 +875,7 @@ function renderProfilePage(data) {
           <div class="profile-badges">
             ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
             <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}<span class="duel-info-icon" data-tooltip="Du möchtest dich von Duellen ausschließen? Schreib &quot;!slots duelopt out&quot; im Chat.">ⓘ</span></span>
+            <span class="profile-selfban-status ${selfBanned ? 'banned' : 'active'}">🎰 ${selfBanned ? 'Selbst-gesperrt' : 'Aktiv'}<span class="duel-info-icon" data-tooltip="${selfBanned ? 'Dieser Spieler hat sich selbst vom Spielen ausgeschlossen.' : 'Du möchtest dich selbst sperren? Schreib &quot;!slots selfban&quot; im Chat.'}">ⓘ</span></span>
           </div>
           ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
         </div>
@@ -1312,7 +1315,7 @@ function renderShopPage() {
             </div>
             <div class="shop-item-desc">${desc}</div>
             <div class="shop-item-meta">
-              <span class="shop-item-id">#${item.id}</span>
+              <code class="shop-item-cmd">!shop buy ${item.id}</code>
               ${requiresHtml}${requiresRankHtml}${weeklyHtml}
             </div>
           </div>

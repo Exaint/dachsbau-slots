@@ -351,6 +351,22 @@ body {
   color: #ef4444;
 }
 
+.profile-selfban-status {
+  font-size: 0.9rem;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.profile-selfban-status.active {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.profile-selfban-status.banned {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
 .duel-info-icon {
   display: inline-flex;
   align-items: center;
@@ -1551,6 +1567,15 @@ body {
   background: rgba(0, 217, 255, 0.15);
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+.shop-item-cmd {
+  font-size: 0.75rem;
+  background: var(--bg-card);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--success);
+  font-family: monospace;
 }
 
 /* Changelog */

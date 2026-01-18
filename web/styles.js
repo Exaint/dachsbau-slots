@@ -769,39 +769,68 @@ body {
   gap: 16px;
   padding: 14px 16px;
   border-radius: 8px;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease;
   animation: slideIn 0.3s ease-out;
   animation-fill-mode: both;
 }
 
 .leaderboard-item:hover {
   background: var(--bg-tertiary);
-  transform: translateX(4px);
 }
 
 .leaderboard-rank {
   font-size: 1.3rem;
   width: 40px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .leaderboard-user {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.leaderboard-username {
+.leaderboard-username-link {
   font-weight: 600;
   color: var(--text-primary);
   text-decoration: none;
+  transition: color 0.2s ease;
 }
 
-.leaderboard-username:hover {
+.leaderboard-username-link:hover {
   color: var(--accent);
+  text-decoration: underline;
+}
+
+.leaderboard-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  font-size: 0.75rem;
+}
+
+.leaderboard-badge {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+
+.leaderboard-role-label {
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .leaderboard-balance {
   font-weight: 600;
   color: var(--dachs-gold);
+  flex-shrink: 0;
 }
 
 /* Home Page */

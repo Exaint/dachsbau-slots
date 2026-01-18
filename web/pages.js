@@ -6,7 +6,7 @@
 import { CSS } from './styles.js';
 import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats } from '../database.js';
 import { isDuelOptedOut } from '../database/duels.js';
-import { getTwitchProfileData } from './twitch.js';
+import { getTwitchProfileData, getUserRole } from './twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
 import { logError } from '../utils.js';
 
@@ -204,7 +204,20 @@ async function handleLeaderboardPage(env) {
     // Sort by balance descending
     users.sort((a, b) => b.balance - a.balance);
 
-    return htmlResponse(renderLeaderboardPage(users.slice(0, 100)));
+    // Get top 100 for display
+    const top100 = users.slice(0, 100);
+
+    // Fetch Twitch roles for all top 100 players in parallel
+    const rolesPromises = top100.map(user => getUserRole(user.username, env));
+    const roles = await Promise.all(rolesPromises);
+
+    // Add roles to user objects
+    const playersWithRoles = top100.map((user, index) => ({
+      ...user,
+      role: roles[index]
+    }));
+
+    return htmlResponse(renderLeaderboardPage(playersWithRoles));
   } catch (error) {
     logError('handleLeaderboardPage', error);
     return htmlResponse(renderErrorPage());
@@ -907,17 +920,42 @@ function renderLeaderboardPage(players) {
     return `#${index + 1}`;
   };
 
+  // Get role badge HTML for a player
+  const getRoleBadge = (username, role) => {
+    const lowerUsername = username.toLowerCase();
+
+    // Special admin badges
+    if (lowerUsername === 'exaint_') {
+      return `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Mod" class="leaderboard-badge" title="Lead-Mod"><span class="leaderboard-role-label">Lead-Mod</span>`;
+    }
+    if (lowerUsername === 'frechhdachs') {
+      return `<img src="${ROLE_BADGES.broadcaster.icon}" alt="Broadcaster" class="leaderboard-badge" title="Broadcaster"><span class="leaderboard-role-label">Broadcaster</span>`;
+    }
+
+    // Regular Twitch roles
+    if (role && ROLE_BADGES[role]) {
+      const badge = ROLE_BADGES[role];
+      return `<img src="${badge.icon}" alt="${badge.label}" class="leaderboard-badge" title="${badge.label}"><span class="leaderboard-role-label">${badge.label}</span>`;
+    }
+
+    return '';
+  };
+
   const playersHtml = players.length === 0
     ? '<p style="text-align: center; color: var(--text-muted); padding: 40px;">Noch keine Spieler gefunden.</p>'
-    : players.map((player, index) => `
-        <a href="?page=profile&user=${encodeURIComponent(player.username)}" class="leaderboard-item">
+    : players.map((player, index) => {
+        const roleBadgeHtml = getRoleBadge(player.username, player.role);
+        return `
+        <div class="leaderboard-item">
           <div class="leaderboard-rank">${getRankDisplay(index)}</div>
           <div class="leaderboard-user">
-            <span class="leaderboard-username">${escapeHtml(player.username)}</span>
+            <a href="?page=profile&user=${encodeURIComponent(player.username)}" class="leaderboard-username-link">${escapeHtml(player.username)}</a>
+            ${roleBadgeHtml ? `<span class="leaderboard-role">${roleBadgeHtml}</span>` : ''}
           </div>
           <div class="leaderboard-balance">${formatNumber(player.balance)} DT</div>
-        </a>
-      `).join('');
+        </div>
+      `;
+      }).join('');
 
   const content = `
     <div class="leaderboard">

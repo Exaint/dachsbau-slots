@@ -638,7 +638,7 @@ function renderHomePage(errorMessage = null) {
  * Profile page
  */
 function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, pendingRewards, lastActive } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive } = data;
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
@@ -816,7 +816,6 @@ function renderProfilePage(data) {
       <div class="achievement-summary">
         <div class="achievement-count">
           <strong>${unlockedCount}</strong> / ${totalCount} Achievements
-          ${pendingRewards > 0 ? `<span style="color: var(--dachs-gold);"> (${formatNumber(pendingRewards)} DT ausstehend)</span>` : ''}
         </div>
         <div class="progress-bar">
           <div class="progress-fill" style="width: ${progressPercent}%"></div>
@@ -986,6 +985,24 @@ function renderInfoPage() {
           <div class="command-item">
             <code>!slots duelopt out/in</code>
             <span>Duelle deaktivieren/aktivieren</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section">
+        <h2>🌐 Website & Erfolge</h2>
+        <div class="command-list">
+          <div class="command-item">
+            <code>!slots website / site / seite</code>
+            <span>Link zur Dachsbau Slots Website</span>
+          </div>
+          <div class="command-item">
+            <code>!slots erfolge / achievements</code>
+            <span>Link zu deinen Erfolgen</span>
+          </div>
+          <div class="command-item">
+            <code>!slots erfolge @user</code>
+            <span>Link zu Erfolgen eines anderen Spielers</span>
           </div>
         </div>
       </section>
@@ -1307,7 +1324,34 @@ function renderChangelogPage() {
   const content = `
     <div class="content-page">
       <h1 class="page-title">📜 Changelog</h1>
-      <p class="page-subtitle">Aktuelle Version: 1.6.0 - "Duell-System"</p>
+      <p class="page-subtitle">Aktuelle Version: 1.7.0 - "Achievement-Website"</p>
+
+      <section class="changelog-entry">
+        <h2>Version 1.7.0 - "Achievement-Website" <span class="changelog-date">18. Januar 2026</span></h2>
+        <div class="changelog-content">
+          <h3>🌐 Öffentliche Website</h3>
+          <ul>
+            <li>Spieler-Profile mit Stats und Erfolgen online einsehen</li>
+            <li>Leaderboard auf der Website</li>
+            <li>Globale Statistiken (seltenste Achievements, etc.)</li>
+            <li>Dark/Light Theme Toggle</li>
+            <li>Mobile-optimiertes Design</li>
+          </ul>
+          <h3>🏆 Achievement-System</h3>
+          <ul>
+            <li>50+ freischaltbare Erfolge in 7 Kategorien</li>
+            <li>Seltenheits-Anzeige (% der Spieler)</li>
+            <li>Fortschritts-Tracking für alle Achievements</li>
+            <li>Konfetti-Effekt bei 100% Completion</li>
+          </ul>
+          <h3>🔗 Neue Commands</h3>
+          <ul>
+            <li><code>!slots website / site / seite</code> - Link zur Website</li>
+            <li><code>!slots erfolge / achievements</code> - Link zu deinen Erfolgen</li>
+            <li><code>!slots erfolge @user</code> - Erfolge eines anderen Spielers</li>
+          </ul>
+        </div>
+      </section>
 
       <section class="changelog-entry">
         <h2>Version 1.6.0 - "Duell-System" <span class="changelog-date">17. Januar 2026</span></h2>

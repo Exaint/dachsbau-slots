@@ -106,5 +106,6 @@ export const DUEL_COOLDOWN_SECONDS = 30;
 export const URLS = {
   INFO: 'https://git.new/DachsbauSlotInfos',
   SHOP: 'https://git.new/DachsbauSlotsShop',
-  UNLOCK: 'https://dub.sh/SlotUnlock'
+  UNLOCK: 'https://dub.sh/SlotUnlock',
+  WEBSITE: 'https://dachsbau-slots.exaint.workers.dev'
 };

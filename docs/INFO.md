@@ -4,9 +4,9 @@
 
 **Das virtuelle Slot-Spiel für den Dachsbau**
 
-[![Shop](https://img.shields.io/badge/🛒_Shop-Items_&_Preise-00D9FF?style=flat-square)](https://git.new/DachsbauSlotsShop) [![Changelog](https://img.shields.io/badge/📜_Changelog-Updates-8B5CF6?style=flat-square)](https://gist.github.com/Exaint/288b8a2707aa41b01d440ee4f207a831) [![Discord](https://img.shields.io/badge/💬_Discord-Dachsbau-5865F2?style=flat-square)](https://discord.gg/dachsbau)
+[![Website](https://img.shields.io/badge/🦡_Website-Erfolge_&_Stats-FFD700?style=flat-square)](https://dachsbau-slots.exaint.workers.dev) [![Shop](https://img.shields.io/badge/🛒_Shop-Items_&_Preise-00D9FF?style=flat-square)](https://git.new/DachsbauSlotsShop) [![Changelog](https://img.shields.io/badge/📜_Changelog-Updates-8B5CF6?style=flat-square)](https://gist.github.com/Exaint/288b8a2707aa41b01d440ee4f207a831) [![Discord](https://img.shields.io/badge/💬_Discord-Dachsbau-5865F2?style=flat-square)](https://discord.gg/dachsbau)
 
-**Version 1.6.0** • Letztes Update: 17. Januar 2026 
+**Version 1.7.0** • Letztes Update: 18. Januar 2026 
 
 </div>
 
@@ -125,6 +125,14 @@ Kaufe die Unlocks im Shop in dieser Reihenfolge:
 | `!shop buy [Nr]` | Item kaufen (z.B. `!shop buy 38`) |
 | `!transfer @user [Betrag]` | DachsTaler senden (1–100.000) |
 | `!transfer @dachsbank [Betrag]` | An Bank spenden |
+
+### Website & Erfolge
+
+| Command | Beschreibung |
+|:--------|:-------------|
+| `!slots website / site / seite` | Link zur Dachsbau Slots Website |
+| `!slots erfolge / achievements` | Link zu deinen Erfolgen |
+| `!slots erfolge @user` | Link zu Erfolgen eines anderen Spielers |
 
 ### Weitere Commands
 
@@ -532,12 +540,14 @@ Das Wild ersetzt **jedes Symbol** für den besten Outcome:
 
 ## 📜 Changelog
 
-### Version 1.6.0 – "Duell-System" *(17.01.2026)*
+### Version 1.7.0 – "Achievement-Website" *(18.01.2026)*
 
-- ⚔️ **Duell-System** – Fordere andere Spieler heraus!
-- 🎮 **`!slots duel @user [Betrag]`** – Starte ein Duell
-- ✅ **`!slots duelaccept/dueldecline`** – Annehmen/Ablehnen
-- 🚫 **`!slots duelopt`** – Opt-Out für Duelle
+- 🌐 **Öffentliche Website** – [dachsbau-slots.exaint.workers.dev](https://dachsbau-slots.exaint.workers.dev)
+- 🏆 **Achievement-System** – 50+ freischaltbare Erfolge
+- 📊 **Spieler-Profile** – Stats, Erfolge & Fortschritt online einsehen
+- 🏅 **Leaderboard** – Top-Spieler auf der Website
+- 📈 **Globale Statistiken** – Seltenste Achievements & mehr
+- 🔗 **Neue Commands:** `!slots erfolge`, `!slots website`
 
 > 📜 [Vollständiger Changelog](https://gist.github.com/Exaint/288b8a2707aa41b01d440ee4f207a831)
 

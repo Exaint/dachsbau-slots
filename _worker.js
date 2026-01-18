@@ -57,9 +57,11 @@ import { handleDuel, handleDuelAccept, handleDuelDecline, handleDuelOpt } from '
 const LEADERBOARD_ALIASES = new Set(['lb', 'leaderboard', 'rank', 'ranking']);
 const BALANCE_ALIASES = new Set(['balance', 'konto']);
 const INFO_ALIASES = new Set(['info', 'help', 'commands']);
+const WEBSITE_ALIASES = new Set(['website', 'site', 'seite']);
+const ACHIEVEMENTS_ALIASES = new Set(['erfolge', 'achievements']);
 
 // OPTIMIZED: Commands that don't need security checks (read-only info commands)
-const SAFE_COMMANDS = new Set(['stats', 'buffs', 'bank', ...LEADERBOARD_ALIASES, ...BALANCE_ALIASES, ...INFO_ALIASES]);
+const SAFE_COMMANDS = new Set(['stats', 'buffs', 'bank', ...LEADERBOARD_ALIASES, ...BALANCE_ALIASES, ...INFO_ALIASES, ...WEBSITE_ALIASES, ...ACHIEVEMENTS_ALIASES]);
 
 // Admin commands that take (username, target, env)
 const ADMIN_COMMANDS_TARGET = {
@@ -176,6 +178,22 @@ export default {
             }
 
             return new Response(`@${finalTarget} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS });
+          }
+          if (WEBSITE_ALIASES.has(lower)) {
+            return new Response(`@${cleanUsername} 🦡 Dachsbau Slots Website: ${URLS.WEBSITE}`, { headers: RESPONSE_HEADERS });
+          }
+          if (ACHIEVEMENTS_ALIASES.has(lower)) {
+            const targetParam = url.searchParams.get('target');
+            let profileUser = cleanUsername;
+
+            if (targetParam) {
+              const cleanTarget = sanitizeUsername(targetParam.replace('@', ''));
+              if (cleanTarget) {
+                profileUser = cleanTarget;
+              }
+            }
+
+            return new Response(`@${cleanUsername} 🏆 Erfolge von ${profileUser}: ${URLS.WEBSITE}?page=profile&user=${profileUser}`, { headers: RESPONSE_HEADERS });
           }
           if (lower === 'daily') return await handleDaily(cleanUsername, env);
           if (lower === 'stats') return await handleStats(cleanUsername, env);

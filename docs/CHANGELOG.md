@@ -1,7 +1,7 @@
 # 🦡 DACHSBAU SLOTS - CHANGELOG 📋
 
-> **Aktuelle Version:** 1.6.0 - "Duell-System"
-> **Letztes Update:** 17. Januar 2026
+> **Aktuelle Version:** 1.7.0 - "Achievement-Website"
+> **Letztes Update:** 18. Januar 2026
 
 ---
 
@@ -9,6 +9,7 @@
 
 | Link | Beschreibung |
 |------|--------------|
+| 🦡 [Website](https://dachsbau-slots.exaint.workers.dev) | Erfolge, Profile & Statistiken |
 | 📖 [Info & Commands](https://git.new/DachsbauSlotInfos) | Alle Commands, Gewinnchancen & FAQ |
 | 🛒 [Shop](https://git.new/DachsbauSlotsShop) | Alle Items, Preise & Kategorien |
 | 🔓 [Unlock Info](https://dub.sh/SlotUnlock) | Multiplier-Unlocks Übersicht |
@@ -48,7 +49,55 @@ Du kannst dich jederzeit selbst vom Spielen ausschließen:
 ---
 
 <details open>
-<summary>🆕 Version 1.6.0 - "Duell-System" (17. Januar 2026)</summary>
+<summary>🆕 Version 1.7.0 - "Achievement-Website" (18. Januar 2026)</summary>
+
+### 🌐 Öffentliche Website
+
+**Dachsbau Slots hat jetzt eine eigene Website!**
+
+Unter [dachsbau-slots.exaint.workers.dev](https://dachsbau-slots.exaint.workers.dev) findest du:
+- Spieler-Profile mit Stats und Erfolgen
+- Leaderboard
+- Globale Statistiken (seltenste Achievements, etc.)
+- Symbol-Guide mit allen Gewinnen
+
+---
+
+### 🏆 Achievement-System
+
+| Feature | Beschreibung |
+|---------|--------------|
+| **50+ Erfolge** | In 7 Kategorien: Spinning, Winning, Collecting, Social, Dedication, Shopping, Special |
+| **Seltenheits-Anzeige** | Sieh wie viel % der Spieler jedes Achievement haben |
+| **Fortschritts-Tracking** | Progress-Bars für alle zählbaren Achievements |
+| **Konfetti-Effekt** | Feier bei 100% Completion! |
+
+---
+
+### 🔗 Neue Commands
+
+| Command | Beschreibung |
+|---------|--------------|
+| `!slots website / site / seite` | Link zur Dachsbau Slots Website |
+| `!slots erfolge / achievements` | Link zu deinen Erfolgen |
+| `!slots erfolge @user` | Erfolge eines anderen Spielers anzeigen |
+
+---
+
+### 🎨 Website-Features
+
+- Dark/Light Theme Toggle
+- Mobile-optimiertes Design
+- Achievement-Filter (Alle/Freigeschaltet/Gesperrt)
+- Sortierung nach Seltenheit
+- Detail-Popup bei Klick auf Achievement
+
+</details>
+
+---
+
+<details>
+<summary>Version 1.6.0 - "Duell-System" (17. Januar 2026)</summary>
 
 ### ⚔️ Neues Feature: Duell-System
 

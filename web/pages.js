@@ -41,45 +41,49 @@ const PRESTIGE_RANK_NAMES = {
 
 /**
  * Handle web page requests
+ * @param {string} page - Page name
+ * @param {URL} url - Request URL
+ * @param {object} env - Environment bindings
+ * @param {object|null} loggedInUser - Logged in user from JWT cookie
  */
-export async function handleWebPage(page, url, env) {
+export async function handleWebPage(page, url, env, loggedInUser = null) {
   try {
     switch (page) {
       case 'home':
-        return htmlResponse(renderHomePage());
+        return htmlResponse(renderHomePage(null, loggedInUser));
       case 'profile':
-        return await handleProfilePage(url, env);
+        return await handleProfilePage(url, env, loggedInUser);
       case 'leaderboard':
-        return await handleLeaderboardPage(env);
+        return await handleLeaderboardPage(env, loggedInUser);
       case 'info':
-        return htmlResponse(renderInfoPage());
+        return htmlResponse(renderInfoPage(loggedInUser));
       case 'shop':
-        return htmlResponse(renderShopPage());
+        return htmlResponse(await renderShopPage(env, loggedInUser));
       case 'changelog':
-        return htmlResponse(renderChangelogPage());
+        return htmlResponse(renderChangelogPage(loggedInUser));
       case 'stats':
-        return await handleGlobalStatsPage(env);
+        return await handleGlobalStatsPage(env, loggedInUser);
       case 'impressum':
-        return htmlResponse(renderImpressumPage());
+        return htmlResponse(renderImpressumPage(loggedInUser));
       case 'datenschutz':
-        return htmlResponse(renderDatenschutzPage());
+        return htmlResponse(renderDatenschutzPage(loggedInUser));
       default:
-        return htmlResponse(renderNotFoundPage());
+        return htmlResponse(renderNotFoundPage(null, loggedInUser));
     }
   } catch (error) {
     logError('handleWebPage', error, { page });
-    return htmlResponse(renderErrorPage());
+    return htmlResponse(renderErrorPage(loggedInUser));
   }
 }
 
 /**
  * Profile page handler
  */
-async function handleProfilePage(url, env) {
+async function handleProfilePage(url, env, loggedInUser = null) {
   const username = url.searchParams.get('user');
 
   if (!username) {
-    return htmlResponse(renderHomePage('Bitte gib einen Spielernamen ein.'));
+    return htmlResponse(renderHomePage('Bitte gib einen Spielernamen ein.', loggedInUser));
   }
 
   // Check if user exists (check both disclaimer AND balance for legacy players)
@@ -91,7 +95,7 @@ async function handleProfilePage(url, env) {
   // User exists if they accepted disclaimer OR have a balance (legacy players)
   const userExists = hasDisclaimer || balance > 0;
   if (!userExists) {
-    return htmlResponse(renderNotFoundPage(username));
+    return htmlResponse(renderNotFoundPage(username, loggedInUser));
   }
 
   // Fetch remaining data in parallel (balance already fetched above)
@@ -161,14 +165,15 @@ async function handleProfilePage(url, env) {
     lastActive,
     duelOptOut,
     selfBanned,
-    twitchData
+    twitchData,
+    loggedInUser
   }));
 }
 
 /**
  * Leaderboard page handler
  */
-async function handleLeaderboardPage(env) {
+async function handleLeaderboardPage(env, loggedInUser = null) {
   const LEADERBOARD_LIMIT = 1000;
   const BATCH_SIZE = 100;
 
@@ -176,7 +181,7 @@ async function handleLeaderboardPage(env) {
     const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
 
     if (!listResult.keys || listResult.keys.length === 0) {
-      return htmlResponse(renderLeaderboardPage([]));
+      return htmlResponse(renderLeaderboardPage([], loggedInUser));
     }
 
     const users = [];
@@ -219,10 +224,10 @@ async function handleLeaderboardPage(env) {
       role: roles[index]
     }));
 
-    return htmlResponse(renderLeaderboardPage(playersWithRoles));
+    return htmlResponse(renderLeaderboardPage(playersWithRoles, loggedInUser));
   } catch (error) {
     logError('handleLeaderboardPage', error);
-    return htmlResponse(renderErrorPage());
+    return htmlResponse(renderErrorPage(loggedInUser));
   }
 }
 
@@ -272,8 +277,12 @@ const DISCLAIMER_HTML = `
 
 /**
  * Base HTML template with navigation
+ * @param {string} title - Page title
+ * @param {string} content - Page content HTML
+ * @param {string} activePage - Current active page for nav highlighting
+ * @param {object|null} user - Logged in user object or null
  */
-function baseTemplate(title, content, activePage = '') {
+function baseTemplate(title, content, activePage = '', user = null) {
   const navItems = [
     { page: 'home', label: 'Start', icon: '🏠' },
     { page: 'info', label: 'Info', icon: 'ℹ️' },
@@ -287,6 +296,26 @@ function baseTemplate(title, content, activePage = '') {
     const isActive = activePage === item.page ? ' active' : '';
     return `<a href="?page=${item.page}" class="nav-item${isActive}">${item.icon} ${item.label}</a>`;
   }).join('');
+
+  // User section - show login button or user info
+  const userSectionHtml = user
+    ? `
+      <div class="user-section">
+        <a href="?page=profile&user=${encodeURIComponent(user.username)}" class="user-profile-link">
+          ${user.avatar ? `<img src="${user.avatar}" alt="" class="user-avatar-small">` : ''}
+          <span class="user-display-name">${escapeHtml(user.displayName || user.username)}</span>
+        </a>
+        <a href="/auth/logout" class="btn-logout" title="Ausloggen">Logout</a>
+      </div>
+    `
+    : `
+      <a href="/auth/login" class="btn-twitch-login">
+        <svg viewBox="0 0 256 268" class="twitch-icon" width="16" height="16">
+          <path fill="currentColor" d="M17.458 0L0 46.556v186.2h63.983v34.934h34.931l34.898-34.934h52.36L256 162.954V0H17.458zm23.259 23.263H232.73v128.029l-40.739 40.617H128L93.113 226.5v-34.91H40.717V23.263zm69.4 106.292h23.24V58.325h-23.24v71.23zm63.986 0h23.24V58.325h-23.24v71.23z"/>
+        </svg>
+        <span>Mit Twitch einloggen</span>
+      </a>
+    `;
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -320,6 +349,7 @@ function baseTemplate(title, content, activePage = '') {
         <input type="text" name="user" placeholder="Spielername..." class="search-input" required>
         <button type="submit" class="btn">Suchen</button>
       </form>
+      ${userSectionHtml}
       <button class="theme-toggle" onclick="toggleTheme()" title="Theme wechseln">
         <span class="theme-toggle-icon">🌙</span>
         <span class="theme-toggle-label">Dark</span>
@@ -333,6 +363,7 @@ function baseTemplate(title, content, activePage = '') {
   </header>
   <nav class="mobile-nav" id="mobileNav">
     ${navHtml}
+    ${user ? `<a href="?page=profile&user=${encodeURIComponent(user.username)}" class="nav-item">👤 Mein Profil</a><a href="/auth/logout" class="nav-item">🚪 Logout</a>` : `<a href="/auth/login" class="nav-item">🟣 Mit Twitch einloggen</a>`}
   </nav>
   <main class="container">
     ${DISCLAIMER_HTML}
@@ -634,7 +665,7 @@ function baseTemplate(title, content, activePage = '') {
 /**
  * Home page
  */
-function renderHomePage(errorMessage = null) {
+function renderHomePage(errorMessage = null, user = null) {
   const errorHtml = errorMessage
     ? `<p style="color: var(--error); margin-bottom: 16px;">${escapeHtml(errorMessage)}</p>`
     : '';
@@ -657,7 +688,7 @@ function renderHomePage(errorMessage = null) {
     </div>
   `;
 
-  return baseTemplate('Home', content, 'home');
+  return baseTemplate('Home', content, 'home', user);
 }
 
 // Role badge info
@@ -683,7 +714,7 @@ const ROLE_BADGES = {
  * Profile page
  */
 function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, twitchData } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, twitchData, loggedInUser } = data;
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
@@ -909,13 +940,13 @@ function renderProfilePage(data) {
     </div>
   `;
 
-  return baseTemplate(`${username}'s Profil`, content, 'profile');
+  return baseTemplate(`${username}'s Profil`, content, 'profile', loggedInUser);
 }
 
 /**
  * Leaderboard page
  */
-function renderLeaderboardPage(players) {
+function renderLeaderboardPage(players, user = null) {
   const getRankDisplay = (index) => {
     if (index === 0) return '🥇';
     if (index === 1) return '🥈';
@@ -971,13 +1002,13 @@ function renderLeaderboardPage(players) {
     </div>
   `;
 
-  return baseTemplate('Leaderboard', content, 'leaderboard');
+  return baseTemplate('Leaderboard', content, 'leaderboard', user);
 }
 
 /**
  * Info page
  */
-function renderInfoPage() {
+function renderInfoPage(user = null) {
   const content = `
     <div class="content-page">
       <h1 class="page-title">ℹ️ Info & Commands</h1>
@@ -1206,7 +1237,7 @@ function renderInfoPage() {
     </div>
   `;
 
-  return baseTemplate('Info & Commands', content, 'info');
+  return baseTemplate('Info & Commands', content, 'info', user);
 }
 
 /**
@@ -1265,7 +1296,33 @@ const ITEM_ICONS = {
   37: '🎯', 38: '🃏', 39: '💎'
 };
 
-function renderShopPage() {
+async function renderShopPage(env, user = null) {
+  // If user is logged in, fetch their balance
+  let userBalanceHtml = '';
+  if (user) {
+    const balance = await getBalance(user.username, env);
+    userBalanceHtml = `
+      <div class="shop-user-info">
+        <div class="shop-user-balance">
+          <span class="balance-label">Dein Kontostand:</span>
+          <span class="balance-value">${formatNumber(balance)} DT</span>
+        </div>
+        <a href="?page=profile&user=${encodeURIComponent(user.username)}" class="btn btn-secondary">Mein Profil</a>
+      </div>
+    `;
+  } else {
+    userBalanceHtml = `
+      <div class="shop-login-prompt">
+        <a href="/auth/login" class="btn-twitch-login">
+          <svg viewBox="0 0 256 268" class="twitch-icon" width="16" height="16">
+            <path fill="currentColor" d="M17.458 0L0 46.556v186.2h63.983v34.934h34.931l34.898-34.934h52.36L256 162.954V0H17.458zm23.259 23.263H232.73v128.029l-40.739 40.617H128L93.113 226.5v-34.91H40.717V23.263zm69.4 106.292h23.24V58.325h-23.24v71.23zm63.986 0h23.24V58.325h-23.24v71.23z"/>
+          </svg>
+          <span>Mit Twitch einloggen um deinen Kontostand zu sehen</span>
+        </a>
+      </div>
+    `;
+  }
+
   // Group items by category
   const categories = {
     boosts: { title: 'Symbol-Boosts', icon: '🎰', desc: 'Erhöhe die Chance auf bestimmte Symbole', items: [] },
@@ -1341,6 +1398,8 @@ function renderShopPage() {
       <h1 class="page-title">🛒 Shop</h1>
       <p class="page-subtitle">Kaufe Items mit <code>!shop buy [Nummer]</code> im Twitch Chat</p>
 
+      ${userBalanceHtml}
+
       <div class="shop-tip">
         💡 <strong>Tipp:</strong> Schreibe <code>!shop</code> im Chat um den aktuellen Shop-Link zu sehen
       </div>
@@ -1353,13 +1412,13 @@ function renderShopPage() {
     </div>
   `;
 
-  return baseTemplate('Shop', content, 'shop');
+  return baseTemplate('Shop', content, 'shop', user);
 }
 
 /**
  * Global Statistics page handler
  */
-async function handleGlobalStatsPage(env) {
+async function handleGlobalStatsPage(env, loggedInUser = null) {
   // Fetch achievement stats and player data
   const achievementStats = await getAchievementStats(env);
   const { totalPlayers, counts } = achievementStats;
@@ -1394,13 +1453,13 @@ async function handleGlobalStatsPage(env) {
     rarestAchievements,
     mostCommonAchievements,
     achievementsWithCounts
-  }));
+  }, loggedInUser));
 }
 
 /**
  * Global Statistics page renderer
  */
-function renderGlobalStatsPage(data) {
+function renderGlobalStatsPage(data, user = null) {
   const { totalPlayers, totalAchievements, totalUnlocked, rarestAchievements, mostCommonAchievements, achievementsWithCounts } = data;
 
   const avgAchievementsPerPlayer = totalPlayers > 0 ? (totalUnlocked / totalPlayers).toFixed(1) : 0;
@@ -1492,13 +1551,13 @@ function renderGlobalStatsPage(data) {
     </div>
   `;
 
-  return baseTemplate('Statistiken', content, 'stats');
+  return baseTemplate('Statistiken', content, 'stats', user);
 }
 
 /**
  * Changelog page
  */
-function renderChangelogPage() {
+function renderChangelogPage(user = null) {
   const content = `
     <div class="content-page">
       <h1 class="page-title">📜 Changelog</h1>
@@ -1609,13 +1668,13 @@ function renderChangelogPage() {
     </div>
   `;
 
-  return baseTemplate('Changelog', content, 'changelog');
+  return baseTemplate('Changelog', content, 'changelog', user);
 }
 
 /**
  * Impressum page (TMG §5)
  */
-function renderImpressumPage() {
+function renderImpressumPage(user = null) {
   const content = `
     <div class="legal-page">
       <h1>Impressum</h1>
@@ -1716,13 +1775,13 @@ function renderImpressumPage() {
     </div>
   `;
 
-  return baseTemplate('Impressum', content, 'impressum');
+  return baseTemplate('Impressum', content, 'impressum', user);
 }
 
 /**
  * Datenschutz page (DSGVO)
  */
-function renderDatenschutzPage() {
+function renderDatenschutzPage(user = null) {
   const content = `
     <div class="legal-page">
       <h1>Datenschutzerklärung</h1>
@@ -1795,7 +1854,23 @@ function renderDatenschutzPage() {
         <p><strong>Speicherdauer:</strong> Die Daten werden unbefristet gespeichert, solange das Spielerkonto aktiv ist.</p>
         <p><strong>Löschung:</strong> Du kannst die Löschung deiner Daten jederzeit per E-Mail an den Verantwortlichen beantragen.</p>
 
-        <h3>4.2 Twitch-API-Daten</h3>
+        <h3>4.2 Twitch-Login (OAuth)</h3>
+        <p>
+          Du kannst dich optional mit deinem Twitch-Konto anmelden. Dabei werden folgende Daten
+          von Twitch abgerufen und in deinem Session-Cookie gespeichert:
+        </p>
+        <ul>
+          <li>Twitch-Benutzer-ID</li>
+          <li>Twitch-Benutzername</li>
+          <li>Anzeigename</li>
+          <li>Profilbild-URL</li>
+        </ul>
+        <p>
+          Diese Daten werden <strong>nicht</strong> dauerhaft auf unseren Servern gespeichert,
+          sondern nur im verschlüsselten Session-Cookie in deinem Browser.
+        </p>
+
+        <h3>4.3 Twitch-API-Daten</h3>
         <p>
           Zur Anzeige von Profilbildern und Kanalrollen (Moderator, VIP) rufen wir öffentlich
           verfügbare Daten über die offizielle Twitch-API ab.
@@ -1815,7 +1890,7 @@ function renderDatenschutzPage() {
           Es werden nur öffentlich verfügbare Informationen abgerufen.
         </p>
 
-        <h3>4.3 Server-Log-Dateien</h3>
+        <h3>4.4 Server-Log-Dateien</h3>
         <p>
           Der Hosting-Provider (Cloudflare) erhebt automatisch Informationen in Server-Log-Dateien:
         </p>
@@ -1832,7 +1907,7 @@ function renderDatenschutzPage() {
           verarbeitet und nicht mit anderen Datenquellen zusammengeführt.
         </p>
 
-        <h3>4.4 Lokaler Speicher (LocalStorage)</h3>
+        <h3>4.5 Lokaler Speicher (LocalStorage)</h3>
         <p>
           Diese Website speichert deine Theme-Einstellung (Hell/Dunkel-Modus) im lokalen Speicher
           deines Browsers. Dies dient ausschließlich deinem Komfort und wird nicht an uns übertragen.
@@ -1843,6 +1918,24 @@ function renderDatenschutzPage() {
         <h2>5. Cookies</h2>
         <p>
           Diese Website verwendet <strong>keine Cookies</strong> zu Tracking- oder Werbezwecken.
+        </p>
+        <h3>5.1 Session-Cookie (optionaler Login)</h3>
+        <p>
+          Wenn du dich mit deinem Twitch-Konto anmeldest, wird ein Session-Cookie gesetzt:
+        </p>
+        <ul>
+          <li><strong>Name:</strong> dachsbau_session</li>
+          <li><strong>Zweck:</strong> Speicherung der Login-Session</li>
+          <li><strong>Inhalt:</strong> Verschlüsselter Token mit Twitch-ID, Benutzername und Profilbild-URL</li>
+          <li><strong>Gültigkeit:</strong> 7 Tage</li>
+          <li><strong>Flags:</strong> HttpOnly, Secure, SameSite=Lax</li>
+        </ul>
+        <p>
+          Dieser Cookie wird nur gesetzt, wenn du dich aktiv einloggst. Du kannst dich jederzeit
+          ausloggen, wodurch der Cookie gelöscht wird.
+        </p>
+        <h3>5.2 Technische Cookies</h3>
+        <p>
           Cloudflare kann technisch notwendige Cookies setzen, um die Sicherheit und Performance
           der Website zu gewährleisten (z.B. DDoS-Schutz).
         </p>
@@ -1905,13 +1998,13 @@ function renderDatenschutzPage() {
     </div>
   `;
 
-  return baseTemplate('Datenschutzerklärung', content, 'datenschutz');
+  return baseTemplate('Datenschutzerklärung', content, 'datenschutz', user);
 }
 
 /**
  * Not found page
  */
-function renderNotFoundPage(username = null) {
+function renderNotFoundPage(username = null, user = null) {
   const message = username
     ? `Spieler "${escapeHtml(username)}" wurde nicht gefunden.`
     : 'Die angeforderte Seite wurde nicht gefunden.';
@@ -1925,13 +2018,13 @@ function renderNotFoundPage(username = null) {
     </div>
   `;
 
-  return baseTemplate('Nicht gefunden', content);
+  return baseTemplate('Nicht gefunden', content, '', user);
 }
 
 /**
  * Error page
  */
-function renderErrorPage() {
+function renderErrorPage(user = null) {
   const content = `
     <div class="not-found">
       <div class="not-found-emoji">🦡💥</div>
@@ -1941,7 +2034,7 @@ function renderErrorPage() {
     </div>
   `;
 
-  return baseTemplate('Fehler', content);
+  return baseTemplate('Fehler', content, '', user);
 }
 
 // ==================== HELPERS ====================

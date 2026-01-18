@@ -5,7 +5,7 @@ import { isBlacklisted, setSelfBan, hasAcceptedDisclaimer, setDisclaimerAccepted
 // Web pages and API
 import { handleWebPage } from './web/pages.js';
 import { handleApi } from './web/api.js';
-import { handleOAuthCallback } from './web/twitch.js';
+import { handleOAuthCallback, getUserFromRequest, getUserLoginUrl, handleUserOAuthCallback, createLogoutResponse } from './web/twitch.js';
 
 // User commands
 import {
@@ -122,15 +122,34 @@ export default {
         return Response.redirect(`${url.origin}/?page=leaderboard`, 302);
       }
 
-      // OAuth callback for Twitch authorization
+      // User login - redirect to Twitch OAuth
+      if (pathname === '/auth/login') {
+        const loginUrl = getUserLoginUrl(env, url.origin);
+        return Response.redirect(loginUrl, 302);
+      }
+
+      // User logout - clear session cookie
+      if (pathname === '/auth/logout') {
+        return createLogoutResponse(url.origin);
+      }
+
+      // User OAuth callback (separate from broadcaster)
+      if (pathname === '/auth/user/callback') {
+        return await handleUserOAuthCallback(url, env);
+      }
+
+      // Broadcaster OAuth callback (for mod/VIP roles)
       if (pathname === '/auth/callback') {
         return await handleOAuthCallback(url, env);
       }
 
+      // Get logged-in user from cookie (for web pages)
+      const loggedInUser = await getUserFromRequest(request, env);
+
       // Web pages (HTML)
       const page = url.searchParams.get('page');
       if (page) {
-        return await handleWebPage(page, url, env);
+        return await handleWebPage(page, url, env, loggedInUser);
       }
 
       // API endpoints (JSON)

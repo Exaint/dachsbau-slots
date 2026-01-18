@@ -261,6 +261,134 @@ body {
   background: var(--bg-card);
 }
 
+/* Twitch Login Button */
+.btn-twitch-login {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #9147ff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.btn-twitch-login:hover {
+  background: #772ce8;
+}
+
+.btn-twitch-login .twitch-icon {
+  flex-shrink: 0;
+}
+
+/* User Section in Header */
+.user-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-profile-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.user-profile-link:hover {
+  background: var(--bg-tertiary);
+}
+
+.user-avatar-small {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+}
+
+.user-display-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-logout {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.btn-logout:hover {
+  background: var(--error);
+  color: white;
+  border-color: var(--error);
+}
+
+/* Shop User Info */
+.shop-user-info {
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.shop-user-balance {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shop-user-balance .balance-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.shop-user-balance .balance-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--dachs-gold);
+}
+
+.shop-login-prompt {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.shop-login-prompt p {
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+
 /* Profile Header */
 .profile-header {
   background: var(--bg-secondary);
@@ -1862,6 +1990,35 @@ body {
 
   .search-form {
     flex: 1;
+  }
+
+  /* Hide login button text on smaller screens */
+  .btn-twitch-login span {
+    display: none;
+  }
+
+  .btn-twitch-login {
+    padding: 8px 10px;
+  }
+
+  /* User section on mobile */
+  .user-section {
+    gap: 8px;
+  }
+
+  .user-display-name {
+    display: none;
+  }
+
+  .btn-logout {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+
+  /* Shop user info on mobile */
+  .shop-user-info {
+    flex-direction: column;
+    text-align: center;
   }
 }
 

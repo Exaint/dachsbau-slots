@@ -1,6 +1,7 @@
 /**
  * Twitch API Integration
  * Fetches avatars and channel roles (Mod/VIP) with caching
+ * Also handles user authentication via OAuth
  */
 
 import { logError } from '../utils.js';
@@ -9,6 +10,10 @@ import { logError } from '../utils.js';
 const AVATAR_CACHE_TTL = 86400; // 24 hours
 const ROLES_CACHE_TTL = 3600;   // 1 hour
 const TOKEN_CACHE_TTL = 3600;   // 1 hour (tokens last longer but we refresh early)
+
+// User session constants
+const USER_SESSION_COOKIE = 'dachsbau_session';
+const SESSION_TTL_SECONDS = 604800; // 7 days
 
 // Twitch API endpoints
 const TWITCH_API = 'https://api.twitch.tv/helix';
@@ -417,11 +422,252 @@ function getAuthorizationUrl(env, origin) {
   return `https://id.twitch.tv/oauth2/authorize?${params}`;
 }
 
+// ==================== USER AUTHENTICATION ====================
+
+/**
+ * Base64URL encode (JWT-safe)
+ */
+function base64UrlEncode(str) {
+  return btoa(str)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+/**
+ * Base64URL decode
+ */
+function base64UrlDecode(str) {
+  // Add padding if needed
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  return atob(str);
+}
+
+/**
+ * Create JWT session token
+ */
+async function createSessionToken(payload, env) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+
+  const claims = {
+    ...payload,
+    iat: now,
+    exp: now + SESSION_TTL_SECONDS
+  };
+
+  const headerB64 = base64UrlEncode(JSON.stringify(header));
+  const payloadB64 = base64UrlEncode(JSON.stringify(claims));
+  const unsigned = `${headerB64}.${payloadB64}`;
+
+  // Sign with HMAC-SHA256
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(env.JWT_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(unsigned)
+  );
+
+  const signatureB64 = base64UrlEncode(String.fromCharCode(...new Uint8Array(signature)));
+  return `${unsigned}.${signatureB64}`;
+}
+
+/**
+ * Verify and decode session token
+ */
+async function verifySessionToken(token, env) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+
+    const [headerB64, payloadB64, signatureB64] = parts;
+
+    // Verify signature
+    const unsigned = `${headerB64}.${payloadB64}`;
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(env.JWT_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const signatureBytes = Uint8Array.from(base64UrlDecode(signatureB64), c => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      signatureBytes,
+      new TextEncoder().encode(unsigned)
+    );
+
+    if (!valid) return null;
+
+    // Decode and check expiration
+    const payload = JSON.parse(base64UrlDecode(payloadB64));
+    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return payload;
+  } catch (error) {
+    logError('verifySessionToken', error);
+    return null;
+  }
+}
+
+/**
+ * Get user from request cookie
+ */
+async function getUserFromRequest(request, env) {
+  try {
+    const cookieHeader = request.headers.get('Cookie') || '';
+    const cookies = Object.fromEntries(
+      cookieHeader.split(';').map(c => {
+        const [key, ...val] = c.trim().split('=');
+        return [key, val.join('=')];
+      })
+    );
+
+    const token = cookies[USER_SESSION_COOKIE];
+    if (!token) return null;
+
+    return await verifySessionToken(token, env);
+  } catch (error) {
+    logError('getUserFromRequest', error);
+    return null;
+  }
+}
+
+/**
+ * Generate user login URL
+ */
+function getUserLoginUrl(env, origin) {
+  const params = new URLSearchParams({
+    client_id: env.TWITCH_CLIENT_ID,
+    redirect_uri: `${origin}/auth/user/callback`,
+    response_type: 'code',
+    scope: '' // No special scopes needed for basic user info
+  });
+
+  return `https://id.twitch.tv/oauth2/authorize?${params}`;
+}
+
+/**
+ * Handle user OAuth callback
+ */
+async function handleUserOAuthCallback(url, env) {
+  const code = url.searchParams.get('code');
+  const error = url.searchParams.get('error');
+
+  if (error) {
+    // User cancelled or error occurred
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': `${url.origin}/?page=home`
+      }
+    });
+  }
+
+  if (!code) {
+    return new Response('Missing authorization code', { status: 400 });
+  }
+
+  try {
+    // Exchange code for tokens
+    const tokenResponse = await fetch(TWITCH_OAUTH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: env.TWITCH_CLIENT_ID,
+        client_secret: env.TWITCH_CLIENT_SECRET,
+        code: code,
+        grant_type: 'authorization_code',
+        redirect_uri: `${url.origin}/auth/user/callback`
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+    }
+
+    const tokens = await tokenResponse.json();
+
+    // Get user info from Twitch
+    const userResponse = await fetch(`${TWITCH_API}/users`, {
+      headers: {
+        'Authorization': `Bearer ${tokens.access_token}`,
+        'Client-Id': env.TWITCH_CLIENT_ID
+      }
+    });
+
+    if (!userResponse.ok) {
+      throw new Error(`User fetch failed: ${userResponse.status}`);
+    }
+
+    const userData = await userResponse.json();
+    if (!userData.data || userData.data.length === 0) {
+      throw new Error('No user data returned');
+    }
+
+    const user = userData.data[0];
+
+    // Create JWT session
+    const session = await createSessionToken({
+      twitchId: user.id,
+      username: user.login,
+      displayName: user.display_name,
+      avatar: user.profile_image_url
+    }, env);
+
+    // Redirect to home with session cookie
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': `${url.origin}/?page=home`,
+        'Set-Cookie': `${USER_SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`
+      }
+    });
+  } catch (error) {
+    logError('handleUserOAuthCallback', error);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': `${url.origin}/?page=home`
+      }
+    });
+  }
+}
+
+/**
+ * Create logout response (clears cookie)
+ */
+function createLogoutResponse(origin) {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': `${origin}/?page=home`,
+      'Set-Cookie': `${USER_SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
+    }
+  });
+}
+
 export {
   getTwitchUser,
   getUserRole,
   getChannelRoles,
   getTwitchProfileData,
   handleOAuthCallback,
-  getAuthorizationUrl
+  getAuthorizationUrl,
+  // User authentication
+  getUserFromRequest,
+  getUserLoginUrl,
+  handleUserOAuthCallback,
+  createLogoutResponse
 };

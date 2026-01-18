@@ -4,7 +4,7 @@
  */
 
 import { CSS } from './styles.js';
-import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned } from '../database.js';
+import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned, hasUnlock } from '../database.js';
 import { isDuelOptedOut } from '../database/duels.js';
 import { getTwitchProfileData, getUserRole } from './twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
@@ -1299,10 +1299,26 @@ const ITEM_ICONS = {
 };
 
 async function renderShopPage(env, user = null) {
-  // If user is logged in, fetch their balance
+  // If user is logged in, fetch their balance, unlocks and prestige rank
   let userBalanceHtml = '';
+  let userUnlocks = new Set();
+  let userPrestigeRank = null;
+
   if (user) {
-    const balance = await getBalance(user.username, env);
+    // Fetch all user data in parallel
+    const unlockKeys = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'stats_tracker', 'daily_boost', 'custom_message'];
+    const [balance, prestigeRank, ...unlockResults] = await Promise.all([
+      getBalance(user.username, env),
+      getPrestigeRank(user.username, env),
+      ...unlockKeys.map(key => hasUnlock(user.username, key, env))
+    ]);
+
+    // Build set of owned unlocks
+    unlockKeys.forEach((key, index) => {
+      if (unlockResults[index]) userUnlocks.add(key);
+    });
+    userPrestigeRank = prestigeRank;
+
     userBalanceHtml = `
       <div class="shop-user-info">
         <div class="shop-user-balance">
@@ -1351,6 +1367,9 @@ async function renderShopPage(env, user = null) {
     }
   });
 
+  // Prestige rank hierarchy for checking owned status
+  const RANK_HIERARCHY = ['🥉', '🥈', '🥇', '💎', '👑'];
+
   const renderCategory = (cat) => {
     if (cat.items.length === 0) return '';
 
@@ -1364,12 +1383,27 @@ async function renderShopPage(env, user = null) {
       const requiresRankHtml = item.requiresRank ? `<span class="shop-item-requires">Benötigt: ${item.requiresRank}</span>` : '';
       const weeklyHtml = item.weeklyLimit ? '<span class="shop-item-limit">1x/Woche</span>' : '';
 
+      // Check if user owns this item (only for unlocks and prestige)
+      let isOwned = false;
+      if (user && item.type === 'unlock' && item.unlockKey) {
+        isOwned = userUnlocks.has(item.unlockKey);
+      } else if (user && item.type === 'prestige' && item.rank && userPrestigeRank) {
+        // User owns this rank if their current rank is >= this item's rank
+        const userRankIndex = RANK_HIERARCHY.indexOf(userPrestigeRank);
+        const itemRankIndex = RANK_HIERARCHY.indexOf(item.rank);
+        isOwned = userRankIndex >= itemRankIndex && itemRankIndex !== -1;
+      }
+
+      const ownedBadge = isOwned ? '<span class="shop-item-owned">✓ Gekauft</span>' : '';
+      const ownedClass = isOwned ? ' shop-item-is-owned' : '';
+
       return `
-        <div class="shop-item">
+        <div class="shop-item${ownedClass}">
           <div class="shop-item-icon">${icon}</div>
           <div class="shop-item-content">
             <div class="shop-item-header">
               <span class="shop-item-name">${escapeHtml(item.name)}</span>
+              ${ownedBadge}
               <span class="shop-item-price">${formatNumber(item.price)} DT</span>
             </div>
             <div class="shop-item-desc">${desc}</div>

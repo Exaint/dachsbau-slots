@@ -1705,6 +1705,32 @@ body {
   font-family: monospace;
 }
 
+/* Shop Item Owned Status */
+.shop-item-owned {
+  font-size: 0.75rem;
+  color: var(--success);
+  background: rgba(0, 245, 147, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.shop-item-is-owned {
+  border-color: var(--success);
+  background: linear-gradient(135deg, var(--bg-card), rgba(0, 245, 147, 0.05));
+}
+
+.shop-item-is-owned .shop-item-icon {
+  opacity: 0.7;
+}
+
+.shop-item-is-owned .shop-item-price {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
 /* Changelog */
 .changelog-entry {
   margin-bottom: 24px;

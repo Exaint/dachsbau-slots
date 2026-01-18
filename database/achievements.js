@@ -597,10 +597,19 @@ async function incrementAchievementCounter(achievementId, env) {
 
 /**
  * Get global achievement statistics (how many players have each achievement)
- * Calculates live from player data for accuracy
+ * Uses KV caching for 5 minutes to reduce load
  */
+const STATS_CACHE_KEY = 'cache:achievement_stats';
+const STATS_CACHE_TTL = 300; // 5 minutes in seconds
+
 async function getAchievementStats(env) {
   try {
+    // Check cache first
+    const cached = await env.SLOTS_KV.get(STATS_CACHE_KEY);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
     // Get all achievement records
     const achievementList = await env.SLOTS_KV.list({ prefix: 'achievements:', limit: 1000 });
     const achievementKeys = achievementList.keys || [];
@@ -639,10 +648,12 @@ async function getAchievementStats(env) {
       }
     }
 
-    return {
-      totalPlayers,
-      counts
-    };
+    const stats = { totalPlayers, counts };
+
+    // Cache the result for 5 minutes
+    await env.SLOTS_KV.put(STATS_CACHE_KEY, JSON.stringify(stats), { expirationTtl: STATS_CACHE_TTL });
+
+    return stats;
   } catch (error) {
     logError('getAchievementStats', error);
     return { totalPlayers: 0, counts: {} };

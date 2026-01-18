@@ -55,6 +55,8 @@ export async function handleWebPage(page, url, env) {
         return htmlResponse(renderShopPage());
       case 'changelog':
         return htmlResponse(renderChangelogPage());
+      case 'stats':
+        return await handleGlobalStatsPage(env);
       default:
         return htmlResponse(renderNotFoundPage());
     }
@@ -252,7 +254,8 @@ function baseTemplate(title, content, activePage = '') {
     { page: 'info', label: 'Info', icon: 'ℹ️' },
     { page: 'shop', label: 'Shop', icon: '🛒' },
     { page: 'changelog', label: 'Changelog', icon: '📜' },
-    { page: 'leaderboard', label: 'Leaderboard', icon: '🏆' }
+    { page: 'leaderboard', label: 'Leaderboard', icon: '🏆' },
+    { page: 'stats', label: 'Statistiken', icon: '📊' }
   ];
 
   const navHtml = navItems.map(item => {
@@ -296,8 +299,16 @@ function baseTemplate(title, content, activePage = '') {
         <span class="theme-toggle-icon">🌙</span>
         <span class="theme-toggle-label">Dark</span>
       </button>
+      <button class="hamburger" onclick="toggleMobileNav()" aria-label="Menü">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
     </div>
   </header>
+  <nav class="mobile-nav" id="mobileNav">
+    ${navHtml}
+  </nav>
   <main class="container">
     ${DISCLAIMER_HTML}
     ${content}
@@ -305,7 +316,85 @@ function baseTemplate(title, content, activePage = '') {
   <footer class="footer">
     <p>Dachsbau Slots - Made by Exaint für <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener" class="footer-link">@frechhdachs</a></p>
   </footer>
+
+  <!-- Achievement Detail Modal -->
+  <div class="modal-overlay" id="achievementModal" onclick="closeAchievementModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeAchievementModal()">&times;</button>
+      <div class="modal-header">
+        <div class="modal-icon" id="modalIcon"></div>
+        <h2 id="modalName"></h2>
+      </div>
+      <p class="modal-desc" id="modalDesc"></p>
+      <div class="modal-details">
+        <div class="modal-detail" id="modalCategory"></div>
+        <div class="modal-detail" id="modalRarity"></div>
+        <div class="modal-detail" id="modalStatus"></div>
+        <div class="modal-detail" id="modalProgress"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // Achievement detail modal
+    function showAchievementDetail(el) {
+      const modal = document.getElementById('achievementModal');
+      const name = el.dataset.name;
+      const desc = el.dataset.desc;
+      const category = el.dataset.category;
+      const rarity = el.dataset.rarity;
+      const rarityCount = el.dataset.rarityCount;
+      const rarityTotal = el.dataset.rarityTotal;
+      const unlocked = el.dataset.unlocked === 'true';
+      const unlockedAt = el.dataset.unlockedAt;
+      const progressCurrent = el.dataset.progressCurrent;
+      const progressRequired = el.dataset.progressRequired;
+
+      document.getElementById('modalIcon').textContent = unlocked ? '✅' : '🔒';
+      document.getElementById('modalName').textContent = name;
+      document.getElementById('modalDesc').textContent = desc;
+      document.getElementById('modalCategory').innerHTML = '<strong>Kategorie:</strong> ' + category;
+      document.getElementById('modalRarity').innerHTML = '<strong>Seltenheit:</strong> ' + rarity + '% (' + rarityCount + ' von ' + rarityTotal + ' Spielern)';
+
+      if (unlocked && unlockedAt) {
+        document.getElementById('modalStatus').innerHTML = '<strong>Freigeschaltet:</strong> ' + unlockedAt;
+        document.getElementById('modalStatus').style.display = 'block';
+      } else {
+        document.getElementById('modalStatus').style.display = 'none';
+      }
+
+      if (!unlocked && progressCurrent && progressRequired) {
+        document.getElementById('modalProgress').innerHTML = '<strong>Fortschritt:</strong> ' + progressCurrent + ' / ' + progressRequired;
+        document.getElementById('modalProgress').style.display = 'block';
+      } else {
+        document.getElementById('modalProgress').style.display = 'none';
+      }
+
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeAchievementModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      const modal = document.getElementById('achievementModal');
+      modal.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeAchievementModal();
+    });
+
+    // Mobile navigation toggle
+    function toggleMobileNav() {
+      const hamburger = document.querySelector('.hamburger');
+      const mobileNav = document.getElementById('mobileNav');
+      hamburger.classList.toggle('active');
+      mobileNav.classList.toggle('active');
+      document.body.style.overflow = mobileNav.classList.contains('active') ? 'hidden' : '';
+    }
+
     // Theme toggle function
     function toggleTheme() {
       const html = document.documentElement;
@@ -368,6 +457,57 @@ function baseTemplate(title, content, activePage = '') {
               const visibleAchievements = cat.querySelectorAll('.achievement:not([style*="display: none"])');
               cat.style.display = visibleAchievements.length > 0 ? '' : 'none';
             });
+          });
+        });
+      }
+
+      // Achievement sort functionality
+      const sortBtns = document.querySelectorAll('.sort-btn');
+      const categoriesContainer = document.querySelector('.categories');
+      if (sortBtns.length > 0 && categoriesContainer) {
+        sortBtns.forEach(btn => {
+          btn.addEventListener('click', function() {
+            const sortType = this.dataset.sort;
+
+            // Update active button
+            sortBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            if (sortType === 'category') {
+              // Restore original category view
+              document.querySelectorAll('.category').forEach(cat => {
+                cat.style.display = '';
+              });
+              const sortedList = document.getElementById('sortedAchievements');
+              if (sortedList) sortedList.remove();
+            } else {
+              // Hide categories and show sorted list
+              document.querySelectorAll('.category').forEach(cat => {
+                cat.style.display = 'none';
+              });
+
+              // Collect all achievements
+              const achievements = Array.from(document.querySelectorAll('.achievement'));
+              const sorted = achievements.sort((a, b) => {
+                const rarityA = parseInt(a.dataset.rarity) || 0;
+                const rarityB = parseInt(b.dataset.rarity) || 0;
+                return sortType === 'rarity-asc' ? rarityA - rarityB : rarityB - rarityA;
+              });
+
+              // Remove existing sorted list
+              const existingList = document.getElementById('sortedAchievements');
+              if (existingList) existingList.remove();
+
+              // Create new sorted list
+              const sortedContainer = document.createElement('div');
+              sortedContainer.id = 'sortedAchievements';
+              sortedContainer.className = 'sorted-achievements';
+              sorted.forEach(ach => {
+                const clone = ach.cloneNode(true);
+                sortedContainer.appendChild(clone);
+              });
+              categoriesContainer.appendChild(sortedContainer);
+            }
           });
         });
       }
@@ -590,13 +730,36 @@ function renderProfilePage(data) {
         `;
       }
 
-      // Rarity display
+      // Rarity display with color coding
+      // < 5% = legendary (orange), < 15% = epic (purple), < 30% = rare (blue), >= 30% = common (gray)
+      const getRarityClass = (percent) => {
+        if (percent < 5) return 'rarity-legendary';
+        if (percent < 15) return 'rarity-epic';
+        if (percent < 30) return 'rarity-rare';
+        return 'rarity-common';
+      };
+      const rarityClass = ach.rarity && ach.rarity.total > 0 ? getRarityClass(ach.rarity.percent) : '';
       const rarityHtml = ach.rarity && ach.rarity.total > 0
-        ? `<div class="achievement-rarity">${ach.rarity.percent}% der Spieler</div>`
+        ? `<div class="achievement-rarity ${rarityClass}">${ach.rarity.percent}% der Spieler</div>`
+        : '';
+
+      // Format unlock date
+      const unlockedDateStr = ach.unlockedAt
+        ? new Date(ach.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '';
 
       return `
-        <div class="achievement ${statusClass}">
+        <div class="achievement ${statusClass}" onclick="showAchievementDetail(this)"
+          data-name="${escapeHtml(ach.name)}"
+          data-desc="${escapeHtml(ach.description)}"
+          data-category="${ach.category}"
+          data-rarity="${ach.rarity?.percent || 0}"
+          data-rarity-count="${ach.rarity?.count || 0}"
+          data-rarity-total="${ach.rarity?.total || 0}"
+          data-unlocked="${ach.unlocked}"
+          data-unlocked-at="${unlockedDateStr}"
+          data-progress-current="${ach.progress?.current || ''}"
+          data-progress-required="${ach.progress?.required || ''}">
           <div class="achievement-icon">${icon}</div>
           <div class="achievement-info">
             <div class="achievement-name">${escapeHtml(ach.name)}</div>
@@ -660,11 +823,19 @@ function renderProfilePage(data) {
         </div>
       </div>
     </div>
-    <div class="achievement-filter">
-      <span class="filter-label">Filter:</span>
-      <button class="filter-btn active" data-filter="all">Alle</button>
-      <button class="filter-btn" data-filter="unlocked">Freigeschaltet</button>
-      <button class="filter-btn" data-filter="locked">Gesperrt</button>
+    <div class="achievement-controls">
+      <div class="achievement-filter">
+        <span class="filter-label">Filter:</span>
+        <button class="filter-btn active" data-filter="all">Alle</button>
+        <button class="filter-btn" data-filter="unlocked">Freigeschaltet</button>
+        <button class="filter-btn" data-filter="locked">Gesperrt</button>
+      </div>
+      <div class="achievement-sort">
+        <span class="filter-label">Sortierung:</span>
+        <button class="sort-btn active" data-sort="category">Kategorie</button>
+        <button class="sort-btn" data-sort="rarity-asc">Seltenste</button>
+        <button class="sort-btn" data-sort="rarity-desc">Häufigste</button>
+      </div>
     </div>
     <div class="categories">
       ${categoriesHtml}
@@ -988,6 +1159,145 @@ function renderShopPage() {
   `;
 
   return baseTemplate('Shop', content, 'shop');
+}
+
+/**
+ * Global Statistics page handler
+ */
+async function handleGlobalStatsPage(env) {
+  // Fetch achievement stats and player data
+  const achievementStats = await getAchievementStats(env);
+  const { totalPlayers, counts } = achievementStats;
+
+  // Get all achievements
+  const allAchievements = getAllAchievements();
+
+  // Calculate total achievements unlocked
+  const totalUnlocked = Object.values(counts).reduce((sum, count) => sum + count, 0);
+
+  // Find rarest and most common achievements
+  const achievementsWithCounts = allAchievements.map(ach => ({
+    ...ach,
+    count: counts[ach.id] || 0,
+    percent: totalPlayers > 0 ? Math.round((counts[ach.id] || 0) / totalPlayers * 100) : 0
+  }));
+
+  // Sort by rarity (ascending count = rarer)
+  const rarestAchievements = [...achievementsWithCounts]
+    .filter(a => a.count > 0)
+    .sort((a, b) => a.count - b.count)
+    .slice(0, 5);
+
+  const mostCommonAchievements = [...achievementsWithCounts]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return htmlResponse(renderGlobalStatsPage({
+    totalPlayers,
+    totalAchievements: allAchievements.length,
+    totalUnlocked,
+    rarestAchievements,
+    mostCommonAchievements,
+    achievementsWithCounts
+  }));
+}
+
+/**
+ * Global Statistics page renderer
+ */
+function renderGlobalStatsPage(data) {
+  const { totalPlayers, totalAchievements, totalUnlocked, rarestAchievements, mostCommonAchievements, achievementsWithCounts } = data;
+
+  const avgAchievementsPerPlayer = totalPlayers > 0 ? (totalUnlocked / totalPlayers).toFixed(1) : 0;
+
+  // Rarest achievements HTML
+  const rarestHtml = rarestAchievements.map((ach, index) => `
+    <div class="stat-achievement">
+      <span class="stat-rank">#${index + 1}</span>
+      <span class="stat-ach-name">${escapeHtml(ach.name)}</span>
+      <span class="stat-ach-count">${ach.count} Spieler (${ach.percent}%)</span>
+    </div>
+  `).join('');
+
+  // Most common achievements HTML
+  const commonHtml = mostCommonAchievements.map((ach, index) => `
+    <div class="stat-achievement">
+      <span class="stat-rank">#${index + 1}</span>
+      <span class="stat-ach-name">${escapeHtml(ach.name)}</span>
+      <span class="stat-ach-count">${ach.count} Spieler (${ach.percent}%)</span>
+    </div>
+  `).join('');
+
+  // Category breakdown
+  const categoryStats = {};
+  for (const cat of Object.values(ACHIEVEMENT_CATEGORIES)) {
+    const catAchievements = achievementsWithCounts.filter(a => a.category === cat);
+    const catUnlocked = catAchievements.reduce((sum, a) => sum + a.count, 0);
+    categoryStats[cat] = {
+      total: catAchievements.length,
+      unlocked: catUnlocked,
+      avgPercent: catAchievements.length > 0 && totalPlayers > 0
+        ? Math.round(catUnlocked / (catAchievements.length * totalPlayers) * 100)
+        : 0
+    };
+  }
+
+  const categoryHtml = Object.entries(categoryStats).map(([cat, stats]) => `
+    <div class="stat-category">
+      <span class="stat-cat-icon">${CATEGORY_ICONS[cat] || '🎯'}</span>
+      <span class="stat-cat-name">${CATEGORY_NAMES[cat] || cat}</span>
+      <span class="stat-cat-value">${stats.avgPercent}% durchschnittlich</span>
+    </div>
+  `).join('');
+
+  const content = `
+    <div class="content-page">
+      <h1 class="page-title">📊 Globale Statistiken</h1>
+      <p class="page-subtitle">Übersicht aller Spielerdaten</p>
+
+      <div class="global-stats-grid">
+        <div class="global-stat-card">
+          <div class="global-stat-value">${formatNumber(totalPlayers)}</div>
+          <div class="global-stat-label">Spieler gesamt</div>
+        </div>
+        <div class="global-stat-card">
+          <div class="global-stat-value">${totalAchievements}</div>
+          <div class="global-stat-label">Achievements verfügbar</div>
+        </div>
+        <div class="global-stat-card">
+          <div class="global-stat-value">${formatNumber(totalUnlocked)}</div>
+          <div class="global-stat-label">Achievements freigeschaltet</div>
+        </div>
+        <div class="global-stat-card">
+          <div class="global-stat-value">${avgAchievementsPerPlayer}</div>
+          <div class="global-stat-label">Ø pro Spieler</div>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <h2>💎 Seltenste Achievements</h2>
+        <div class="stat-achievement-list">
+          ${rarestHtml || '<p class="text-muted">Noch keine Daten verfügbar</p>'}
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <h2>👥 Häufigste Achievements</h2>
+        <div class="stat-achievement-list">
+          ${commonHtml || '<p class="text-muted">Noch keine Daten verfügbar</p>'}
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <h2>📈 Kategorien-Übersicht</h2>
+        <div class="stat-category-list">
+          ${categoryHtml}
+        </div>
+      </div>
+    </div>
+  `;
+
+  return baseTemplate('Statistiken', content, 'stats');
 }
 
 /**

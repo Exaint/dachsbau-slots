@@ -104,6 +104,23 @@ export default {
         return new Response('KV not configured', { headers: RESPONSE_HEADERS });
       }
 
+      // Short URL paths (e.g., /u/username -> profile page)
+      const pathname = url.pathname;
+      if (pathname.startsWith('/u/')) {
+        const username = sanitizeUsername(pathname.slice(3));
+        if (username) {
+          // Redirect to profile page
+          const profileUrl = `${url.origin}/?page=profile&user=${username}`;
+          return Response.redirect(profileUrl, 302);
+        }
+      }
+      if (pathname === '/stats' || pathname === '/stats/') {
+        return Response.redirect(`${url.origin}/?page=stats`, 302);
+      }
+      if (pathname === '/lb' || pathname === '/lb/' || pathname === '/leaderboard' || pathname === '/leaderboard/') {
+        return Response.redirect(`${url.origin}/?page=leaderboard`, 302);
+      }
+
       // Web pages (HTML)
       const page = url.searchParams.get('page');
       if (page) {
@@ -193,7 +210,7 @@ export default {
               }
             }
 
-            return new Response(`@${cleanUsername} 🏆 Erfolge von ${profileUser}: ${URLS.WEBSITE}?page=profile&user=${profileUser}`, { headers: RESPONSE_HEADERS });
+            return new Response(`@${cleanUsername} 🏆 Erfolge von ${profileUser}: ${URLS.WEBSITE}/u/${profileUser}`, { headers: RESPONSE_HEADERS });
           }
           if (lower === 'daily') return await handleDaily(cleanUsername, env);
           if (lower === 'stats') return await handleStats(cleanUsername, env);

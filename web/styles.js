@@ -337,11 +337,38 @@ body {
   color: var(--text-muted);
   cursor: help;
   vertical-align: middle;
+  position: relative;
 }
 
 .duel-info-icon:hover {
   background: var(--text-muted);
   color: var(--bg-primary);
+}
+
+.duel-info-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+  pointer-events: none;
+  margin-bottom: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+.duel-info-icon:hover::after {
+  opacity: 1;
+  visibility: visible;
 }
 
 .profile-stats {

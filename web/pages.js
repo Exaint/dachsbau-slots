@@ -874,8 +874,8 @@ function renderProfilePage(data) {
           </div>
           <div class="profile-badges">
             ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
-            <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}<span class="duel-info-icon" data-tooltip="Du möchtest dich von Duellen ausschließen? Schreib &quot;!slots duelopt out&quot; im Chat.">ⓘ</span></span>
-            <span class="profile-selfban-status ${selfBanned ? 'banned' : 'active'}">🎰 ${selfBanned ? 'Selbst-gesperrt' : 'Aktiv'}<span class="duel-info-icon" data-tooltip="${selfBanned ? 'Dieser Spieler hat sich selbst vom Spielen ausgeschlossen.' : 'Du möchtest dich selbst sperren? Schreib &quot;!slots selfban&quot; im Chat.'}">ⓘ</span></span>
+            <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}<span class="info-tooltip" data-tooltip="Du möchtest dich von Duellen ausschließen? Schreib &quot;!slots duelopt out&quot; im Chat.">❓</span></span>
+            ${selfBanned ? `<span class="profile-selfban-status banned">🚫 Selbst-gesperrt<span class="info-tooltip" data-tooltip="Dieser Spieler hat sich selbst vom Spielen ausgeschlossen.">❓</span></span>` : ''}
           </div>
           ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
         </div>

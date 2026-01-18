@@ -357,39 +357,29 @@ body {
   border-radius: 20px;
 }
 
-.profile-selfban-status.active {
-  background: rgba(34, 197, 94, 0.2);
-  color: #22c55e;
-}
-
 .profile-selfban-status.banned {
   background: rgba(239, 68, 68, 0.2);
   color: #ef4444;
 }
 
-.duel-info-icon {
+.info-tooltip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
   margin-left: 6px;
-  font-size: 0.7rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--text-muted);
-  border-radius: 50%;
-  color: var(--text-muted);
+  font-size: 0.85rem;
   cursor: help;
   vertical-align: middle;
   position: relative;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
 }
 
-.duel-info-icon:hover {
-  background: var(--text-muted);
-  color: var(--bg-primary);
+.info-tooltip:hover {
+  opacity: 1;
 }
 
-.duel-info-icon::after {
+.info-tooltip::after {
   content: attr(data-tooltip);
   position: absolute;
   bottom: 100%;
@@ -410,7 +400,7 @@ body {
   z-index: 100;
 }
 
-.duel-info-icon:hover::after {
+.info-tooltip:hover::after {
   opacity: 1;
   visibility: visible;
 }
@@ -1963,7 +1953,7 @@ body {
     padding: 3px 10px;
   }
 
-  .duel-info-icon::after {
+  .info-tooltip::after {
     white-space: normal;
     width: 200px;
     left: auto;

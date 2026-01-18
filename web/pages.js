@@ -1749,7 +1749,7 @@ function renderDatenschutzPage() {
           <li><strong>Widerruf der Einwilligung (Art. 7 Abs. 3 DSGVO)</strong> – Du kannst deine Einwilligung jederzeit widerrufen.</li>
         </ul>
         <p>
-          Zur Ausübung deiner Rechte wende dich an: <a href="mailto:[EMAIL@EXAMPLE.COM]">[EMAIL@EXAMPLE.COM]</a>
+          Zur Ausübung deiner Rechte wende dich an: <a href="mailto:tulpe_salbei6s@icloud.com">tulpe_salbei6s@icloud.com</a>
         </p>
         <p>
           Du hast außerdem das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu beschweren.

@@ -1171,41 +1171,123 @@ function renderInfoPage() {
 /**
  * Shop page
  */
+// Item descriptions for shop
+const ITEM_DESCRIPTIONS = {
+  1: 'Zeigt dir das nächste Symbol bevor du spinnst',
+  2: 'Erhöht die Chance auf 🍒 Kirschen für den nächsten Spin',
+  3: 'Erhöht die Chance auf 🍋 Zitronen für den nächsten Spin',
+  4: 'Erhöht die Chance auf 🍊 Orangen für den nächsten Spin',
+  5: 'Erhöht die Chance auf 🍇 Trauben für den nächsten Spin',
+  6: 'Erhöht die Chance auf 🍉 Wassermelonen für den nächsten Spin',
+  7: 'Erhöht die Chance auf ⭐ Sterne für den nächsten Spin',
+  8: 'Erhöht die Chance auf 🦡 Dachs für den nächsten Spin (1x/Woche)',
+  9: '3x Versicherung: Bei Verlust bekommst du deinen Einsatz zurück',
+  10: '3x Gewinn-Multiplikator: Verdoppelt deinen nächsten Gewinn',
+  11: 'Mischt alle Symbole zufällig durch - alles kann passieren!',
+  12: 'Drehe das Glücksrad für zufällige Preise von 10-1000 DT',
+  13: 'Schaltet !slots 20 frei - setze bis zu 20 DT pro Spin',
+  14: '1 Stunde lang +50% auf alle Gewinne',
+  15: '10 Spins zum Preis von 9 (1x/Woche, max 3x)',
+  16: 'Öffne eine Mystery Box mit zufälligem Inhalt',
+  17: 'Bronze Prestige-Rang mit 🥉 Badge',
+  18: 'Schaltet !slots stats frei - tracke deine Statistiken',
+  19: 'Schaltet !slots 30 frei - setze bis zu 30 DT pro Spin',
+  20: '1 Stunde lang höhere Chance auf seltene Symbole',
+  21: 'Schaltet !slots 50 frei - setze bis zu 50 DT pro Spin',
+  22: 'Silber Prestige-Rang mit 🥈 Badge (benötigt Bronze)',
+  23: 'Schaltet !slots 100 frei - setze bis zu 100 DT pro Spin',
+  24: '1 Stunde lang +100% auf alle Gewinne',
+  25: 'Schaltet !slots all frei - setze alles auf einen Spin',
+  26: 'Gold Prestige-Rang mit 🥇 Badge (benötigt Silber)',
+  27: 'Permanenter Bonus auf tägliche Belohnungen',
+  28: 'Eigene Gewinn-Nachricht bei großen Wins',
+  29: 'Diamant Prestige-Rang mit 💎 Badge (benötigt Gold)',
+  30: 'Legendärer Prestige-Rang mit 👑 Badge (benötigt Diamant)',
+  31: 'Kehrt den letzten Chaos Spin um',
+  32: '1 Stunde lang erhöhte ⭐ Stern-Chance',
+  33: '10 Spins mit erhöhter 🦡 Dachs-Chance',
+  34: '30 Minuten Rage Mode: Höhere Gewinne, aber auch Verluste',
+  35: '24 Stunden lang werden alle Gewinne verdoppelt',
+  36: 'Sofortiger Bonus basierend auf deiner Spin-Anzahl',
+  37: 'Garantiert mindestens ein Paar beim nächsten Spin',
+  38: 'Ersetzt ein Symbol durch Wild 🃏 (zählt als jedes Symbol)',
+  39: '1 Stunde lang erhöhte 💎 Diamant-Chance für Free Spins'
+};
+
+// Item icons for shop
+const ITEM_ICONS = {
+  1: '👁️', 2: '🍒', 3: '🍋', 4: '🍊', 5: '🍇', 6: '🍉', 7: '⭐', 8: '🦡',
+  9: '🛡️', 10: '✖️', 11: '🌀', 12: '🎡', 13: '🔓', 14: '🎉', 15: '📦',
+  16: '🎁', 17: '🥉', 18: '📊', 19: '🔓', 20: '🍀', 21: '🔓', 22: '🥈',
+  23: '🔓', 24: '✨', 25: '🔓', 26: '🥇', 27: '💰', 28: '💬', 29: '💎',
+  30: '👑', 31: '🔄', 32: '🌟', 33: '🦡', 34: '🔥', 35: '📈', 36: '💎',
+  37: '🎯', 38: '🃏', 39: '💎'
+};
+
 function renderShopPage() {
-  // Group items by type
-  const itemsByType = {
-    instant: [],
-    boost: [],
-    timed: [],
-    uses: [],
-    unlock: [],
-    prestige: []
+  // Group items by category
+  const categories = {
+    boosts: { title: 'Symbol-Boosts', icon: '🎰', desc: 'Erhöhe die Chance auf bestimmte Symbole', items: [] },
+    instant: { title: 'Sofort-Items', icon: '⚡', desc: 'Einmalige Effekte die sofort wirken', items: [] },
+    timed: { title: 'Timed Buffs', icon: '⏰', desc: 'Zeitlich begrenzte Boni', items: [] },
+    unlocks: { title: 'Freischaltungen', icon: '🔓', desc: 'Schalte neue Features dauerhaft frei', items: [] },
+    prestige: { title: 'Prestige-Ränge', icon: '👑', desc: 'Zeige deinen Status mit exklusiven Badges', items: [] }
   };
 
   Object.entries(SHOP_ITEMS).forEach(([id, item]) => {
-    const type = item.type || 'instant';
-    if (itemsByType[type]) {
-      itemsByType[type].push({ id: parseInt(id, 10), ...item });
+    const numId = parseInt(id, 10);
+    const itemData = { id: numId, ...item };
+
+    if (item.type === 'boost') {
+      categories.boosts.items.push(itemData);
+    } else if (item.type === 'prestige') {
+      categories.prestige.items.push(itemData);
+    } else if (item.type === 'unlock') {
+      categories.unlocks.items.push(itemData);
+    } else if (item.type === 'timed') {
+      categories.timed.items.push(itemData);
+    } else {
+      categories.instant.items.push(itemData);
     }
   });
 
-  const renderItemGroup = (title, icon, items) => {
-    if (items.length === 0) return '';
+  const renderCategory = (cat) => {
+    if (cat.items.length === 0) return '';
 
-    const itemsHtml = items.map(item => `
-      <div class="shop-item">
-        <div class="shop-item-header">
-          <span class="shop-item-id">#${item.id}</span>
-          <span class="shop-item-name">${escapeHtml(item.name)}</span>
-          <span class="shop-item-price">${formatNumber(item.price)} DT</span>
+    // Sort items by price
+    cat.items.sort((a, b) => a.price - b.price);
+
+    const itemsHtml = cat.items.map(item => {
+      const icon = ITEM_ICONS[item.id] || '📦';
+      const desc = ITEM_DESCRIPTIONS[item.id] || '';
+      const requiresHtml = item.requires ? `<span class="shop-item-requires">Benötigt: ${item.requires.replace('slots_', '!slots ')}</span>` : '';
+      const requiresRankHtml = item.requiresRank ? `<span class="shop-item-requires">Benötigt: ${item.requiresRank}</span>` : '';
+      const weeklyHtml = item.weeklyLimit ? '<span class="shop-item-limit">1x/Woche</span>' : '';
+
+      return `
+        <div class="shop-item">
+          <div class="shop-item-icon">${icon}</div>
+          <div class="shop-item-content">
+            <div class="shop-item-header">
+              <span class="shop-item-name">${escapeHtml(item.name)}</span>
+              <span class="shop-item-price">${formatNumber(item.price)} DT</span>
+            </div>
+            <div class="shop-item-desc">${desc}</div>
+            <div class="shop-item-meta">
+              <span class="shop-item-id">#${item.id}</span>
+              ${requiresHtml}${requiresRankHtml}${weeklyHtml}
+            </div>
+          </div>
         </div>
-        <div class="shop-item-command">!shop buy ${item.id}</div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     return `
       <div class="shop-category">
-        <h3 class="shop-category-title">${icon} ${title}</h3>
+        <div class="shop-category-header">
+          <h3 class="shop-category-title">${cat.icon} ${cat.title}</h3>
+          <p class="shop-category-desc">${cat.desc}</p>
+        </div>
         <div class="shop-items">
           ${itemsHtml}
         </div>
@@ -1218,12 +1300,24 @@ function renderShopPage() {
       <h1 class="page-title">🛒 Shop</h1>
       <p class="page-subtitle">Kaufe Items mit <code>!shop buy [Nummer]</code> im Twitch Chat</p>
 
+<<<<<<< Updated upstream
       ${renderItemGroup('Instant Items', '⚡', itemsByType.instant)}
       ${renderItemGroup('Symbol-Boosts', '🔥', itemsByType.boost)}
       ${renderItemGroup('Timed Buffs', '⏰', itemsByType.timed)}
       ${renderItemGroup('Uses Items', '🔢', itemsByType.uses)}
       ${renderItemGroup('Unlocks', '🔓', itemsByType.unlock)}
       ${renderItemGroup('Prestige Ränge', '👑', itemsByType.prestige)}
+=======
+      <div class="shop-tip">
+        💡 <strong>Tipp:</strong> Schreibe <code>!shop</code> im Chat um den aktuellen Shop-Link zu sehen
+      </div>
+
+      ${renderCategory(categories.boosts)}
+      ${renderCategory(categories.instant)}
+      ${renderCategory(categories.timed)}
+      ${renderCategory(categories.unlocks)}
+      ${renderCategory(categories.prestige)}
+>>>>>>> Stashed changes
     </div>
   `;
 

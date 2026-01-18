@@ -1408,53 +1408,120 @@ body {
   margin-bottom: 0;
 }
 
+.shop-category-header {
+  margin-bottom: 16px;
+}
+
 .shop-category-title {
-  font-size: 1.1rem;
-  margin-bottom: 12px;
+  font-size: 1.2rem;
+  margin-bottom: 4px;
   color: var(--text-primary);
+}
+
+.shop-category-desc {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.shop-tip {
+  background: var(--bg-tertiary);
+  border-left: 3px solid var(--dachs-gold);
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.9rem;
 }
 
 .shop-items {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .shop-item {
   background: var(--bg-tertiary);
-  border-radius: 6px;
-  padding: 12px 16px;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.shop-item:hover {
+  transform: translateX(4px);
+  box-shadow: -4px 0 0 var(--accent);
+}
+
+.shop-item-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+  width: 40px;
+  text-align: center;
+}
+
+.shop-item-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .shop-item-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.shop-item-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.shop-item-price {
+  color: var(--dachs-gold);
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.shop-item-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.shop-item-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .shop-item-id {
   background: var(--bg-card);
   padding: 2px 8px;
   border-radius: 4px;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-.shop-item-name {
-  flex: 1;
-  font-weight: 500;
-}
-
-.shop-item-price {
-  color: var(--dachs-gold);
-  font-weight: 600;
-}
-
-.shop-item-command {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-family: monospace;
+}
+
+.shop-item-requires {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: rgba(239, 68, 68, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.shop-item-limit {
+  font-size: 0.75rem;
+  color: var(--accent);
+  background: rgba(0, 217, 255, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
 /* Changelog */

@@ -1338,14 +1338,6 @@ function renderShopPage() {
       <h1 class="page-title">🛒 Shop</h1>
       <p class="page-subtitle">Kaufe Items mit <code>!shop buy [Nummer]</code> im Twitch Chat</p>
 
-<<<<<<< Updated upstream
-      ${renderItemGroup('Instant Items', '⚡', itemsByType.instant)}
-      ${renderItemGroup('Symbol-Boosts', '🔥', itemsByType.boost)}
-      ${renderItemGroup('Timed Buffs', '⏰', itemsByType.timed)}
-      ${renderItemGroup('Uses Items', '🔢', itemsByType.uses)}
-      ${renderItemGroup('Unlocks', '🔓', itemsByType.unlock)}
-      ${renderItemGroup('Prestige Ränge', '👑', itemsByType.prestige)}
-=======
       <div class="shop-tip">
         💡 <strong>Tipp:</strong> Schreibe <code>!shop</code> im Chat um den aktuellen Shop-Link zu sehen
       </div>
@@ -1355,7 +1347,6 @@ function renderShopPage() {
       ${renderCategory(categories.timed)}
       ${renderCategory(categories.unlocks)}
       ${renderCategory(categories.prestige)}
->>>>>>> Stashed changes
     </div>
   `;
 

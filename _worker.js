@@ -5,6 +5,7 @@ import { isBlacklisted, setSelfBan, hasAcceptedDisclaimer, setDisclaimerAccepted
 // Web pages and API
 import { handleWebPage } from './web/pages.js';
 import { handleApi } from './web/api.js';
+import { handleOAuthCallback } from './web/twitch.js';
 
 // User commands
 import {
@@ -119,6 +120,11 @@ export default {
       }
       if (pathname === '/lb' || pathname === '/lb/' || pathname === '/leaderboard' || pathname === '/leaderboard/') {
         return Response.redirect(`${url.origin}/?page=leaderboard`, 302);
+      }
+
+      // OAuth callback for Twitch authorization
+      if (pathname === '/auth/callback') {
+        return await handleOAuthCallback(url, env);
       }
 
       // Web pages (HTML)

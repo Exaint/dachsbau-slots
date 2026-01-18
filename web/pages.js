@@ -6,6 +6,7 @@
 import { CSS } from './styles.js';
 import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats } from '../database.js';
 import { isDuelOptedOut } from '../database/duels.js';
+import { getTwitchProfileData } from './twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
 import { logError } from '../utils.js';
 
@@ -94,13 +95,14 @@ async function handleProfilePage(url, env) {
   }
 
   // Fetch remaining data in parallel (balance already fetched above)
-  const [rank, stats, achievementData, lastActive, achievementStats, duelOptOut] = await Promise.all([
+  const [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, twitchData] = await Promise.all([
     getPrestigeRank(username, env),
     getStats(username, env),
     getPlayerAchievements(username, env),
     getLastActive(username, env),
     getAchievementStats(env),
-    isDuelOptedOut(username, env)
+    isDuelOptedOut(username, env),
+    getTwitchProfileData(username, env)
   ]);
 
   const allAchievements = getAllAchievements();
@@ -156,7 +158,8 @@ async function handleProfilePage(url, env) {
     byCategory,
     pendingRewards: achievementData.pendingRewards,
     lastActive,
-    duelOptOut
+    duelOptOut,
+    twitchData
   }));
 }
 
@@ -642,11 +645,30 @@ function renderHomePage(errorMessage = null) {
   return baseTemplate('Home', content, 'home');
 }
 
+// Role badge info
+const ROLE_BADGES = {
+  broadcaster: {
+    icon: 'https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1',
+    label: 'Broadcaster',
+    class: 'role-broadcaster'
+  },
+  moderator: {
+    icon: 'https://static-cdn.jtvnw.net/badges/v1/3267646d-33f0-4b17-b3df-f923a41db1d0/1',
+    label: 'Moderator',
+    class: 'role-moderator'
+  },
+  vip: {
+    icon: 'https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744f55777/1',
+    label: 'VIP',
+    class: 'role-vip'
+  }
+};
+
 /**
  * Profile page
  */
 function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, twitchData } = data;
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
@@ -798,13 +820,26 @@ function renderProfilePage(data) {
     `;
   }).join('');
 
-  // Special badges for admins
+  // Avatar from Twitch (or default)
+  const avatarUrl = twitchData?.avatar || null;
+  const displayName = twitchData?.displayName || username;
+
+  // Role badge from Twitch API
   const lowerUsername = username.toLowerCase();
-  let badgeHtml = '';
+  let roleBadgeHtml = '';
+  let roleTitle = '';
+
+  // Special admin overrides
   if (lowerUsername === 'exaint_') {
-    badgeHtml = `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Mod" class="profile-badge" title="Lead-Mod"><span class="profile-title">Head-Mod / Dachsbau-Slots Admin</span>`;
+    roleBadgeHtml = `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Mod" class="profile-badge" title="Lead-Mod">`;
+    roleTitle = 'Head-Mod / Dachsbau-Slots Admin';
   } else if (lowerUsername === 'frechhdachs') {
-    badgeHtml = `<img src="https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1" alt="Broadcaster" class="profile-badge" title="Broadcaster"><span class="profile-title">Streamerin / Dachsbau-Slots Admin</span>`;
+    roleBadgeHtml = `<img src="${ROLE_BADGES.broadcaster.icon}" alt="Broadcaster" class="profile-badge" title="Broadcaster">`;
+    roleTitle = 'Streamerin / Dachsbau-Slots Admin';
+  } else if (twitchData?.role && ROLE_BADGES[twitchData.role]) {
+    const badge = ROLE_BADGES[twitchData.role];
+    roleBadgeHtml = `<img src="${badge.icon}" alt="${badge.label}" class="profile-badge" title="${badge.label}">`;
+    roleTitle = badge.label;
   }
 
   const isComplete = progressPercent === 100;
@@ -813,14 +848,22 @@ function renderProfilePage(data) {
   const content = `
     ${isComplete ? '<div class="confetti-container" id="confetti"></div>' : ''}
     <div class="profile-header${isComplete ? ' complete' : ''}">
-      <div class="profile-name">
-        ${escapeHtml(username)}
-        ${badgeHtml}
-        ${completeBadgeHtml}
-        ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
-        <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}<span class="duel-info-icon" data-tooltip="Du möchtest dich von Duellen ausschließen? Schreib &quot;!slots duelopt out&quot; im Chat.">ⓘ</span></span>
+      <div class="profile-top">
+        ${avatarUrl ? `<img src="${avatarUrl}" alt="${escapeHtml(displayName)}" class="profile-avatar">` : ''}
+        <div class="profile-info">
+          <div class="profile-name">
+            ${escapeHtml(displayName)}
+            ${roleBadgeHtml}
+            ${roleTitle ? `<span class="profile-title">${roleTitle}</span>` : ''}
+            ${completeBadgeHtml}
+          </div>
+          <div class="profile-badges">
+            ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
+            <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}<span class="duel-info-icon" data-tooltip="Du möchtest dich von Duellen ausschließen? Schreib &quot;!slots duelopt out&quot; im Chat.">ⓘ</span></span>
+          </div>
+          ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
+        </div>
       </div>
-      ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
       ${statsHtml}
       <div class="achievement-summary">
         <div class="achievement-count">

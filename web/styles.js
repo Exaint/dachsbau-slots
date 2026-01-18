@@ -270,6 +270,26 @@ body {
   border: 1px solid var(--border);
 }
 
+.profile-top {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
 .profile-name {
   font-size: 1.8rem;
   font-weight: 700;
@@ -277,6 +297,14 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .profile-badge {
@@ -1781,11 +1809,31 @@ body {
     margin-top: 8px;
   }
 
-  /* Profile name mobile fixes */
+  /* Profile mobile fixes */
+  .profile-top {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile-avatar {
+    width: 70px;
+    height: 70px;
+  }
+
   .profile-name {
     flex-wrap: wrap;
     font-size: 1.4rem;
     gap: 8px;
+    justify-content: center;
+  }
+
+  .profile-badges {
+    justify-content: center;
+  }
+
+  .profile-last-active {
+    text-align: center;
   }
 
   .profile-rank,

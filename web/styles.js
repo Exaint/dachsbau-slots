@@ -307,6 +307,43 @@ body {
   color: var(--dachs-gold);
 }
 
+.profile-duel-status {
+  font-size: 0.9rem;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.profile-duel-status.opted-in {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.profile-duel-status.opted-out {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.duel-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  font-size: 0.7rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--text-muted);
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: help;
+  vertical-align: middle;
+}
+
+.duel-info-icon:hover {
+  background: var(--text-muted);
+  color: var(--bg-primary);
+}
+
 .profile-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

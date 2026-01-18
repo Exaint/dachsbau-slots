@@ -5,6 +5,7 @@
 
 import { CSS } from './styles.js';
 import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats } from '../database.js';
+import { isDuelOptedOut } from '../database/duels.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
 import { logError } from '../utils.js';
 
@@ -89,12 +90,13 @@ async function handleProfilePage(url, env) {
   }
 
   // Fetch remaining data in parallel (balance already fetched above)
-  const [rank, stats, achievementData, lastActive, achievementStats] = await Promise.all([
+  const [rank, stats, achievementData, lastActive, achievementStats, duelOptOut] = await Promise.all([
     getPrestigeRank(username, env),
     getStats(username, env),
     getPlayerAchievements(username, env),
     getLastActive(username, env),
-    getAchievementStats(env)
+    getAchievementStats(env),
+    isDuelOptedOut(username, env)
   ]);
 
   const allAchievements = getAllAchievements();
@@ -149,7 +151,8 @@ async function handleProfilePage(url, env) {
     achievements,
     byCategory,
     pendingRewards: achievementData.pendingRewards,
-    lastActive
+    lastActive,
+    duelOptOut
   }));
 }
 
@@ -638,7 +641,7 @@ function renderHomePage(errorMessage = null) {
  * Profile page
  */
 function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, lastActive } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut } = data;
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
@@ -810,6 +813,7 @@ function renderProfilePage(data) {
         ${badgeHtml}
         ${completeBadgeHtml}
         ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
+        <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}<span class="duel-info-icon" title="Du möchtest dich von Duellen ausschließen? Schreib "!slots duelopt out" im Chat.">ⓘ</span></span>
       </div>
       ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
       ${statsHtml}

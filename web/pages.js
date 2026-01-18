@@ -658,7 +658,7 @@ const ROLE_BADGES = {
     class: 'role-moderator'
   },
   vip: {
-    icon: 'https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744f55777/1',
+    icon: 'https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744dfa6ec/3',
     label: 'VIP',
     class: 'role-vip'
   }

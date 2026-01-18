@@ -344,16 +344,14 @@ function baseTemplate(title, content, activePage = '', user = null) {
       <nav class="nav-bar">
         ${navHtml}
       </nav>
-      <form class="search-form" action="" method="get">
-        <input type="hidden" name="page" value="profile">
-        <input type="text" name="user" placeholder="Spielername..." class="search-input" required>
-        <button type="submit" class="btn">Suchen</button>
-      </form>
-      ${userSectionHtml}
-      <button class="theme-toggle" onclick="toggleTheme()" title="Theme wechseln">
-        <span class="theme-toggle-icon">🌙</span>
-        <span class="theme-toggle-label">Dark</span>
-      </button>
+      <div class="header-right">
+        <form class="search-form" action="" method="get">
+          <input type="hidden" name="page" value="profile">
+          <input type="text" name="user" placeholder="Spieler..." class="search-input" required>
+          <button type="submit" class="btn btn-search">🔍</button>
+        </form>
+        ${userSectionHtml}
+      </div>
       <button class="hamburger" onclick="toggleMobileNav()" aria-label="Menü">
         <span></span>
         <span></span>
@@ -372,6 +370,10 @@ function baseTemplate(title, content, activePage = '', user = null) {
   <footer class="footer">
     <p>Dachsbau Slots - Made by Exaint für <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener" class="footer-link">@frechhdachs</a></p>
     <p class="footer-legal"><a href="?page=impressum">Impressum</a> · <a href="?page=datenschutz">Datenschutz</a></p>
+    <button class="theme-toggle-footer" onclick="toggleTheme()" title="Theme wechseln">
+      <span class="theme-toggle-icon">🌙</span>
+      <span class="theme-toggle-label">Theme</span>
+    </button>
   </footer>
 
   <!-- Achievement Detail Modal -->

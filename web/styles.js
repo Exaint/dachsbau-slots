@@ -1780,6 +1780,49 @@ body {
     width: 100%;
     margin-top: 8px;
   }
+
+  /* Profile name mobile fixes */
+  .profile-name {
+    flex-wrap: wrap;
+    font-size: 1.4rem;
+    gap: 8px;
+  }
+
+  .profile-rank,
+  .profile-duel-status {
+    font-size: 0.8rem;
+    padding: 3px 10px;
+  }
+
+  .duel-info-icon::after {
+    white-space: normal;
+    width: 200px;
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+
+  /* Command list mobile fixes */
+  .command-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .command-item code {
+    min-width: auto;
+    width: 100%;
+  }
+
+  /* Info table mobile fixes */
+  .info-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .info-row > *:first-child {
+    font-weight: 600;
+  }
 }
 
 /* Skeleton Loading */

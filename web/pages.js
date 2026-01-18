@@ -976,11 +976,11 @@ function renderInfoPage() {
           </div>
           <div class="command-item">
             <code>!slots [20/30/50/100/all]</code>
-            <span>Hoehere Einsaetze (benoetigtt Unlock)</span>
+            <span>Höhere Einsätze (benötigt Unlock)</span>
           </div>
           <div class="command-item">
             <code>!slots daily</code>
-            <span>Taeglicher Bonus (+50 DachsTaler)</span>
+            <span>Täglicher Bonus (+50 DachsTaler)</span>
           </div>
           <div class="command-item">
             <code>!slots balance</code>
@@ -1159,7 +1159,7 @@ function renderInfoPage() {
         </div>
         <p style="margin-top: 16px; color: var(--text-secondary);">
           Du kannst dich jederzeit mit <code>!slots selfban</code> selbst vom Spielen ausschliessen.
-          Nur Admins koennen den Selfban wieder aufheben.
+          Nur Admins können den Selfban wieder aufheben.
         </p>
       </section>
     </div>
@@ -1223,7 +1223,7 @@ function renderShopPage() {
       ${renderItemGroup('Timed Buffs', '⏰', itemsByType.timed)}
       ${renderItemGroup('Uses Items', '🔢', itemsByType.uses)}
       ${renderItemGroup('Unlocks', '🔓', itemsByType.unlock)}
-      ${renderItemGroup('Prestige Raenge', '👑', itemsByType.prestige)}
+      ${renderItemGroup('Prestige Ränge', '👑', itemsByType.prestige)}
     </div>
   `;
 
@@ -1474,9 +1474,9 @@ function renderChangelogPage() {
         <div class="changelog-content">
           <ul>
             <li>Slot Machine mit 3x3 Grid</li>
-            <li>DachsTaler Waehrung</li>
+            <li>DachsTaler Währung</li>
             <li>Shop-System mit 30+ Items</li>
-            <li>Prestige-Raenge</li>
+            <li>Prestige-Ränge</li>
           </ul>
         </div>
       </section>

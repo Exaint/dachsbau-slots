@@ -6,7 +6,7 @@
 import { CSS } from './styles.js';
 import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned, hasUnlock } from '../database.js';
 import { isDuelOptedOut } from '../database/duels.js';
-import { getTwitchProfileData, getUserRole } from './twitch.js';
+import { getTwitchProfileData, getUserRole, getTwitchUser } from './twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
 import { logError, isAdmin } from '../utils.js';
 
@@ -220,14 +220,17 @@ async function handleLeaderboardPage(env, loggedInUser = null) {
     // Get top 100 for display
     const top100 = users.slice(0, 100);
 
-    // Fetch Twitch roles for all top 100 players in parallel
-    const rolesPromises = top100.map(user => getUserRole(user.username, env));
-    const roles = await Promise.all(rolesPromises);
+    // Fetch Twitch roles and avatars for all top 100 players in parallel
+    const [roles, twitchUsers] = await Promise.all([
+      Promise.all(top100.map(user => getUserRole(user.username, env))),
+      Promise.all(top100.map(user => getTwitchUser(user.username, env)))
+    ]);
 
-    // Add roles to user objects
+    // Add roles and avatars to user objects
     const playersWithRoles = top100.map((user, index) => ({
       ...user,
-      role: roles[index]
+      role: roles[index],
+      avatar: twitchUsers[index]?.avatar || null
     }));
 
     return htmlResponse(renderLeaderboardPage(playersWithRoles, loggedInUser));
@@ -1114,9 +1117,13 @@ function renderLeaderboardPage(players, user = null) {
     ? '<p style="text-align: center; color: var(--text-muted); padding: 40px;">Noch keine Spieler gefunden.</p>'
     : players.map((player, index) => {
         const roleBadgeHtml = getRoleBadge(player.username, player.role);
+        const avatarHtml = player.avatar
+          ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar">`
+          : `<div class="leaderboard-avatar-placeholder">👤</div>`;
         return `
         <div class="leaderboard-item">
           <div class="leaderboard-rank">${getRankDisplay(index)}</div>
+          ${avatarHtml}
           <div class="leaderboard-user">
             <a href="?page=profile&user=${encodeURIComponent(player.username)}" class="leaderboard-username-link">${escapeHtml(player.username)}</a>
             ${roleBadgeHtml ? `<span class="leaderboard-role">${roleBadgeHtml}</span>` : ''}

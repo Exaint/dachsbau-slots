@@ -25,7 +25,7 @@
  */
 
 import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
-import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStat } from '../database.js';
+import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStat, checkBalanceAchievements } from '../database.js';
 import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
 
@@ -221,24 +221,28 @@ async function handleDuelAccept(username, env) {
 
     if (challengerScore.score > targetScore.score) {
       // Challenger wins
+      const newChallengerBalance = challengerBalance + duel.amount;
       await Promise.all([
-        setBalance(duel.challenger, challengerBalance + duel.amount, env),
+        setBalance(duel.challenger, newChallengerBalance, env),
         setBalance(username, targetBalance - duel.amount, env)
       ]);
       resultMessage = `🏆 @${duel.challenger} GEWINNT ${pot} DachsTaler!`;
       // Fire-and-forget achievement tracking
       trackDuelAchievements(duel.challenger, true, env);
       trackDuelAchievements(username, false, env);
+      checkBalanceAchievements(duel.challenger, newChallengerBalance, env);
     } else if (targetScore.score > challengerScore.score) {
       // Target wins
+      const newTargetBalance = targetBalance + duel.amount;
       await Promise.all([
         setBalance(duel.challenger, challengerBalance - duel.amount, env),
-        setBalance(username, targetBalance + duel.amount, env)
+        setBalance(username, newTargetBalance, env)
       ]);
       resultMessage = `🏆 @${username} GEWINNT ${pot} DachsTaler!`;
       // Fire-and-forget achievement tracking
       trackDuelAchievements(username, true, env);
       trackDuelAchievements(duel.challenger, false, env);
+      checkBalanceAchievements(username, newTargetBalance, env);
     } else {
       // True tie - return bets (both participated, neither won)
       resultMessage = `🤝 UNENTSCHIEDEN! Beide behalten ihren Einsatz.`;

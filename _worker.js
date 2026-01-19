@@ -1,6 +1,6 @@
 import { RESPONSE_HEADERS, URLS, KV_TRUE } from './constants.js';
 import { sanitizeUsername, isAdmin, getAdminList, logError } from './utils.js';
-import { isBlacklisted, setSelfBan, hasAcceptedDisclaimer, setDisclaimerAccepted } from './database.js';
+import { isBlacklisted, setSelfBan, hasAcceptedDisclaimer, setDisclaimerAccepted, getBalance } from './database.js';
 
 // Web pages and API
 import { handleWebPage } from './web/pages.js';
@@ -302,7 +302,12 @@ export default {
             if (alreadyAccepted) {
               return new Response(`@${cleanUsername} ✅ Du hast den Disclaimer bereits akzeptiert! Nutze einfach !slots zum Spielen 🎰`, { headers: RESPONSE_HEADERS });
             }
+            // Check if legacy player (has balance before disclaimer system)
+            const currentBalance = await getBalance(cleanUsername, env);
             await setDisclaimerAccepted(cleanUsername, env);
+            if (currentBalance > 0) {
+              return new Response(`@${cleanUsername} ✅ Disclaimer akzeptiert! Dein Kontostand: ${currentBalance} DachsTaler. Viel Spaß beim Spielen! 🦡🎰 Nutze !slots zum Spinnen!`, { headers: RESPONSE_HEADERS });
+            }
             return new Response(`@${cleanUsername} ✅ Disclaimer akzeptiert! Du startest mit 100 DachsTaler. Viel Spaß beim Spielen! 🦡🎰 Nutze !slots zum Spinnen!`, { headers: RESPONSE_HEADERS });
           }
 

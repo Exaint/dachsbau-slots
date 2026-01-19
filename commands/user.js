@@ -40,7 +40,8 @@ import {
   isBuffActive,
   hasAcceptedDisclaimer,
   checkAndUnlockAchievement,
-  updateAchievementStat
+  updateAchievementStat,
+  checkBalanceAchievements
 } from '../database.js';
 
 /**
@@ -195,6 +196,7 @@ async function handleDaily(username, env) {
 
     // Fire-and-forget achievement tracking
     trackDailyAchievements(username, newMonthlyLogin.days.length, env);
+    checkBalanceAchievements(username, newBalance, env);
 
     const boostText = hasBoost ? ' (💎 Boosted!)' : '';
     let milestoneText = '';
@@ -417,6 +419,7 @@ async function handleTransfer(username, target, amount, env) {
       if (verifySender === newSenderBalance) {
         // Fire-and-forget achievement tracking
         trackTransferAchievements(username, parsedAmount, env);
+        checkBalanceAchievements(cleanTarget, newReceiverBalance, env);
         return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸`, { headers: RESPONSE_HEADERS });
       }
 

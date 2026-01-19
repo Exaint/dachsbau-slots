@@ -164,6 +164,15 @@ export default {
         return await handleApi(api, url, env, loggedInUser, request);
       }
 
+      // Browser detection: If no bot parameters and browser request, redirect to home page
+      const hasNoParams = !url.searchParams.has('action') && !url.searchParams.has('user') && !url.searchParams.has('amount');
+      const acceptHeader = request.headers.get('Accept') || '';
+      const isBrowserRequest = acceptHeader.includes('text/html');
+
+      if (hasNoParams && isBrowserRequest) {
+        return Response.redirect(`${url.origin}/?page=home`, 302);
+      }
+
       // Twitch bot commands (existing logic)
       const action = url.searchParams.get('action') || 'slot';
       const username = url.searchParams.get('user') || 'Spieler';

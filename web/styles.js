@@ -893,11 +893,22 @@ body {
 .leaderboard-header {
   padding: 20px;
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .leaderboard-title {
   font-size: 1.3rem;
   font-weight: 700;
+}
+
+.leaderboard-info {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: help;
 }
 
 .leaderboard-list {

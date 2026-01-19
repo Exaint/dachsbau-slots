@@ -186,23 +186,24 @@ async function handleLeaderboardPage(env, loggedInUser = null) {
 
     const users = [];
 
-    // Batch fetch balances and disclaimer status
+    // Batch fetch balances, disclaimer status, and self-ban status
     for (let i = 0; i < listResult.keys.length; i += BATCH_SIZE) {
       const batch = listResult.keys.slice(i, i + BATCH_SIZE);
       const usernames = batch.map(key => key.name.replace('user:', ''));
 
-      // Fetch balances and disclaimer status in parallel
-      const [balances, disclaimerStatuses] = await Promise.all([
+      // Fetch balances, disclaimer status, and self-ban status in parallel
+      const [balances, disclaimerStatuses, selfBanStatuses] = await Promise.all([
         Promise.all(batch.map(key => env.SLOTS_KV.get(key.name))),
-        Promise.all(usernames.map(username => hasAcceptedDisclaimer(username, env)))
+        Promise.all(usernames.map(username => hasAcceptedDisclaimer(username, env))),
+        Promise.all(usernames.map(username => isSelfBanned(username, env)))
       ]);
 
       for (let j = 0; j < batch.length; j++) {
         if (balances[j]) {
           const balance = parseInt(balances[j], 10);
           const username = usernames[j];
-          // Filter out DachsBank and users who haven't accepted disclaimer
-          if (!isNaN(balance) && balance > 0 && username.toLowerCase() !== 'dachsbank' && disclaimerStatuses[j]) {
+          // Filter out DachsBank, users who haven't accepted disclaimer, and self-banned users
+          if (!isNaN(balance) && balance > 0 && username.toLowerCase() !== 'dachsbank' && disclaimerStatuses[j] && !selfBanStatuses[j]) {
             users.push({
               username,
               balance
@@ -1002,6 +1003,7 @@ function renderLeaderboardPage(players, user = null) {
     <div class="leaderboard">
       <div class="leaderboard-header">
         <h1 class="leaderboard-title">🏆 Leaderboard</h1>
+        <span class="leaderboard-info" title="Nur Spieler die den Disclaimer akzeptiert haben werden angezeigt">ℹ️ Nur verifizierte Spieler</span>
       </div>
       <div class="leaderboard-list">
         ${playersHtml}

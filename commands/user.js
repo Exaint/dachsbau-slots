@@ -468,16 +468,21 @@ async function handleLeaderboard(env) {
 
     for (let i = 0; i < validKeys.length; i += LEADERBOARD_BATCH_SIZE) {
       const batch = validKeys.slice(i, i + LEADERBOARD_BATCH_SIZE);
-      const balances = await Promise.all(
-        batch.map(key => env.SLOTS_KV.get(key.name))
-      );
+      const usernames = batch.map(key => key.name.replace('user:', ''));
+
+      // Fetch balances and disclaimer status in parallel
+      const [balances, disclaimerStatuses] = await Promise.all([
+        Promise.all(batch.map(key => env.SLOTS_KV.get(key.name))),
+        Promise.all(usernames.map(username => hasAcceptedDisclaimer(username, env)))
+      ]);
 
       for (let j = 0; j < batch.length; j++) {
-        if (balances[j]) {
+        // Only include users who have accepted the disclaimer
+        if (balances[j] && disclaimerStatuses[j]) {
           const balance = parseInt(balances[j], 10);
           if (!isNaN(balance) && balance > 0) {
             users.push({
-              username: batch[j].name.replace('user:', ''),
+              username: usernames[j],
               balance
             });
           }

@@ -54,7 +54,8 @@ export async function handleWebPage(page, url, env, loggedInUser = null) {
       case 'profile':
         return await handleProfilePage(url, env, loggedInUser);
       case 'leaderboard':
-        return await handleLeaderboardPage(env, loggedInUser);
+        const showAll = url.searchParams.get('showAll') === 'true';
+        return await handleLeaderboardPage(env, loggedInUser, showAll);
       case 'info':
         return htmlResponse(renderInfoPage(loggedInUser));
       case 'shop':
@@ -174,15 +175,19 @@ async function handleProfilePage(url, env, loggedInUser = null) {
 /**
  * Leaderboard page handler
  */
-async function handleLeaderboardPage(env, loggedInUser = null) {
+async function handleLeaderboardPage(env, loggedInUser = null, showAll = false) {
   const LEADERBOARD_LIMIT = 1000;
   const BATCH_SIZE = 100;
+
+  // Only admins can use showAll filter
+  const isAdminUser = loggedInUser && isAdmin(loggedInUser.username);
+  const actualShowAll = isAdminUser && showAll;
 
   try {
     const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
 
     if (!listResult.keys || listResult.keys.length === 0) {
-      return htmlResponse(renderLeaderboardPage([], loggedInUser));
+      return htmlResponse(renderLeaderboardPage([], loggedInUser, actualShowAll, isAdminUser));
     }
 
     const users = [];
@@ -203,13 +208,33 @@ async function handleLeaderboardPage(env, loggedInUser = null) {
         if (balances[j]) {
           const balance = parseInt(balances[j], 10);
           const username = usernames[j];
-          // Filter out DachsBank, "Spieler" (default fallback), users who haven't accepted disclaimer, and self-banned users
           const lowerUsername = username.toLowerCase();
-          if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler' && disclaimerStatuses[j] && !selfBanStatuses[j]) {
-            users.push({
-              username,
-              balance
-            });
+          const hasDisclaimer = disclaimerStatuses[j];
+          const isSelfBannedUser = selfBanStatuses[j];
+
+          // Base filter: valid balance, not system accounts
+          if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler') {
+            // Admin showAll: show all users (even without disclaimer), but still hide self-banned
+            // Normal: show only users with disclaimer and not self-banned
+            if (actualShowAll) {
+              // Admin view: show all, mark those without disclaimer
+              if (!isSelfBannedUser) {
+                users.push({
+                  username,
+                  balance,
+                  hasDisclaimer
+                });
+              }
+            } else {
+              // Normal view: only show users with disclaimer and not self-banned
+              if (hasDisclaimer && !isSelfBannedUser) {
+                users.push({
+                  username,
+                  balance,
+                  hasDisclaimer: true
+                });
+              }
+            }
           }
         }
       }
@@ -234,7 +259,7 @@ async function handleLeaderboardPage(env, loggedInUser = null) {
       avatar: twitchUsers[index]?.avatar || null
     }));
 
-    return htmlResponse(renderLeaderboardPage(playersWithRoles, loggedInUser));
+    return htmlResponse(renderLeaderboardPage(playersWithRoles, loggedInUser, actualShowAll, isAdminUser));
   } catch (error) {
     logError('handleLeaderboardPage', error);
     return htmlResponse(renderErrorPage(loggedInUser));
@@ -1085,7 +1110,7 @@ function renderProfilePage(data) {
 /**
  * Leaderboard page
  */
-function renderLeaderboardPage(players, user = null) {
+function renderLeaderboardPage(players, user = null, showAll = false, isAdminUser = false) {
   const getRankDisplay = (index) => {
     if (index === 0) return '🥇';
     if (index === 1) return '🥈';
@@ -1121,12 +1146,17 @@ function renderLeaderboardPage(players, user = null) {
         const avatarHtml = player.avatar
           ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar">`
           : `<div class="leaderboard-avatar-placeholder">👤</div>`;
+        // Show warning icon for users without disclaimer (only visible in admin showAll mode)
+        const noDisclaimerBadge = showAll && !player.hasDisclaimer
+          ? '<span class="no-disclaimer-badge" title="Kein Disclaimer akzeptiert">⚠️</span>'
+          : '';
         return `
-        <div class="leaderboard-item">
+        <div class="leaderboard-item${showAll && !player.hasDisclaimer ? ' no-disclaimer' : ''}">
           <div class="leaderboard-rank">${getRankDisplay(index)}</div>
           ${avatarHtml}
           <div class="leaderboard-user">
             <a href="?page=profile&user=${encodeURIComponent(player.username)}" class="leaderboard-username-link">${escapeHtml(player.username)}</a>
+            ${noDisclaimerBadge}
             ${roleBadgeHtml ? `<span class="leaderboard-role">${roleBadgeHtml}</span>` : ''}
           </div>
           <div class="leaderboard-balance">${formatNumber(player.balance)} DT</div>
@@ -1134,11 +1164,37 @@ function renderLeaderboardPage(players, user = null) {
       `;
       }).join('');
 
+  // Admin filter toggle (only shown to admins)
+  const adminFilterHtml = isAdminUser ? `
+    <div class="admin-filter">
+      <label class="admin-filter-toggle">
+        <input type="checkbox" id="showAllToggle" ${showAll ? 'checked' : ''} onchange="toggleShowAll(this.checked)">
+        <span class="admin-filter-label">🔧 Alle User anzeigen (auch ohne Disclaimer)</span>
+      </label>
+    </div>
+    <script>
+      function toggleShowAll(checked) {
+        const url = new URL(window.location);
+        if (checked) {
+          url.searchParams.set('showAll', 'true');
+        } else {
+          url.searchParams.delete('showAll');
+        }
+        window.location.href = url.toString();
+      }
+    </script>
+  ` : '';
+
+  const infoText = showAll
+    ? 'Admin-Ansicht: Alle Spieler · ⚠️ = Kein Disclaimer'
+    : 'Nur Spieler mit akzeptiertem Disclaimer · <code>!slots accept</code>';
+
   const content = `
     <div class="leaderboard">
       <div class="leaderboard-header">
         <h1 class="leaderboard-title">🏆 Leaderboard</h1>
-        <span class="leaderboard-info">Nur Spieler mit akzeptiertem Disclaimer · <code>!slots accept</code></span>
+        <span class="leaderboard-info">${infoText}</span>
+        ${adminFilterHtml}
       </div>
       <div class="leaderboard-list">
         ${playersHtml}

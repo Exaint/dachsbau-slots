@@ -1048,6 +1048,45 @@ body {
   border-radius: 8px;
 }
 
+/* Admin Filter (Leaderboard) */
+.admin-filter {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(145, 71, 255, 0.1);
+  border: 1px solid rgba(145, 71, 255, 0.3);
+  border-radius: 8px;
+}
+
+.admin-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.admin-filter-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.admin-filter-label {
+  user-select: none;
+}
+
+.no-disclaimer-badge {
+  margin-left: 4px;
+  font-size: 0.9rem;
+}
+
+.leaderboard-item.no-disclaimer {
+  background: rgba(255, 165, 0, 0.08);
+  border-left: 3px solid orange;
+}
+
 /* Home Page */
 .hero {
   text-align: center;

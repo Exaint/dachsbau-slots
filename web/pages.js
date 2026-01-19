@@ -725,6 +725,20 @@ function baseTemplate(title, content, activePage = '', user = null) {
     function adminSetDuelOpt(username, optedOut) {
       adminApiCall('setDuelOpt', { username, optedOut });
     }
+
+    function adminSetAchievement(username, unlocked) {
+      const select = document.getElementById('adminAchievement');
+      const achievementId = select.value;
+      const achievementName = select.options[select.selectedIndex].text;
+      const action = unlocked ? 'freischalten' : 'sperren';
+      if (!confirm(\`Achievement "\${achievementName}" wirklich \${action}?\`)) return;
+      adminApiCall('setAchievement', { username, achievementId, unlocked }).then(() => {
+        // Update the select option to reflect the change
+        const option = select.options[select.selectedIndex];
+        option.dataset.unlocked = unlocked ? 'true' : 'false';
+        option.text = (unlocked ? '✓' : '○') + option.text.substring(1);
+      });
+    }
   </script>
 </body>
 </html>`;
@@ -1026,6 +1040,16 @@ function renderProfilePage(data) {
           <div class="admin-toggle-group">
             <span class="admin-status ${duelOptOut ? 'danger' : 'active'}">${duelOptOut ? '✗ Deaktiviert' : '✓ Aktiviert'}</span>
             <button class="btn admin-btn" onclick="adminSetDuelOpt('${escapeHtml(username)}', ${!duelOptOut})">${duelOptOut ? 'Aktivieren' : 'Deaktivieren'}</button>
+          </div>
+        </div>
+        <div class="admin-control admin-control-wide">
+          <label>Achievement</label>
+          <div class="admin-input-group">
+            <select id="adminAchievement" class="admin-input admin-select">
+              ${achievements.map(a => `<option value="${a.id}" data-unlocked="${a.unlocked}">${a.unlocked ? '✓' : '○'} ${escapeHtml(a.name)}</option>`).join('')}
+            </select>
+            <button class="btn admin-btn success" onclick="adminSetAchievement('${escapeHtml(username)}', true)">Freischalten</button>
+            <button class="btn admin-btn danger" onclick="adminSetAchievement('${escapeHtml(username)}', false)">Sperren</button>
           </div>
         </div>
       </div>
@@ -1610,20 +1634,26 @@ function renderGlobalStatsPage(data, user = null) {
 
   const avgAchievementsPerPlayer = totalPlayers > 0 ? (totalUnlocked / totalPlayers).toFixed(1) : 0;
 
-  // Rarest achievements HTML
+  // Rarest achievements HTML (with description)
   const rarestHtml = rarestAchievements.map((ach, index) => `
     <div class="stat-achievement">
       <span class="stat-rank">#${index + 1}</span>
-      <span class="stat-ach-name">${escapeHtml(ach.name)}</span>
+      <div class="stat-ach-info">
+        <span class="stat-ach-name">${escapeHtml(ach.name)}</span>
+        <span class="stat-ach-desc">${escapeHtml(ach.description)}</span>
+      </div>
       <span class="stat-ach-count">${ach.count} Spieler (${ach.percent}%)</span>
     </div>
   `).join('');
 
-  // Most common achievements HTML
+  // Most common achievements HTML (with description)
   const commonHtml = mostCommonAchievements.map((ach, index) => `
     <div class="stat-achievement">
       <span class="stat-rank">#${index + 1}</span>
-      <span class="stat-ach-name">${escapeHtml(ach.name)}</span>
+      <div class="stat-ach-info">
+        <span class="stat-ach-name">${escapeHtml(ach.name)}</span>
+        <span class="stat-ach-desc">${escapeHtml(ach.description)}</span>
+      </div>
       <span class="stat-ach-count">${ach.count} Spieler (${ach.percent}%)</span>
     </div>
   `).join('');
@@ -1650,10 +1680,20 @@ function renderGlobalStatsPage(data, user = null) {
     </div>
   `).join('');
 
+  // Profile link for logged-in users
+  const profileLinkHtml = user ? `
+    <div class="stats-profile-link">
+      <a href="/?page=profile&user=${encodeURIComponent(user.username)}" class="btn btn-primary">
+        🏆 Meine Erfolge anzeigen
+      </a>
+    </div>
+  ` : '';
+
   const content = `
     <div class="content-page">
       <h1 class="page-title">📊 Globale Statistiken</h1>
       <p class="page-subtitle">Übersicht aller Spielerdaten</p>
+      ${profileLinkHtml}
 
       <div class="global-stats-grid">
         <div class="global-stat-card">

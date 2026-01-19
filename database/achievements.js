@@ -217,6 +217,50 @@ async function hasAchievement(username, achievementId, env) {
 }
 
 /**
+ * Lock (remove) an achievement from a player
+ * Used by admins to revoke achievements
+ */
+async function lockAchievement(username, achievementId, env) {
+  try {
+    const data = await getPlayerAchievements(username, env);
+
+    // Not unlocked, nothing to do
+    if (!data.unlockedAt[achievementId]) {
+      return { locked: false, wasUnlocked: false };
+    }
+
+    // Remove the achievement
+    delete data.unlockedAt[achievementId];
+
+    // Save and decrement global counter in parallel
+    await Promise.all([
+      savePlayerAchievements(username, data, env),
+      decrementAchievementCounter(achievementId, env)
+    ]);
+
+    return { locked: true, wasUnlocked: true };
+  } catch (error) {
+    logError('lockAchievement', error, { username, achievementId });
+    return { locked: false, wasUnlocked: false };
+  }
+}
+
+/**
+ * Decrement the global counter for an achievement
+ */
+async function decrementAchievementCounter(achievementId, env) {
+  try {
+    const key = `achievement_count:${achievementId}`;
+    const current = parseInt(await env.SLOTS_KV.get(key) || '0', 10);
+    if (current > 0) {
+      await env.SLOTS_KV.put(key, String(current - 1));
+    }
+  } catch (error) {
+    logError('decrementAchievementCounter', error, { achievementId });
+  }
+}
+
+/**
  * Unlock an achievement for a player (if not already unlocked)
  * Returns the reward amount if newly unlocked and REWARDS_ENABLED, otherwise 0
  *
@@ -665,6 +709,7 @@ export {
   savePlayerAchievements,
   hasAchievement,
   unlockAchievement,
+  lockAchievement,
   updateAchievementStat,
   markTripleCollected,
   checkAndUnlockAchievement,

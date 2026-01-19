@@ -13,7 +13,9 @@ import {
   setDisclaimerAccepted,
   setSelfBan,
   removeSelfBan,
-  setDuelOptOut
+  setDuelOptOut,
+  unlockAchievement,
+  lockAchievement
 } from '../database.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES } from '../constants.js';
 import { logError, isAdmin, sanitizeUsername } from '../utils.js';
@@ -349,6 +351,8 @@ async function handleAdminApi(url, env, loggedInUser, request) {
         return await handleAdminSetSelfBan(targetUser, body.banned, env);
       case 'setDuelOpt':
         return await handleAdminSetDuelOpt(targetUser, body.optedOut, env);
+      case 'setAchievement':
+        return await handleAdminSetAchievement(targetUser, body.achievementId, body.unlocked, env);
       default:
         return jsonResponse({ error: 'Unknown admin action' }, 400);
     }
@@ -413,4 +417,27 @@ async function handleAdminSetDuelOpt(username, optedOut, env) {
 
   await setDuelOptOut(username, optedOut, env);
   return jsonResponse({ success: true, username, optedOut });
+}
+
+/**
+ * Admin: Set achievement status (unlock/lock)
+ */
+async function handleAdminSetAchievement(username, achievementId, unlocked, env) {
+  if (!achievementId || typeof achievementId !== 'string') {
+    return jsonResponse({ error: 'Invalid achievementId' }, 400);
+  }
+  if (typeof unlocked !== 'boolean') {
+    return jsonResponse({ error: 'Invalid unlocked value' }, 400);
+  }
+
+  if (unlocked) {
+    const result = await unlockAchievement(username, achievementId, env);
+    if (!result.achievement) {
+      return jsonResponse({ error: 'Achievement not found' }, 404);
+    }
+    return jsonResponse({ success: true, username, achievementId, unlocked: true, newlyUnlocked: result.unlocked });
+  } else {
+    const result = await lockAchievement(username, achievementId, env);
+    return jsonResponse({ success: true, username, achievementId, unlocked: false, wasUnlocked: result.wasUnlocked });
+  }
 }

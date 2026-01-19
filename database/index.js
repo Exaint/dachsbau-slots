@@ -108,6 +108,7 @@ export {
   savePlayerAchievements,
   hasAchievement,
   unlockAchievement,
+  lockAchievement,
   updateAchievementStat,
   markTripleCollected,
   checkAndUnlockAchievement,

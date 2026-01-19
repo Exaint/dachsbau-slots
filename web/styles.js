@@ -970,34 +970,10 @@ body {
 }
 
 .leaderboard-rank {
-  font-size: 1.4rem;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 1.3rem;
+  width: 40px;
+  text-align: center;
   flex-shrink: 0;
-  border-radius: 12px;
-  background: var(--bg-card);
-  font-weight: 700;
-}
-
-.leaderboard-item:nth-child(1) .leaderboard-rank {
-  background: linear-gradient(135deg, #ffd700, #ffaa00);
-  color: #000;
-  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
-}
-
-.leaderboard-item:nth-child(2) .leaderboard-rank {
-  background: linear-gradient(135deg, #c0c0c0, #a8a8a8);
-  color: #000;
-  box-shadow: 0 4px 12px rgba(192, 192, 192, 0.3);
-}
-
-.leaderboard-item:nth-child(3) .leaderboard-rank {
-  background: linear-gradient(135deg, #cd7f32, #b8722c);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(205, 127, 50, 0.3);
 }
 
 .leaderboard-user {
@@ -1417,6 +1393,11 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.9em;
+}
+
+.stats-profile-link {
+  margin-bottom: 24px;
+  text-align: center;
 }
 
 .content-section {
@@ -1938,9 +1919,20 @@ body {
   width: 30px;
 }
 
-.stat-ach-name {
+.stat-ach-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-ach-name {
   font-weight: 500;
+}
+
+.stat-ach-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 
 .stat-ach-count {
@@ -2406,6 +2398,24 @@ body {
 .admin-input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.admin-select {
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.admin-control-wide {
+  grid-column: 1 / -1;
+}
+
+.admin-control-wide .admin-input-group {
+  flex-wrap: wrap;
+}
+
+.admin-control-wide .admin-select {
+  flex: 2;
+  min-width: 250px;
 }
 
 .admin-toggle-group {

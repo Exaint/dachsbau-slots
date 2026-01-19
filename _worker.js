@@ -5,6 +5,7 @@ import { isBlacklisted, setSelfBan, hasAcceptedDisclaimer, setDisclaimerAccepted
 // Web pages and API
 import { handleWebPage } from './web/pages.js';
 import { handleApi } from './web/api.js';
+import { serveLogoPng } from './web/assets.js';
 import { handleOAuthCallback, getUserFromRequest, getUserLoginUrl, handleUserOAuthCallback, createLogoutResponse } from './web/twitch.js';
 
 // User commands
@@ -120,6 +121,11 @@ export default {
       }
       if (pathname === '/lb' || pathname === '/lb/' || pathname === '/leaderboard' || pathname === '/leaderboard/') {
         return Response.redirect(`${url.origin}/?page=leaderboard`, 302);
+      }
+
+      // Static assets
+      if (pathname === '/assets/logo.png') {
+        return serveLogoPng();
       }
 
       // User login - redirect to Twitch OAuth

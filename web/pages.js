@@ -323,6 +323,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)} - Dachsbau Slots</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
   <style>${CSS}</style>
   <script>
     // Theme handling - check localStorage, default to dark
@@ -338,7 +339,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
   <header class="header">
     <div class="header-content">
       <a href="?page=home" class="logo">
-        <span class="logo-emoji">🦡</span>
+        <img src="/assets/logo.png" alt="Logo" class="logo-img">
         <span class="logo-text">Dachsbau Slots</span>
       </a>
       <nav class="nav-bar">

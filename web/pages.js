@@ -203,8 +203,9 @@ async function handleLeaderboardPage(env, loggedInUser = null) {
         if (balances[j]) {
           const balance = parseInt(balances[j], 10);
           const username = usernames[j];
-          // Filter out DachsBank, users who haven't accepted disclaimer, and self-banned users
-          if (!isNaN(balance) && balance > 0 && username.toLowerCase() !== 'dachsbank' && disclaimerStatuses[j] && !selfBanStatuses[j]) {
+          // Filter out DachsBank, "Spieler" (default fallback), users who haven't accepted disclaimer, and self-banned users
+          const lowerUsername = username.toLowerCase();
+          if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler' && disclaimerStatuses[j] && !selfBanStatuses[j]) {
             users.push({
               username,
               balance

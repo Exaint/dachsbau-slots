@@ -197,8 +197,9 @@ async function handleLeaderboardApi(env) {
         if (balances[j]) {
           const balance = parseInt(balances[j], 10);
           const username = batch[j].name.replace('user:', '');
-          // Filter out DachsBank (not a real player)
-          if (!isNaN(balance) && balance > 0 && username.toLowerCase() !== 'dachsbank') {
+          const lowerUsername = username.toLowerCase();
+          // Filter out DachsBank and "Spieler" (not real players)
+          if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler') {
             users.push({
               username,
               balance

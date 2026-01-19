@@ -186,19 +186,23 @@ async function handleLeaderboardPage(env, loggedInUser = null) {
 
     const users = [];
 
-    // Batch fetch balances
+    // Batch fetch balances and disclaimer status
     for (let i = 0; i < listResult.keys.length; i += BATCH_SIZE) {
       const batch = listResult.keys.slice(i, i + BATCH_SIZE);
-      const balances = await Promise.all(
-        batch.map(key => env.SLOTS_KV.get(key.name))
-      );
+      const usernames = batch.map(key => key.name.replace('user:', ''));
+
+      // Fetch balances and disclaimer status in parallel
+      const [balances, disclaimerStatuses] = await Promise.all([
+        Promise.all(batch.map(key => env.SLOTS_KV.get(key.name))),
+        Promise.all(usernames.map(username => hasAcceptedDisclaimer(username, env)))
+      ]);
 
       for (let j = 0; j < batch.length; j++) {
         if (balances[j]) {
           const balance = parseInt(balances[j], 10);
-          const username = batch[j].name.replace('user:', '');
-          // Filter out DachsBank (not a real player)
-          if (!isNaN(balance) && balance > 0 && username.toLowerCase() !== 'dachsbank') {
+          const username = usernames[j];
+          // Filter out DachsBank and users who haven't accepted disclaimer
+          if (!isNaN(balance) && balance > 0 && username.toLowerCase() !== 'dachsbank' && disclaimerStatuses[j]) {
             users.push({
               username,
               balance

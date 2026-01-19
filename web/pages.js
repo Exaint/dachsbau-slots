@@ -293,7 +293,6 @@ function baseTemplate(title, content, activePage = '', user = null) {
     { page: 'home', label: 'Start', icon: '🏠' },
     { page: 'info', label: 'Info', icon: 'ℹ️' },
     { page: 'shop', label: 'Shop', icon: '🛒' },
-    { page: 'changelog', label: 'Changelog', icon: '📜' },
     { page: 'leaderboard', label: 'Leaderboard', icon: '🏆' },
     { page: 'stats', label: 'Statistiken', icon: '📊' }
   ];
@@ -376,7 +375,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
   </main>
   <footer class="footer">
     <p>Dachsbau Slots - Made by Exaint für <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener" class="footer-link">@frechhdachs</a></p>
-    <p class="footer-legal"><a href="?page=impressum">Impressum</a> · <a href="?page=datenschutz">Datenschutz</a></p>
+    <p class="footer-legal"><a href="?page=changelog">Changelog</a> · <a href="?page=impressum">Impressum</a> · <a href="?page=datenschutz">Datenschutz</a></p>
     <button class="theme-toggle-footer" onclick="toggleTheme()" title="Theme wechseln">
       <span class="theme-toggle-icon">🌙</span>
       <span class="theme-toggle-label">Theme</span>

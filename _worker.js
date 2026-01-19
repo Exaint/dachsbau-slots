@@ -86,7 +86,6 @@ const ADMIN_COMMANDS_AMOUNT = {
   setbalance: handleSetBalance,
   givebuff: handleGiveBuff,
   removebuff: handleRemoveBuff,
-  givefreespins: handleGiveFreespins,
   giveinsurance: handleGiveInsurance
 };
 
@@ -277,6 +276,7 @@ export default {
           if (lower === 'bankset') return await handleBankSet(cleanUsername, url.searchParams.get('target'), env);
           if (lower === 'bankreset') return await handleBankReset(cleanUsername, env);
           if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target'), env);
+          if (lower === 'givefreespins') return await handleGiveFreespins(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), url.searchParams.get('multiplier'), env);
           if (lower === 'disclaimer') {
             // For disclaimer, check the target parameter (which is $(2) in Fossabot)
             const targetParam = url.searchParams.get('target');

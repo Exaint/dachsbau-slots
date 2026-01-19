@@ -581,7 +581,7 @@ Das Wild ersetzt **jedes Symbol** für den besten Outcome:
 **Items verschenken:**
 | Command | Beschreibung |
 |:--------|:-------------|
-| `!slots givefreespins @user [Anzahl]` | Free Spins geben (1-100) |
+| `!slots givefreespins @user [Anzahl] [Multi]` | Free Spins geben (Multi: 1=10DT, 2=20DT, 3=30DT, 5=50DT, 10=100DT) |
 | `!slots giveinsurance @user [Anzahl]` | Insurance geben (1-100) |
 
 **Info & Debug:**

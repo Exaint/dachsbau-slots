@@ -359,17 +359,17 @@ async function handleResetDaily(username, target, env) {
   }
 }
 
-async function handleGiveFreespins(username, target, amount, env) {
+async function handleGiveFreespins(username, target, amount, multiplier, env) {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
 
     if (!target) {
-      return new Response(`@${username} ❌ Nutze: !slots givefreespins @user [Anzahl]`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ❌ Nutze: !slots givefreespins @user [Anzahl] [Multiplier] - Multiplier: 1=10DT, 2=20DT, 3=30DT, 5=50DT, 10=100DT`, { headers: RESPONSE_HEADERS });
     }
 
     if (!amount) {
-      return new Response(`@${username} ❌ Nutze: !slots givefreespins @user [Anzahl]`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ❌ Nutze: !slots givefreespins @user [Anzahl] [Multiplier] - Multiplier: 1=10DT, 2=20DT, 3=30DT, 5=50DT, 10=100DT`, { headers: RESPONSE_HEADERS });
     }
 
     const cleanTarget = sanitizeUsername(target.replace('@', ''));
@@ -382,16 +382,27 @@ async function handleGiveFreespins(username, target, amount, env) {
       return new Response(`@${username} ❌ Ungültige Anzahl! (1-100)`, { headers: RESPONSE_HEADERS });
     }
 
-    // Add freespins with 1x multiplier (standard freespins)
-    await addFreeSpinsWithMultiplier(cleanTarget, parsedAmount, 1, env);
+    // Parse multiplier (default: 1 = 10 DT freespins)
+    const validMultipliers = [1, 2, 3, 5, 10];
+    let parsedMultiplier = 1;
+    if (multiplier) {
+      parsedMultiplier = parseInt(multiplier, 10);
+      if (!validMultipliers.includes(parsedMultiplier)) {
+        return new Response(`@${username} ❌ Ungültiger Multiplier! Erlaubt: 1 (10DT), 2 (20DT), 3 (30DT), 5 (50DT), 10 (100DT)`, { headers: RESPONSE_HEADERS });
+      }
+    }
+
+    // Add freespins with specified multiplier
+    await addFreeSpinsWithMultiplier(cleanTarget, parsedAmount, parsedMultiplier, env);
 
     // Get total freespins for confirmation
     const totalSpins = await getFreeSpins(cleanTarget, env);
     const totalCount = totalSpins.reduce((sum, fs) => sum + fs.count, 0);
 
-    return new Response(`@${username} ✅ ${parsedAmount} Freespins an @${cleanTarget} gegeben! (Gesamt: ${totalCount}) 🎰🎁`, { headers: RESPONSE_HEADERS });
+    const dtValue = parsedMultiplier * 10;
+    return new Response(`@${username} ✅ ${parsedAmount}x ${dtValue}DT Freespins an @${cleanTarget} gegeben! (Gesamt: ${totalCount}) 🎰🎁`, { headers: RESPONSE_HEADERS });
   } catch (error) {
-    logError('handleGiveFreespins', error, { username, target, amount });
+    logError('handleGiveFreespins', error, { username, target, amount, multiplier });
     return new Response(`@${username} ❌ Fehler beim Geben der Freespins.`, { headers: RESPONSE_HEADERS });
   }
 }

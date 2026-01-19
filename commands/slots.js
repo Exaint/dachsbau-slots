@@ -97,88 +97,84 @@ const NORMALIZE_SPACES_REGEX = /\s+/g;
 const UNLOCK_PRICES = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
 
 // Achievement tracking (fire-and-forget, non-blocking)
+// IMPORTANT: Operations are run sequentially to avoid race conditions on KV writes
 async function trackSlotAchievements(username, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env) {
   try {
-    const promises = [];
+    // Stat updates (these modify achievement data)
+    await updateAchievementStat(username, 'totalSpins', 1, env);
 
-    // FIRST_SPIN (tracked via totalSpins stat)
-    promises.push(updateAchievementStat(username, 'totalSpins', 1, env));
-
-    // Win tracking
     if (result.points > 0) {
-      promises.push(updateAchievementStat(username, 'wins', 1, env));
-
-      // FIRST_WIN
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_WIN.id, env));
-
-      // Big win achievements
-      promises.push(checkBigWinAchievements(username, result.points, env));
-
-      // FREE_SPIN_WIN
-      if (isFreeSpinUsed) {
-        promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FREE_SPIN_WIN.id, env));
-      }
-
-      // SLOTS_ALL_WIN
-      if (isAllIn) {
-        promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.SLOTS_ALL_WIN.id, env));
-      }
-
-      // WILD_CARD_WIN
-      if (hasWildCardToken && grid.includes('🃏')) {
-        promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.WILD_CARD_WIN.id, env));
-      }
+      await updateAchievementStat(username, 'wins', 1, env);
     }
 
-    // Triple tracking
-    if (grid[0] === grid[1] && grid[1] === grid[2] && grid[0] !== '🃏') {
-      promises.push(markTripleCollected(username, grid[0], env));
+    // Collect all one-time achievements to unlock
+    const achievementsToUnlock = [];
+
+    // Win-related achievements
+    if (result.points > 0) {
+      achievementsToUnlock.push(ACHIEVEMENTS.FIRST_WIN.id);
+
+      if (isFreeSpinUsed) {
+        achievementsToUnlock.push(ACHIEVEMENTS.FREE_SPIN_WIN.id);
+      }
+      if (isAllIn) {
+        achievementsToUnlock.push(ACHIEVEMENTS.SLOTS_ALL_WIN.id);
+      }
+      if (hasWildCardToken && grid.includes('🃏')) {
+        achievementsToUnlock.push(ACHIEVEMENTS.WILD_CARD_WIN.id);
+      }
+      // ZERO_HERO (win with 0 balance before spin)
+      if (newBalance === result.points) {
+        achievementsToUnlock.push(ACHIEVEMENTS.ZERO_HERO.id);
+      }
     }
 
     // Dachs tracking
     if (grid.includes('🦡')) {
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_DACHS.id, env));
+      achievementsToUnlock.push(ACHIEVEMENTS.FIRST_DACHS.id);
       const dachsCount = grid.filter(s => s === '🦡').length;
       if (dachsCount === 2) {
-        promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DACHS_PAIR.id, env));
+        achievementsToUnlock.push(ACHIEVEMENTS.DACHS_PAIR.id);
       }
     }
 
-    // Balance achievements
-    promises.push(checkBalanceAchievements(username, newBalance, env));
-
-    // ZERO_HERO (win with 0 balance before spin)
-    if (result.points > 0 && newBalance === result.points) {
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.ZERO_HERO.id, env));
-    }
-
-    // INSURANCE_SAVE
+    // Special event achievements
     if (insuranceUsed) {
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.INSURANCE_SAVE.id, env));
+      achievementsToUnlock.push(ACHIEVEMENTS.INSURANCE_SAVE.id);
     }
-
-    // HOURLY_JACKPOT
     if (hourlyJackpotWon) {
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.HOURLY_JACKPOT.id, env));
+      achievementsToUnlock.push(ACHIEVEMENTS.HOURLY_JACKPOT.id);
     }
-
-    // HOT_STREAK
     if (hotStreakTriggered) {
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.HOT_STREAK.id, env));
+      achievementsToUnlock.push(ACHIEVEMENTS.HOT_STREAK.id);
     }
-
-    // COMEBACK_KING
     if (comebackTriggered) {
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.COMEBACK_KING.id, env));
+      achievementsToUnlock.push(ACHIEVEMENTS.COMEBACK_KING.id);
     }
 
     // PERFECT_TIMING (midnight UTC)
     const nowUTC = new Date();
     if (nowUTC.getUTCHours() === 0 && nowUTC.getUTCMinutes() === 0) {
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.PERFECT_TIMING.id, env));
+      achievementsToUnlock.push(ACHIEVEMENTS.PERFECT_TIMING.id);
     }
 
-    await Promise.all(promises);
+    // Unlock all collected achievements sequentially (share same data object)
+    for (const achievementId of achievementsToUnlock) {
+      await checkAndUnlockAchievement(username, achievementId, env);
+    }
+
+    // These functions load their own data, run after unlocks
+    if (result.points > 0) {
+      await checkBigWinAchievements(username, result.points, env);
+    }
+
+    // Triple tracking
+    if (grid[0] === grid[1] && grid[1] === grid[2] && grid[0] !== '🃏') {
+      await markTripleCollected(username, grid[0], env);
+    }
+
+    // Balance achievements
+    await checkBalanceAchievements(username, newBalance, env);
   } catch (error) {
     // Silently fail - achievements should never break the game
     logError('trackSlotAchievements', error, { username });

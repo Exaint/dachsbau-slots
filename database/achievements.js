@@ -106,6 +106,50 @@ async function getPlayerAchievements(username, env) {
     if (typeof data.pendingRewards !== 'number') {
       data.pendingRewards = 0;
     }
+
+    // One-time shop migration: Check unlocks and update shopPurchases stat
+    if (!data.shopMigrated) {
+      const shopUnlockKeys = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'daily_boost', 'stats_tracker'];
+      const unlockChecks = await Promise.all(
+        shopUnlockKeys.map(key => env.SLOTS_KV.get(`unlock:${lowerUsername}:${key}`))
+      );
+
+      // Count how many unlocks the user has (each unlock = 1 shop purchase)
+      const unlockCount = unlockChecks.filter(v => v === 'true').length;
+      if (unlockCount > 0 && (data.stats.shopPurchases || 0) < unlockCount) {
+        data.stats.shopPurchases = unlockCount;
+
+        // Auto-unlock shop achievements based on count
+        const now = Date.now();
+        let addedRewards = 0;
+
+        if (!data.unlockedAt[ACHIEVEMENTS.FIRST_PURCHASE.id]) {
+          data.unlockedAt[ACHIEVEMENTS.FIRST_PURCHASE.id] = now;
+          addedRewards += ACHIEVEMENTS.FIRST_PURCHASE.reward || 0;
+        }
+        if (unlockCount >= 10 && !data.unlockedAt[ACHIEVEMENTS.SHOP_10.id]) {
+          data.unlockedAt[ACHIEVEMENTS.SHOP_10.id] = now;
+          addedRewards += ACHIEVEMENTS.SHOP_10.reward || 0;
+        }
+        if (unlockCount >= 50 && !data.unlockedAt[ACHIEVEMENTS.SHOP_50.id]) {
+          data.unlockedAt[ACHIEVEMENTS.SHOP_50.id] = now;
+          addedRewards += ACHIEVEMENTS.SHOP_50.reward || 0;
+        }
+        if (unlockCount >= 100 && !data.unlockedAt[ACHIEVEMENTS.SHOP_100.id]) {
+          data.unlockedAt[ACHIEVEMENTS.SHOP_100.id] = now;
+          addedRewards += ACHIEVEMENTS.SHOP_100.reward || 0;
+        }
+
+        if (addedRewards > 0 && !ACHIEVEMENTS_REWARDS_ENABLED) {
+          data.pendingRewards = (data.pendingRewards || 0) + addedRewards;
+        }
+      }
+
+      data.shopMigrated = true;
+      // Save migrated data
+      await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+    }
+
     return data;
   } catch (error) {
     logError('getPlayerAchievements', error, { username });
@@ -339,9 +383,10 @@ async function updateAchievementStat(username, statKey, increment, env) {
       // Skip if already unlocked
       if (data.unlockedAt[achievement.id]) continue;
 
-      // Check requirement
+      // Check requirement - also catch up achievements that were missed
+      // (e.g., if stats were tracked before achievements existed)
       const requirement = achievement.requirement || 1;
-      if (oldValue < requirement && newValue >= requirement) {
+      if (newValue >= requirement) {
         const result = await unlockAchievement(username, achievement.id, env, data);
         if (result.unlocked) {
           unlockedAchievements.push({ achievement: result.achievement, reward: result.reward });

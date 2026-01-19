@@ -17,7 +17,7 @@ import {
   KV_ACTIVE,
   ACHIEVEMENTS
 } from '../constants.js';
-import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError } from '../utils.js';
+import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -161,21 +161,16 @@ async function handleDaily(username, env) {
     const dailyAmount = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
     const now = Date.now();
 
-    // Check if daily was already claimed today (UTC day reset)
-    const nowDate = new Date(now);
-    const todayUTC = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
+    // Check if daily was already claimed today (German timezone reset at midnight)
+    const todayGerman = getCurrentDate();
     const daysInMonth = getDaysInCurrentMonth(); // Cache once at start
 
     if (lastDaily) {
-      const lastDailyDate = new Date(lastDaily);
-      const lastDailyUTC = Date.UTC(lastDailyDate.getUTCFullYear(), lastDailyDate.getUTCMonth(), lastDailyDate.getUTCDate());
+      const lastDailyGerman = getGermanDateFromTimestamp(lastDaily);
 
-      if (todayUTC === lastDailyUTC) {
-        // Already claimed today, calculate time until next UTC midnight
-        const tomorrow = new Date(todayUTC);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-        const remainingMs = tomorrow.getTime() - now;
-
+      if (todayGerman === lastDailyGerman) {
+        // Already claimed today, calculate time until next German midnight
+        const remainingMs = getMsUntilGermanMidnight();
         return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${formatTimeRemaining(remainingMs)} | Login-Tage: ${monthlyLogin.days.length}/${daysInMonth} 📅`, { headers: RESPONSE_HEADERS });
       }
     }

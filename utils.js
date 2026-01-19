@@ -114,6 +114,36 @@ function getCurrentDate() {
   return `${year}-${month}-${day}`;
 }
 
+// Get German date string from a timestamp (for comparing daily claims)
+function getGermanDateFromTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  const parts = GERMAN_DATE_FORMATTER.formatToParts(date);
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  return `${year}-${month}-${day}`;
+}
+
+// Get milliseconds until next German midnight
+function getMsUntilGermanMidnight() {
+  const now = new Date();
+  // Get current German time components
+  const germanTimeFormatter = new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  const timeParts = germanTimeFormatter.formatToParts(now);
+  const hours = parseInt(timeParts.find(p => p.type === 'hour').value, 10);
+  const minutes = parseInt(timeParts.find(p => p.type === 'minute').value, 10);
+  const seconds = parseInt(timeParts.find(p => p.type === 'second').value, 10);
+
+  // Calculate remaining time until midnight (in ms)
+  return ((23 - hours) * 3600 + (59 - minutes) * 60 + (60 - seconds)) * 1000;
+}
+
 // Calculate week start (Monday) in German timezone - always fresh
 function calculateWeekStart() {
   // Use Intl.DateTimeFormat for reliable timezone handling
@@ -253,6 +283,8 @@ export {
   validateAmount,
   getCurrentMonth,
   getCurrentDate,
+  getGermanDateFromTimestamp,
+  getMsUntilGermanMidnight,
   getWeekStart,
   calculateWeekStart,
   isLeaderboardBlocked,

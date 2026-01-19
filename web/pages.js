@@ -962,10 +962,10 @@ function renderProfilePage(data) {
 
   // Special admin overrides
   if (lowerUsername === 'exaint_') {
-    roleBadgeHtml = `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Mod" class="profile-badge" title="Lead-Mod">`;
+    roleBadgeHtml = `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Moderator" class="profile-badge" title="Lead-Moderator">`;
     roleTitle = 'Lead-Mod / Dachsbau-Slots Admin';
   } else if (lowerUsername === 'frechhdachs') {
-    roleBadgeHtml = `<img src="${ROLE_BADGES.broadcaster.icon}" alt="Broadcaster" class="profile-badge" title="Broadcaster">`;
+    roleBadgeHtml = `<img src="${ROLE_BADGES.broadcaster.icon}" alt="Streamerin" class="profile-badge" title="Streamerin">`;
     roleTitle = 'Streamerin / Dachsbau-Slots Admin';
   } else if (twitchData?.role && ROLE_BADGES[twitchData.role]) {
     const badge = ROLE_BADGES[twitchData.role];
@@ -1869,7 +1869,7 @@ function renderImpressumPage(user = null) {
       <section class="legal-section">
         <h2>Verantwortlich für den Inhalt</h2>
         <address>
-          <strong>Exaint</strong><br>
+          <strong>Exaint i. A. frechhdachs (Maria Kellner)</strong><br>
           c/o OOE-Esports<br>
           Lastenstr. 42<br>
           4020 Linz<br>
@@ -1887,7 +1887,7 @@ function renderImpressumPage(user = null) {
       <section class="legal-section">
         <h2>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h2>
         <address>
-          <strong>Exaint</strong><br>
+          <strong>Exaint i. A. frechhdachs (Maria Kellner)</strong><br>
           c/o OOE-Esports<br>
           Lastenstr. 42<br>
           4020 Linz
@@ -1977,7 +1977,7 @@ function renderDatenschutzPage(user = null) {
         <h2>1. Verantwortlicher</h2>
         <p>Verantwortlicher im Sinne der Datenschutz-Grundverordnung (DSGVO):</p>
         <address>
-          <strong>Exaint c/o OOE-Esports</strong><br>
+          <strong>Exaint i. A. frechhdachs (Maria Kellner) c/o OOE-Esports</strong><br>
           Lastenstr. 42<br>
           4020 Linz<br>
           E-Mail: <a href="mailto:tulpe_salbei6s@icloud.com">tulpe_salbei6s@icloud.com</a>

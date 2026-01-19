@@ -76,10 +76,13 @@ async function getPlayerAchievements(username, env) {
         };
 
         // Auto-unlock achievements based on migrated stats
-        migrateAchievementsFromStats(migratedData);
+        const unlockedIds = migrateAchievementsFromStats(migratedData);
 
-        // Save the migrated data
-        await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(migratedData));
+        // Save the migrated data and increment global counters
+        await Promise.all([
+          env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(migratedData)),
+          ...unlockedIds.map(id => incrementAchievementCounter(id, env))
+        ]);
 
         return migratedData;
       }
@@ -116,6 +119,8 @@ async function getPlayerAchievements(username, env) {
 
       // Count how many unlocks the user has (each unlock = 1 shop purchase)
       const unlockCount = unlockChecks.filter(v => v === 'true').length;
+      const counterPromises = [];
+
       if (unlockCount > 0 && (data.stats.shopPurchases || 0) < unlockCount) {
         data.stats.shopPurchases = unlockCount;
 
@@ -126,18 +131,22 @@ async function getPlayerAchievements(username, env) {
         if (!data.unlockedAt[ACHIEVEMENTS.FIRST_PURCHASE.id]) {
           data.unlockedAt[ACHIEVEMENTS.FIRST_PURCHASE.id] = now;
           addedRewards += ACHIEVEMENTS.FIRST_PURCHASE.reward || 0;
+          counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.FIRST_PURCHASE.id, env));
         }
         if (unlockCount >= 10 && !data.unlockedAt[ACHIEVEMENTS.SHOP_10.id]) {
           data.unlockedAt[ACHIEVEMENTS.SHOP_10.id] = now;
           addedRewards += ACHIEVEMENTS.SHOP_10.reward || 0;
+          counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.SHOP_10.id, env));
         }
         if (unlockCount >= 50 && !data.unlockedAt[ACHIEVEMENTS.SHOP_50.id]) {
           data.unlockedAt[ACHIEVEMENTS.SHOP_50.id] = now;
           addedRewards += ACHIEVEMENTS.SHOP_50.reward || 0;
+          counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.SHOP_50.id, env));
         }
         if (unlockCount >= 100 && !data.unlockedAt[ACHIEVEMENTS.SHOP_100.id]) {
           data.unlockedAt[ACHIEVEMENTS.SHOP_100.id] = now;
           addedRewards += ACHIEVEMENTS.SHOP_100.reward || 0;
+          counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.SHOP_100.id, env));
         }
 
         if (addedRewards > 0 && !ACHIEVEMENTS_REWARDS_ENABLED) {
@@ -146,8 +155,11 @@ async function getPlayerAchievements(username, env) {
       }
 
       data.shopMigrated = true;
-      // Save migrated data
-      await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+      // Save migrated data and increment counters
+      await Promise.all([
+        env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data)),
+        ...counterPromises
+      ]);
     }
 
     return data;
@@ -164,76 +176,94 @@ async function getPlayerAchievements(username, env) {
 /**
  * Auto-unlock achievements based on migrated stats
  * Called once during migration from legacy stats system
+ * Returns array of unlocked achievement IDs for counter updates
  */
 function migrateAchievementsFromStats(data) {
   const { stats, unlockedAt } = data;
   const now = Date.now();
   let pendingRewards = 0;
+  const unlockedIds = [];
 
   // Spin milestones
   if (stats.totalSpins >= 1) {
     unlockedAt[ACHIEVEMENTS.FIRST_SPIN.id] = now;
     pendingRewards += ACHIEVEMENTS.FIRST_SPIN.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.FIRST_SPIN.id);
   }
   if (stats.totalSpins >= 100) {
     unlockedAt[ACHIEVEMENTS.SPIN_100.id] = now;
     pendingRewards += ACHIEVEMENTS.SPIN_100.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.SPIN_100.id);
   }
   if (stats.totalSpins >= 500) {
     unlockedAt[ACHIEVEMENTS.SPIN_500.id] = now;
     pendingRewards += ACHIEVEMENTS.SPIN_500.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.SPIN_500.id);
   }
   if (stats.totalSpins >= 1000) {
     unlockedAt[ACHIEVEMENTS.SPIN_1000.id] = now;
     pendingRewards += ACHIEVEMENTS.SPIN_1000.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.SPIN_1000.id);
   }
   if (stats.totalSpins >= 5000) {
     unlockedAt[ACHIEVEMENTS.SPIN_5000.id] = now;
     pendingRewards += ACHIEVEMENTS.SPIN_5000.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.SPIN_5000.id);
   }
   if (stats.totalSpins >= 10000) {
     unlockedAt[ACHIEVEMENTS.SPIN_10000.id] = now;
     pendingRewards += ACHIEVEMENTS.SPIN_10000.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.SPIN_10000.id);
   }
 
   // Win milestones
   if (stats.wins >= 1) {
     unlockedAt[ACHIEVEMENTS.FIRST_WIN.id] = now;
     pendingRewards += ACHIEVEMENTS.FIRST_WIN.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.FIRST_WIN.id);
   }
   if (stats.wins >= 100) {
     unlockedAt[ACHIEVEMENTS.WIN_100.id] = now;
     pendingRewards += ACHIEVEMENTS.WIN_100.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.WIN_100.id);
   }
   if (stats.wins >= 500) {
     unlockedAt[ACHIEVEMENTS.WIN_500.id] = now;
     pendingRewards += ACHIEVEMENTS.WIN_500.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.WIN_500.id);
   }
   if (stats.wins >= 1000) {
     unlockedAt[ACHIEVEMENTS.WIN_1000.id] = now;
     pendingRewards += ACHIEVEMENTS.WIN_1000.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.WIN_1000.id);
   }
 
   // Big win milestones (based on biggestWin)
   if (stats.biggestWin >= 500) {
     unlockedAt[ACHIEVEMENTS.BIG_WIN_500.id] = now;
     pendingRewards += ACHIEVEMENTS.BIG_WIN_500.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.BIG_WIN_500.id);
   }
   if (stats.biggestWin >= 1000) {
     unlockedAt[ACHIEVEMENTS.BIG_WIN_1000.id] = now;
     pendingRewards += ACHIEVEMENTS.BIG_WIN_1000.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.BIG_WIN_1000.id);
   }
   if (stats.biggestWin >= 5000) {
     unlockedAt[ACHIEVEMENTS.BIG_WIN_5000.id] = now;
     pendingRewards += ACHIEVEMENTS.BIG_WIN_5000.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.BIG_WIN_5000.id);
   }
   if (stats.biggestWin >= 10000) {
     unlockedAt[ACHIEVEMENTS.BIG_WIN_10000.id] = now;
     pendingRewards += ACHIEVEMENTS.BIG_WIN_10000.reward || 0;
+    unlockedIds.push(ACHIEVEMENTS.BIG_WIN_10000.id);
   }
 
   // Store pending rewards (paid out when ACHIEVEMENTS_REWARDS_ENABLED = true)
   data.pendingRewards = pendingRewards;
+
+  return unlockedIds;
 }
 
 /**
@@ -688,7 +718,7 @@ async function incrementAchievementCounter(achievementId, env) {
  * Get global achievement statistics (how many players have each achievement)
  * Uses KV caching for 5 minutes to reduce load
  */
-const STATS_CACHE_KEY = 'cache:achievement_stats';
+const STATS_CACHE_KEY = 'cache:achievement_stats_v2'; // v2: Fixed counter tracking
 const STATS_CACHE_TTL = 300; // 5 minutes in seconds
 
 async function getAchievementStats(env) {

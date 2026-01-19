@@ -913,8 +913,9 @@ function renderProfilePage(data) {
           </div>
           <div class="profile-badges">
             ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
-            <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}<span class="info-tooltip" data-tooltip="Du möchtest dich von Duellen ausschließen? Schreib &quot;!slots duelopt out&quot; im Chat.">❓</span></span>
-            ${selfBanned ? `<span class="profile-selfban-status banned">🚫 Selbst-gesperrt<span class="info-tooltip" data-tooltip="Dieser Spieler hat sich selbst vom Spielen ausgeschlossen.">❓</span></span>` : ''}
+            <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}</span>
+            <span class="profile-duel-hint">Duelle an/aus: <code>!slots duelopt</code></span>
+            ${selfBanned ? `<span class="profile-selfban-status banned">🚫 Selbst-gesperrt</span>` : ''}
           </div>
           ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
         </div>
@@ -1003,7 +1004,7 @@ function renderLeaderboardPage(players, user = null) {
     <div class="leaderboard">
       <div class="leaderboard-header">
         <h1 class="leaderboard-title">🏆 Leaderboard</h1>
-        <span class="leaderboard-info" title="Nur Spieler die den Disclaimer akzeptiert haben werden angezeigt">ℹ️ Nur verifizierte Spieler</span>
+        <span class="leaderboard-info">Nur Spieler mit akzeptiertem Disclaimer · <code>!slots accept</code></span>
       </div>
       <div class="leaderboard-list">
         ${playersHtml}

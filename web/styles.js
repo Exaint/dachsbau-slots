@@ -193,6 +193,11 @@ body {
 .btn-search {
   padding: 8px 12px;
   min-width: auto;
+  font-size: 1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .search-input:focus {
@@ -495,6 +500,19 @@ body {
 .profile-selfban-status.banned {
   background: rgba(239, 68, 68, 0.2);
   color: #ef4444;
+}
+
+.profile-duel-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  width: 100%;
+  margin-top: 4px;
+}
+
+.profile-duel-hint code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .info-tooltip {
@@ -908,7 +926,13 @@ body {
 .leaderboard-info {
   font-size: 0.8rem;
   color: var(--text-muted);
-  cursor: help;
+}
+
+.leaderboard-info code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
 }
 
 .leaderboard-list {

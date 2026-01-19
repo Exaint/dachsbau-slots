@@ -96,6 +96,12 @@ export {
   checkAndClaimHourlyJackpot
 } from './bank.js';
 
+// Duels
+export {
+  setDuelOptOut,
+  isDuelOptedOut
+} from './duels.js';
+
 // Achievements
 export {
   getPlayerAchievements,

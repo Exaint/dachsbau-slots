@@ -161,7 +161,7 @@ export default {
       // API endpoints (JSON)
       const api = url.searchParams.get('api');
       if (api) {
-        return await handleApi(api, url, env);
+        return await handleApi(api, url, env, loggedInUser, request);
       }
 
       // Twitch bot commands (existing logic)

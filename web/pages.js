@@ -8,7 +8,7 @@ import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAccept
 import { isDuelOptedOut } from '../database/duels.js';
 import { getTwitchProfileData, getUserRole } from './twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
-import { logError } from '../utils.js';
+import { logError, isAdmin } from '../utils.js';
 
 const CATEGORY_ICONS = {
   [ACHIEVEMENT_CATEGORIES.SPINNING]: '🎰',
@@ -165,6 +165,7 @@ async function handleProfilePage(url, env, loggedInUser = null) {
     lastActive,
     duelOptOut,
     selfBanned,
+    hasDisclaimer,
     twitchData,
     loggedInUser
   }));
@@ -665,6 +666,66 @@ function baseTemplate(title, content, activePage = '', user = null) {
         }, 6000);
       }
     });
+
+    // Admin Panel Functions
+    async function adminApiCall(action, data) {
+      const msgEl = document.getElementById('adminMessage');
+      if (msgEl) {
+        msgEl.className = 'admin-message';
+        msgEl.textContent = '';
+      }
+
+      try {
+        const response = await fetch('?api=admin&action=' + action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (msgEl) {
+          if (result.success) {
+            msgEl.className = 'admin-message success';
+            msgEl.textContent = '✓ Erfolgreich aktualisiert!';
+            setTimeout(() => location.reload(), 1000);
+          } else {
+            msgEl.className = 'admin-message error';
+            msgEl.textContent = '✗ Fehler: ' + (result.error || 'Unbekannter Fehler');
+          }
+        }
+
+        return result;
+      } catch (e) {
+        if (msgEl) {
+          msgEl.className = 'admin-message error';
+          msgEl.textContent = '✗ Netzwerkfehler';
+        }
+        return { error: e.message };
+      }
+    }
+
+    function adminSetBalance(username) {
+      const balance = parseInt(document.getElementById('adminBalance').value, 10);
+      if (isNaN(balance) || balance < 0) {
+        alert('Ungültiger Betrag');
+        return;
+      }
+      adminApiCall('setBalance', { username, balance });
+    }
+
+    function adminSetDisclaimer(username, accepted) {
+      adminApiCall('setDisclaimer', { username, accepted });
+    }
+
+    function adminSetSelfBan(username, banned) {
+      if (banned && !confirm('Diesen Spieler wirklich sperren?')) return;
+      adminApiCall('setSelfBan', { username, banned });
+    }
+
+    function adminSetDuelOpt(username, optedOut) {
+      adminApiCall('setDuelOpt', { username, optedOut });
+    }
   </script>
 </body>
 </html>`;
@@ -722,7 +783,10 @@ const ROLE_BADGES = {
  * Profile page
  */
 function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, twitchData, loggedInUser } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, hasDisclaimer, twitchData, loggedInUser } = data;
+
+  // Check if logged-in user is admin
+  const showAdminPanel = loggedInUser && isAdmin(loggedInUser.username);
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
@@ -930,6 +994,45 @@ function renderProfilePage(data) {
         </div>
       </div>
     </div>
+    ${showAdminPanel ? `
+    <div class="admin-panel">
+      <div class="admin-panel-header">
+        <h3>🔧 Admin Panel</h3>
+        <span class="admin-panel-user">Spieler: <strong>${escapeHtml(username)}</strong></span>
+      </div>
+      <div class="admin-panel-grid">
+        <div class="admin-control">
+          <label>Balance</label>
+          <div class="admin-input-group">
+            <input type="number" id="adminBalance" value="${balance}" min="0" class="admin-input">
+            <button class="btn admin-btn" onclick="adminSetBalance('${escapeHtml(username)}')">Setzen</button>
+          </div>
+        </div>
+        <div class="admin-control">
+          <label>Disclaimer</label>
+          <div class="admin-toggle-group">
+            <span class="admin-status ${hasDisclaimer ? 'active' : ''}">${hasDisclaimer ? '✓ Akzeptiert' : '✗ Nicht akzeptiert'}</span>
+            <button class="btn admin-btn ${hasDisclaimer ? 'danger' : 'success'}" onclick="adminSetDisclaimer('${escapeHtml(username)}', ${!hasDisclaimer})">${hasDisclaimer ? 'Entfernen' : 'Setzen'}</button>
+          </div>
+        </div>
+        <div class="admin-control">
+          <label>Self-Ban</label>
+          <div class="admin-toggle-group">
+            <span class="admin-status ${selfBanned ? 'active danger' : ''}">${selfBanned ? '🚫 Gesperrt' : '✓ Nicht gesperrt'}</span>
+            <button class="btn admin-btn ${selfBanned ? 'success' : 'danger'}" onclick="adminSetSelfBan('${escapeHtml(username)}', ${!selfBanned})">${selfBanned ? 'Entsperren' : 'Sperren'}</button>
+          </div>
+        </div>
+        <div class="admin-control">
+          <label>Duelle</label>
+          <div class="admin-toggle-group">
+            <span class="admin-status ${duelOptOut ? 'danger' : 'active'}">${duelOptOut ? '✗ Deaktiviert' : '✓ Aktiviert'}</span>
+            <button class="btn admin-btn" onclick="adminSetDuelOpt('${escapeHtml(username)}', ${!duelOptOut})">${duelOptOut ? 'Aktivieren' : 'Deaktivieren'}</button>
+          </div>
+        </div>
+      </div>
+      <div id="adminMessage" class="admin-message"></div>
+    </div>
+    ` : ''}
     <div class="achievement-controls">
       <div class="achievement-filter">
         <span class="filter-label">Filter:</span>

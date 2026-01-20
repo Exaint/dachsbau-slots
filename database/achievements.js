@@ -164,7 +164,7 @@ async function getPlayerAchievements(username, env) {
 
     // Daily achievement catch-up: Check monthly login and unlock missed daily achievements
     // This runs every time (not one-time) because monthly days change throughout the month
-    const monthlyLoginData = await env.SLOTS_KV.get(`monthly_login:${lowerUsername}`);
+    const monthlyLoginData = await env.SLOTS_KV.get(`monthlylogin:${lowerUsername}`);
     if (monthlyLoginData) {
       try {
         const monthlyLogin = JSON.parse(monthlyLoginData);

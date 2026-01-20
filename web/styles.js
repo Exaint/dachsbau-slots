@@ -39,8 +39,23 @@ export const CSS = `
   --bg-card: #e5e5e8;
   --text-primary: #0e0e10;
   --text-secondary: #53535f;
-  --text-muted: #848494;
+  --text-muted: #6b6b7b;
   --border: #d2d2d7;
+  /* Adjusted colors for light mode readability */
+  --dachs-gold: #b8860b;
+  --warning: #c77800;
+  --success: #008f5d;
+  --error: #d00000;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  /* Category colors adjusted for light mode */
+  --cat-spinning: #7c3aed;
+  --cat-winning: #008f5d;
+  --cat-collecting: #c77800;
+  --cat-social: #db2777;
+  --cat-dedication: #0284c7;
+  --cat-shopping: #ea580c;
+  --cat-special: #c026d3;
 }
 
 * {
@@ -151,6 +166,88 @@ body {
 
 [data-theme="light"] .header {
   background: rgba(255, 255, 255, 0.95);
+}
+
+/* Light theme specific overrides for better readability */
+[data-theme="light"] .btn-secondary {
+  color: var(--text-primary);
+  background: #ffffff;
+  border-color: #c5c5d0;
+}
+
+[data-theme="light"] .btn-secondary:hover {
+  background: #f0f0f3;
+  border-color: var(--accent);
+}
+
+[data-theme="light"] .leaderboard-balance {
+  color: #8b6914;
+  background: rgba(184, 134, 11, 0.15);
+}
+
+[data-theme="light"] .stat-value {
+  color: #8b6914;
+}
+
+[data-theme="light"] .logo:hover {
+  color: #8b6914;
+}
+
+[data-theme="light"] .footer-link:hover {
+  color: #8b6914;
+}
+
+[data-theme="light"] .complete-badge {
+  background: linear-gradient(135deg, #b8860b, #d4a017);
+  color: white;
+}
+
+[data-theme="light"] .achievement-card.unlocked {
+  border-color: #b8860b;
+}
+
+[data-theme="light"] .achievement-icon.unlocked {
+  background: rgba(184, 134, 11, 0.15);
+  color: #8b6914;
+}
+
+[data-theme="light"] .progress-fill {
+  background: linear-gradient(90deg, var(--accent), #8b5cf6);
+}
+
+[data-theme="light"] .nav-item.active {
+  background: rgba(124, 58, 237, 0.12);
+}
+
+[data-theme="light"] .search-input:focus {
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+}
+
+[data-theme="light"] .admin-panel {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(219, 39, 119, 0.08));
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+[data-theme="light"] .admin-panel-header:hover {
+  background: rgba(124, 58, 237, 0.08);
+}
+
+[data-theme="light"] .shop-item:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .category-badge {
+  background: rgba(124, 58, 237, 0.1);
+}
+
+[data-theme="light"] .stat-box:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .profile-header.complete {
+  border-color: #b8860b;
+  box-shadow: 0 0 20px rgba(184, 134, 11, 0.15);
 }
 
 .header-content {

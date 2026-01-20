@@ -162,6 +162,133 @@ async function getPlayerAchievements(username, env) {
       ]);
     }
 
+    // One-time daily achievement catch-up: Check monthly login and unlock missed daily achievements
+    if (!data.dailyMigrated) {
+      const monthlyLoginData = await env.SLOTS_KV.get(`monthly_login:${lowerUsername}`);
+      if (monthlyLoginData) {
+        try {
+          const monthlyLogin = JSON.parse(monthlyLoginData);
+          const monthlyDays = monthlyLogin.days ? monthlyLogin.days.length : 0;
+
+          if (monthlyDays > 0) {
+            const now = Date.now();
+            let addedRewards = 0;
+            const counterPromises = [];
+
+            // FIRST_DAILY if they have any daily claims
+            if (!data.unlockedAt[ACHIEVEMENTS.FIRST_DAILY.id]) {
+              data.unlockedAt[ACHIEVEMENTS.FIRST_DAILY.id] = now;
+              addedRewards += ACHIEVEMENTS.FIRST_DAILY.reward || 0;
+              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.FIRST_DAILY.id, env));
+            }
+
+            // DAILY_7/14/21/28 based on monthly login days
+            if (monthlyDays >= 7 && !data.unlockedAt[ACHIEVEMENTS.DAILY_7.id]) {
+              data.unlockedAt[ACHIEVEMENTS.DAILY_7.id] = now;
+              addedRewards += ACHIEVEMENTS.DAILY_7.reward || 0;
+              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_7.id, env));
+            }
+            if (monthlyDays >= 14 && !data.unlockedAt[ACHIEVEMENTS.DAILY_14.id]) {
+              data.unlockedAt[ACHIEVEMENTS.DAILY_14.id] = now;
+              addedRewards += ACHIEVEMENTS.DAILY_14.reward || 0;
+              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_14.id, env));
+            }
+            if (monthlyDays >= 21 && !data.unlockedAt[ACHIEVEMENTS.DAILY_21.id]) {
+              data.unlockedAt[ACHIEVEMENTS.DAILY_21.id] = now;
+              addedRewards += ACHIEVEMENTS.DAILY_21.reward || 0;
+              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_21.id, env));
+            }
+            if (monthlyDays >= 28 && !data.unlockedAt[ACHIEVEMENTS.DAILY_28.id]) {
+              data.unlockedAt[ACHIEVEMENTS.DAILY_28.id] = now;
+              addedRewards += ACHIEVEMENTS.DAILY_28.reward || 0;
+              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_28.id, env));
+            }
+
+            if (addedRewards > 0 && !ACHIEVEMENTS_REWARDS_ENABLED) {
+              data.pendingRewards = (data.pendingRewards || 0) + addedRewards;
+            }
+
+            if (counterPromises.length > 0) {
+              data.dailyMigrated = true;
+              await Promise.all([
+                env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data)),
+                ...counterPromises
+              ]);
+            } else {
+              data.dailyMigrated = true;
+              await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+            }
+          } else {
+            data.dailyMigrated = true;
+            await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+          }
+        } catch (e) {
+          // Invalid monthly login data, just mark as migrated
+          data.dailyMigrated = true;
+          await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+        }
+      } else {
+        data.dailyMigrated = true;
+        await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+      }
+    }
+
+    // One-time balance achievement catch-up: Check current balance and unlock missed balance achievements
+    if (!data.balanceMigrated) {
+      const balanceData = await env.SLOTS_KV.get(`user:${lowerUsername}`);
+      if (balanceData) {
+        const balance = parseInt(balanceData, 10);
+        if (!isNaN(balance) && balance > 0) {
+          const now = Date.now();
+          let addedRewards = 0;
+          const counterPromises = [];
+
+          const balanceAchievements = [
+            { id: 'balance_1000', threshold: 1000, achievement: ACHIEVEMENTS.BALANCE_1000 },
+            { id: 'balance_5000', threshold: 5000, achievement: ACHIEVEMENTS.BALANCE_5000 },
+            { id: 'balance_10000', threshold: 10000, achievement: ACHIEVEMENTS.BALANCE_10000 },
+            { id: 'balance_50000', threshold: 50000, achievement: ACHIEVEMENTS.BALANCE_50000 },
+            { id: 'balance_100000', threshold: 100000, achievement: ACHIEVEMENTS.BALANCE_100000 }
+          ];
+
+          for (const { id, threshold, achievement } of balanceAchievements) {
+            if (balance >= threshold && !data.unlockedAt[id]) {
+              data.unlockedAt[id] = now;
+              addedRewards += achievement.reward || 0;
+              counterPromises.push(incrementAchievementCounter(id, env));
+            }
+          }
+
+          // Special: Lucky 777
+          if (balance === 777 && !data.unlockedAt[ACHIEVEMENTS.LUCKY_777.id]) {
+            data.unlockedAt[ACHIEVEMENTS.LUCKY_777.id] = now;
+            addedRewards += ACHIEVEMENTS.LUCKY_777.reward || 0;
+            counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.LUCKY_777.id, env));
+          }
+
+          if (addedRewards > 0 && !ACHIEVEMENTS_REWARDS_ENABLED) {
+            data.pendingRewards = (data.pendingRewards || 0) + addedRewards;
+          }
+
+          data.balanceMigrated = true;
+          if (counterPromises.length > 0) {
+            await Promise.all([
+              env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data)),
+              ...counterPromises
+            ]);
+          } else {
+            await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+          }
+        } else {
+          data.balanceMigrated = true;
+          await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+        }
+      } else {
+        data.balanceMigrated = true;
+        await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+      }
+    }
+
     return data;
   } catch (error) {
     logError('getPlayerAchievements', error, { username });
@@ -715,10 +842,59 @@ async function incrementAchievementCounter(achievementId, env) {
 }
 
 /**
+ * Migrate all players with user: entries to have achievements: entries
+ * This ensures all existing players are counted in achievement stats
+ * Runs once per cache period (5 minutes)
+ */
+const MIGRATION_KEY = 'cache:all_players_migrated_v3';
+const MIGRATION_TTL = 300; // Check every 5 minutes for new players
+
+async function migrateAllPlayersToAchievements(env) {
+  try {
+    // Check if we already ran migration recently
+    const migrated = await env.SLOTS_KV.get(MIGRATION_KEY);
+    if (migrated) {
+      return; // Skip, already done recently
+    }
+
+    // Get all user: entries
+    const userList = await env.SLOTS_KV.list({ prefix: 'user:', limit: 1000 });
+    const userKeys = userList.keys || [];
+
+    // Get all existing achievements: entries
+    const achievementList = await env.SLOTS_KV.list({ prefix: 'achievements:', limit: 1000 });
+    const existingAchievements = new Set(achievementList.keys.map(k => k.name.replace('achievements:', '')));
+
+    // Find users without achievement entries
+    const missingUsers = [];
+    for (const key of userKeys) {
+      const username = key.name.replace('user:', '').toLowerCase();
+      // Skip DachsBank and placeholder users
+      if (username === 'dachsbank' || username === 'spieler') continue;
+      if (!existingAchievements.has(username)) {
+        missingUsers.push(username);
+      }
+    }
+
+    // Create achievement entries for missing users (batch of 5 to avoid timeouts)
+    const batchSize = 5;
+    for (let i = 0; i < missingUsers.length; i += batchSize) {
+      const batch = missingUsers.slice(i, i + batchSize);
+      await Promise.all(batch.map(username => getPlayerAchievements(username, env)));
+    }
+
+    // Mark migration as done
+    await env.SLOTS_KV.put(MIGRATION_KEY, 'true', { expirationTtl: MIGRATION_TTL });
+  } catch (error) {
+    logError('migrateAllPlayersToAchievements', error);
+  }
+}
+
+/**
  * Get global achievement statistics (how many players have each achievement)
  * Uses KV caching for 5 minutes to reduce load
  */
-const STATS_CACHE_KEY = 'cache:achievement_stats_v2'; // v2: Fixed counter tracking
+const STATS_CACHE_KEY = 'cache:achievement_stats_v3'; // v3: With auto-migration
 const STATS_CACHE_TTL = 300; // 5 minutes in seconds
 
 async function getAchievementStats(env) {
@@ -728,6 +904,9 @@ async function getAchievementStats(env) {
     if (cached) {
       return JSON.parse(cached);
     }
+
+    // Run migration to ensure all players have achievement entries
+    await migrateAllPlayersToAchievements(env);
 
     // Get all achievement records
     const achievementList = await env.SLOTS_KV.list({ prefix: 'achievements:', limit: 1000 });

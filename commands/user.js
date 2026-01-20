@@ -46,6 +46,7 @@ import {
 
 /**
  * Track daily claim achievements (fire-and-forget)
+ * Daily achievements are based on monthly login days, not cumulative claims
  */
 async function trackDailyAchievements(username, monthlyDays, env) {
   try {
@@ -54,10 +55,19 @@ async function trackDailyAchievements(username, monthlyDays, env) {
     // FIRST_DAILY
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_DAILY.id, env));
 
-    // Track dailysClaimed for DAILY_7/14/21/28 achievements
-    // Note: We pass monthlyDays as the new total (not increment), so we update to that value
-    // But updateAchievementStat expects an increment, so we track milestone via the monthly login count
-    promises.push(updateAchievementStat(username, 'dailysClaimed', 1, env));
+    // DAILY_7/14/21/28 - Check and unlock based on monthly login days
+    if (monthlyDays >= 7) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DAILY_7.id, env));
+    }
+    if (monthlyDays >= 14) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DAILY_14.id, env));
+    }
+    if (monthlyDays >= 21) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DAILY_21.id, env));
+    }
+    if (monthlyDays >= 28) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DAILY_28.id, env));
+    }
 
     await Promise.all(promises);
   } catch (error) {
@@ -189,9 +199,11 @@ async function handleDaily(username, env) {
       isNewMilestone ? markMilestoneClaimed(username, newMonthlyLogin.days.length, env, newMonthlyLogin) : Promise.resolve()
     ]);
 
-    // Fire-and-forget achievement tracking
-    trackDailyAchievements(username, newMonthlyLogin.days.length, env);
-    checkBalanceAchievements(username, newBalance, env);
+    // Track achievements (await to ensure they complete before response)
+    await Promise.all([
+      trackDailyAchievements(username, newMonthlyLogin.days.length, env),
+      checkBalanceAchievements(username, newBalance, env)
+    ]);
 
     const boostText = hasBoost ? ' (💎 Boosted!)' : '';
     let milestoneText = '';
@@ -375,8 +387,8 @@ async function handleTransfer(username, target, amount, env) {
         updateBankBalance(parsedAmount, env)
       ]);
 
-      // Fire-and-forget achievement tracking (bank donations count as transfers)
-      trackTransferAchievements(username, parsedAmount, env);
+      // Track achievements (await to ensure they complete before response)
+      await trackTransferAchievements(username, parsedAmount, env);
 
       return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DachsTaler 🏦`, { headers: RESPONSE_HEADERS });
     }
@@ -412,9 +424,11 @@ async function handleTransfer(username, target, amount, env) {
       // Verify the write succeeded
       const verifySender = await getBalance(username, env);
       if (verifySender === newSenderBalance) {
-        // Fire-and-forget achievement tracking
-        trackTransferAchievements(username, parsedAmount, env);
-        checkBalanceAchievements(cleanTarget, newReceiverBalance, env);
+        // Track achievements (await to ensure they complete before response)
+        await Promise.all([
+          trackTransferAchievements(username, parsedAmount, env),
+          checkBalanceAchievements(cleanTarget, newReceiverBalance, env)
+        ]);
         return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸`, { headers: RESPONSE_HEADERS });
       }
 

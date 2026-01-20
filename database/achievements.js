@@ -17,6 +17,10 @@
 import { ACHIEVEMENTS, ACHIEVEMENTS_REWARDS_ENABLED, getAchievementById } from '../constants/achievements.js';
 import { logError } from '../utils.js';
 
+// Cache keys (defined early so they can be used in migrations)
+const STATS_CACHE_KEY = 'cache:achievement_stats_v3';
+const STATS_CACHE_TTL = 300; // 5 minutes in seconds
+
 // Default stats structure for new players
 const DEFAULT_STATS = {
   totalSpins: 0,
@@ -211,7 +215,9 @@ async function getPlayerAchievements(username, env) {
           if (counterPromises.length > 0) {
             await Promise.all([
               env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data)),
-              ...counterPromises
+              ...counterPromises,
+              // Invalidate stats cache so new unlocks are reflected immediately
+              env.SLOTS_KV.delete(STATS_CACHE_KEY)
             ]);
           }
         }
@@ -882,9 +888,6 @@ async function migrateAllPlayersToAchievements(env) {
  * Get global achievement statistics (how many players have each achievement)
  * Uses KV caching for 5 minutes to reduce load
  */
-const STATS_CACHE_KEY = 'cache:achievement_stats_v3'; // v3: With auto-migration
-const STATS_CACHE_TTL = 300; // 5 minutes in seconds
-
 async function getAchievementStats(env) {
   try {
     // Check cache first

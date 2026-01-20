@@ -2393,17 +2393,22 @@ body {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1));
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 12px;
-  padding: 20px;
   margin-bottom: 24px;
+  overflow: hidden;
 }
 
 .admin-panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  user-select: none;
+}
+
+.admin-panel-header:hover {
+  background: rgba(139, 92, 246, 0.1);
 }
 
 .admin-panel-header h3 {
@@ -2415,12 +2420,41 @@ body {
 .admin-panel-user {
   font-size: 0.9rem;
   color: var(--text-muted);
+  flex: 1;
+  text-align: center;
+}
+
+.admin-panel-toggle {
+  color: var(--accent);
+  font-size: 0.9rem;
+  transition: transform 0.3s ease;
+}
+
+.admin-panel-content {
+  padding: 0 20px 20px;
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+  max-height: 600px;
+  opacity: 1;
+}
+
+.admin-panel.collapsed .admin-panel-content {
+  max-height: 0;
+  padding: 0 20px;
+  opacity: 0;
+  overflow: hidden;
+  border-top: none;
+}
+
+.admin-panel.collapsed .admin-panel-header {
+  border-bottom: none;
 }
 
 .admin-panel-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+  padding-top: 16px;
 }
 
 .admin-control {

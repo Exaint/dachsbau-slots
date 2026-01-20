@@ -1037,53 +1037,64 @@ function renderProfilePage(data) {
       </div>
     </div>
     ${showAdminPanel ? `
-    <div class="admin-panel">
-      <div class="admin-panel-header">
+    <div class="admin-panel collapsed" id="adminPanel">
+      <div class="admin-panel-header" onclick="toggleAdminPanel()">
         <h3>🔧 Admin Panel</h3>
         <span class="admin-panel-user">Spieler: <strong>${escapeHtml(username)}</strong></span>
+        <span class="admin-panel-toggle" id="adminPanelToggle">▼</span>
       </div>
-      <div class="admin-panel-grid">
-        <div class="admin-control">
-          <label>Balance</label>
-          <div class="admin-input-group">
-            <input type="number" id="adminBalance" value="${balance}" min="0" class="admin-input">
-            <button class="btn admin-btn" onclick="adminSetBalance('${escapeHtml(username)}')">Setzen</button>
+      <div class="admin-panel-content" id="adminPanelContent">
+        <div class="admin-panel-grid">
+          <div class="admin-control">
+            <label>Balance</label>
+            <div class="admin-input-group">
+              <input type="number" id="adminBalance" value="${balance}" min="0" class="admin-input">
+              <button class="btn admin-btn" onclick="adminSetBalance('${escapeHtml(username)}')">Setzen</button>
+            </div>
+          </div>
+          <div class="admin-control">
+            <label>Disclaimer</label>
+            <div class="admin-toggle-group">
+              <span class="admin-status ${hasDisclaimer ? 'active' : ''}">${hasDisclaimer ? '✓ Akzeptiert' : '✗ Nicht akzeptiert'}</span>
+              <button class="btn admin-btn ${hasDisclaimer ? 'danger' : 'success'}" onclick="adminSetDisclaimer('${escapeHtml(username)}', ${!hasDisclaimer})">${hasDisclaimer ? 'Entfernen' : 'Setzen'}</button>
+            </div>
+          </div>
+          <div class="admin-control">
+            <label>Self-Ban</label>
+            <div class="admin-toggle-group">
+              <span class="admin-status ${selfBanned ? 'active danger' : ''}">${selfBanned ? '🚫 Gesperrt' : '✓ Nicht gesperrt'}</span>
+              <button class="btn admin-btn ${selfBanned ? 'success' : 'danger'}" onclick="adminSetSelfBan('${escapeHtml(username)}', ${!selfBanned})">${selfBanned ? 'Entsperren' : 'Sperren'}</button>
+            </div>
+          </div>
+          <div class="admin-control">
+            <label>Duelle</label>
+            <div class="admin-toggle-group">
+              <span class="admin-status ${duelOptOut ? 'danger' : 'active'}">${duelOptOut ? '✗ Deaktiviert' : '✓ Aktiviert'}</span>
+              <button class="btn admin-btn" onclick="adminSetDuelOpt('${escapeHtml(username)}', ${!duelOptOut})">${duelOptOut ? 'Aktivieren' : 'Deaktivieren'}</button>
+            </div>
+          </div>
+          <div class="admin-control admin-control-wide">
+            <label>Achievement</label>
+            <div class="admin-input-group">
+              <select id="adminAchievement" class="admin-input admin-select">
+                ${achievements.map(a => `<option value="${a.id}" data-unlocked="${a.unlocked}">${a.unlocked ? '✓' : '○'} ${escapeHtml(a.name)}</option>`).join('')}
+              </select>
+              <button class="btn admin-btn success" onclick="adminSetAchievement('${escapeHtml(username)}', true)">Freischalten</button>
+              <button class="btn admin-btn danger" onclick="adminSetAchievement('${escapeHtml(username)}', false)">Sperren</button>
+            </div>
           </div>
         </div>
-        <div class="admin-control">
-          <label>Disclaimer</label>
-          <div class="admin-toggle-group">
-            <span class="admin-status ${hasDisclaimer ? 'active' : ''}">${hasDisclaimer ? '✓ Akzeptiert' : '✗ Nicht akzeptiert'}</span>
-            <button class="btn admin-btn ${hasDisclaimer ? 'danger' : 'success'}" onclick="adminSetDisclaimer('${escapeHtml(username)}', ${!hasDisclaimer})">${hasDisclaimer ? 'Entfernen' : 'Setzen'}</button>
-          </div>
-        </div>
-        <div class="admin-control">
-          <label>Self-Ban</label>
-          <div class="admin-toggle-group">
-            <span class="admin-status ${selfBanned ? 'active danger' : ''}">${selfBanned ? '🚫 Gesperrt' : '✓ Nicht gesperrt'}</span>
-            <button class="btn admin-btn ${selfBanned ? 'success' : 'danger'}" onclick="adminSetSelfBan('${escapeHtml(username)}', ${!selfBanned})">${selfBanned ? 'Entsperren' : 'Sperren'}</button>
-          </div>
-        </div>
-        <div class="admin-control">
-          <label>Duelle</label>
-          <div class="admin-toggle-group">
-            <span class="admin-status ${duelOptOut ? 'danger' : 'active'}">${duelOptOut ? '✗ Deaktiviert' : '✓ Aktiviert'}</span>
-            <button class="btn admin-btn" onclick="adminSetDuelOpt('${escapeHtml(username)}', ${!duelOptOut})">${duelOptOut ? 'Aktivieren' : 'Deaktivieren'}</button>
-          </div>
-        </div>
-        <div class="admin-control admin-control-wide">
-          <label>Achievement</label>
-          <div class="admin-input-group">
-            <select id="adminAchievement" class="admin-input admin-select">
-              ${achievements.map(a => `<option value="${a.id}" data-unlocked="${a.unlocked}">${a.unlocked ? '✓' : '○'} ${escapeHtml(a.name)}</option>`).join('')}
-            </select>
-            <button class="btn admin-btn success" onclick="adminSetAchievement('${escapeHtml(username)}', true)">Freischalten</button>
-            <button class="btn admin-btn danger" onclick="adminSetAchievement('${escapeHtml(username)}', false)">Sperren</button>
-          </div>
-        </div>
+        <div id="adminMessage" class="admin-message"></div>
       </div>
-      <div id="adminMessage" class="admin-message"></div>
     </div>
+    <script>
+      function toggleAdminPanel() {
+        const panel = document.getElementById('adminPanel');
+        const toggle = document.getElementById('adminPanelToggle');
+        panel.classList.toggle('collapsed');
+        toggle.textContent = panel.classList.contains('collapsed') ? '▼' : '▲';
+      }
+    </script>
     ` : ''}
     <div class="achievement-controls">
       <div class="achievement-filter">

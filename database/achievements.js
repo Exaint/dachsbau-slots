@@ -162,74 +162,62 @@ async function getPlayerAchievements(username, env) {
       ]);
     }
 
-    // One-time daily achievement catch-up: Check monthly login and unlock missed daily achievements
-    if (!data.dailyMigrated) {
-      const monthlyLoginData = await env.SLOTS_KV.get(`monthly_login:${lowerUsername}`);
-      if (monthlyLoginData) {
-        try {
-          const monthlyLogin = JSON.parse(monthlyLoginData);
-          const monthlyDays = monthlyLogin.days ? monthlyLogin.days.length : 0;
+    // Daily achievement catch-up: Check monthly login and unlock missed daily achievements
+    // This runs every time (not one-time) because monthly days change throughout the month
+    const monthlyLoginData = await env.SLOTS_KV.get(`monthly_login:${lowerUsername}`);
+    if (monthlyLoginData) {
+      try {
+        const monthlyLogin = JSON.parse(monthlyLoginData);
+        const monthlyDays = monthlyLogin.days ? monthlyLogin.days.length : 0;
 
-          if (monthlyDays > 0) {
-            const now = Date.now();
-            let addedRewards = 0;
-            const counterPromises = [];
+        if (monthlyDays > 0) {
+          const now = Date.now();
+          let addedRewards = 0;
+          const counterPromises = [];
 
-            // FIRST_DAILY if they have any daily claims
-            if (!data.unlockedAt[ACHIEVEMENTS.FIRST_DAILY.id]) {
-              data.unlockedAt[ACHIEVEMENTS.FIRST_DAILY.id] = now;
-              addedRewards += ACHIEVEMENTS.FIRST_DAILY.reward || 0;
-              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.FIRST_DAILY.id, env));
-            }
-
-            // DAILY_7/14/21/28 based on monthly login days
-            if (monthlyDays >= 7 && !data.unlockedAt[ACHIEVEMENTS.DAILY_7.id]) {
-              data.unlockedAt[ACHIEVEMENTS.DAILY_7.id] = now;
-              addedRewards += ACHIEVEMENTS.DAILY_7.reward || 0;
-              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_7.id, env));
-            }
-            if (monthlyDays >= 14 && !data.unlockedAt[ACHIEVEMENTS.DAILY_14.id]) {
-              data.unlockedAt[ACHIEVEMENTS.DAILY_14.id] = now;
-              addedRewards += ACHIEVEMENTS.DAILY_14.reward || 0;
-              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_14.id, env));
-            }
-            if (monthlyDays >= 21 && !data.unlockedAt[ACHIEVEMENTS.DAILY_21.id]) {
-              data.unlockedAt[ACHIEVEMENTS.DAILY_21.id] = now;
-              addedRewards += ACHIEVEMENTS.DAILY_21.reward || 0;
-              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_21.id, env));
-            }
-            if (monthlyDays >= 28 && !data.unlockedAt[ACHIEVEMENTS.DAILY_28.id]) {
-              data.unlockedAt[ACHIEVEMENTS.DAILY_28.id] = now;
-              addedRewards += ACHIEVEMENTS.DAILY_28.reward || 0;
-              counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_28.id, env));
-            }
-
-            if (addedRewards > 0 && !ACHIEVEMENTS_REWARDS_ENABLED) {
-              data.pendingRewards = (data.pendingRewards || 0) + addedRewards;
-            }
-
-            if (counterPromises.length > 0) {
-              data.dailyMigrated = true;
-              await Promise.all([
-                env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data)),
-                ...counterPromises
-              ]);
-            } else {
-              data.dailyMigrated = true;
-              await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
-            }
-          } else {
-            data.dailyMigrated = true;
-            await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+          // FIRST_DAILY if they have any daily claims
+          if (!data.unlockedAt[ACHIEVEMENTS.FIRST_DAILY.id]) {
+            data.unlockedAt[ACHIEVEMENTS.FIRST_DAILY.id] = now;
+            addedRewards += ACHIEVEMENTS.FIRST_DAILY.reward || 0;
+            counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.FIRST_DAILY.id, env));
           }
-        } catch (e) {
-          // Invalid monthly login data, just mark as migrated
-          data.dailyMigrated = true;
-          await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+
+          // DAILY_7/14/21/28 based on monthly login days
+          if (monthlyDays >= 7 && !data.unlockedAt[ACHIEVEMENTS.DAILY_7.id]) {
+            data.unlockedAt[ACHIEVEMENTS.DAILY_7.id] = now;
+            addedRewards += ACHIEVEMENTS.DAILY_7.reward || 0;
+            counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_7.id, env));
+          }
+          if (monthlyDays >= 14 && !data.unlockedAt[ACHIEVEMENTS.DAILY_14.id]) {
+            data.unlockedAt[ACHIEVEMENTS.DAILY_14.id] = now;
+            addedRewards += ACHIEVEMENTS.DAILY_14.reward || 0;
+            counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_14.id, env));
+          }
+          if (monthlyDays >= 21 && !data.unlockedAt[ACHIEVEMENTS.DAILY_21.id]) {
+            data.unlockedAt[ACHIEVEMENTS.DAILY_21.id] = now;
+            addedRewards += ACHIEVEMENTS.DAILY_21.reward || 0;
+            counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_21.id, env));
+          }
+          if (monthlyDays >= 28 && !data.unlockedAt[ACHIEVEMENTS.DAILY_28.id]) {
+            data.unlockedAt[ACHIEVEMENTS.DAILY_28.id] = now;
+            addedRewards += ACHIEVEMENTS.DAILY_28.reward || 0;
+            counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_28.id, env));
+          }
+
+          if (addedRewards > 0 && !ACHIEVEMENTS_REWARDS_ENABLED) {
+            data.pendingRewards = (data.pendingRewards || 0) + addedRewards;
+          }
+
+          if (counterPromises.length > 0) {
+            await Promise.all([
+              env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data)),
+              ...counterPromises
+            ]);
+          }
         }
-      } else {
-        data.dailyMigrated = true;
-        await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+      } catch (e) {
+        // Invalid monthly login data, skip
+        logError('dailyAchievementCatchup', e, { username });
       }
     }
 

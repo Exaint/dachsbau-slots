@@ -161,12 +161,18 @@ async function handleStats(username, env) {
 
 async function handleDaily(username, env) {
   try {
-    const [hasBoost, lastDaily, currentBalance, monthlyLogin] = await Promise.all([
+    const [hasAccepted, hasBoost, lastDaily, currentBalance, monthlyLogin] = await Promise.all([
+      hasAcceptedDisclaimer(username, env),
       hasUnlock(username, 'daily_boost', env),
       getLastDaily(username, env),
       getBalance(username, env),
       getMonthlyLogin(username, env)
     ]);
+
+    // Disclaimer check - same as slots
+    if (!hasAccepted) {
+      return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - Hier geht es NICHT um Echtgeld! Verstanden? Schreib "!slots accept" zum Spielen! Weitere Infos: ${URLS.INFO} | Shop: ${URLS.SHOP} 🎰`, { headers: RESPONSE_HEADERS });
+    }
 
     const dailyAmount = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
     const now = Date.now();

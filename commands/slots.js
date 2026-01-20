@@ -111,20 +111,21 @@ async function trackSlotAchievements(username, grid, result, newBalance, isFreeS
     const achievementsToUnlock = [];
 
     // Win-related achievements
-    if (result.points > 0) {
+    const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
+    if (isWin) {
       achievementsToUnlock.push(ACHIEVEMENTS.FIRST_WIN.id);
 
       if (isFreeSpinUsed) {
         achievementsToUnlock.push(ACHIEVEMENTS.FREE_SPIN_WIN.id);
       }
-      if (isAllIn) {
+      if (isAllIn && result.points > 0) {
         achievementsToUnlock.push(ACHIEVEMENTS.SLOTS_ALL_WIN.id);
       }
       if (hasWildCardToken && grid.includes('🃏')) {
         achievementsToUnlock.push(ACHIEVEMENTS.WILD_CARD_WIN.id);
       }
-      // ZERO_HERO (win with 0 balance before spin)
-      if (newBalance === result.points) {
+      // ZERO_HERO (win with 0 balance before spin - only for actual point wins)
+      if (result.points > 0 && newBalance === result.points) {
         achievementsToUnlock.push(ACHIEVEMENTS.ZERO_HERO.id);
       }
     }

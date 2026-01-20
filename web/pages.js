@@ -1430,7 +1430,7 @@ function renderInfoPage(user = null) {
             <a href="https://check-dein-spiel.de" target="_blank" rel="noopener">check-dein-spiel.de</a>
           </div>
           <div class="help-row">
-            <span>🇦🇹 Oesterreich</span>
+            <span>🇦🇹 Österreich</span>
             <span>0800 - 20 20 11</span>
             <a href="https://spielsuchthilfe.at" target="_blank" rel="noopener">spielsuchthilfe.at</a>
           </div>

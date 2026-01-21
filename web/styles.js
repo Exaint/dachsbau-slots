@@ -31,27 +31,27 @@ export const CSS = `
   --cat-special: #e040fb;
 }
 
-/* Light theme */
+/* Light theme - inspired by Tailwind CSS Slate palette */
 [data-theme="light"] {
-  --bg-primary: #ebebed;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f0f0f2;
-  --bg-card: #e5e5e8;
-  --text-primary: #0e0e10;
-  --text-secondary: #53535f;
-  --text-muted: #6b6b7b;
-  --border: #d2d2d7;
+  --bg-primary: #e4e5f1;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f1f5f9;
+  --bg-card: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --border: #cbd5e1;
   /* Adjusted colors for light mode readability */
-  --dachs-gold: #b8860b;
-  --warning: #c77800;
-  --success: #008f5d;
-  --error: #d00000;
+  --dachs-gold: #92400e;
+  --warning: #b45309;
+  --success: #059669;
+  --error: #dc2626;
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
   /* Category colors adjusted for light mode */
   --cat-spinning: #7c3aed;
-  --cat-winning: #008f5d;
-  --cat-collecting: #c77800;
+  --cat-winning: #059669;
+  --cat-collecting: #b45309;
   --cat-social: #db2777;
   --cat-dedication: #0284c7;
   --cat-shopping: #ea580c;
@@ -181,44 +181,44 @@ body {
 }
 
 [data-theme="light"] .leaderboard-balance {
-  color: #8b6914;
-  background: rgba(184, 134, 11, 0.15);
+  color: #92400e;
+  background: rgba(146, 64, 14, 0.12);
 }
 
 [data-theme="light"] .stat-value {
-  color: #8b6914;
+  color: #92400e;
 }
 
 [data-theme="light"] .logo:hover {
-  color: #8b6914;
+  color: #7c3aed;
 }
 
 [data-theme="light"] .footer-link:hover {
-  color: #8b6914;
+  color: #7c3aed;
 }
 
 [data-theme="light"] .footer {
-  background: #f7f7f8;
-  border-top-color: #b0b0b8;
+  background: #f1f5f9;
+  border-top-color: #94a3b8;
 }
 
 [data-theme="light"] .legal-footer {
-  background: #f7f7f8;
-  border-top-color: #b0b0b8;
+  background: #f1f5f9;
+  border-top-color: #94a3b8;
 }
 
 [data-theme="light"] .complete-badge {
-  background: linear-gradient(135deg, #b8860b, #d4a017);
+  background: linear-gradient(135deg, #92400e, #b45309);
   color: white;
 }
 
 [data-theme="light"] .achievement-card.unlocked {
-  border-color: #b8860b;
+  border-color: #92400e;
 }
 
 [data-theme="light"] .achievement-icon.unlocked {
-  background: rgba(184, 134, 11, 0.15);
-  color: #8b6914;
+  background: rgba(146, 64, 14, 0.12);
+  color: #92400e;
 }
 
 [data-theme="light"] .progress-fill {
@@ -256,8 +256,8 @@ body {
 }
 
 [data-theme="light"] .profile-header.complete {
-  border-color: #b8860b;
-  box-shadow: 0 0 20px rgba(184, 134, 11, 0.15);
+  border-color: #92400e;
+  box-shadow: 0 0 20px rgba(146, 64, 14, 0.12);
 }
 
 [data-theme="light"] .global-stat-card {

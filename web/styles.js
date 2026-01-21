@@ -2010,18 +2010,15 @@ body {
 
 /* Shop */
 .shop-category {
-  margin-bottom: 48px;
-  padding-top: 24px;
+  margin-top: 56px;
+  padding-top: 40px;
   border-top: 1px solid var(--border);
 }
 
 .shop-category:first-child {
+  margin-top: 0;
   padding-top: 0;
   border-top: none;
-}
-
-.shop-category:last-child {
-  margin-bottom: 0;
 }
 
 .shop-category-header {

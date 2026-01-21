@@ -98,7 +98,9 @@ const UNLOCK_PRICES = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
 
 // Achievement tracking (fire-and-forget, non-blocking)
 // IMPORTANT: Operations are run sequentially to avoid race conditions on KV writes
-async function trackSlotAchievements(username, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env) {
+// originalGrid = before special items (for dachs detection)
+// displayGrid = after special items (for wild card and triple detection)
+async function trackSlotAchievements(username, originalGrid, displayGrid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env) {
   try {
     // Stat updates (these modify achievement data)
     await updateAchievementStat(username, 'totalSpins', 1, env);
@@ -121,7 +123,8 @@ async function trackSlotAchievements(username, grid, result, newBalance, isFreeS
       if (isAllIn && result.points > 0) {
         achievementsToUnlock.push(ACHIEVEMENTS.SLOTS_ALL_WIN.id);
       }
-      if (hasWildCardToken && grid.includes('🃏')) {
+      // Wild Card win uses displayGrid (wild card is added by applySpecialItems)
+      if (hasWildCardToken && displayGrid.includes('🃏')) {
         achievementsToUnlock.push(ACHIEVEMENTS.WILD_CARD_WIN.id);
       }
       // ZERO_HERO (win with 0 balance before spin - only for actual point wins)
@@ -130,10 +133,10 @@ async function trackSlotAchievements(username, grid, result, newBalance, isFreeS
       }
     }
 
-    // Dachs tracking
-    if (grid.includes('🦡')) {
+    // Dachs tracking - use originalGrid (before special items may have overwritten dachs)
+    if (originalGrid.includes('🦡')) {
       achievementsToUnlock.push(ACHIEVEMENTS.FIRST_DACHS.id);
-      const dachsCount = grid.filter(s => s === '🦡').length;
+      const dachsCount = originalGrid.filter(s => s === '🦡').length;
       if (dachsCount === 2) {
         achievementsToUnlock.push(ACHIEVEMENTS.DACHS_PAIR.id);
       }
@@ -169,9 +172,9 @@ async function trackSlotAchievements(username, grid, result, newBalance, isFreeS
       await checkBigWinAchievements(username, result.points, env);
     }
 
-    // Triple tracking
-    if (grid[0] === grid[1] && grid[1] === grid[2] && grid[0] !== '🃏') {
-      await markTripleCollected(username, grid[0], env);
+    // Triple tracking - use displayGrid (what the user sees)
+    if (displayGrid[0] === displayGrid[1] && displayGrid[1] === displayGrid[2] && displayGrid[0] !== '🃏') {
+      await markTripleCollected(username, displayGrid[0], env);
     }
 
     // Balance achievements
@@ -472,6 +475,9 @@ async function handleSlot(username, amountParam, url, env) {
     // Generate grid
     const grid = await generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamondRush, env);
 
+    // Save original grid for achievement tracking (before special items modify it)
+    const originalGrid = [...grid];
+
     // STAGE 2 AWAIT: Now that grid is generated, await non-essential buffs
     const [
       insuranceCount,
@@ -562,7 +568,7 @@ async function handleSlot(username, amountParam, url, env) {
       const rankSymbol = prestigeRank ? `${prestigeRank} ` : '';
 
       // Fire-and-forget achievement tracking (insurance used)
-      trackSlotAchievements(username, grid, result, newBalanceWithRefund, isFreeSpinUsed, isAllIn, hasWildCardToken, true, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env);
+      trackSlotAchievements(username, originalGrid, grid, result, newBalanceWithRefund, isFreeSpinUsed, isAllIn, hasWildCardToken, true, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env);
 
       return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
     }
@@ -627,7 +633,7 @@ async function handleSlot(username, amountParam, url, env) {
     });
 
     // Fire-and-forget achievement tracking
-    trackSlotAchievements(username, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env);
+    trackSlotAchievements(username, originalGrid, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env);
 
     if (customMsg) {
       return new Response(`@${username} [ ${grid.join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DachsTaler`, { headers: RESPONSE_HEADERS });

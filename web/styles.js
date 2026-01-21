@@ -2935,4 +2935,703 @@ body {
     display: none;
   }
 }
+
+/* Info Page Table of Contents */
+.info-toc {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 32px;
+}
+
+.info-toc h2 {
+  font-size: 1.1rem;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.toc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.toc-item {
+  display: block;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.toc-item:hover {
+  background: var(--bg-secondary);
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+/* Info Page Sections - scroll offset for sticky header */
+.content-section[id] {
+  scroll-margin-top: 80px;
+}
+
+/* Info Grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.info-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.info-card {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Compact Command List */
+.command-list.compact .command-item {
+  padding: 8px 12px;
+}
+
+.command-list.compact .command-item code {
+  min-width: 200px;
+}
+
+/* Tip List */
+.tip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.tip-item {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--dachs-gold);
+}
+
+.tip-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.tip-item p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.tip-item code {
+  background: var(--bg-card);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85em;
+}
+
+/* Unlock List */
+.unlock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.unlock-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.unlock-arrow {
+  color: var(--text-muted);
+}
+
+.unlock-price {
+  margin-left: auto;
+  color: var(--dachs-gold);
+  font-weight: 600;
+}
+
+.unlock-item code {
+  background: var(--bg-card);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+/* Section Note */
+.section-note {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--accent);
+}
+
+.section-warning {
+  font-size: 0.9rem;
+  color: var(--warning);
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 184, 0, 0.1);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--warning);
+}
+
+/* Win Chance in Symbol Cards */
+.win-chance {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.symbol-note {
+  font-size: 0.75rem;
+  color: var(--accent);
+  margin-top: 8px;
+  font-style: italic;
+}
+
+/* Multiplier Table */
+.multiplier-table,
+.streak-table,
+.bonus-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 0;
+}
+
+.multiplier-row,
+.streak-row,
+.bonus-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  align-items: center;
+}
+
+.streak-row {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.bonus-row {
+  grid-template-columns: 60px 1fr 1fr;
+}
+
+.multiplier-row.header,
+.streak-row.header,
+.bonus-row.header {
+  background: var(--bg-card);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.streak-row.hot,
+.bonus-row.highlight {
+  background: linear-gradient(90deg, var(--bg-tertiary), rgba(255, 107, 107, 0.15));
+  border-left: 3px solid var(--warning);
+}
+
+.multiplier-value {
+  font-weight: 700;
+  color: var(--dachs-gold);
+}
+
+/* Combo List */
+.combo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.combo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.combo-item.hot {
+  background: linear-gradient(90deg, var(--bg-tertiary), rgba(255, 107, 107, 0.15));
+  border-left: 3px solid var(--warning);
+}
+
+.combo-wins {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.combo-bonus {
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Bonus Cards */
+.bonus-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.bonus-card {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.bonus-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.bonus-info {
+  flex: 1;
+}
+
+.bonus-info p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Duel Steps */
+.duel-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.duel-step {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-content strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.step-content p {
+  margin: 6px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.step-content code {
+  background: var(--bg-card);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  display: inline-block;
+  margin: 4px 4px 4px 0;
+}
+
+/* Duel Win Order */
+.duel-win-order {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.win-tier {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  align-items: center;
+}
+
+.tier-medal {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.win-tier p {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Symbol Values */
+.symbol-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.symbol-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.symbol-value span:first-child {
+  font-size: 1.2rem;
+}
+
+/* Bank Grid */
+.bank-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.bank-card {
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.bank-card h4 {
+  margin: 0 0 12px;
+  color: var(--text-primary);
+}
+
+.bank-card ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+}
+
+.bank-card li {
+  margin-bottom: 6px;
+}
+
+.bank-card.income {
+  border-color: var(--success);
+  background: linear-gradient(135deg, var(--bg-tertiary), rgba(0, 245, 147, 0.05));
+}
+
+.bank-card.expense {
+  border-color: var(--error);
+  background: linear-gradient(135deg, var(--bg-tertiary), rgba(248, 113, 113, 0.05));
+}
+
+/* FAQ */
+.faq-item {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.faq-item summary {
+  padding: 14px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-primary);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.2s ease;
+}
+
+.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-item summary::after {
+  content: '+';
+  margin-left: auto;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.faq-item[open] summary::after {
+  content: '−';
+}
+
+.faq-item summary:hover {
+  background: var(--bg-card);
+}
+
+.faq-content {
+  padding: 0 16px 16px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.faq-content ol,
+.faq-content ul {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.faq-content li {
+  margin-bottom: 6px;
+}
+
+.faq-content code {
+  background: var(--bg-card);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85em;
+}
+
+/* Selfban Info */
+.selfban-info {
+  padding: 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-md);
+  margin-top: 12px;
+}
+
+.selfban-info code {
+  display: block;
+  background: var(--bg-card);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.selfban-info p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Shop Page Additions */
+.shop-toc {
+  margin-bottom: 24px;
+}
+
+.shop-pro-tip {
+  margin-top: 16px;
+  margin-bottom: 24px;
+}
+
+/* Combo Cards */
+.combo-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.combo-card {
+  background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-card));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.combo-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.combo-card-items {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.combo-card-effect {
+  font-size: 0.85rem;
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Investment Guide */
+.investment-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.investment-tier {
+  display: flex;
+  gap: 16px;
+  padding: 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  align-items: flex-start;
+}
+
+.tier-label {
+  background: var(--accent);
+  color: white;
+  padding: 4px 12px;
+  border-radius: var(--radius-lg);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tier-content {
+  flex: 1;
+}
+
+.tier-content p {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Section with scroll offset */
+.content-section[id],
+div[id] > .shop-category {
+  scroll-margin-top: 80px;
+}
+
+div[id] {
+  scroll-margin-top: 80px;
+}
+
+/* Mobile fixes for info page */
+@media (max-width: 600px) {
+  .toc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .multiplier-row,
+  .bonus-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .multiplier-row > span:nth-child(3),
+  .multiplier-row > span:nth-child(4) {
+    font-size: 0.8rem;
+  }
+
+  .streak-row {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .symbol-values {
+    justify-content: center;
+  }
+
+  .duel-step {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .step-number {
+    align-self: flex-start;
+  }
+
+  .bank-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bonus-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .unlock-item {
+    flex-wrap: wrap;
+  }
+
+  .unlock-price {
+    width: 100%;
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  .combo-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .investment-tier {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tier-label {
+    align-self: flex-start;
+  }
+}
 `;

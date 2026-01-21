@@ -5,24 +5,24 @@
 
 export const CSS = `
 :root {
-  /* Dark theme (default) */
+  /* Dark theme (default) - WCAG AA compliant */
   --bg-primary: #0e0e10;
   --bg-secondary: #18181b;
   --bg-tertiary: #1f1f23;
   --bg-card: #26262c;
   --text-primary: #efeff1;
   --text-secondary: #adadb8;
-  --text-muted: #848494;
-  --accent: #9147ff;
-  --accent-hover: #772ce8;
+  --text-muted: #9494a4;
+  --accent: #a855f7;
+  --accent-hover: #9333ea;
   --success: #00f593;
   --warning: #ffb800;
-  --error: #eb0400;
+  --error: #f87171;
   --border: #3d3d44;
   --dachs-gold: #ffd700;
 
   /* Category colors */
-  --cat-spinning: #9147ff;
+  --cat-spinning: #a855f7;
   --cat-winning: #00f593;
   --cat-collecting: #ffb800;
   --cat-social: #ff6b9d;
@@ -62,6 +62,20 @@ export const CSS = `
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* Global focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 body {
@@ -164,19 +178,19 @@ body {
 }
 
 [data-theme="light"] .header {
-  background: rgba(247, 247, 248, 0.95);
-  border-bottom-color: #b0b0b8;
+  background: rgba(241, 245, 249, 0.95);
+  border-bottom-color: var(--border);
 }
 
 /* Light theme specific overrides for better readability */
 [data-theme="light"] .btn-secondary {
   color: var(--text-primary);
   background: #ffffff;
-  border-color: #c5c5d0;
+  border-color: var(--border);
 }
 
 [data-theme="light"] .btn-secondary:hover {
-  background: #f0f0f3;
+  background: var(--bg-tertiary);
   border-color: var(--accent);
 }
 
@@ -198,13 +212,13 @@ body {
 }
 
 [data-theme="light"] .footer {
-  background: #f1f5f9;
-  border-top-color: #94a3b8;
+  background: var(--bg-tertiary);
+  border-top-color: var(--border);
 }
 
 [data-theme="light"] .legal-footer {
-  background: #f1f5f9;
-  border-top-color: #94a3b8;
+  background: var(--bg-tertiary);
+  border-top-color: var(--border);
 }
 
 [data-theme="light"] .complete-badge {
@@ -614,6 +628,25 @@ body {
   background: var(--bg-tertiary);
   border-radius: 20px;
   color: var(--dachs-gold);
+}
+
+/* Profile Role Badges */
+.profile-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--role-color, var(--accent));
+  color: var(--role-color, var(--accent));
+}
+
+.profile-role-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
 .profile-duel-status {
@@ -1311,6 +1344,13 @@ body {
 .footer-legal a:hover {
   color: var(--text-primary);
   text-decoration: underline;
+}
+
+.footer-disclaimer {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 /* Theme Toggle in Footer */

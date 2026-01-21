@@ -429,6 +429,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
   <footer class="footer">
     <p>Dachsbau Slots - Made by Exaint für <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener" class="footer-link">@frechhdachs</a></p>
     <p class="footer-legal"><a href="?page=changelog">Changelog</a> · <a href="?page=impressum">Impressum</a> · <a href="?page=datenschutz">Datenschutz</a></p>
+    <p class="footer-disclaimer">This website is not affiliated with or endorsed by Twitch.</p>
     <button class="theme-toggle-footer" onclick="toggleTheme()" title="Theme wechseln">
       <span class="theme-toggle-icon">🌙</span>
       <span class="theme-toggle-label">Theme</span>
@@ -830,22 +831,32 @@ function renderHomePage(errorMessage = null, user = null) {
   return baseTemplate('Home', content, 'home', user);
 }
 
-// Role badge info
+// Role badge info with colors for styling
 const ROLE_BADGES = {
   broadcaster: {
     icon: 'https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1',
-    label: 'Broadcaster',
-    class: 'role-broadcaster'
+    label: 'Streamerin',
+    color: '#e91916'
   },
   moderator: {
     icon: 'https://static-cdn.jtvnw.net/badges/v1/3267646d-33f0-4b17-b3df-f923a41db1d0/1',
     label: 'Moderator',
-    class: 'role-moderator'
+    color: '#00ad03'
   },
   vip: {
     icon: 'https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744dfa6ec/3',
     label: 'VIP',
-    class: 'role-vip'
+    color: '#e005b9'
+  },
+  leadmod: {
+    icon: 'https://assets.help.twitch.tv/article/img/000002212-07.png',
+    label: 'Lead-Mod',
+    color: '#00ad03'
+  },
+  admin: {
+    icon: 'https://static-cdn.jtvnw.net/badges/v1/d97c37bd-a6f5-4c38-8f57-4e4bef88af34/1',
+    label: 'Dachsbau-Slots Admin',
+    color: '#9147ff'
   }
 };
 
@@ -1012,23 +1023,28 @@ function renderProfilePage(data) {
   const avatarUrl = twitchData?.avatar || null;
   const displayName = twitchData?.displayName || username;
 
-  // Role badge from Twitch API
+  // Build role badges array
   const lowerUsername = username.toLowerCase();
-  let roleBadgeHtml = '';
-  let roleTitle = '';
+  const roleBadges = [];
 
-  // Special admin overrides
+  // Special admin overrides - multiple badges
   if (lowerUsername === 'exaint_') {
-    roleBadgeHtml = `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Moderator" class="profile-badge" title="Lead-Moderator">`;
-    roleTitle = 'Lead-Mod / Dachsbau-Slots Admin';
+    roleBadges.push({ ...ROLE_BADGES.leadmod });
+    roleBadges.push({ ...ROLE_BADGES.admin });
   } else if (lowerUsername === 'frechhdachs') {
-    roleBadgeHtml = `<img src="${ROLE_BADGES.broadcaster.icon}" alt="Streamerin" class="profile-badge" title="Streamerin">`;
-    roleTitle = 'Streamerin / Dachsbau-Slots Admin';
+    roleBadges.push({ ...ROLE_BADGES.broadcaster });
+    roleBadges.push({ ...ROLE_BADGES.admin });
   } else if (twitchData?.role && ROLE_BADGES[twitchData.role]) {
-    const badge = ROLE_BADGES[twitchData.role];
-    roleBadgeHtml = `<img src="${badge.icon}" alt="${badge.label}" class="profile-badge" title="${badge.label}">`;
-    roleTitle = badge.label;
+    roleBadges.push({ ...ROLE_BADGES[twitchData.role] });
   }
+
+  // Generate role badges HTML
+  const roleBadgesHtml = roleBadges.map(badge =>
+    `<span class="profile-role-badge" style="--role-color: ${badge.color}">
+      <img src="${badge.icon}" alt="${badge.label}" class="profile-role-icon">
+      <span>${badge.label}</span>
+    </span>`
+  ).join('');
 
   const isComplete = progressPercent === 100;
   const completeBadgeHtml = isComplete ? '<span class="complete-badge">🏆 100% Complete!</span>' : '';
@@ -1041,11 +1057,10 @@ function renderProfilePage(data) {
         <div class="profile-info">
           <div class="profile-name">
             ${escapeHtml(displayName)}
-            ${roleBadgeHtml}
-            ${roleTitle ? `<span class="profile-title">${roleTitle}</span>` : ''}
             ${completeBadgeHtml}
           </div>
           <div class="profile-badges">
+            ${roleBadgesHtml}
             ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
             <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}</span>
             <span class="profile-duel-hint">Duelle an/aus: <code>!slots duelopt</code></span>
@@ -1170,10 +1185,12 @@ function renderLeaderboardPage(players, user = null, showAll = false, isAdminUse
 
     // Special admin badges
     if (lowerUsername === 'exaint_') {
-      return `<img src="https://assets.help.twitch.tv/article/img/000002212-07.png" alt="Lead-Mod" class="leaderboard-badge" title="Lead-Mod"><span class="leaderboard-role-label">Lead-Mod</span>`;
+      const badge = ROLE_BADGES.leadmod;
+      return `<img src="${badge.icon}" alt="${badge.label}" class="leaderboard-badge" title="${badge.label}"><span class="leaderboard-role-label">${badge.label}</span>`;
     }
     if (lowerUsername === 'frechhdachs') {
-      return `<img src="${ROLE_BADGES.broadcaster.icon}" alt="Broadcaster" class="leaderboard-badge" title="Broadcaster"><span class="leaderboard-role-label">Broadcaster</span>`;
+      const badge = ROLE_BADGES.broadcaster;
+      return `<img src="${badge.icon}" alt="${badge.label}" class="leaderboard-badge" title="${badge.label}"><span class="leaderboard-role-label">${badge.label}</span>`;
     }
 
     // Regular Twitch roles

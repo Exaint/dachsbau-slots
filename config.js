@@ -57,6 +57,63 @@ const CUSTOM_MESSAGES = {
 };
 
 // --------------------------------------------
+// CONFIG VALIDATION
+// --------------------------------------------
+// Validates configuration at module load time.
+// Throws errors early if config is invalid.
+// --------------------------------------------
+function validateConfig() {
+  const errors = [];
+
+  // Validate ADMINS
+  if (!(ADMINS instanceof Set)) {
+    errors.push('ADMINS must be a Set');
+  } else if (ADMINS.size === 0) {
+    errors.push('ADMINS must contain at least one admin');
+  } else {
+    for (const admin of ADMINS) {
+      if (typeof admin !== 'string' || admin.length < 3) {
+        errors.push(`Invalid admin username: ${admin}`);
+      }
+      if (admin !== admin.toLowerCase()) {
+        errors.push(`Admin username must be lowercase: ${admin}`);
+      }
+    }
+  }
+
+  // Validate CUSTOM_MESSAGES
+  if (typeof CUSTOM_MESSAGES !== 'object' || CUSTOM_MESSAGES === null) {
+    errors.push('CUSTOM_MESSAGES must be an object');
+  } else {
+    for (const [username, messages] of Object.entries(CUSTOM_MESSAGES)) {
+      if (username !== username.toLowerCase()) {
+        errors.push(`Custom message username must be lowercase: ${username}`);
+      }
+      if (typeof messages !== 'object' || messages === null) {
+        errors.push(`Custom messages for ${username} must be an object`);
+        continue;
+      }
+      if (messages.win && typeof messages.win !== 'string') {
+        errors.push(`Custom win message for ${username} must be a string`);
+      }
+      if (messages.loss && typeof messages.loss !== 'string') {
+        errors.push(`Custom loss message for ${username} must be a string`);
+      }
+      if (!messages.win && !messages.loss) {
+        errors.push(`Custom messages for ${username} must have at least one of: win, loss`);
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Config validation failed:\n  - ${errors.join('\n  - ')}`);
+  }
+}
+
+// Run validation at module load
+validateConfig();
+
+// --------------------------------------------
 // EXPORTS
 // --------------------------------------------
 export {

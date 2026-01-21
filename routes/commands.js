@@ -1,0 +1,304 @@
+/**
+ * Command Routes - Twitch bot command handling
+ */
+
+import { RESPONSE_HEADERS, URLS, KV_TRUE } from '../constants.js';
+import { sanitizeUsername, isAdmin, getAdminList } from '../utils.js';
+import { isBlacklisted, setSelfBan, hasAcceptedDisclaimer, setDisclaimerAccepted, getBalance } from '../database.js';
+
+// User commands
+import {
+  handleBalance,
+  handleStats,
+  handleDaily,
+  handleBuffs,
+  handleBank,
+  handleTransfer,
+  handleLeaderboard
+} from '../commands/user.js';
+
+// Admin commands
+import {
+  handleGive,
+  handleBan,
+  handleUnban,
+  handleReset,
+  handleFreeze,
+  handleUnfreeze,
+  handleSetBalance,
+  handleBankSet,
+  handleBankReset,
+  handleGiveBuff,
+  handleRemoveBuff,
+  handleClearAllBuffs,
+  handleGetStats,
+  handleGetDaily,
+  handleResetDaily,
+  handleMaintenance,
+  handleWipe,
+  handleRemoveFromLB,
+  handleGiveFreespins,
+  handleGiveInsurance,
+  handleGetMonthlyLogin,
+  handleResetWeeklyLimits,
+  handleGiveWinMulti
+} from '../commands/admin.js';
+
+// Slots commands
+import { handleSlot } from '../commands/slots.js';
+
+// Shop commands
+import { handleShop } from '../commands/shop.js';
+
+// Duel commands
+import { handleDuel, handleDuelAccept, handleDuelDecline, handleDuelOpt } from '../commands/duel.js';
+
+// Command alias sets (O(1) lookup)
+export const LEADERBOARD_ALIASES = new Set(['lb', 'leaderboard', 'rank', 'ranking']);
+export const BALANCE_ALIASES = new Set(['balance', 'konto']);
+export const INFO_ALIASES = new Set(['info', 'help', 'commands']);
+export const WEBSITE_ALIASES = new Set(['website', 'site', 'seite']);
+export const ACHIEVEMENTS_ALIASES = new Set(['erfolge', 'achievements']);
+
+// Commands that don't need security checks (read-only info commands)
+export const SAFE_COMMANDS = new Set([
+  'stats', 'buffs', 'bank',
+  ...LEADERBOARD_ALIASES, ...BALANCE_ALIASES, ...INFO_ALIASES,
+  ...WEBSITE_ALIASES, ...ACHIEVEMENTS_ALIASES
+]);
+
+// Admin commands that take (username, target, env)
+const ADMIN_COMMANDS_TARGET = {
+  ban: handleBan,
+  unban: handleUnban,
+  reset: handleReset,
+  freeze: handleFreeze,
+  unfreeze: handleUnfreeze,
+  clearallbuffs: handleClearAllBuffs,
+  getstats: handleGetStats,
+  getdaily: handleGetDaily,
+  resetdaily: handleResetDaily,
+  wipe: handleWipe,
+  removefromlb: handleRemoveFromLB
+};
+
+// Admin commands that take (username, target, amount, env)
+const ADMIN_COMMANDS_AMOUNT = {
+  give: handleGive,
+  setbalance: handleSetBalance,
+  givebuff: handleGiveBuff,
+  removebuff: handleRemoveBuff,
+  giveinsurance: handleGiveInsurance
+};
+
+// Admin commands that take (username, target, env) - target only, no amount
+const ADMIN_COMMANDS_TARGET_ONLY = {
+  getmonthlylogin: handleGetMonthlyLogin,
+  resetweeklylimits: handleResetWeeklyLimits,
+  givewinmulti: handleGiveWinMulti
+};
+
+/**
+ * Check security constraints (blacklist, frozen, maintenance)
+ * @param {string} username - Username to check
+ * @param {object} env - Environment bindings
+ * @returns {Promise<Response|null>} Error response if blocked, null if allowed
+ */
+export async function checkSecurityConstraints(username, env) {
+  const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
+    isBlacklisted(username, env),
+    env.SLOTS_KV.get(`frozen:${username}`),
+    env.SLOTS_KV.get('maintenance_mode')
+  ]);
+
+  if (blacklisted) {
+    return new Response(`@${username} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
+  }
+  if (isFrozen === KV_TRUE) {
+    return new Response(`@${username} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
+  }
+  if (maintenanceMode === KV_TRUE && !isAdmin(username)) {
+    return new Response(`@${username} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
+  }
+
+  return null;
+}
+
+/**
+ * Handle slot subcommands (amount parameter variations)
+ * @param {string} cleanUsername - Sanitized username
+ * @param {string} lower - Lowercase amount parameter
+ * @param {URL} url - Request URL
+ * @param {object} env - Environment bindings
+ * @returns {Promise<Response|null>} Command response or null if not a subcommand
+ */
+export async function handleSlotSubcommands(cleanUsername, lower, url, env) {
+  // Detect !slots buy mistake
+  if (lower === 'buy') {
+    const itemNumber = url.searchParams.get('target');
+    if (itemNumber && !isNaN(parseInt(itemNumber, 10))) {
+      return new Response(`@${cleanUsername} ❓ Meintest du !shop buy ${itemNumber}?`, { headers: RESPONSE_HEADERS });
+    }
+    return new Response(`@${cleanUsername} ❓ Meintest du !shop buy [Nummer]? (z.B. !shop buy 1)`, { headers: RESPONSE_HEADERS });
+  }
+
+  // Read-only info commands
+  if (LEADERBOARD_ALIASES.has(lower)) return await handleLeaderboard(env);
+  if (BALANCE_ALIASES.has(lower)) return await handleBalance(cleanUsername, env);
+
+  if (INFO_ALIASES.has(lower)) {
+    const targetParam = url.searchParams.get('target');
+    let finalTarget = cleanUsername;
+    if (targetParam) {
+      const cleanTarget = sanitizeUsername(targetParam.replace('@', ''));
+      if (cleanTarget) finalTarget = cleanTarget;
+    }
+    return new Response(`@${finalTarget} ℹ️ Hier findest du alle Commands & Infos zum Dachsbau Slots: ${URLS.INFO}`, { headers: RESPONSE_HEADERS });
+  }
+
+  if (WEBSITE_ALIASES.has(lower)) {
+    return new Response(`@${cleanUsername} 🦡 Dachsbau Slots Website: ${URLS.WEBSITE}`, { headers: RESPONSE_HEADERS });
+  }
+
+  if (ACHIEVEMENTS_ALIASES.has(lower)) {
+    const targetParam = url.searchParams.get('target');
+    let profileUser = cleanUsername;
+    if (targetParam) {
+      const cleanTarget = sanitizeUsername(targetParam.replace('@', ''));
+      if (cleanTarget) profileUser = cleanTarget;
+    }
+    return new Response(`@${cleanUsername} 🏆 Erfolge von ${profileUser}: ${URLS.WEBSITE}/u/${profileUser}`, { headers: RESPONSE_HEADERS });
+  }
+
+  // User commands
+  if (lower === 'daily') return await handleDaily(cleanUsername, env);
+  if (lower === 'stats') return await handleStats(cleanUsername, env);
+  if (lower === 'buffs') return await handleBuffs(cleanUsername, env);
+  if (lower === 'bank') return await handleBank(cleanUsername, env);
+  if (lower === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
+
+  // Admin commands with target only
+  if (ADMIN_COMMANDS_TARGET[lower]) {
+    return await ADMIN_COMMANDS_TARGET[lower](cleanUsername, url.searchParams.get('target'), env);
+  }
+
+  // Admin commands with target and amount
+  if (ADMIN_COMMANDS_AMOUNT[lower]) {
+    return await ADMIN_COMMANDS_AMOUNT[lower](cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
+  }
+
+  // Admin commands with target only (no amount)
+  if (ADMIN_COMMANDS_TARGET_ONLY[lower]) {
+    return await ADMIN_COMMANDS_TARGET_ONLY[lower](cleanUsername, url.searchParams.get('target'), env);
+  }
+
+  // Special admin commands with unique signatures
+  if (lower === 'bankset') return await handleBankSet(cleanUsername, url.searchParams.get('target'), env);
+  if (lower === 'bankreset') return await handleBankReset(cleanUsername, env);
+  if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target'), env);
+  if (lower === 'givefreespins') return await handleGiveFreespins(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), url.searchParams.get('multiplier'), env);
+
+  // Disclaimer command
+  if (lower === 'disclaimer') {
+    const targetParam = url.searchParams.get('target');
+    let finalTarget = cleanUsername;
+    if (targetParam) {
+      const cleanTarget = sanitizeUsername(targetParam.replace('@', ''));
+      if (cleanTarget) finalTarget = cleanTarget;
+    }
+    return new Response(`@${finalTarget} ⚠️ Dachsbau Slots dient nur zur Unterhaltung! Es werden keine Echtgeld-Beträge eingesetzt oder gewonnen. Hilfsangebote bei Glücksspielproblemen: ${URLS.INFO} 🦡`, { headers: RESPONSE_HEADERS });
+  }
+
+  // Self-ban
+  if (lower === 'selfban') {
+    await setSelfBan(cleanUsername, env);
+    const adminList = getAdminList().join(', ');
+    return new Response(`@${cleanUsername} ✅ Du wurdest vom Slots spielen ausgeschlossen. Nur Admins (${adminList}) können dich wieder freischalten. Wenn du Hilfe brauchst: ${URLS.INFO} 🦡`, { headers: RESPONSE_HEADERS });
+  }
+
+  // Accept disclaimer
+  if (lower === 'accept') {
+    const alreadyAccepted = await hasAcceptedDisclaimer(cleanUsername, env);
+    if (alreadyAccepted) {
+      return new Response(`@${cleanUsername} ✅ Du hast den Disclaimer bereits akzeptiert! Nutze einfach !slots zum Spielen 🎰`, { headers: RESPONSE_HEADERS });
+    }
+    const currentBalance = await getBalance(cleanUsername, env);
+    await setDisclaimerAccepted(cleanUsername, env);
+    if (currentBalance > 0) {
+      return new Response(`@${cleanUsername} ✅ Disclaimer akzeptiert! Dein Kontostand: ${currentBalance} DachsTaler. Viel Spaß beim Spielen! 🦡🎰 Nutze !slots zum Spinnen!`, { headers: RESPONSE_HEADERS });
+    }
+    return new Response(`@${cleanUsername} ✅ Disclaimer akzeptiert! Du startest mit 100 DachsTaler. Viel Spaß beim Spielen! 🦡🎰 Nutze !slots zum Spinnen!`, { headers: RESPONSE_HEADERS });
+  }
+
+  // Duel commands
+  if (lower === 'duel') {
+    const target = url.searchParams.get('target');
+    const amount = url.searchParams.get('giveamount');
+    const args = [target, amount].filter(Boolean);
+    return new Response(await handleDuel(cleanUsername, args, env), { headers: RESPONSE_HEADERS });
+  }
+  if (lower === 'duelaccept') {
+    return new Response(await handleDuelAccept(cleanUsername, env), { headers: RESPONSE_HEADERS });
+  }
+  if (lower === 'dueldecline') {
+    return new Response(await handleDuelDecline(cleanUsername, env), { headers: RESPONSE_HEADERS });
+  }
+  if (lower === 'duelopt') {
+    const target = url.searchParams.get('target');
+    const args = target ? [target] : [];
+    return new Response(await handleDuelOpt(cleanUsername, args, env), { headers: RESPONSE_HEADERS });
+  }
+
+  return null; // Not a subcommand, continue to regular slot
+}
+
+/**
+ * Handle the main slot action
+ * @param {string} cleanUsername - Sanitized username
+ * @param {string|null} amountParam - Amount parameter
+ * @param {URL} url - Request URL
+ * @param {object} env - Environment bindings
+ * @returns {Promise<Response>} Slot response
+ */
+export async function handleSlotAction(cleanUsername, amountParam, url, env) {
+  if (amountParam) {
+    const lower = amountParam.toLowerCase();
+
+    // Skip security checks for safe read-only commands
+    if (!SAFE_COMMANDS.has(lower)) {
+      const securityError = await checkSecurityConstraints(cleanUsername, env);
+      if (securityError) return securityError;
+    }
+
+    // Try subcommands first
+    const subcommandResponse = await handleSlotSubcommands(cleanUsername, lower, url, env);
+    if (subcommandResponse) return subcommandResponse;
+  }
+
+  return await handleSlot(cleanUsername, amountParam, url, env);
+}
+
+/**
+ * Handle legacy action-based commands
+ * @param {string} action - Action parameter
+ * @param {string} cleanUsername - Sanitized username
+ * @param {URL} url - Request URL
+ * @param {object} env - Environment bindings
+ * @returns {Promise<Response|null>} Action response or null if invalid
+ */
+export async function handleLegacyActions(action, cleanUsername, url, env) {
+  // Safe read-only actions (no security check needed)
+  if (action === 'leaderboard') return await handleLeaderboard(env);
+  if (action === 'stats') return await handleStats(cleanUsername, env);
+  if (action === 'balance') return await handleBalance(cleanUsername, env);
+
+  // Actions that modify state need security checks
+  const securityError = await checkSecurityConstraints(cleanUsername, env);
+  if (securityError) return securityError;
+
+  if (action === 'daily') return await handleDaily(cleanUsername, env);
+  if (action === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('amount'), env);
+  if (action === 'shop') return await handleShop(cleanUsername, url.searchParams.get('item'), env);
+
+  return null;
+}

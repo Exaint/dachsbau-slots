@@ -304,10 +304,6 @@ export async function renderShopPage(env, user = null) {
       <div id="unlocks">${renderCategory(categories.unlocks)}</div>
 
       <div id="prestige">${renderCategory(categories.prestige)}</div>
-      <div class="section-note">
-        <strong>🏆 Prestige-Progression:</strong><br>
-        🥉 Bronze (1.200 DT) → 🥈 Silber (+3.000 = 4.200 DT) → 🥇 Gold (+8.000 = 12.200 DT) → 💎 Platin (+25.000 = 37.200 DT) → 👑 Legendary (+44.444 = <strong>81.644 DT</strong>)
-      </div>
 
       <!-- Buff-Kombinationen -->
       <section id="combos" class="content-section">

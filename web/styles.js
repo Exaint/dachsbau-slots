@@ -10,6 +10,9 @@ export const CSS = `
   --bg-secondary: #18181b;
   --bg-tertiary: #1f1f23;
   --bg-card: #26262c;
+  /* Gradient colors (same as secondary/tertiary in dark mode) */
+  --gradient-start: #18181b;
+  --gradient-end: #1f1f23;
   --text-primary: #efeff1;
   --text-secondary: #adadb8;
   --text-muted: #a8a8b8; /* WCAG AA: 4.5:1 contrast on --bg-primary */
@@ -56,6 +59,9 @@ export const CSS = `
   --bg-secondary: #fafafa;
   --bg-tertiary: #f1f5f9;
   --bg-card: #e2e8f0;
+  /* Gradient colors for better contrast in light mode */
+  --gradient-start: #d8dce8;
+  --gradient-end: #e8ecf4;
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #64748b;
@@ -289,7 +295,57 @@ body {
 }
 
 [data-theme="light"] .global-stat-card {
-  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+}
+
+[data-theme="light"] .shop-user-info {
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+}
+
+[data-theme="light"] .combo-card {
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+}
+
+[data-theme="light"] .info-accordion.admin-section {
+  background: linear-gradient(135deg, var(--gradient-start), rgba(220, 38, 38, 0.08));
+}
+
+[data-theme="light"] .skeleton {
+  background: linear-gradient(90deg, var(--gradient-start) 25%, var(--gradient-end) 50%, var(--gradient-start) 75%);
+}
+
+[data-theme="light"] .symbol-card.jackpot {
+  background: linear-gradient(135deg, var(--gradient-start) 0%, rgba(146, 64, 14, 0.12) 100%);
+}
+
+[data-theme="light"] .symbol-card.special {
+  background: linear-gradient(135deg, var(--gradient-start) 0%, rgba(124, 58, 237, 0.12) 100%);
+}
+
+[data-theme="light"] .bank-card.income {
+  background: linear-gradient(135deg, var(--gradient-start), rgba(5, 150, 105, 0.1));
+}
+
+[data-theme="light"] .bank-card.expense {
+  background: linear-gradient(135deg, var(--gradient-start), rgba(220, 38, 38, 0.1));
+}
+
+[data-theme="light"] .streak-row.hot,
+[data-theme="light"] .bonus-row.highlight,
+[data-theme="light"] .combo-item.hot {
+  background: linear-gradient(90deg, var(--gradient-start), rgba(180, 83, 9, 0.15));
+}
+
+[data-theme="light"] .chances-row.jackpot-row {
+  background: linear-gradient(90deg, var(--gradient-start), rgba(146, 64, 14, 0.15));
+}
+
+[data-theme="light"] .chances-row.special-row {
+  background: linear-gradient(90deg, var(--gradient-start), rgba(124, 58, 237, 0.15));
+}
+
+[data-theme="light"] .chances-row.fruit-row {
+  background: linear-gradient(90deg, var(--gradient-start), rgba(5, 150, 105, 0.12));
 }
 
 .header-content {

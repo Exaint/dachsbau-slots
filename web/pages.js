@@ -1781,7 +1781,8 @@ function renderGlobalStatsPage(data, user = null) {
         </div>
         <div class="global-stat-card">
           <div class="global-stat-value">${formatNumber(totalUnlocked)}</div>
-          <div class="global-stat-label">Achievements freigeschaltet</div>
+          <div class="global-stat-label">Freischaltungen insgesamt</div>
+          <div class="global-stat-hint">von allen Spielern</div>
         </div>
         <div class="global-stat-card">
           <div class="global-stat-value">${avgAchievementsPerPlayer}</div>

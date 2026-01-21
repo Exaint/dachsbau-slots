@@ -256,7 +256,12 @@ body {
   padding: 0 24px;
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 24px;
+  overflow: hidden;
+}
+
+.header {
+  overflow-x: hidden;
 }
 
 .logo {
@@ -268,6 +273,7 @@ body {
   align-items: center;
   gap: 10px;
   transition: transform 0.2s ease;
+  flex-shrink: 0;
 }
 
 .logo:hover {
@@ -276,8 +282,8 @@ body {
 }
 
 .logo-img {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   object-fit: contain;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
@@ -1402,6 +1408,7 @@ body {
   align-items: center;
   gap: 12px;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* Navigation Bar (inline in header) */
@@ -2038,6 +2045,13 @@ body {
 .global-stat-label {
   font-size: 0.9rem;
   color: var(--text-secondary);
+}
+
+.global-stat-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-style: italic;
 }
 
 .stats-section {

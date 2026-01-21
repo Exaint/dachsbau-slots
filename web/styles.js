@@ -33,9 +33,9 @@ export const CSS = `
 
 /* Light theme */
 [data-theme="light"] {
-  --bg-primary: #f7f7f8;
+  --bg-primary: #ebebed;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #efeff1;
+  --bg-tertiary: #f0f0f2;
   --bg-card: #e5e5e8;
   --text-primary: #0e0e10;
   --text-secondary: #53535f;
@@ -164,7 +164,7 @@ body {
 }
 
 [data-theme="light"] .header {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(247, 247, 248, 0.95);
   border-bottom-color: #b0b0b8;
 }
 
@@ -198,10 +198,12 @@ body {
 }
 
 [data-theme="light"] .footer {
+  background: #f7f7f8;
   border-top-color: #b0b0b8;
 }
 
 [data-theme="light"] .legal-footer {
+  background: #f7f7f8;
   border-top-color: #b0b0b8;
 }
 
@@ -308,6 +310,8 @@ body {
   color: var(--text-primary);
   font-size: 0.85rem;
   width: 140px;
+  height: 38px;
+  box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s, width 0.3s ease;
 }
 
@@ -323,7 +327,7 @@ body {
 }
 
 .btn-search {
-  padding: 10px 14px;
+  padding: 8px 14px;
   min-width: auto;
   font-size: 1rem;
   line-height: 1;
@@ -331,6 +335,8 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  height: 38px;
+  box-sizing: border-box;
 }
 
 /* Search Suggestions */
@@ -427,20 +433,22 @@ body {
 .user-section {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: var(--bg-tertiary);
-  padding: 6px 10px;
+  padding: 4px 8px;
   border-radius: 8px;
   border: 1px solid var(--border);
+  height: 38px;
+  box-sizing: border-box;
 }
 
 .user-profile-link {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   text-decoration: none;
   color: var(--text-primary);
-  padding: 4px 8px;
+  padding: 2px 6px;
   border-radius: 6px;
   transition: background 0.2s;
 }
@@ -450,8 +458,8 @@ body {
 }
 
 .user-avatar-small {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--accent);
@@ -471,7 +479,7 @@ body {
   color: var(--text-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 5px 10px;
+  padding: 4px 10px;
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
@@ -1078,8 +1086,12 @@ body {
   animation-fill-mode: both;
 }
 
+.leaderboard-item:nth-child(odd) {
+  background: var(--bg-card);
+}
+
 .leaderboard-item:hover {
-  background: var(--bg-tertiary);
+  background: rgba(145, 71, 255, 0.1);
 }
 
 .leaderboard-rank {

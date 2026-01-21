@@ -165,6 +165,7 @@ body {
 
 [data-theme="light"] .header {
   background: rgba(255, 255, 255, 0.95);
+  border-bottom-color: #b0b0b8;
 }
 
 /* Light theme specific overrides for better readability */
@@ -194,6 +195,14 @@ body {
 
 [data-theme="light"] .footer-link:hover {
   color: #8b6914;
+}
+
+[data-theme="light"] .footer {
+  border-top-color: #b0b0b8;
+}
+
+[data-theme="light"] .legal-footer {
+  border-top-color: #b0b0b8;
 }
 
 [data-theme="light"] .complete-badge {
@@ -420,7 +429,7 @@ body {
   align-items: center;
   gap: 10px;
   background: var(--bg-tertiary);
-  padding: 4px 8px 4px 4px;
+  padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
 }

@@ -388,6 +388,7 @@ body {
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s;
+  text-decoration: none;
 }
 
 .btn:hover {
@@ -1231,16 +1232,24 @@ body {
 }
 
 .hero-search {
-  max-width: 400px;
+  max-width: 500px;
   margin: 0 auto;
 }
 
 .hero-search .search-form {
   justify-content: center;
+  flex-wrap: nowrap;
 }
 
 .hero-search .search-input {
   width: 250px;
+  flex-shrink: 1;
+  min-width: 150px;
+}
+
+.hero-search .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Not Found */

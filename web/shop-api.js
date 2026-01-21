@@ -53,8 +53,8 @@ const WEB_PURCHASABLE_ITEM_IDS = new Set([
   15,
   // Prestige Ranks (17, 22, 26, 29, 30)
   17, 22, 26, 29, 30,
-  // Stats Tracker, Daily Boost, Custom Message (18, 27, 28)
-  18, 27, 28
+  // Daily Boost, Custom Message (27, 28)
+  27, 28
 ]);
 
 // Items that CANNOT be purchased via web (require chat/immediate action)

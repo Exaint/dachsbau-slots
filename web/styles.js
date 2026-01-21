@@ -2010,7 +2010,14 @@ body {
 
 /* Shop */
 .shop-category {
-  margin-bottom: 24px;
+  margin-bottom: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.shop-category:first-child {
+  padding-top: 0;
+  border-top: none;
 }
 
 .shop-category:last-child {
@@ -3510,6 +3517,43 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Admin Section */
+.info-accordion.admin-section {
+  border: 2px solid var(--error);
+  background: linear-gradient(135deg, var(--bg-secondary), rgba(248, 113, 113, 0.05));
+}
+
+.info-accordion.admin-section .accordion-header h2 {
+  color: var(--error);
+}
+
+.admin-warning {
+  color: var(--error);
+  font-weight: 600;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(248, 113, 113, 0.1);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+}
+
+.admin-commands {
+  border-left: 3px solid var(--error);
+  padding-left: var(--space-md);
+}
+
+.admin-commands .command-item code {
+  color: var(--error);
+}
+
+.toc-admin {
+  border-color: var(--error) !important;
+  color: var(--error) !important;
+}
+
+.toc-admin:hover {
+  background: rgba(248, 113, 113, 0.1) !important;
 }
 
 /* FAQ */

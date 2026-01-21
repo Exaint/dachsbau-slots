@@ -355,23 +355,14 @@ export const ACHIEVEMENTS = {
     hidden: false,
     requirement: 14
   },
-  DAILY_21: {
-    id: 'daily_21',
-    name: 'Drei-Wochen-Krieger',
-    description: 'Hole 21 Daily-Belohnungen in einem Monat',
+  DAILY_20: {
+    id: 'daily_20',
+    name: 'Dauerbrenner',
+    description: 'Hole 20 Daily-Belohnungen in einem Monat',
     category: ACHIEVEMENT_CATEGORIES.DEDICATION,
-    reward: 175,
+    reward: 200,
     hidden: false,
-    requirement: 21
-  },
-  DAILY_28: {
-    id: 'daily_28',
-    name: 'Monats-Marathon',
-    description: 'Hole 28 Daily-Belohnungen in einem Monat',
-    category: ACHIEVEMENT_CATEGORIES.DEDICATION,
-    reward: 300,
-    hidden: false,
-    requirement: 28
+    requirement: 20
   },
   BALANCE_1000: {
     id: 'balance_1000',
@@ -585,8 +576,7 @@ const ACHIEVEMENT_STAT_MAPPING = {
   // Dedication
   'daily_7': 'dailysClaimed',
   'daily_14': 'dailysClaimed',
-  'daily_21': 'dailysClaimed',
-  'daily_28': 'dailysClaimed',
+  'daily_20': 'dailysClaimed',
   // Shopping
   'shop_10': 'shopPurchases',
   'shop_50': 'shopPurchases',

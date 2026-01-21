@@ -88,7 +88,7 @@ const MYSTERY_BOX_ITEMS = [
   9, 10,                   // Utility Items (2)
   14, 20, 24,              // Timed Buffs Classic (3)
   32, 33, 34, 35, 39       // Timed Buffs Premium (5)
-]; // Total: 17 Items (Stats Tracker, Unlocks, Prestige, Instants excluded)
+]; // Total: 17 Items (Unlocks, Prestige, Instants excluded)
 
 // Dynamic shop item max (avoids hardcoded values)
 const SHOP_ITEM_MAX = Math.max(...Object.keys(SHOP_ITEMS).map(Number));

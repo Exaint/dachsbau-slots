@@ -62,11 +62,8 @@ async function trackDailyAchievements(username, monthlyDays, env) {
     if (monthlyDays >= 14) {
       promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DAILY_14.id, env));
     }
-    if (monthlyDays >= 21) {
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DAILY_21.id, env));
-    }
-    if (monthlyDays >= 28) {
-      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DAILY_28.id, env));
+    if (monthlyDays >= 20) {
+      promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.DAILY_20.id, env));
     }
 
     await Promise.all(promises);
@@ -139,16 +136,7 @@ async function handleBalance(username, env) {
 
 async function handleStats(username, env) {
   try {
-    // OPTIMIZED: Load unlock check and stats in parallel
-    const [hasStatsUnlock, stats] = await Promise.all([
-      hasUnlock(username, 'stats_tracker', env),
-      getStats(username, env)
-    ]);
-
-    if (!hasStatsUnlock) {
-      return new Response(`@${username} ❌ Du benötigst den Stats Tracker! Kaufe ihn im Shop: !shop buy 18`, { headers: RESPONSE_HEADERS });
-    }
-
+    const stats = await getStats(username, env);
     const winRate = stats.totalSpins > 0 ? ((stats.wins / stats.totalSpins) * 100).toFixed(1) : 0;
     const netProfit = stats.totalWon - stats.totalLost;
 

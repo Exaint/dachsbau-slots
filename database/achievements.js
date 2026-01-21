@@ -115,7 +115,7 @@ async function getPlayerAchievements(username, env) {
 
     // One-time shop migration: Check unlocks and update shopPurchases stat
     if (!data.shopMigrated) {
-      const shopUnlockKeys = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'daily_boost', 'stats_tracker'];
+      const shopUnlockKeys = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'daily_boost'];
       const unlockChecks = await Promise.all(
         shopUnlockKeys.map(key => env.SLOTS_KV.get(kvKey('unlock:', username, key)))
       );
@@ -196,15 +196,10 @@ async function getPlayerAchievements(username, env) {
             addedRewards += ACHIEVEMENTS.DAILY_14.reward || 0;
             counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_14.id, env));
           }
-          if (monthlyDays >= 21 && !data.unlockedAt[ACHIEVEMENTS.DAILY_21.id]) {
-            data.unlockedAt[ACHIEVEMENTS.DAILY_21.id] = now;
-            addedRewards += ACHIEVEMENTS.DAILY_21.reward || 0;
-            counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_21.id, env));
-          }
-          if (monthlyDays >= 28 && !data.unlockedAt[ACHIEVEMENTS.DAILY_28.id]) {
-            data.unlockedAt[ACHIEVEMENTS.DAILY_28.id] = now;
-            addedRewards += ACHIEVEMENTS.DAILY_28.reward || 0;
-            counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_28.id, env));
+          if (monthlyDays >= 20 && !data.unlockedAt[ACHIEVEMENTS.DAILY_20.id]) {
+            data.unlockedAt[ACHIEVEMENTS.DAILY_20.id] = now;
+            addedRewards += ACHIEVEMENTS.DAILY_20.reward || 0;
+            counterPromises.push(incrementAchievementCounter(ACHIEVEMENTS.DAILY_20.id, env));
           }
 
           if (addedRewards > 0 && !ACHIEVEMENTS_REWARDS_ENABLED) {
@@ -794,7 +789,7 @@ function getAchievementsForStat(statKey) {
     totalTransferred: ['TRANSFER_1000', 'TRANSFER_10000'],
     shopPurchases: ['SHOP_10', 'SHOP_50', 'SHOP_100'],
     duelsWon: ['DUEL_WIN_10', 'DUEL_WIN_50', 'DUEL_WIN_100'],
-    dailysClaimed: ['DAILY_7', 'DAILY_14', 'DAILY_21', 'DAILY_28']
+    dailysClaimed: ['DAILY_7', 'DAILY_14', 'DAILY_20']
   };
   return mapping[statKey] || [];
 }

@@ -41,5 +41,5 @@ export const SYMBOL_BOOST_CHANCE = 0.33;
 
 // Buff and unlock keys for admin operations
 export const ALL_BUFF_KEYS = ['happy_hour', 'lucky_charm', 'golden_hour', 'dachs_locator', 'rage_mode', 'star_magnet', 'profit_doubler', 'diamond_rush'];
-export const ALL_UNLOCK_KEYS = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'stats_tracker', 'daily_boost', 'custom_message'];
+export const ALL_UNLOCK_KEYS = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'daily_boost', 'custom_message'];
 export const PRESTIGE_RANKS = ['🥉', '🥈', '🥇', '💎', '👑'];

@@ -713,6 +713,7 @@ function renderInfoPage(user = null) {
           <a href="#schnellstart" class="toc-item">🚀 Schnellstart</a>
           <a href="#wichtig" class="toc-item">⚠️ Wichtig zu wissen</a>
           <a href="#commands" class="toc-item">📋 Commands</a>
+          ${user && isAdmin(user.username) ? '<a href="#admin" class="toc-item toc-admin">🔧 Admin Commands</a>' : ''}
           <a href="#gewinne" class="toc-item">💎 Gewinne & Chancen</a>
           <a href="#multiplier" class="toc-item">📈 Multiplier-System</a>
           <a href="#bonus" class="toc-item">🎁 Bonus-Systeme</a>
@@ -918,7 +919,7 @@ function renderInfoPage(user = null) {
         <div class="command-list">
           <div class="command-item">
             <code>!slots stats</code>
-            <span>Persönliche Statistiken (benötigt Stats Tracker #18)</span>
+            <span>Persönliche Statistiken anzeigen</span>
           </div>
           <div class="command-item">
             <code>!slots bank</code>
@@ -963,6 +964,124 @@ function renderInfoPage(user = null) {
           </div>
         </section>
       </details>
+
+      ${user && isAdmin(user.username) ? `
+      <!-- Admin Commands -->
+      <details class="info-accordion admin-section">
+        <summary class="accordion-header"><h2>🔧 Admin Commands</h2></summary>
+        <section id="admin" class="content-section accordion-content">
+          <p class="section-intro admin-warning">Diese Commands sind nur für Admins verfügbar.</p>
+
+          <h3>Moderation</h3>
+          <div class="command-list admin-commands">
+            <div class="command-item">
+              <code>!slots ban @user</code>
+              <span>Spieler vom Slots-Spiel ausschließen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots unban @user</code>
+              <span>Spieler wieder freischalten</span>
+            </div>
+            <div class="command-item">
+              <code>!slots freeze @user</code>
+              <span>Account einfrieren (kann nicht spielen)</span>
+            </div>
+            <div class="command-item">
+              <code>!slots unfreeze @user</code>
+              <span>Account wieder freigeben</span>
+            </div>
+            <div class="command-item">
+              <code>!slots maintenance [on/off]</code>
+              <span>Wartungsmodus aktivieren/deaktivieren</span>
+            </div>
+          </div>
+
+          <h3>Economy</h3>
+          <div class="command-list admin-commands">
+            <div class="command-item">
+              <code>!slots give @user [Betrag]</code>
+              <span>DachsTaler an Spieler geben</span>
+            </div>
+            <div class="command-item">
+              <code>!slots setbalance @user [Betrag]</code>
+              <span>Kontostand direkt setzen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots reset @user</code>
+              <span>Spieler-Account komplett zurücksetzen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots wipe @user</code>
+              <span>Alle Daten eines Spielers löschen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots bankset [Betrag]</code>
+              <span>DachsBank Kontostand setzen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots bankreset</code>
+              <span>DachsBank auf Startwert zurücksetzen</span>
+            </div>
+          </div>
+
+          <h3>Buffs & Items</h3>
+          <div class="command-list admin-commands">
+            <div class="command-item">
+              <code>!slots givebuff @user [buff] [dauer]</code>
+              <span>Buff an Spieler geben (z.B. happy_hour 3600)</span>
+            </div>
+            <div class="command-item">
+              <code>!slots removebuff @user [buff]</code>
+              <span>Buff von Spieler entfernen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots clearallbuffs @user</code>
+              <span>Alle Buffs eines Spielers entfernen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots givefreespins @user [anzahl] [multi]</code>
+              <span>Free Spins geben (optional mit Multiplier)</span>
+            </div>
+            <div class="command-item">
+              <code>!slots giveinsurance @user [anzahl]</code>
+              <span>Insurance-Ladungen geben</span>
+            </div>
+            <div class="command-item">
+              <code>!slots givewinmulti @user</code>
+              <span>Win-Multiplier geben</span>
+            </div>
+          </div>
+
+          <h3>Info & Debug</h3>
+          <div class="command-list admin-commands">
+            <div class="command-item">
+              <code>!slots getstats @user</code>
+              <span>Detaillierte Stats eines Spielers anzeigen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots getdaily @user</code>
+              <span>Daily-Status eines Spielers prüfen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots resetdaily @user</code>
+              <span>Daily-Cooldown zurücksetzen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots getmonthlylogin @user</code>
+              <span>Monthly Login Status anzeigen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots resetweeklylimits @user</code>
+              <span>Wöchentliche Kauflimits zurücksetzen</span>
+            </div>
+            <div class="command-item">
+              <code>!slots removefromlb @user</code>
+              <span>Spieler vom Leaderboard ausblenden</span>
+            </div>
+          </div>
+        </section>
+      </details>
+      ` : ''}
 
       <!-- Gewinne & Chancen -->
       <details class="info-accordion">
@@ -1462,10 +1581,7 @@ function renderInfoPage(user = null) {
         <details class="faq-item">
           <summary>📊 Wie sehe ich meine Stats?</summary>
           <div class="faq-content">
-            <ol>
-              <li><strong>Kaufen:</strong> <code>!shop buy 18</code> (1.250 DT)</li>
-              <li><strong>Nutzen:</strong> <code>!slots stats</code></li>
-            </ol>
+            <p>Nutze <code>!slots stats</code> im Chat!</p>
             <p>Zeigt: Spins, Win-Rate, Biggest Win, Total Won/Lost</p>
           </div>
         </details>
@@ -1602,7 +1718,7 @@ async function renderShopPage(env, user = null) {
 
   if (user) {
     // Fetch all user data in parallel
-    const unlockKeys = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'stats_tracker', 'daily_boost', 'custom_message'];
+    const unlockKeys = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'daily_boost', 'custom_message'];
     const [balance, prestigeRank, ...unlockResults] = await Promise.all([
       getBalance(user.username, env),
       getPrestigeRank(user.username, env),

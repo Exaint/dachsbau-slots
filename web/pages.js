@@ -806,7 +806,7 @@ function renderInfoPage(user = null) {
           <div class="tip-item">
             <span class="tip-icon">💡</span>
             <div>
-              <strong>Gross/Kleinschreibung egal</strong>
+              <strong>Groß/Kleinschreibung egal</strong>
               <p><code>!SLOTS</code>, <code>!Slots</code>, <code>!slots</code> funktionieren alle</p>
             </div>
           </div>
@@ -1837,7 +1837,7 @@ async function renderShopPage(env, user = null) {
             <span class="tier-label">🌿 Early Game</span>
             <div class="tier-content">
               <strong>!slots 20 & 30 (#13, #19)</strong> - 2.500 DT gesamt
-              <p>2×-3× Gewinne - der erste grosse Sprung!</p>
+              <p>2×-3× Gewinne - der erste große Sprung!</p>
             </div>
           </div>
           <div class="investment-tier">

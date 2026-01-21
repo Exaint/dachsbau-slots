@@ -4,9 +4,7 @@
  */
 
 import {
-  DEBUG_MODE,
   GRID_SIZE,
-  DEBUG_DACHS_PAIR_CHANCE,
   BUFF_REROLL_CHANCE,
   SYMBOL_BOOST_CHANCE,
   GUARANTEED_PAIR_SYMBOLS,
@@ -46,19 +44,7 @@ async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamon
 
   const grid = [];
 
-  // DEBUG MODE: Special user gets higher chance for exactly 2 dachs
-  if (DEBUG_MODE && lowerUsername === 'exaint_') {
-    const roll = secureRandom();
-    if (roll < DEBUG_DACHS_PAIR_CHANCE) {
-      const dachsPair = secureRandom() < 0.5 ? [0, 1] : [1, 2];
-      for (let i = 0; i < GRID_SIZE; i++) {
-        grid.push(dachsPair.includes(i) ? '🦡' : getWeightedSymbol());
-      }
-      return grid;
-    }
-  }
-
-  // Normal generation - only 3 elements needed (the winning row)
+  // Generate 3 elements (the winning row)
   for (let i = 0; i < GRID_SIZE; i++) {
     if (secureRandom() < dachsChance) {
       grid.push('🦡');
@@ -94,7 +80,7 @@ async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamon
  * @param {object} env - Cloudflare environment
  */
 async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWildCardToken, env) {
-  if (hasGuaranteedPairToken) {
+  if (hasGuaranteedPairToken && grid.length >= 2 && GUARANTEED_PAIR_SYMBOLS.length > 0) {
     const hasPair = (grid[0] === grid[1]) || (grid[1] === grid[2]) || (grid[0] === grid[2]);
 
     if (!hasPair) {

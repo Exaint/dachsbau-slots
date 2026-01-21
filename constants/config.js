@@ -142,14 +142,7 @@ export const MAX_RETRIES = 3;
 export const EXPONENTIAL_BACKOFF_BASE_MS = 10;
 
 // ===========================================
-// 11. Feature Flags & Debug
-// ===========================================
-
-export const DEBUG_MODE = false;
-export const DEBUG_DACHS_PAIR_CHANCE = 0.75;
-
-// ===========================================
-// 12. HTTP & URLs
+// 11. HTTP & URLs
 // ===========================================
 
 export const RESPONSE_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8' };

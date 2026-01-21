@@ -2,7 +2,7 @@
  * Admin Economy Commands - Give, balance, buffs, stats
  */
 
-import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY } from '../../constants.js';
+import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, SHOP_ITEM_MAX, BANK_KEY } from '../../constants.js';
 import { requireAdmin, requireAdminWithTarget, validateAmount, sanitizeUsername, logError, logAudit, createErrorResponse } from '../../utils.js';
 import {
   getBalance,
@@ -23,9 +23,6 @@ import {
   activateWildCard,
   getMonthlyLogin
 } from '../../database.js';
-
-// Dynamic shop item max (avoids hardcoded values)
-const SHOP_ITEM_MAX = Math.max(...Object.keys(SHOP_ITEMS).map(Number));
 
 async function handleGive(username, target, amount, env) {
   try {

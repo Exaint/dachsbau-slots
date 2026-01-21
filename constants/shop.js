@@ -55,3 +55,6 @@ export const WEEKLY_DACHS_BOOST_LIMIT = 1;
 export const WEEKLY_SPIN_BUNDLE_LIMIT = 3;
 export const SPIN_BUNDLE_COUNT = 10;
 export const SPIN_BUNDLE_MULTIPLIER = 1;
+
+// Highest shop item ID (computed once at module load)
+export const SHOP_ITEM_MAX = Math.max(...Object.keys(SHOP_ITEMS).map(Number));

@@ -21,6 +21,7 @@ import {
   RESPONSE_HEADERS,
   MAX_BALANCE,
   SHOP_ITEMS,
+  SHOP_ITEM_MAX,
   PREREQUISITE_NAMES,
   PRESTIGE_RANKS,
   DACHS_BASE_CHANCE,
@@ -89,9 +90,6 @@ const MYSTERY_BOX_ITEMS = [
   14, 20, 24,              // Timed Buffs Classic (3)
   32, 33, 34, 35, 39       // Timed Buffs Premium (5)
 ]; // Total: 17 Items (Unlocks, Prestige, Instants excluded)
-
-// Dynamic shop item max (avoids hardcoded values)
-const SHOP_ITEM_MAX = Math.max(...Object.keys(SHOP_ITEMS).map(Number));
 
 // Achievement tracking for shop purchases (fire-and-forget)
 async function trackShopAchievements(username, itemId, item, extraData, env) {

@@ -168,6 +168,17 @@ export default {
         return await handleUserOAuthCallback(url, env);
       }
 
+      // CSRF protection for POST API endpoints: validate Origin header
+      if (request.method === 'POST' && pathname.startsWith('/api/')) {
+        const origin = request.headers.get('Origin');
+        if (!origin || !origin.startsWith(url.origin)) {
+          return new Response(JSON.stringify({ error: 'Invalid origin' }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Shop buy API endpoint (requires logged-in user)
       if (pathname === '/api/shop/buy' && request.method === 'POST') {
         const loggedInUser = await getUserFromRequest(request, env);

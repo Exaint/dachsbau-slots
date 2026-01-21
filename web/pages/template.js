@@ -146,10 +146,10 @@ export function baseTemplate(title, content, activePage = '', user = null) {
       </div>
       <p class="modal-desc" id="modalDesc"></p>
       <div class="modal-details">
-        <div class="modal-detail" id="modalCategory"></div>
-        <div class="modal-detail" id="modalRarity"></div>
-        <div class="modal-detail" id="modalStatus"></div>
-        <div class="modal-detail" id="modalProgress"></div>
+        <div class="modal-detail"><strong>Kategorie:</strong> <span id="modalCategory"></span></div>
+        <div class="modal-detail"><strong>Seltenheit:</strong> <span id="modalRarity"></span></div>
+        <div class="modal-detail" id="modalStatusRow" style="display:none"><strong>Freigeschaltet:</strong> <span id="modalStatus"></span></div>
+        <div class="modal-detail" id="modalProgressRow" style="display:none"><strong>Fortschritt:</strong> <span id="modalProgress"></span></div>
       </div>
     </div>
   </div>
@@ -182,21 +182,21 @@ function getClientScripts() {
       document.getElementById('modalIcon').textContent = unlocked ? '✅' : '🔒';
       document.getElementById('modalName').textContent = name;
       document.getElementById('modalDesc').textContent = desc;
-      document.getElementById('modalCategory').innerHTML = '<strong>Kategorie:</strong> ' + category;
-      document.getElementById('modalRarity').innerHTML = '<strong>Seltenheit:</strong> ' + rarity + '% (' + rarityCount + ' von ' + rarityTotal + ' Spielern)';
+      document.getElementById('modalCategory').textContent = category;
+      document.getElementById('modalRarity').textContent = rarity + '% (' + rarityCount + ' von ' + rarityTotal + ' Spielern)';
 
       if (unlocked && unlockedAt) {
-        document.getElementById('modalStatus').innerHTML = '<strong>Freigeschaltet:</strong> ' + unlockedAt;
-        document.getElementById('modalStatus').style.display = 'block';
+        document.getElementById('modalStatus').textContent = unlockedAt;
+        document.getElementById('modalStatusRow').style.display = 'block';
       } else {
-        document.getElementById('modalStatus').style.display = 'none';
+        document.getElementById('modalStatusRow').style.display = 'none';
       }
 
       if (!unlocked && progressCurrent && progressRequired) {
-        document.getElementById('modalProgress').innerHTML = '<strong>Fortschritt:</strong> ' + progressCurrent + ' / ' + progressRequired;
-        document.getElementById('modalProgress').style.display = 'block';
+        document.getElementById('modalProgress').textContent = progressCurrent + ' / ' + progressRequired;
+        document.getElementById('modalProgressRow').style.display = 'block';
       } else {
-        document.getElementById('modalProgress').style.display = 'none';
+        document.getElementById('modalProgressRow').style.display = 'none';
       }
 
       modal.classList.add('active');
@@ -401,9 +401,14 @@ function getClientScripts() {
               const data = await response.json();
 
               if (data.players && data.players.length > 0) {
-                suggestionsContainer.innerHTML = data.players.map(player =>
-                  '<div class="suggestion-item" data-username="' + player + '">' + player + '</div>'
-                ).join('');
+                suggestionsContainer.innerHTML = '';
+                data.players.forEach(player => {
+                  const div = document.createElement('div');
+                  div.className = 'suggestion-item';
+                  div.dataset.username = player;
+                  div.textContent = player;
+                  suggestionsContainer.appendChild(div);
+                });
                 suggestionsContainer.style.display = 'block';
               } else {
                 suggestionsContainer.innerHTML = '';

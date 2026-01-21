@@ -807,16 +807,9 @@ function renderInfoPage(user = null) {
               <p><code>!transfer @user 100</code> ✅ nicht <code>!transfer @ user 100</code> ❌</p>
             </div>
           </div>
-          <div class="tip-item">
-            <span class="tip-icon">💡</span>
-            <div>
-              <strong>Groß/Kleinschreibung egal</strong>
-              <p><code>!SLOTS</code>, <code>!Slots</code>, <code>!slots</code> funktionieren alle</p>
-            </div>
-          </div>
         </div>
 
-        <h3>🎰 Höhere Einsätze freischalten</h3>
+          <h3>🎰 Höhere Einsätze freischalten</h3>
         <p>Höhere Einsätze müssen <strong>zuerst im Shop gekauft</strong> werden:</p>
         <div class="unlock-list">
           <div class="unlock-item">

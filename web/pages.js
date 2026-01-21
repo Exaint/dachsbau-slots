@@ -33,11 +33,11 @@ const CATEGORY_NAMES = {
 
 // Prestige rank names for display
 const PRESTIGE_RANK_NAMES = {
-  '🥉': 'Bronze',
-  '🥈': 'Silber',
-  '🥇': 'Gold',
-  '💎': 'Diamant',
-  '👑': 'Legende'
+  '🥉': { name: 'Bronze', color: '#cd7f32' },
+  '🥈': { name: 'Silber', color: '#c0c0c0' },
+  '🥇': { name: 'Gold', color: '#ffd700' },
+  '💎': { name: 'Diamant', color: '#b9f2ff' },
+  '👑': { name: 'Legende', color: '#ff6b6b' }
 };
 
 /**
@@ -1061,7 +1061,7 @@ function renderProfilePage(data) {
           </div>
           <div class="profile-badges">
             ${roleBadgesHtml}
-            ${rank ? `<span class="profile-rank">Prestige Rang: ${escapeHtml(rank)} ${PRESTIGE_RANK_NAMES[rank] || ''}</span>` : ''}
+            ${rank && PRESTIGE_RANK_NAMES[rank] ? `<span class="profile-prestige-badge" style="--prestige-color: ${PRESTIGE_RANK_NAMES[rank].color}">${rank} ${PRESTIGE_RANK_NAMES[rank].name}</span>` : ''}
             <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}</span>
             <span class="profile-duel-hint">Duelle an/aus: <code>!slots duelopt</code></span>
             ${selfBanned ? `<span class="profile-selfban-status banned">🚫 Selbst-gesperrt</span>` : ''}
@@ -1555,7 +1555,7 @@ const ITEM_ICONS = {
   9: '🛡️', 10: '✖️', 11: '🌀', 12: '🎡', 13: '🔓', 14: '🎉', 15: '📦',
   16: '🎁', 17: '🥉', 18: '📊', 19: '🔓', 20: '🍀', 21: '🔓', 22: '🥈',
   23: '🔓', 24: '✨', 25: '🔓', 26: '🥇', 27: '💰', 28: '💬', 29: '💎',
-  30: '👑', 31: '🔄', 32: '🌟', 33: '🦡', 34: '🔥', 35: '📈', 36: '💎',
+  30: '👑', 31: '🔄', 32: '🌟', 33: '🦡', 34: '<img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Rage.png" alt="Rage Mode" class="shop-item-img">', 35: '📈', 36: '💎',
   37: '🎯', 38: '🃏', 39: '💎'
 };
 

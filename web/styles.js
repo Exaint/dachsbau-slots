@@ -636,6 +636,18 @@ body {
   color: var(--dachs-gold);
 }
 
+.profile-prestige-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--prestige-color, var(--dachs-gold));
+  color: var(--prestige-color, var(--dachs-gold));
+}
+
 /* Profile Role Badges */
 .profile-role-badge {
   display: inline-flex;
@@ -1776,7 +1788,8 @@ body {
   border-radius: 4px;
   font-size: 0.85rem;
   white-space: nowrap;
-  min-width: 200px;
+  min-width: 260px;
+  flex-shrink: 0;
 }
 
 .command-item span {
@@ -1997,6 +2010,12 @@ body {
   flex-shrink: 0;
   width: 40px;
   text-align: center;
+}
+
+.shop-item-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .shop-item-content {

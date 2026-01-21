@@ -1,6 +1,7 @@
 /**
  * Slot Machine - Main game logic
  * Engine functions (grid, win calculation) are in ./slots/engine.js
+ * Helper functions (parsing, buffs, streaks, achievements) are in ./slots/helpers.js
  *
  * ARCHITECTURE NOTES (for future coding sessions):
  * ================================================
@@ -14,7 +15,7 @@
  *
  * KEY PERFORMANCE PATTERNS:
  * - Promise.all() for parallel KV reads (21 operations → ~13 Stage 1 + 8 Stage 2)
- * - Pre-computed values cached at module level (regex patterns, unlock prices)
+ * - Pre-computed values cached at module level (regex patterns)
  * - Only check symbol boosts for symbols that appear in the grid (1-3 vs 7)
  */
 
@@ -23,50 +24,34 @@ import {
   MAX_BALANCE,
   COOLDOWN_SECONDS,
   BASE_SPIN_COST,
-  UNLOCK_MAP,
-  MULTIPLIER_MAP,
-  LOSS_MESSAGES,
-  ROTATING_LOSS_MESSAGES,
-  COMBO_BONUSES,
   HOURLY_JACKPOT_AMOUNT,
   DACHS_BASE_CHANCE,
   DAILY_BOOST_AMOUNT,
   DAILY_AMOUNT,
   LOW_BALANCE_WARNING,
   STREAK_THRESHOLD,
-  HOT_STREAK_BONUS,
-  COMEBACK_BONUS,
-  STREAK_TTL_SECONDS,
   INSURANCE_REFUND_RATE,
   URLS,
   RAGE_MODE_LOSS_STACK,
   RAGE_MODE_MAX_STACK,
-  RAGE_MODE_WIN_THRESHOLD,
-  BUFF_TTL_BUFFER_SECONDS,
   FREE_SPIN_COST_THRESHOLD
 } from '../constants.js';
 import { calculateBuffTTL, logError, logWarn, kvKey } from '../utils.js';
-import { CUSTOM_MESSAGES } from '../config.js';
 import {
   getBalance,
   setBalance,
   getLastSpin,
   setLastSpin,
   hasAcceptedDisclaimer,
-  setDisclaimerAccepted,
   isSelfBanned,
   setLastActive,
   hasGuaranteedPair,
   hasWildCard,
   getFreeSpins,
-  addFreeSpinsWithMultiplier,
   consumeFreeSpinWithMultiplier,
-  hasUnlock,
   isBuffActive,
   getBuffWithUses,
   getBuffWithStack,
-  consumeBoost,
-  consumeWinMultiplier,
   getInsuranceCount,
   setInsuranceCount,
   getStreakMultiplier,
@@ -78,280 +63,24 @@ import {
   updateBankBalance,
   checkAndClaimHourlyJackpot,
   getLastDaily,
-  updateAchievementStat,
-  markTripleCollected,
-  checkAndUnlockAchievement,
-  checkBalanceAchievements,
-  checkBigWinAchievements
+  hasUnlock
 } from '../database.js';
-import { ACHIEVEMENTS } from '../constants.js';
 
 // Engine functions
 import { generateGrid, applySpecialItems, calculateWin, buildResponseMessage } from './slots/engine.js';
 
+// Helper functions
+import {
+  trackSlotAchievements,
+  getCustomMessage,
+  parseSpinAmount,
+  applyMultipliersAndBuffs,
+  calculateStreakBonuses
+} from './slots/helpers.js';
+
 // Pre-compiled regex patterns
 const INVISIBLE_CHARS_REGEX = /[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u0000-\u001F\u007F-\u009F]+/g;
 const NORMALIZE_SPACES_REGEX = /\s+/g;
-
-// Unlock prices for error messages
-const UNLOCK_PRICES = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
-
-// Achievement tracking (fire-and-forget, non-blocking)
-// IMPORTANT: Operations are run sequentially to avoid race conditions on KV writes
-// originalGrid = before special items (for dachs detection)
-// displayGrid = after special items (for wild card and triple detection)
-async function trackSlotAchievements(username, originalGrid, displayGrid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env) {
-  try {
-    // Stat updates (these modify achievement data)
-    await updateAchievementStat(username, 'totalSpins', 1, env);
-
-    if (result.points > 0) {
-      await updateAchievementStat(username, 'wins', 1, env);
-    }
-
-    // Collect all one-time achievements to unlock
-    const achievementsToUnlock = [];
-
-    // Win-related achievements
-    const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
-    if (isWin) {
-      achievementsToUnlock.push(ACHIEVEMENTS.FIRST_WIN.id);
-
-      if (isFreeSpinUsed) {
-        achievementsToUnlock.push(ACHIEVEMENTS.FREE_SPIN_WIN.id);
-      }
-      if (isAllIn && result.points > 0) {
-        achievementsToUnlock.push(ACHIEVEMENTS.SLOTS_ALL_WIN.id);
-      }
-      // Wild Card win uses displayGrid (wild card is added by applySpecialItems)
-      if (hasWildCardToken && displayGrid.includes('🃏')) {
-        achievementsToUnlock.push(ACHIEVEMENTS.WILD_CARD_WIN.id);
-      }
-      // ZERO_HERO (win with 0 balance before spin - only for actual point wins)
-      if (result.points > 0 && newBalance === result.points) {
-        achievementsToUnlock.push(ACHIEVEMENTS.ZERO_HERO.id);
-      }
-    }
-
-    // Dachs tracking - use originalGrid (before special items may have overwritten dachs)
-    if (originalGrid.includes('🦡')) {
-      achievementsToUnlock.push(ACHIEVEMENTS.FIRST_DACHS.id);
-      const dachsCount = originalGrid.filter(s => s === '🦡').length;
-      if (dachsCount === 2) {
-        achievementsToUnlock.push(ACHIEVEMENTS.DACHS_PAIR.id);
-      }
-    }
-
-    // Special event achievements
-    if (insuranceUsed) {
-      achievementsToUnlock.push(ACHIEVEMENTS.INSURANCE_SAVE.id);
-    }
-    if (hourlyJackpotWon) {
-      achievementsToUnlock.push(ACHIEVEMENTS.HOURLY_JACKPOT.id);
-    }
-    if (hotStreakTriggered) {
-      achievementsToUnlock.push(ACHIEVEMENTS.HOT_STREAK.id);
-    }
-    if (comebackTriggered) {
-      achievementsToUnlock.push(ACHIEVEMENTS.COMEBACK_KING.id);
-    }
-
-    // PERFECT_TIMING (midnight UTC)
-    const nowUTC = new Date();
-    if (nowUTC.getUTCHours() === 0 && nowUTC.getUTCMinutes() === 0) {
-      achievementsToUnlock.push(ACHIEVEMENTS.PERFECT_TIMING.id);
-    }
-
-    // Unlock all collected achievements sequentially (share same data object)
-    for (const achievementId of achievementsToUnlock) {
-      await checkAndUnlockAchievement(username, achievementId, env);
-    }
-
-    // These functions load their own data, run after unlocks
-    if (result.points > 0) {
-      await checkBigWinAchievements(username, result.points, env);
-    }
-
-    // Triple tracking - use displayGrid (what the user sees)
-    if (displayGrid[0] === displayGrid[1] && displayGrid[1] === displayGrid[2] && displayGrid[0] !== '🃏') {
-      await markTripleCollected(username, displayGrid[0], env);
-    }
-
-    // Balance achievements
-    await checkBalanceAchievements(username, newBalance, env);
-  } catch (error) {
-    // Silently fail - achievements should never break the game
-    logError('trackSlotAchievements', error, { username });
-  }
-}
-
-// Helper: Get custom message for special users
-function getCustomMessage(lowerUsername, username, isWin, data) {
-  const userMessages = CUSTOM_MESSAGES[lowerUsername];
-  if (!userMessages) return null;
-
-  const template = isWin ? userMessages.win : userMessages.loss;
-  if (!template) return null;
-
-  return template
-    .replace(/{username}/g, username)
-    .replace(/{amount}/g, data.amount)
-    .replace(/{balance}/g, data.balance)
-    .replace(/{grid}/g, data.grid);
-}
-
-// Helper: Parse and validate spin cost/multiplier
-async function parseSpinAmount(username, amountParam, currentBalance, isFreeSpinUsed, env) {
-  if (isFreeSpinUsed || !amountParam) {
-    return { spinCost: BASE_SPIN_COST, multiplier: 1 };
-  }
-
-  const lower = amountParam.toLowerCase();
-
-  if (lower === 'all') {
-    if (!await hasUnlock(username, 'slots_all', env)) {
-      return { error: `@${username} ❌ !slots all nicht freigeschaltet! Du musst es für ${UNLOCK_PRICES.all} DachsTaler im Shop kaufen! Weitere Infos: ${URLS.UNLOCK}` };
-    }
-    if (currentBalance < BASE_SPIN_COST) {
-      return { error: `@${username} ❌ Du brauchst mindestens ${BASE_SPIN_COST} DachsTaler für !slots all!` };
-    }
-    const multiplier = Math.floor(currentBalance / BASE_SPIN_COST);
-    return { spinCost: multiplier * BASE_SPIN_COST, multiplier };
-  }
-
-  const customAmount = parseInt(amountParam, 10);
-  if (isNaN(customAmount)) {
-    return { spinCost: BASE_SPIN_COST, multiplier: 1 };
-  }
-
-  if (customAmount < BASE_SPIN_COST) {
-    return { error: `@${username} ❌ Minimum ist !slots ${BASE_SPIN_COST}! Verfügbar: 10, 20, 30, 50, 100, all 💡` };
-  }
-  if (customAmount > 100) {
-    return { error: `@${username} ❌ Maximum ist !slots 100! Verfügbar: 10, 20, 30, 50, 100, all 💡` };
-  }
-  if (customAmount === BASE_SPIN_COST) {
-    return { spinCost: BASE_SPIN_COST, multiplier: 1 };
-  }
-
-  if (UNLOCK_MAP[customAmount]) {
-    if (await hasUnlock(username, UNLOCK_MAP[customAmount], env)) {
-      return { spinCost: customAmount, multiplier: MULTIPLIER_MAP[customAmount] };
-    }
-    return { error: `@${username} ❌ !slots ${customAmount} nicht freigeschaltet! Du musst es für ${UNLOCK_PRICES[customAmount]} DachsTaler im Shop kaufen! Weitere Infos: ${URLS.UNLOCK}` };
-  }
-
-  return { error: `@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all | Info: ${URLS.UNLOCK}` };
-}
-
-// OPTIMIZED: Apply multipliers and buffs to win result (uses pre-loaded buff values)
-async function applyMultipliersAndBuffs(username, result, multiplier, grid, env, preloadedBuffs) {
-  const { hasGoldenHour, hasProfitDoubler, currentStreakMulti } = preloadedBuffs;
-  const shopBuffs = [];
-
-  // Award Free Spins
-  if (result.freeSpins && result.freeSpins > 0) {
-    try {
-      await addFreeSpinsWithMultiplier(username, result.freeSpins, multiplier, env);
-    } catch (error) {
-      logError('applyMultipliersAndBuffs.addFreeSpins', error, { username, freeSpins: result.freeSpins, multiplier });
-    }
-  }
-
-  result.points = result.points * multiplier;
-
-  // Win Multiplier (Shop Buff) - must consume, so still needs KV call
-  if (result.points > 0 && await consumeWinMultiplier(username, env)) {
-    result.points *= 2;
-    shopBuffs.push('2x');
-  }
-
-  // Symbol Boost - only check for matching symbols (must consume, so needs KV)
-  if (result.points > 0) {
-    const matchingSymbols = new Set();
-    if (grid[0] === grid[1]) matchingSymbols.add(grid[0]);
-    if (grid[1] === grid[2]) matchingSymbols.add(grid[1]);
-    if (grid[0] === grid[2]) matchingSymbols.add(grid[0]);
-
-    if (matchingSymbols.size > 0) {
-      const boostResults = await Promise.all(
-        Array.from(matchingSymbols).map(symbol => consumeBoost(username, symbol, env))
-      );
-      if (boostResults.some(hasBoost => hasBoost)) {
-        result.points *= 2;
-        shopBuffs.push('2x Boost');
-      }
-    }
-  }
-
-  // Golden Hour, Profit Doubler & Streak Multiplier (pre-loaded)
-  let streakMulti = 1.0;
-  if (result.points > 0) {
-    if (hasGoldenHour) {
-      result.points = Math.floor(result.points * 1.3);
-      shopBuffs.push('+30%');
-    }
-    if (hasProfitDoubler && result.points > RAGE_MODE_WIN_THRESHOLD) {
-      result.points *= 2;
-      shopBuffs.push('Profit x2');
-    }
-    if (currentStreakMulti > 1.0) {
-      result.points = Math.floor(result.points * currentStreakMulti);
-      streakMulti = currentStreakMulti;
-    }
-  }
-
-  return { shopBuffs, streakMulti };
-}
-
-// OPTIMIZED: Calculate streak bonuses (uses pre-loaded streak)
-async function calculateStreakBonuses(lowerUsername, username, isWin, previousStreak, env) {
-  const naturalBonuses = [];
-  let streakBonus = 0;
-  let comboBonus = 0;
-  let lossWarningMessage = '';
-  let shouldResetStreak = false;
-
-  // Hot Streak
-  if (isWin && previousStreak.wins + 1 === STREAK_THRESHOLD) {
-    streakBonus += HOT_STREAK_BONUS;
-    naturalBonuses.push(`🔥 Hot Streak +${HOT_STREAK_BONUS}`);
-    shouldResetStreak = true;
-  }
-
-  // Comeback King
-  if (isWin && previousStreak.losses >= STREAK_THRESHOLD) {
-    streakBonus += COMEBACK_BONUS;
-    naturalBonuses.push(`👑 Comeback +${COMEBACK_BONUS}`);
-    shouldResetStreak = true;
-  }
-
-  const newStreak = shouldResetStreak
-    ? { wins: 0, losses: 0 }
-    : { wins: isWin ? previousStreak.wins + 1 : 0, losses: isWin ? 0 : previousStreak.losses + 1 };
-
-  await env.SLOTS_KV.put(kvKey('streak:', lowerUsername), JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
-
-  // Combo Bonus
-  if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {
-    comboBonus = COMBO_BONUSES[newStreak.wins] || 0;
-    if (comboBonus > 0) {
-      naturalBonuses.push(`🎯 Combo +${comboBonus}`);
-    }
-  }
-
-  // Loss Warning
-  if (!isWin && newStreak.losses >= 10) {
-    if (LOSS_MESSAGES[newStreak.losses]) {
-      lossWarningMessage = LOSS_MESSAGES[newStreak.losses];
-    } else if (newStreak.losses > 20) {
-      const index = (newStreak.losses - 21) % ROTATING_LOSS_MESSAGES.length;
-      lossWarningMessage = ROTATING_LOSS_MESSAGES[index];
-    }
-  }
-
-  return { streakBonus, comboBonus, naturalBonuses, lossWarningMessage, newStreak };
-}
 
 // Main slot handler
 async function handleSlot(username, amountParam, url, env) {

@@ -1,0 +1,425 @@
+/**
+ * Profile Page Handler and Renderer
+ */
+
+import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned } from '../../database.js';
+import { isDuelOptedOut } from '../../database/duels.js';
+import { isLeaderboardHidden } from '../../database/core.js';
+import { getTwitchProfileData } from '../twitch.js';
+import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement } from '../../constants.js';
+import { isAdmin } from '../../utils.js';
+import { escapeHtml, formatNumber } from './utils.js';
+import { CATEGORY_ICONS, CATEGORY_NAMES, PRESTIGE_RANK_NAMES, ROLE_BADGES } from './constants.js';
+import { baseTemplate, htmlResponse } from './template.js';
+import { renderHomePage } from './home.js';
+import { renderNotFoundPage } from './errors.js';
+
+/**
+ * Profile page handler
+ */
+export async function handleProfilePage(url, env, loggedInUser = null) {
+  const username = url.searchParams.get('user');
+
+  if (!username) {
+    return htmlResponse(renderHomePage('Bitte gib einen Spielernamen ein.', loggedInUser));
+  }
+
+  // Check if user exists (check both disclaimer AND balance for legacy players)
+  const [hasDisclaimer, balance] = await Promise.all([
+    hasAcceptedDisclaimer(username, env),
+    getBalance(username, env)
+  ]);
+
+  // User exists if they accepted disclaimer OR have a balance (legacy players)
+  const userExists = hasDisclaimer || balance > 0;
+  if (!userExists) {
+    return htmlResponse(renderNotFoundPage(username, loggedInUser));
+  }
+
+  // Fetch remaining data in parallel (balance already fetched above)
+  const [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData] = await Promise.all([
+    getPrestigeRank(username, env),
+    getStats(username, env),
+    getPlayerAchievements(username, env),
+    getLastActive(username, env),
+    getAchievementStats(env),
+    isDuelOptedOut(username, env),
+    isSelfBanned(username, env),
+    isLeaderboardHidden(username, env),
+    getTwitchProfileData(username, env)
+  ]);
+
+  const allAchievements = getAllAchievements();
+
+  // Build achievements with unlock status and rarity
+  const { totalPlayers, counts } = achievementStats;
+  const achievements = allAchievements.map(ach => {
+    const unlocked = !!achievementData.unlockedAt[ach.id];
+    const unlockedAt = achievementData.unlockedAt[ach.id] || null;
+
+    // Calculate progress
+    let progress = null;
+    if (ach.requirement && !unlocked) {
+      const statKey = getStatKeyForAchievement(ach.id);
+      if (statKey && achievementData.stats[statKey] !== undefined) {
+        progress = {
+          current: achievementData.stats[statKey],
+          required: ach.requirement,
+          percent: Math.min(100, Math.round((achievementData.stats[statKey] / ach.requirement) * 100))
+        };
+      }
+    }
+
+    // Calculate rarity percentage
+    const unlockCount = counts[ach.id] || 0;
+    const rarityPercent = totalPlayers > 0 ? Math.round((unlockCount / totalPlayers) * 100) : 0;
+
+    return {
+      ...ach,
+      unlocked,
+      unlockedAt,
+      progress,
+      rarity: {
+        percent: rarityPercent,
+        count: unlockCount,
+        total: totalPlayers
+      }
+    };
+  });
+
+  // Group by category
+  const byCategory = {};
+  for (const cat of Object.values(ACHIEVEMENT_CATEGORIES)) {
+    byCategory[cat] = achievements.filter(a => a.category === cat);
+  }
+
+  return htmlResponse(renderProfilePage({
+    username,
+    balance,
+    rank,
+    stats,
+    achievements,
+    byCategory,
+    pendingRewards: achievementData.pendingRewards,
+    lastActive,
+    duelOptOut,
+    selfBanned,
+    leaderboardHidden,
+    hasDisclaimer,
+    twitchData,
+    loggedInUser
+  }));
+}
+
+/**
+ * Profile page renderer
+ */
+export function renderProfilePage(data) {
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, leaderboardHidden, hasDisclaimer, twitchData, loggedInUser } = data;
+
+  // Check if logged-in user is admin
+  const showAdminPanel = loggedInUser && isAdmin(loggedInUser.username);
+
+  const unlockedCount = achievements.filter(a => a.unlocked).length;
+  const totalCount = achievements.length;
+  const progressPercent = Math.round((unlockedCount / totalCount) * 100);
+
+  // Format last active time
+  const formatLastActive = (timestamp) => {
+    if (!timestamp) return null;
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'Gerade eben';
+    if (minutes < 60) return `Vor ${minutes} Minute${minutes !== 1 ? 'n' : ''}`;
+    if (hours < 24) return `Vor ${hours} Stunde${hours !== 1 ? 'n' : ''}`;
+    if (days < 7) return `Vor ${days} Tag${days !== 1 ? 'en' : ''}`;
+
+    // Format as date for older entries
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const lastActiveText = formatLastActive(lastActive);
+
+  // Stats display
+  const statsHtml = `
+    <div class="profile-stats">
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(balance)}</div>
+        <div class="stat-label">DachsTaler</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(stats.totalSpins || 0)}</div>
+        <div class="stat-label">Spins</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(stats.wins || 0)}</div>
+        <div class="stat-label">Gewinne</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(stats.biggestWin || 0)}</div>
+        <div class="stat-label">Höchster Gewinn</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(stats.totalWon || 0)}</div>
+        <div class="stat-label">Gesamt gewonnen</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(stats.totalLost || 0)}</div>
+        <div class="stat-label">Gesamt verloren</div>
+      </div>
+    </div>
+  `;
+
+  // Categories HTML
+  const categoriesHtml = Object.entries(byCategory).map(([category, achs]) => {
+    const catUnlocked = achs.filter(a => a.unlocked).length;
+    const catTotal = achs.length;
+    const catClass = `category-${category.toLowerCase()}`;
+
+    const achievementsHtml = achs.map(ach => {
+      // Skip hidden achievements that aren't unlocked
+      if (ach.hidden && !ach.unlocked) {
+        return `
+          <div class="achievement locked hidden">
+            <div class="achievement-icon">❓</div>
+            <div class="achievement-info">
+              <div class="achievement-name">Verstecktes Achievement</div>
+              <div class="achievement-desc">Spiele weiter um es zu entdecken...</div>
+            </div>
+          </div>
+        `;
+      }
+
+      const statusClass = ach.unlocked ? 'unlocked' : 'locked';
+      const icon = ach.unlocked ? '✅' : '🔒';
+
+      let progressHtml = '';
+      if (ach.progress && !ach.unlocked) {
+        progressHtml = `
+          <div class="achievement-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: ${ach.progress.percent}%"></div>
+            </div>
+            <div class="achievement-progress-text">${formatNumber(ach.progress.current)}/${formatNumber(ach.progress.required)}</div>
+          </div>
+        `;
+      }
+
+      // Rarity display with color coding
+      // < 5% = legendary (orange), < 15% = epic (purple), < 30% = rare (blue), >= 30% = common (gray)
+      const getRarityClass = (percent) => {
+        if (percent < 5) return 'rarity-legendary';
+        if (percent < 15) return 'rarity-epic';
+        if (percent < 30) return 'rarity-rare';
+        return 'rarity-common';
+      };
+      const rarityClass = ach.rarity && ach.rarity.total > 0 ? getRarityClass(ach.rarity.percent) : '';
+      const rarityHtml = ach.rarity && ach.rarity.total > 0
+        ? `<div class="achievement-rarity ${rarityClass}">${ach.rarity.percent}% der Spieler</div>`
+        : '';
+
+      // Format unlock date
+      const unlockedDateStr = ach.unlockedAt
+        ? new Date(ach.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '';
+
+      return `
+        <div class="achievement ${statusClass}" onclick="showAchievementDetail(this)"
+          data-name="${escapeHtml(ach.name)}"
+          data-desc="${escapeHtml(ach.description)}"
+          data-category="${ach.category}"
+          data-rarity="${ach.rarity?.percent || 0}"
+          data-rarity-count="${ach.rarity?.count || 0}"
+          data-rarity-total="${ach.rarity?.total || 0}"
+          data-unlocked="${ach.unlocked}"
+          data-unlocked-at="${unlockedDateStr}"
+          data-progress-current="${ach.progress?.current || ''}"
+          data-progress-required="${ach.progress?.required || ''}">
+          <div class="achievement-icon">${icon}</div>
+          <div class="achievement-info">
+            <div class="achievement-name">${escapeHtml(ach.name)}</div>
+            <div class="achievement-desc">${escapeHtml(ach.description)}</div>
+            ${rarityHtml}
+          </div>
+          ${ach.reward ? `<div class="achievement-reward">+${formatNumber(ach.reward)} DT</div>` : ''}
+          ${progressHtml}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="category ${catClass}">
+        <div class="category-header">
+          <div class="category-title">
+            <div class="category-icon">${CATEGORY_ICONS[category] || '🎯'}</div>
+            <span>${CATEGORY_NAMES[category] || category}</span>
+          </div>
+          <div class="category-progress">${catUnlocked}/${catTotal}</div>
+        </div>
+        <div class="category-content">
+          <div class="achievement-list">
+            ${achievementsHtml}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Avatar from Twitch (or default)
+  const avatarUrl = twitchData?.avatar || null;
+  const displayName = twitchData?.displayName || username;
+
+  // Build role badges array
+  const lowerUsername = username.toLowerCase();
+  const roleBadges = [];
+
+  // Special admin overrides - multiple badges
+  if (lowerUsername === 'exaint_') {
+    roleBadges.push({ ...ROLE_BADGES.leadmod });
+    roleBadges.push({ ...ROLE_BADGES.admin });
+  } else if (lowerUsername === 'frechhdachs') {
+    roleBadges.push({ ...ROLE_BADGES.broadcaster });
+    roleBadges.push({ ...ROLE_BADGES.admin });
+  } else if (twitchData?.role && ROLE_BADGES[twitchData.role]) {
+    roleBadges.push({ ...ROLE_BADGES[twitchData.role] });
+  }
+
+  // Generate role badges HTML
+  const roleBadgesHtml = roleBadges.map(badge =>
+    `<span class="profile-role-badge" style="--role-color: ${badge.color}">
+      <img src="${badge.icon}" alt="${badge.label}" class="profile-role-icon">
+      <span>${badge.label}</span>
+    </span>`
+  ).join('');
+
+  const isComplete = progressPercent === 100;
+  const completeBadgeHtml = isComplete ? '<span class="complete-badge">🏆 100% Complete!</span>' : '';
+
+  // Admin panel HTML
+  const adminPanelHtml = showAdminPanel ? `
+    <div class="admin-panel collapsed" id="adminPanel">
+      <div class="admin-panel-header" onclick="toggleAdminPanel()">
+        <h3>🔧 Admin Panel</h3>
+        <span class="admin-panel-user">Spieler: <strong>${escapeHtml(username)}</strong></span>
+        <span class="admin-panel-toggle" id="adminPanelToggle">▼</span>
+      </div>
+      <div class="admin-panel-content" id="adminPanelContent">
+        <div class="admin-panel-grid">
+          <div class="admin-control">
+            <label>Balance</label>
+            <div class="admin-input-group">
+              <input type="number" id="adminBalance" value="${balance}" min="0" class="admin-input">
+              <button class="btn admin-btn" onclick="adminSetBalance('${escapeHtml(username)}')">Setzen</button>
+            </div>
+          </div>
+          <div class="admin-control">
+            <label>Disclaimer</label>
+            <div class="admin-toggle-group">
+              <span class="admin-status ${hasDisclaimer ? 'active' : ''}">${hasDisclaimer ? '✓ Akzeptiert' : '✗ Nicht akzeptiert'}</span>
+              <button class="btn admin-btn ${hasDisclaimer ? 'danger' : 'success'}" onclick="adminSetDisclaimer('${escapeHtml(username)}', ${!hasDisclaimer})">${hasDisclaimer ? 'Entfernen' : 'Setzen'}</button>
+            </div>
+          </div>
+          <div class="admin-control">
+            <label>Self-Ban</label>
+            <div class="admin-toggle-group">
+              <span class="admin-status ${selfBanned ? 'active danger' : ''}">${selfBanned ? '🚫 Gesperrt' : '✓ Nicht gesperrt'}</span>
+              <button class="btn admin-btn ${selfBanned ? 'success' : 'danger'}" onclick="adminSetSelfBan('${escapeHtml(username)}', ${!selfBanned})">${selfBanned ? 'Entsperren' : 'Sperren'}</button>
+            </div>
+          </div>
+          <div class="admin-control">
+            <label>Duelle</label>
+            <div class="admin-toggle-group">
+              <span class="admin-status ${duelOptOut ? 'danger' : 'active'}">${duelOptOut ? '✗ Deaktiviert' : '✓ Aktiviert'}</span>
+              <button class="btn admin-btn" onclick="adminSetDuelOpt('${escapeHtml(username)}', ${!duelOptOut})">${duelOptOut ? 'Aktivieren' : 'Deaktivieren'}</button>
+            </div>
+          </div>
+          <div class="admin-control">
+            <label>Leaderboard</label>
+            <div class="admin-toggle-group">
+              <span class="admin-status ${leaderboardHidden ? 'danger' : 'active'}">${leaderboardHidden ? '✗ Versteckt' : '✓ Sichtbar'}</span>
+              <button class="btn admin-btn" onclick="adminSetLeaderboardHidden('${escapeHtml(username)}', ${!leaderboardHidden})">${leaderboardHidden ? 'Anzeigen' : 'Verstecken'}</button>
+            </div>
+          </div>
+          <div class="admin-control admin-control-wide">
+            <label>Achievement</label>
+            <div class="admin-input-group">
+              <select id="adminAchievement" class="admin-input admin-select">
+                ${achievements.map(a => `<option value="${a.id}" data-unlocked="${a.unlocked}">${a.unlocked ? '✓' : '○'} ${escapeHtml(a.name)}</option>`).join('')}
+              </select>
+              <button class="btn admin-btn success" onclick="adminSetAchievement('${escapeHtml(username)}', true)">Freischalten</button>
+              <button class="btn admin-btn danger" onclick="adminSetAchievement('${escapeHtml(username)}', false)">Sperren</button>
+            </div>
+          </div>
+        </div>
+        <div id="adminMessage" class="admin-message"></div>
+      </div>
+    </div>
+    <script>
+      function toggleAdminPanel() {
+        const panel = document.getElementById('adminPanel');
+        const toggle = document.getElementById('adminPanelToggle');
+        panel.classList.toggle('collapsed');
+        toggle.textContent = panel.classList.contains('collapsed') ? '▼' : '▲';
+      }
+    </script>
+  ` : '';
+
+  const content = `
+    ${isComplete ? '<div class="confetti-container" id="confetti"></div>' : ''}
+    <div class="profile-header${isComplete ? ' complete' : ''}">
+      <div class="profile-top">
+        ${avatarUrl ? `<img src="${avatarUrl}" alt="${escapeHtml(displayName)}" class="profile-avatar">` : ''}
+        <div class="profile-info">
+          <div class="profile-name">
+            ${escapeHtml(displayName)}
+            ${completeBadgeHtml}
+          </div>
+          <div class="profile-badges">
+            ${roleBadgesHtml}
+            ${rank && PRESTIGE_RANK_NAMES[rank] ? `<span class="profile-prestige-badge" style="--prestige-color: ${PRESTIGE_RANK_NAMES[rank].color}">${rank} ${PRESTIGE_RANK_NAMES[rank].name}</span>` : ''}
+            <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}</span>
+            <span class="profile-duel-hint">Duelle an/aus: <code>!slots duelopt</code></span>
+            ${selfBanned ? `<span class="profile-selfban-status banned">🚫 Selbst-gesperrt</span>` : ''}
+          </div>
+          ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
+        </div>
+      </div>
+      ${statsHtml}
+      <div class="achievement-summary">
+        <div class="achievement-count">
+          <span class="achievement-count-label">🏆 Achievements</span>
+          <span class="achievement-count-value"><strong>${unlockedCount}</strong> / ${totalCount}</span>
+          <span class="achievement-count-percent">(${progressPercent}%)</span>
+        </div>
+        <div class="progress-bar achievement-progress-bar">
+          <div class="progress-fill" style="width: ${progressPercent}%"></div>
+        </div>
+      </div>
+    </div>
+    ${adminPanelHtml}
+    <div class="achievement-controls">
+      <div class="achievement-filter" role="group" aria-label="Achievement Filter">
+        <span class="filter-label" id="filter-label">Filter:</span>
+        <button class="filter-btn active" data-filter="all" aria-pressed="true">Alle</button>
+        <button class="filter-btn" data-filter="unlocked" aria-pressed="false">Freigeschaltet</button>
+        <button class="filter-btn" data-filter="locked" aria-pressed="false">Gesperrt</button>
+      </div>
+      <div class="achievement-sort" role="group" aria-label="Achievement Sortierung">
+        <span class="filter-label" id="sort-label">Sortierung:</span>
+        <button class="sort-btn active" data-sort="category" aria-pressed="true">Kategorie</button>
+        <button class="sort-btn" data-sort="rarity-asc" aria-pressed="false">Seltenste</button>
+        <button class="sort-btn" data-sort="rarity-desc" aria-pressed="false">Häufigste</button>
+      </div>
+    </div>
+    <div class="categories">
+      ${categoriesHtml}
+    </div>
+  `;
+
+  return baseTemplate(`${username}'s Profil`, content, 'profile', loggedInUser);
+}

@@ -3449,6 +3449,56 @@ body {
   font-size: 0.85em;
 }
 
+/* Chances Table */
+.chances-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chances-row {
+  display: grid;
+  grid-template-columns: 1fr 120px 120px;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  align-items: center;
+}
+
+.chances-row.header {
+  background: var(--bg-card);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.chances-row.jackpot-row {
+  background: linear-gradient(90deg, var(--bg-tertiary), rgba(255, 215, 0, 0.15));
+  border-left: 3px solid var(--dachs-gold);
+}
+
+.chances-row.special-row {
+  background: linear-gradient(90deg, var(--bg-tertiary), rgba(168, 85, 247, 0.15));
+  border-left: 3px solid var(--accent);
+}
+
+.chances-row .gold {
+  color: var(--dachs-gold);
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .chances-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .chances-row span:first-child {
+    font-weight: 600;
+  }
+}
+
 /* Selfban Info */
 .selfban-info {
   padding: 16px;

@@ -976,9 +976,9 @@ function renderInfoPage(user = null) {
             <div class="symbol-name">Dachs</div>
             <div class="symbol-rarity">JACKPOT</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🦡🦡🦡</span><span class="win-amount gold">15.000 DT</span><span class="win-chance">~1 in 140.000</span></div>
-              <div class="win-row"><span class="win-combo">🦡🦡</span><span class="win-amount">2.500 DT</span><span class="win-chance">~1 in 5.000</span></div>
-              <div class="win-row"><span class="win-combo">🦡</span><span class="win-amount">100 DT</span><span class="win-chance">~1 in 50</span></div>
+              <div class="win-row"><span class="win-combo">🦡🦡🦡</span><span class="win-amount gold">15.000 DT</span></div>
+              <div class="win-row"><span class="win-combo">🦡🦡</span><span class="win-amount">2.500 DT</span></div>
+              <div class="win-row"><span class="win-combo">🦡</span><span class="win-amount">100 DT</span></div>
             </div>
           </div>
           <div class="symbol-card special">
@@ -986,8 +986,8 @@ function renderInfoPage(user = null) {
             <div class="symbol-name">Diamant</div>
             <div class="symbol-rarity">FREE SPINS</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">💎💎💎</span><span class="win-amount">5 Free Spins</span><span class="win-chance">~1 in 740</span></div>
-              <div class="win-row"><span class="win-combo">💎💎</span><span class="win-amount">1 Free Spin</span><span class="win-chance">~1 in 34</span></div>
+              <div class="win-row"><span class="win-combo">💎💎💎</span><span class="win-amount">5 Free Spins</span></div>
+              <div class="win-row"><span class="win-combo">💎💎</span><span class="win-amount">1 Free Spin</span></div>
             </div>
             <p class="symbol-note">Free Spins behalten den Multiplier!</p>
           </div>
@@ -996,8 +996,8 @@ function renderInfoPage(user = null) {
             <div class="symbol-name">Stern</div>
             <div class="symbol-rarity">Sehr selten</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">⭐⭐⭐</span><span class="win-amount">500 DT</span><span class="win-chance">~1 in 1.728</span></div>
-              <div class="win-row"><span class="win-combo">⭐⭐</span><span class="win-amount">50 DT</span><span class="win-chance">~1 in 144</span></div>
+              <div class="win-row"><span class="win-combo">⭐⭐⭐</span><span class="win-amount">500 DT</span></div>
+              <div class="win-row"><span class="win-combo">⭐⭐</span><span class="win-amount">50 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -1005,8 +1005,8 @@ function renderInfoPage(user = null) {
             <div class="symbol-name">Melone</div>
             <div class="symbol-rarity">Selten</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍉🍉🍉</span><span class="win-amount">250 DT</span><span class="win-chance">~1 in 1.331</span></div>
-              <div class="win-row"><span class="win-combo">🍉🍉</span><span class="win-amount">25 DT</span><span class="win-chance">~1 in 100</span></div>
+              <div class="win-row"><span class="win-combo">🍉🍉🍉</span><span class="win-amount">250 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍉🍉</span><span class="win-amount">25 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -1014,8 +1014,8 @@ function renderInfoPage(user = null) {
             <div class="symbol-name">Trauben</div>
             <div class="symbol-rarity">Ungewöhnlich</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍇🍇🍇</span><span class="win-amount">150 DT</span><span class="win-chance">~1 in 512</span></div>
-              <div class="win-row"><span class="win-combo">🍇🍇</span><span class="win-amount">15 DT</span><span class="win-chance">~1 in 53</span></div>
+              <div class="win-row"><span class="win-combo">🍇🍇🍇</span><span class="win-amount">150 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍇🍇</span><span class="win-amount">15 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -1023,8 +1023,8 @@ function renderInfoPage(user = null) {
             <div class="symbol-name">Orange</div>
             <div class="symbol-rarity">Gewöhnlich</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍊🍊🍊</span><span class="win-amount">100 DT</span><span class="win-chance">~1 in 248</span></div>
-              <div class="win-row"><span class="win-combo">🍊🍊</span><span class="win-amount">10 DT</span><span class="win-chance">~1 in 40</span></div>
+              <div class="win-row"><span class="win-combo">🍊🍊🍊</span><span class="win-amount">100 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍊🍊</span><span class="win-amount">10 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -1032,8 +1032,8 @@ function renderInfoPage(user = null) {
             <div class="symbol-name">Zitrone</div>
             <div class="symbol-rarity">Gewöhnlich</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍋🍋🍋</span><span class="win-amount">75 DT</span><span class="win-chance">~1 in 216</span></div>
-              <div class="win-row"><span class="win-combo">🍋🍋</span><span class="win-amount">8 DT</span><span class="win-chance">~1 in 36</span></div>
+              <div class="win-row"><span class="win-combo">🍋🍋🍋</span><span class="win-amount">75 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍋🍋</span><span class="win-amount">8 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -1041,65 +1041,116 @@ function renderInfoPage(user = null) {
             <div class="symbol-name">Kirsche</div>
             <div class="symbol-rarity">Häufig</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍒🍒🍒</span><span class="win-amount">50 DT</span><span class="win-chance">~1 in 125</span></div>
-              <div class="win-row"><span class="win-combo">🍒🍒</span><span class="win-amount">5 DT</span><span class="win-chance">~1 in 25</span></div>
+              <div class="win-row"><span class="win-combo">🍒🍒🍒</span><span class="win-amount">50 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍒🍒</span><span class="win-amount">5 DT</span></div>
             </div>
           </div>
         </div>
         <p class="section-note"><strong>Beispiel:</strong> Triple-Dachs mit <code>!slots 100</code> = 15.000 × 10 = <strong>150.000 DachsTaler!</strong></p>
+
+        <h3>🎲 Gewinnchancen</h3>
+        <details class="faq-item">
+          <summary>Alle Gewinnchancen anzeigen</summary>
+          <div class="faq-content">
+            <div class="chances-table">
+              <div class="chances-row header">
+                <span>Kombination</span>
+                <span>Gewinn</span>
+                <span>Chance</span>
+              </div>
+              <div class="chances-row jackpot-row">
+                <span>🦡🦡🦡 Triple-Dachs</span>
+                <span class="gold">15.000 DT</span>
+                <span>~1 in 140.000</span>
+              </div>
+              <div class="chances-row">
+                <span>🦡🦡 Doppel-Dachs</span>
+                <span>2.500 DT</span>
+                <span>~1 in 5.000</span>
+              </div>
+              <div class="chances-row">
+                <span>🦡 Einzel-Dachs</span>
+                <span>100 DT</span>
+                <span>~1 in 50</span>
+              </div>
+              <div class="chances-row special-row">
+                <span>💎💎💎 Triple-Diamant</span>
+                <span>5 Free Spins</span>
+                <span>~1 in 740</span>
+              </div>
+              <div class="chances-row">
+                <span>💎💎 Doppel-Diamant</span>
+                <span>1 Free Spin</span>
+                <span>~1 in 34</span>
+              </div>
+              <div class="chances-row">
+                <span>⭐⭐⭐ Triple-Stern</span>
+                <span>500 DT</span>
+                <span>~1 in 1.728</span>
+              </div>
+              <div class="chances-row">
+                <span>⭐⭐ Doppel-Stern</span>
+                <span>50 DT</span>
+                <span>~1 in 144</span>
+              </div>
+              <div class="chances-row">
+                <span>🍉🍉🍉 Triple-Melone</span>
+                <span>250 DT</span>
+                <span>~1 in 1.331</span>
+              </div>
+              <div class="chances-row">
+                <span>🍉🍉 Doppel-Melone</span>
+                <span>25 DT</span>
+                <span>~1 in 100</span>
+              </div>
+              <div class="chances-row">
+                <span>🍇🍇🍇 Triple-Trauben</span>
+                <span>150 DT</span>
+                <span>~1 in 512</span>
+              </div>
+              <div class="chances-row">
+                <span>🍇🍇 Doppel-Trauben</span>
+                <span>15 DT</span>
+                <span>~1 in 53</span>
+              </div>
+              <div class="chances-row">
+                <span>🍊🍊🍊 Triple-Orange</span>
+                <span>100 DT</span>
+                <span>~1 in 248</span>
+              </div>
+              <div class="chances-row">
+                <span>🍊🍊 Doppel-Orange</span>
+                <span>10 DT</span>
+                <span>~1 in 40</span>
+              </div>
+              <div class="chances-row">
+                <span>🍋🍋🍋 Triple-Zitrone</span>
+                <span>75 DT</span>
+                <span>~1 in 216</span>
+              </div>
+              <div class="chances-row">
+                <span>🍋🍋 Doppel-Zitrone</span>
+                <span>8 DT</span>
+                <span>~1 in 36</span>
+              </div>
+              <div class="chances-row">
+                <span>🍒🍒🍒 Triple-Kirsche</span>
+                <span>50 DT</span>
+                <span>~1 in 125</span>
+              </div>
+              <div class="chances-row">
+                <span>🍒🍒 Doppel-Kirsche</span>
+                <span>5 DT</span>
+                <span>~1 in 25</span>
+              </div>
+            </div>
+          </div>
+        </details>
       </section>
 
       <!-- Multiplier-System -->
       <section id="multiplier" class="content-section">
         <h2>📈 Multiplier-System</h2>
-
-        <h3>Einsatz-Multiplier (Unlocks)</h3>
-        <p>Höhere Einsätze = Höhere Gewinne!</p>
-        <div class="multiplier-table">
-          <div class="multiplier-row header">
-            <span>Einsatz</span>
-            <span>Multiplier</span>
-            <span>Unlock</span>
-            <span>Kosten</span>
-          </div>
-          <div class="multiplier-row">
-            <span>10 DT</span>
-            <span class="multiplier-value">1×</span>
-            <span>—</span>
-            <span>Kostenlos</span>
-          </div>
-          <div class="multiplier-row">
-            <span>20 DT</span>
-            <span class="multiplier-value">2×</span>
-            <span>#13</span>
-            <span>500 DT</span>
-          </div>
-          <div class="multiplier-row">
-            <span>30 DT</span>
-            <span class="multiplier-value">3×</span>
-            <span>#19</span>
-            <span>2.000 DT</span>
-          </div>
-          <div class="multiplier-row">
-            <span>50 DT</span>
-            <span class="multiplier-value">5×</span>
-            <span>#21</span>
-            <span>2.500 DT</span>
-          </div>
-          <div class="multiplier-row">
-            <span>100 DT</span>
-            <span class="multiplier-value">10×</span>
-            <span>#23</span>
-            <span>3.250 DT</span>
-          </div>
-          <div class="multiplier-row">
-            <span>All-In</span>
-            <span class="multiplier-value">var.</span>
-            <span>#25</span>
-            <span>4.444 DT</span>
-          </div>
-        </div>
-        <p class="section-note">Gesamt: <strong>12.694 DachsTaler</strong> für alle Unlocks</p>
 
         <h3>🔥 Streak-Multiplier (Kostenlos!)</h3>
         <p>Jeder Gewinn in Folge erhöht deinen Multiplier automatisch:</p>
@@ -1244,7 +1295,7 @@ function renderInfoPage(user = null) {
             <span class="step-number">3</span>
             <div class="step-content">
               <strong>Duell-Ablauf</strong>
-              <p>Beide Spieler spinnen gleichzeitig – <strong>ohne Buffs, ohne Items</strong>. Ein faires 1v1!</p>
+              <p>Beide Spieler spinnen gleichzeitig – ohne Buffs, ohne Items. Ein faires 1v1!</p>
             </div>
           </div>
         </div>

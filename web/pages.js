@@ -380,7 +380,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)} - Dachsbau Slots</title>
-  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="icon" type="image/png" href="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Slots.png">
   <style>${CSS}</style>
   <script>
     // Theme handling - check localStorage, default to dark
@@ -396,7 +396,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
   <header class="header">
     <div class="header-content">
       <a href="?page=home" class="logo">
-        <img src="/assets/logo.png" alt="Logo" class="logo-img">
+        <img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Slots.png" alt="Logo" class="logo-img">
         <span class="logo-text">Dachsbau Slots</span>
       </a>
       <nav class="nav-bar">
@@ -406,7 +406,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
         <form class="search-form" action="" method="get">
           <input type="hidden" name="page" value="profile">
           <input type="text" name="user" placeholder="Spieler..." class="search-input" required>
-          <button type="submit" class="btn btn-search"><img src="https://i.imgur.com/2P5dUjB.png" alt="Suchen" class="search-icon"></button>
+          <button type="submit" class="btn btn-search"><img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Suche.png" alt="Suchen" class="search-icon"></button>
         </form>
         ${userSectionHtml}
       </div>

@@ -406,7 +406,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
         <form class="search-form" action="" method="get">
           <input type="hidden" name="page" value="profile">
           <input type="text" name="user" placeholder="Spieler..." class="search-input" required>
-          <button type="submit" class="btn btn-search">🔍</button>
+          <button type="submit" class="btn btn-search"><img src="https://i.imgur.com/2P5dUjB.png" alt="Suchen" class="search-icon"></button>
         </form>
         ${userSectionHtml}
       </div>

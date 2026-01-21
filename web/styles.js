@@ -357,6 +357,12 @@ body {
   box-sizing: border-box;
 }
 
+.search-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
 /* Search Suggestions */
 .search-wrapper {
   position: relative;
@@ -650,18 +656,20 @@ body {
 }
 
 .profile-duel-status {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   padding: 4px 12px;
   border-radius: 20px;
 }
 
 .profile-duel-status.opted-in {
-  background: rgba(34, 197, 94, 0.2);
-  color: #22c55e;
+  background: var(--bg-tertiary);
+  border: 1px solid #00ad03;
+  color: #00ad03;
 }
 
 .profile-duel-status.opted-out {
-  background: rgba(239, 68, 68, 0.2);
+  background: var(--bg-tertiary);
+  border: 1px solid #ef4444;
   color: #ef4444;
 }
 

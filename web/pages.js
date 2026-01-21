@@ -280,7 +280,8 @@ const DISCLAIMER_HTML = `
 <div class="disclaimer" id="disclaimer">
   <div class="disclaimer-icon">⚠️</div>
   <div class="disclaimer-content">
-    <p><strong>Dachsbau Slots ist ein reines Unterhaltungsspiel.</strong> Es werden keine echten Geldbeträge verwendet.</p>
+    <p><strong>Disclaimer</strong></p>
+    <p>Dachsbau Slots ist ein reines Unterhaltungsspiel. Es werden keine echten Geldbeträge verwendet.</p>
     <p><strong>DachsTaler (DT)</strong> sind eine rein virtuelle Währung ohne jeglichen realen Geldwert. Sie können nicht in echtes Geld umgetauscht werden.</p>
     <p>Die Streamerin <strong>frechhdachs</strong> distanziert sich ausdrücklich von echtem Glücksspiel und übernimmt keine Haftung. <a href="/?page=info#hilfe" style="color: var(--warning); text-decoration: underline;">Hilfsangebote bei Spielsucht findest du hier.</a></p>
   </div>
@@ -2372,7 +2373,7 @@ function htmlResponse(html, status = 200) {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-cache',
       // Content Security Policy - allows inline styles/scripts (needed for SSR), images from Twitch CDN
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://static-cdn.jtvnw.net data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://static-cdn.jtvnw.net https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
       // Prevent MIME type sniffing
       'X-Content-Type-Options': 'nosniff',
       // Prevent clickjacking

@@ -1651,6 +1651,12 @@ body {
   margin-bottom: 8px;
 }
 
+.disclaimer-content p:first-child {
+  font-size: 1rem;
+  margin-bottom: 12px;
+  color: var(--warning);
+}
+
 .disclaimer-content p:last-child {
   margin-bottom: 0;
 }

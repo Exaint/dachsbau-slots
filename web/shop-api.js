@@ -25,7 +25,9 @@ import {
   incrementSpinBundlePurchases,
   getDachsBoostPurchases,
   incrementDachsBoostPurchases,
-  updateBankBalance
+  updateBankBalance,
+  activateGuaranteedPair,
+  activateWildCard
 } from '../database.js';
 import {
   WEEKLY_DACHS_BOOST_LIMIT,
@@ -54,7 +56,9 @@ const WEB_PURCHASABLE_ITEM_IDS = new Set([
   // Prestige Ranks (17, 22, 26, 29, 30)
   17, 22, 26, 29, 30,
   // Daily Boost, Custom Message (27, 28)
-  27, 28
+  27, 28,
+  // Spin Tokens - stored for next chat spin (37, 38)
+  37, 38
 ]);
 
 // Items that CANNOT be purchased via web (require chat/immediate action)
@@ -64,8 +68,6 @@ const WEB_PURCHASABLE_ITEM_IDS = new Set([
 // 16 = Mystery Box (instant action)
 // 31 = Reverse Chaos (instant action)
 // 36 = Diamond Mine (instant action)
-// 37 = Guaranteed Pair (requires immediate spin)
-// 38 = Wild Card (requires immediate spin)
 
 /**
  * Check if item can be purchased via web
@@ -209,6 +211,8 @@ async function processWebPurchase(username, itemId, env) {
       return await purchaseWinMulti(username, item, balance, env);
     case 'bundle':
       return await purchaseBundle(username, item, balance, env);
+    case 'instant':
+      return await purchaseSpinToken(username, item, itemId, balance, env);
     default:
       return { success: false, error: 'Unbekannter Item-Typ' };
   }
@@ -403,4 +407,40 @@ async function purchaseBundle(username, item, balance, env) {
     message: `Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins! (Noch ${remainingPurchases} diese Woche)`,
     newBalance
   };
+}
+
+async function purchaseSpinToken(username, item, itemId, balance, env) {
+  const newBalance = balance - item.price;
+
+  // Guaranteed Pair (ID 37)
+  if (itemId === 37) {
+    await Promise.all([
+      setBalance(username, newBalance, env),
+      activateGuaranteedPair(username, env),
+      updateBankBalance(item.price, env)
+    ]);
+
+    return {
+      success: true,
+      message: 'Guaranteed Pair aktiviert! Dein nächster Spin hat garantiert ein Pair!',
+      newBalance
+    };
+  }
+
+  // Wild Card (ID 38)
+  if (itemId === 38) {
+    await Promise.all([
+      setBalance(username, newBalance, env),
+      activateWildCard(username, env),
+      updateBankBalance(item.price, env)
+    ]);
+
+    return {
+      success: true,
+      message: 'Wild Card aktiviert! Dein nächster Spin enthält ein 🃏 Wild!',
+      newBalance
+    };
+  }
+
+  return { success: false, error: 'Dieses Item kann nur im Chat gekauft werden' };
 }

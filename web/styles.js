@@ -83,6 +83,10 @@ export const CSS = `
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* Global focus styles for accessibility */
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -1613,6 +1617,7 @@ body {
   display: flex;
   gap: 12px;
   align-items: flex-start;
+  scroll-margin-top: 80px; /* Offset for sticky header */
 }
 
 .disclaimer-icon {

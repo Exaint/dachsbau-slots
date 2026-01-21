@@ -2,8 +2,8 @@
  * Progression System - Streaks, Stats, Monthly Login, Prestige, Unlocks
  */
 
-import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, KV_TRUE } from '../constants.js';
-import { getCurrentMonth, getCurrentDate, logError, kvKey } from '../utils.js';
+import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, KV_TRUE, MAX_RETRIES } from '../constants.js';
+import { getCurrentMonth, getCurrentDate, logError, kvKey, exponentialBackoff } from '../utils.js';
 
 // Streak Multiplier
 async function getStreakMultiplier(username, env) {
@@ -15,15 +15,32 @@ async function getStreakMultiplier(username, env) {
   }
 }
 
-async function incrementStreakMultiplier(username, env) {
-  try {
-    const current = await getStreakMultiplier(username, env);
-    const newMultiplier = Math.min(current + STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX);
-    await env.SLOTS_KV.put(kvKey('streakmultiplier:', username), newMultiplier.toFixed(1));
-    return newMultiplier;
-  } catch (error) {
-    return 1.0;
+async function incrementStreakMultiplier(username, env, maxRetries = MAX_RETRIES) {
+  const key = kvKey('streakmultiplier:', username);
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const current = await getStreakMultiplier(username, env);
+      const newMultiplier = Math.min(current + STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX);
+      const newValue = newMultiplier.toFixed(1);
+      await env.SLOTS_KV.put(key, newValue);
+
+      // Verify the write succeeded
+      const verifyValue = await env.SLOTS_KV.get(key);
+      if (verifyValue === newValue) {
+        return newMultiplier;
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await exponentialBackoff(attempt);
+      }
+    } catch (error) {
+      logError('incrementStreakMultiplier', error, { username, attempt: attempt + 1 });
+      if (attempt === maxRetries - 1) return 1.0;
+    }
   }
+  return 1.0;
 }
 
 async function resetStreakMultiplier(username, env) {

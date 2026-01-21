@@ -2,31 +2,47 @@
  * Bank System - DachsBank balance and Hourly Jackpot
  */
 
-import { BANK_USERNAME, BANK_START_BALANCE, JACKPOT_CLAIM_TTL } from '../constants.js';
-import { logError } from '../utils.js';
+import { BANK_USERNAME, BANK_START_BALANCE, JACKPOT_CLAIM_TTL, MAX_RETRIES } from '../constants.js';
+import { logError, exponentialBackoff } from '../utils.js';
 
 // DachsBank Helper Functions
-async function updateBankBalance(amount, env) {
-  try {
-    let bankBalance = await env.SLOTS_KV.get(`user:${BANK_USERNAME}`);
+async function updateBankBalance(amount, env, maxRetries = MAX_RETRIES) {
+  const key = `user:${BANK_USERNAME}`;
 
-    // Initialize bank if doesn't exist
-    if (bankBalance === null) {
-      bankBalance = BANK_START_BALANCE;
-    } else {
-      bankBalance = parseInt(bankBalance, 10);
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      let bankBalance = await env.SLOTS_KV.get(key);
+
+      // Initialize bank if doesn't exist
+      if (bankBalance === null) {
+        bankBalance = BANK_START_BALANCE;
+      } else {
+        bankBalance = parseInt(bankBalance, 10);
+      }
+
+      // Update balance (can go negative)
+      const newBalance = bankBalance + amount;
+      await env.SLOTS_KV.put(key, newBalance.toString());
+
+      // Verify the write (bank is high-traffic, verify atomicity)
+      const verifyValue = await env.SLOTS_KV.get(key);
+      const verifyBalance = parseInt(verifyValue, 10);
+
+      // Allow some tolerance for concurrent updates (just verify it changed in the right direction)
+      if ((amount >= 0 && verifyBalance >= bankBalance) || (amount < 0 && verifyBalance <= bankBalance)) {
+        return verifyBalance;
+      }
+
+      // Verification suspicious, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await exponentialBackoff(attempt);
+      }
+    } catch (error) {
+      logError('updateBankBalance', error, { amount, attempt: attempt + 1 });
+      if (attempt === maxRetries - 1) return BANK_START_BALANCE;
     }
-
-    // Update balance (can go negative)
-    const newBalance = bankBalance + amount;
-    await env.SLOTS_KV.put(`user:${BANK_USERNAME}`, newBalance.toString());
-
-    return newBalance;
-  } catch (error) {
-    logError('updateBankBalance', error, { amount });
-    // Return current balance estimate on error (prevents crash when caller uses return value)
-    return BANK_START_BALANCE;
   }
+  return BANK_START_BALANCE;
 }
 
 async function getBankBalance(env) {

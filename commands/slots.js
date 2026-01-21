@@ -45,7 +45,7 @@ import {
   BUFF_TTL_BUFFER_SECONDS,
   FREE_SPIN_COST_THRESHOLD
 } from '../constants.js';
-import { calculateBuffTTL, logError, logWarn } from '../utils.js';
+import { calculateBuffTTL, logError, logWarn, kvKey } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
 import {
   getBalance,
@@ -330,7 +330,7 @@ async function calculateStreakBonuses(lowerUsername, username, isWin, previousSt
     ? { wins: 0, losses: 0 }
     : { wins: isWin ? previousStreak.wins + 1 : 0, losses: isWin ? 0 : previousStreak.losses + 1 };
 
-  await env.SLOTS_KV.put(`streak:${lowerUsername}`, JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
+  await env.SLOTS_KV.put(kvKey('streak:', lowerUsername), JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
 
   // Combo Bonus
   if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {
@@ -494,10 +494,11 @@ async function handleSlot(username, amountParam, url, env) {
     if (hasDachsLocator.active && hasDachsLocator.data) {
       const data = hasDachsLocator.data;
       data.uses--;
+      const dachsLocatorKey = kvKey('buff:', lowerUsername, 'dachs_locator');
       if (data.uses <= 0) {
-        await env.SLOTS_KV.delete(`buff:${lowerUsername}:dachs_locator`);
+        await env.SLOTS_KV.delete(dachsLocatorKey);
       } else {
-        await env.SLOTS_KV.put(`buff:${lowerUsername}:dachs_locator`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) });
+        await env.SLOTS_KV.put(dachsLocatorKey, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) });
       }
     }
 
@@ -530,18 +531,19 @@ async function handleSlot(username, amountParam, url, env) {
     const isAllIn = amountParam && amountParam.toLowerCase() === 'all';
 
     // Rage Mode updates
+    const rageModeKey = kvKey('buff:', lowerUsername, 'rage_mode');
     if (!isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = Math.min((data.stack || 0) + RAGE_MODE_LOSS_STACK, RAGE_MODE_MAX_STACK);
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${lowerUsername}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
+        env.SLOTS_KV.put(rageModeKey, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
         resetStreakMultiplier(username, env)
       ]);
     } else if (isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = 0;
       await Promise.all([
-        env.SLOTS_KV.put(`buff:${lowerUsername}:rage_mode`, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
+        env.SLOTS_KV.put(rageModeKey, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
         incrementStreakMultiplier(username, env)
       ]);
     } else if (isWin) {

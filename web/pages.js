@@ -14,6 +14,7 @@ import { isDuelOptedOut } from '../database/duels.js';
 import { isLeaderboardHidden } from '../database/core.js';
 import { getTwitchProfileData, getUserRole, getTwitchUser } from './twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
+import { isWebPurchasable } from './shop-api.js';
 import { logError, isAdmin } from '../utils.js';
 
 // Import extracted modules
@@ -1083,7 +1084,7 @@ function renderInfoPage(user = null) {
                 <span>1 Free Spin</span>
                 <span>~1 in 34</span>
               </div>
-              <div class="chances-row">
+              <div class="chances-row fruit-row">
                 <span>⭐⭐⭐ Triple-Stern</span>
                 <span>500 DT</span>
                 <span>~1 in 1.728</span>
@@ -1093,7 +1094,7 @@ function renderInfoPage(user = null) {
                 <span>50 DT</span>
                 <span>~1 in 144</span>
               </div>
-              <div class="chances-row">
+              <div class="chances-row fruit-row">
                 <span>🍉🍉🍉 Triple-Melone</span>
                 <span>250 DT</span>
                 <span>~1 in 1.331</span>
@@ -1103,7 +1104,7 @@ function renderInfoPage(user = null) {
                 <span>25 DT</span>
                 <span>~1 in 100</span>
               </div>
-              <div class="chances-row">
+              <div class="chances-row fruit-row">
                 <span>🍇🍇🍇 Triple-Trauben</span>
                 <span>150 DT</span>
                 <span>~1 in 512</span>
@@ -1113,7 +1114,7 @@ function renderInfoPage(user = null) {
                 <span>15 DT</span>
                 <span>~1 in 53</span>
               </div>
-              <div class="chances-row">
+              <div class="chances-row fruit-row">
                 <span>🍊🍊🍊 Triple-Orange</span>
                 <span>100 DT</span>
                 <span>~1 in 248</span>
@@ -1123,7 +1124,7 @@ function renderInfoPage(user = null) {
                 <span>10 DT</span>
                 <span>~1 in 40</span>
               </div>
-              <div class="chances-row">
+              <div class="chances-row fruit-row">
                 <span>🍋🍋🍋 Triple-Zitrone</span>
                 <span>75 DT</span>
                 <span>~1 in 216</span>
@@ -1133,7 +1134,7 @@ function renderInfoPage(user = null) {
                 <span>8 DT</span>
                 <span>~1 in 36</span>
               </div>
-              <div class="chances-row">
+              <div class="chances-row fruit-row">
                 <span>🍒🍒🍒 Triple-Kirsche</span>
                 <span>50 DT</span>
                 <span>~1 in 125</span>
@@ -1589,6 +1590,7 @@ async function renderShopPage(env, user = null) {
   let userBalanceHtml = '';
   let userUnlocks = new Set();
   let userPrestigeRank = null;
+  let userBalance = 0;
 
   if (user) {
     // Fetch all user data in parallel
@@ -1604,15 +1606,17 @@ async function renderShopPage(env, user = null) {
       if (unlockResults[index]) userUnlocks.add(key);
     });
     userPrestigeRank = prestigeRank;
+    userBalance = balance;
 
     userBalanceHtml = `
       <div class="shop-user-info">
         <div class="shop-user-balance">
           <span class="balance-label">Dein Kontostand:</span>
-          <span class="balance-value">${formatNumber(balance)} DT</span>
+          <span class="balance-value" id="userBalance">${formatNumber(balance)} DT</span>
         </div>
         <a href="?page=profile&user=${encodeURIComponent(user.username)}" class="btn btn-secondary">Mein Profil</a>
       </div>
+      <div id="purchaseFeedback" class="purchase-feedback"></div>
     `;
   } else {
     userBalanceHtml = `
@@ -1683,8 +1687,24 @@ async function renderShopPage(env, user = null) {
       const ownedBadge = isOwned ? '<span class="shop-item-owned">✓ Gekauft</span>' : '';
       const ownedClass = isOwned ? ' shop-item-is-owned' : '';
 
+      // Web purchase button (only for logged-in users and web-purchasable items)
+      let buyButtonHtml = '';
+      if (user && isWebPurchasable(item.id) && !isOwned) {
+        const canAfford = userBalance >= item.price;
+        const disabledAttr = canAfford ? '' : ' disabled';
+        const disabledTitle = canAfford ? '' : ` title="Nicht genug DachsTaler"`;
+        buyButtonHtml = `
+          <button class="btn-buy${canAfford ? '' : ' btn-buy-disabled'}"${disabledAttr}${disabledTitle}
+            onclick="buyItem(${item.id}, '${escapeHtml(item.name)}', ${item.price})">
+            Kaufen
+          </button>
+        `;
+      } else if (user && !isWebPurchasable(item.id) && !isOwned) {
+        buyButtonHtml = `<span class="shop-item-chat-only" title="Dieses Item kann nur im Chat gekauft werden">Nur Chat</span>`;
+      }
+
       return `
-        <div class="shop-item${ownedClass}">
+        <div class="shop-item${ownedClass}" data-item-id="${item.id}">
           <div class="shop-item-icon">${icon}</div>
           <div class="shop-item-content">
             <div class="shop-item-header">
@@ -1696,6 +1716,7 @@ async function renderShopPage(env, user = null) {
             <div class="shop-item-meta">
               <code class="shop-item-cmd">!shop buy ${item.id}</code>
               ${requiresHtml}${requiresRankHtml}${weeklyHtml}
+              ${buyButtonHtml}
             </div>
           </div>
         </div>

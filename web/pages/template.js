@@ -531,6 +531,110 @@ function getClientScripts() {
         option.text = (unlocked ? '✓' : '○') + option.text.substring(1);
       });
     }
+
+    // Shop purchase function
+    async function buyItem(itemId, itemName, price) {
+      const feedback = document.getElementById('purchaseFeedback');
+      const btn = event.target;
+
+      // Disable button during purchase
+      btn.disabled = true;
+      btn.textContent = '...';
+
+      try {
+        const response = await fetch('/api/shop/buy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ itemId })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // Update balance display
+          const balanceEl = document.getElementById('userBalance');
+          if (balanceEl && result.newBalance !== undefined) {
+            balanceEl.textContent = result.newBalance.toLocaleString('de-DE') + ' DT';
+          }
+
+          // Show success message
+          if (feedback) {
+            feedback.className = 'purchase-feedback success';
+            feedback.textContent = '✓ ' + result.message;
+            feedback.style.display = 'block';
+            setTimeout(() => { feedback.style.display = 'none'; }, 4000);
+          }
+
+          // Update button to show purchased (for one-time items)
+          const itemEl = document.querySelector('[data-item-id="' + itemId + '"]');
+          if (itemEl) {
+            const isUnlockOrPrestige = itemEl.closest('#unlocks, #prestige');
+            if (isUnlockOrPrestige) {
+              btn.remove();
+              const header = itemEl.querySelector('.shop-item-header');
+              if (header) {
+                const badge = document.createElement('span');
+                badge.className = 'shop-item-owned';
+                badge.textContent = '✓ Gekauft';
+                header.insertBefore(badge, header.querySelector('.shop-item-price'));
+              }
+              itemEl.classList.add('shop-item-is-owned');
+            } else {
+              // For repeatable items, re-enable button
+              btn.disabled = false;
+              btn.textContent = 'Kaufen';
+
+              // Check if user can still afford it
+              if (result.newBalance < price) {
+                btn.disabled = true;
+                btn.classList.add('btn-buy-disabled');
+                btn.title = 'Nicht genug DachsTaler';
+              }
+            }
+          }
+
+          // Update all buy buttons based on new balance
+          updateBuyButtons(result.newBalance);
+        } else {
+          // Show error message
+          if (feedback) {
+            feedback.className = 'purchase-feedback error';
+            feedback.textContent = '✗ ' + (result.error || 'Fehler beim Kauf');
+            feedback.style.display = 'block';
+            setTimeout(() => { feedback.style.display = 'none'; }, 4000);
+          }
+          btn.disabled = false;
+          btn.textContent = 'Kaufen';
+        }
+      } catch (error) {
+        if (feedback) {
+          feedback.className = 'purchase-feedback error';
+          feedback.textContent = '✗ Netzwerkfehler';
+          feedback.style.display = 'block';
+          setTimeout(() => { feedback.style.display = 'none'; }, 4000);
+        }
+        btn.disabled = false;
+        btn.textContent = 'Kaufen';
+      }
+    }
+
+    // Update all buy buttons based on new balance
+    function updateBuyButtons(newBalance) {
+      document.querySelectorAll('.btn-buy').forEach(btn => {
+        const itemEl = btn.closest('.shop-item');
+        if (!itemEl) return;
+
+        const priceText = itemEl.querySelector('.shop-item-price')?.textContent || '';
+        const price = parseInt(priceText.replace(/[^0-9]/g, ''), 10);
+
+        if (price && newBalance < price) {
+          btn.disabled = true;
+          btn.classList.add('btn-buy-disabled');
+          btn.title = 'Nicht genug DachsTaler';
+        }
+      });
+    }
   </script>`;
 }
 

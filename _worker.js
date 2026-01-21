@@ -7,6 +7,7 @@ import { handleWebPage } from './web/pages.js';
 import { handleApi } from './web/api.js';
 import { serveLogoPng } from './web/assets.js';
 import { handleOAuthCallback, getUserFromRequest, getUserLoginUrl, handleUserOAuthCallback, createLogoutResponse } from './web/twitch.js';
+import { handleShopBuyAPI } from './web/shop-api.js';
 
 // User commands
 import {
@@ -165,6 +166,12 @@ export default {
       // User OAuth callback (separate from broadcaster)
       if (pathname === '/auth/user/callback') {
         return await handleUserOAuthCallback(url, env);
+      }
+
+      // Shop buy API endpoint (requires logged-in user)
+      if (pathname === '/api/shop/buy' && request.method === 'POST') {
+        const loggedInUser = await getUserFromRequest(request, env);
+        return await handleShopBuyAPI(request, env, loggedInUser);
       }
 
       // Accept disclaimer endpoint (requires logged-in user)

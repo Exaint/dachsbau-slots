@@ -2176,6 +2176,73 @@ body {
   opacity: 0.5;
 }
 
+/* Shop Buy Button */
+.btn-buy {
+  padding: 6px 16px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  margin-left: auto;
+}
+
+.btn-buy:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.btn-buy:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-buy:disabled,
+.btn-buy-disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.shop-item-chat-only {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+}
+
+/* Purchase Feedback */
+.purchase-feedback {
+  display: none;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
+
+.purchase-feedback.success {
+  background: rgba(0, 245, 147, 0.15);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.purchase-feedback.error {
+  background: rgba(244, 67, 54, 0.15);
+  color: #f44336;
+  border: 1px solid #f44336;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Changelog */
 .changelog-entry {
   margin-bottom: 24px;
@@ -3481,6 +3548,11 @@ body {
 .chances-row.special-row {
   background: linear-gradient(90deg, var(--bg-tertiary), rgba(168, 85, 247, 0.15));
   border-left: 3px solid var(--accent);
+}
+
+.chances-row.fruit-row {
+  background: linear-gradient(90deg, var(--bg-tertiary), rgba(34, 197, 94, 0.12));
+  border-left: 3px solid #22c55e;
 }
 
 .chances-row .gold {

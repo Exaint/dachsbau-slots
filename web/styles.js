@@ -277,9 +277,11 @@ body {
 }
 
 .logo-img {
-  width: 56px;
-  height: 56px;
+  height: 44px;
+  width: auto;
+  max-width: 60px;
   object-fit: contain;
+  object-position: center;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 

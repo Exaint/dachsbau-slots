@@ -64,20 +64,21 @@ export async function handleApi(api, url, env, loggedInUser = null, request = nu
  * Get player achievements with progress
  */
 async function handleAchievementsApi(username, env) {
-  if (!username) {
-    return jsonResponse({ error: 'Username required' }, 400);
+  const cleanUsername = sanitizeUsername(username);
+  if (!cleanUsername) {
+    return jsonResponse({ error: 'Username required or invalid' }, 400);
   }
 
   // Check if user exists (check both disclaimer AND balance for legacy players)
   const [hasDisclaimer, balance] = await Promise.all([
-    hasAcceptedDisclaimer(username, env),
-    getBalance(username, env)
+    hasAcceptedDisclaimer(cleanUsername, env),
+    getBalance(cleanUsername, env)
   ]);
   if (!hasDisclaimer && balance <= 0) {
-    return jsonResponse({ error: 'Player not found', username }, 404);
+    return jsonResponse({ error: 'Player not found', username: cleanUsername }, 404);
   }
 
-  const data = await getPlayerAchievements(username, env);
+  const data = await getPlayerAchievements(cleanUsername, env);
   const allAchievements = getAllAchievements();
 
   // Build achievements with unlock status and progress
@@ -138,29 +139,30 @@ async function handleAchievementsApi(username, env) {
  * Get full player profile (balance, rank, stats, achievements summary)
  */
 async function handleProfileApi(username, env) {
-  if (!username) {
-    return jsonResponse({ error: 'Username required' }, 400);
+  const cleanUsername = sanitizeUsername(username);
+  if (!cleanUsername) {
+    return jsonResponse({ error: 'Username required or invalid' }, 400);
   }
 
   // Check if user exists and fetch data in parallel
   const [hasDisclaimer, balance, rank, stats, achievementData] = await Promise.all([
-    hasAcceptedDisclaimer(username, env),
-    getBalance(username, env),
-    getPrestigeRank(username, env),
-    getStats(username, env),
-    getPlayerAchievements(username, env)
+    hasAcceptedDisclaimer(cleanUsername, env),
+    getBalance(cleanUsername, env),
+    getPrestigeRank(cleanUsername, env),
+    getStats(cleanUsername, env),
+    getPlayerAchievements(cleanUsername, env)
   ]);
 
   // User exists if they accepted disclaimer OR have a balance (legacy players)
   if (!hasDisclaimer && balance <= 0) {
-    return jsonResponse({ error: 'Player not found', username }, 404);
+    return jsonResponse({ error: 'Player not found', username: cleanUsername }, 404);
   }
 
   const allAchievements = getAllAchievements();
   const unlockedCount = Object.keys(achievementData.unlockedAt).length;
 
   return jsonResponse({
-    username,
+    username: cleanUsername,
     balance,
     rank,
     stats,
@@ -238,7 +240,8 @@ async function handleSearchApi(query, env) {
     return jsonResponse({ players: [] });
   }
 
-  const searchQuery = query.toLowerCase();
+  // Sanitize search query - only allow valid username characters
+  const searchQuery = query.toLowerCase().replace(/[^a-z0-9_]/g, '');
   const SEARCH_LIMIT = 500;
 
   try {

@@ -3,12 +3,12 @@
  */
 
 import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE, COOLDOWN_TTL_SECONDS, KV_TRUE, KV_ACCEPTED } from '../constants.js';
-import { logError } from '../utils.js';
+import { logError, kvKey } from '../utils.js';
 
 // Balance Functions
 async function getBalance(username, env) {
   try {
-    const key = `user:${username.toLowerCase()}`;
+    const key = kvKey('user:', username);
     const value = await env.SLOTS_KV.get(key);
     if (value === null) {
       await setBalance(username, STARTING_BALANCE, env);
@@ -25,7 +25,7 @@ async function getBalance(username, env) {
 async function setBalance(username, balance, env) {
   try {
     const safeBalance = Math.max(0, Math.min(balance, MAX_BALANCE));
-    await env.SLOTS_KV.put(`user:${username.toLowerCase()}`, safeBalance.toString());
+    await env.SLOTS_KV.put(kvKey('user:', username), safeBalance.toString());
   } catch (error) {
     logError('setBalance', error, { username, balance });
   }
@@ -34,7 +34,7 @@ async function setBalance(username, balance, env) {
 // Daily Functions
 async function getLastDaily(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`daily:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('daily:', username));
     return value ? parseInt(value, 10) : null;
   } catch (error) {
     logError('getLastDaily', error, { username });
@@ -44,7 +44,7 @@ async function getLastDaily(username, env) {
 
 async function setLastDaily(username, timestamp, env) {
   try {
-    await env.SLOTS_KV.put(`daily:${username.toLowerCase()}`, timestamp.toString(), { expirationTtl: DAILY_TTL_SECONDS });
+    await env.SLOTS_KV.put(kvKey('daily:', username), timestamp.toString(), { expirationTtl: DAILY_TTL_SECONDS });
   } catch (error) {
     logError('setLastDaily', error, { username });
   }
@@ -53,7 +53,7 @@ async function setLastDaily(username, timestamp, env) {
 // Cooldown System
 async function getLastSpin(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`cooldown:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('cooldown:', username));
     return value ? parseInt(value, 10) : null;
   } catch (error) {
     logError('getLastSpin', error, { username });
@@ -63,7 +63,7 @@ async function getLastSpin(username, env) {
 
 async function setLastSpin(username, timestamp, env) {
   try {
-    await env.SLOTS_KV.put(`cooldown:${username.toLowerCase()}`, timestamp.toString(), { expirationTtl: COOLDOWN_TTL_SECONDS });
+    await env.SLOTS_KV.put(kvKey('cooldown:', username), timestamp.toString(), { expirationTtl: COOLDOWN_TTL_SECONDS });
   } catch (error) {
     logError('setLastSpin', error, { username });
   }
@@ -72,7 +72,7 @@ async function setLastSpin(username, timestamp, env) {
 // First-Time User System
 async function hasAcceptedDisclaimer(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`disclaimer:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('disclaimer:', username));
     return value === KV_ACCEPTED;
   } catch (error) {
     logError('hasAcceptedDisclaimer', error, { username });
@@ -82,7 +82,7 @@ async function hasAcceptedDisclaimer(username, env) {
 
 async function setDisclaimerAccepted(username, env) {
   try {
-    await env.SLOTS_KV.put(`disclaimer:${username.toLowerCase()}`, KV_ACCEPTED);
+    await env.SLOTS_KV.put(kvKey('disclaimer:', username), KV_ACCEPTED);
   } catch (error) {
     logError('setDisclaimerAccepted', error, { username });
   }
@@ -91,7 +91,7 @@ async function setDisclaimerAccepted(username, env) {
 // Selfban System
 async function isSelfBanned(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`selfban:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('selfban:', username));
     if (!value) return null;
     return JSON.parse(value); // Returns { timestamp, date }
   } catch (error) {
@@ -117,7 +117,7 @@ async function setSelfBan(username, env) {
       date: date
     };
 
-    await env.SLOTS_KV.put(`selfban:${username.toLowerCase()}`, JSON.stringify(banData));
+    await env.SLOTS_KV.put(kvKey('selfban:', username), JSON.stringify(banData));
   } catch (error) {
     logError('setSelfBan', error, { username });
   }
@@ -125,7 +125,7 @@ async function setSelfBan(username, env) {
 
 async function removeSelfBan(username, env) {
   try {
-    await env.SLOTS_KV.delete(`selfban:${username.toLowerCase()}`);
+    await env.SLOTS_KV.delete(kvKey('selfban:', username));
   } catch (error) {
     logError('removeSelfBan', error, { username });
   }
@@ -134,7 +134,7 @@ async function removeSelfBan(username, env) {
 // Blacklist
 async function isBlacklisted(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`blacklist:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('blacklist:', username));
     return value === KV_TRUE;
   } catch (error) {
     logError('isBlacklisted', error, { username });
@@ -145,7 +145,7 @@ async function isBlacklisted(username, env) {
 // Last Active tracking
 async function getLastActive(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`lastActive:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('lastActive:', username));
     return value ? parseInt(value, 10) : null;
   } catch (error) {
     logError('getLastActive', error, { username });
@@ -155,7 +155,7 @@ async function getLastActive(username, env) {
 
 async function setLastActive(username, env) {
   try {
-    await env.SLOTS_KV.put(`lastActive:${username.toLowerCase()}`, Date.now().toString());
+    await env.SLOTS_KV.put(kvKey('lastActive:', username), Date.now().toString());
   } catch (error) {
     logError('setLastActive', error, { username });
   }
@@ -164,7 +164,7 @@ async function setLastActive(username, env) {
 // Leaderboard Visibility
 async function isLeaderboardHidden(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`leaderboard_hidden:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('leaderboard_hidden:', username));
     return value === KV_TRUE;
   } catch (error) {
     logError('isLeaderboardHidden', error, { username });
@@ -174,7 +174,7 @@ async function isLeaderboardHidden(username, env) {
 
 async function setLeaderboardHidden(username, hidden, env) {
   try {
-    const key = `leaderboard_hidden:${username.toLowerCase()}`;
+    const key = kvKey('leaderboard_hidden:', username);
     if (hidden) {
       await env.SLOTS_KV.put(key, KV_TRUE);
     } else {

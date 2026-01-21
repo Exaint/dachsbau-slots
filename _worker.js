@@ -167,6 +167,23 @@ export default {
         return await handleUserOAuthCallback(url, env);
       }
 
+      // Accept disclaimer endpoint (requires logged-in user)
+      if (pathname === '/api/disclaimer/accept' && request.method === 'POST') {
+        const loggedInUser = await getUserFromRequest(request, env);
+        if (!loggedInUser) {
+          return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        // Set disclaimer as accepted
+        await setDisclaimerAccepted(loggedInUser.username, env);
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
       // Broadcaster OAuth callback (for mod/VIP roles)
       if (pathname === '/auth/callback') {
         return await handleOAuthCallback(url, env);

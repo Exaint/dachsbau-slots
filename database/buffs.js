@@ -21,13 +21,13 @@
  */
 
 import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES, KV_ACTIVE } from '../constants.js';
-import { exponentialBackoff, logError } from '../utils.js';
+import { exponentialBackoff, logError, kvKey } from '../utils.js';
 
 // Buffs (timed)
 async function activateBuff(username, buffKey, duration, env) {
   try {
     const expireAt = Date.now() + (duration * 1000);
-    await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, expireAt.toString(), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
+    await env.SLOTS_KV.put(kvKey('buff:', username, buffKey), expireAt.toString(), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
     logError('activateBuff', error, { username, buffKey, duration });
   }
@@ -35,7 +35,7 @@ async function activateBuff(username, buffKey, duration, env) {
 
 async function isBuffActive(username, buffKey, env) {
   try {
-    const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buffKey}`);
+    const value = await env.SLOTS_KV.get(kvKey('buff:', username, buffKey));
     if (!value) return false;
     return Date.now() < parseInt(value, 10);
   } catch (error) {
@@ -49,7 +49,7 @@ async function activateBuffWithUses(username, buffKey, duration, uses, env) {
   try {
     const expireAt = Date.now() + (duration * 1000);
     const data = { expireAt, uses };
-    await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
+    await env.SLOTS_KV.put(kvKey('buff:', username, buffKey), JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
     logError('activateBuffWithUses', error, { username, buffKey, duration, uses });
   }
@@ -58,7 +58,8 @@ async function activateBuffWithUses(username, buffKey, duration, uses, env) {
 // OPTIMIZED: Return full data object to avoid redundant reads
 async function getBuffWithUses(username, buffKey, env) {
   try {
-    const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buffKey}`);
+    const key = kvKey('buff:', username, buffKey);
+    const value = await env.SLOTS_KV.get(key);
     if (!value) return { active: false, uses: 0, data: null };
 
     let data;
@@ -66,20 +67,20 @@ async function getBuffWithUses(username, buffKey, env) {
       data = JSON.parse(value);
     } catch {
       // Corrupted data, clean up
-      await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      await env.SLOTS_KV.delete(key);
       return { active: false, uses: 0, data: null };
     }
 
     // Validate data structure
     if (!data || typeof data.expireAt !== 'number' || typeof data.uses !== 'number') {
-      await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+      await env.SLOTS_KV.delete(key);
       return { active: false, uses: 0, data: null };
     }
 
     // BUG FIX: Handle delete errors gracefully - log but don't fail the read
     if (Date.now() >= data.expireAt || data.uses <= 0) {
       try {
-        await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+        await env.SLOTS_KV.delete(key);
       } catch (deleteError) {
         // Log error but still return inactive - the buff is expired anyway
         logError('getBuffWithUses.cleanup', deleteError, { username, buffKey });
@@ -96,7 +97,7 @@ async function getBuffWithUses(username, buffKey, env) {
 
 // Atomic buff uses decrement with retry mechanism (prevents race conditions)
 async function decrementBuffUses(username, buffKey, env, maxRetries = MAX_RETRIES) {
-  const key = `buff:${username.toLowerCase()}:${buffKey}`;
+  const key = kvKey('buff:', username, buffKey);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -150,7 +151,7 @@ async function activateBuffWithStack(username, buffKey, duration, env) {
   try {
     const expireAt = Date.now() + (duration * 1000);
     const data = { expireAt, stack: 0 };
-    await env.SLOTS_KV.put(`buff:${username.toLowerCase()}:${buffKey}`, JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
+    await env.SLOTS_KV.put(kvKey('buff:', username, buffKey), JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
     logError('activateBuffWithStack', error, { username, buffKey, duration });
   }
@@ -159,14 +160,15 @@ async function activateBuffWithStack(username, buffKey, duration, env) {
 // OPTIMIZED: Return full data object to avoid redundant reads
 async function getBuffWithStack(username, buffKey, env) {
   try {
-    const value = await env.SLOTS_KV.get(`buff:${username.toLowerCase()}:${buffKey}`);
+    const key = kvKey('buff:', username, buffKey);
+    const value = await env.SLOTS_KV.get(key);
     if (!value) return { active: false, stack: 0, data: null };
 
     const data = JSON.parse(value);
     // BUG FIX: Handle delete errors gracefully - log but don't fail the read
     if (Date.now() >= data.expireAt) {
       try {
-        await env.SLOTS_KV.delete(`buff:${username.toLowerCase()}:${buffKey}`);
+        await env.SLOTS_KV.delete(key);
       } catch (deleteError) {
         logError('getBuffWithStack.cleanup', deleteError, { username, buffKey });
       }
@@ -183,7 +185,7 @@ async function getBuffWithStack(username, buffKey, env) {
 // Boosts (symbol-specific)
 async function addBoost(username, symbol, env) {
   try {
-    await env.SLOTS_KV.put(`boost:${username.toLowerCase()}:${symbol}`, KV_ACTIVE);
+    await env.SLOTS_KV.put(kvKey('boost:', username, symbol), KV_ACTIVE);
   } catch (error) {
     logError('addBoost', error, { username, symbol });
   }
@@ -191,7 +193,7 @@ async function addBoost(username, symbol, env) {
 
 async function consumeBoost(username, symbol, env) {
   try {
-    const key = `boost:${username.toLowerCase()}:${symbol}`;
+    const key = kvKey('boost:', username, symbol);
     const value = await env.SLOTS_KV.get(key);
     if (value === KV_ACTIVE) {
       await env.SLOTS_KV.delete(key);
@@ -212,7 +214,7 @@ async function consumeBoost(username, symbol, env) {
 
 // Insurance - Atomic add with retry mechanism
 async function addInsurance(username, count, env, maxRetries = MAX_RETRIES) {
-  const key = `insurance:${username.toLowerCase()}`;
+  const key = kvKey('insurance:', username);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -239,7 +241,7 @@ async function addInsurance(username, count, env, maxRetries = MAX_RETRIES) {
 
 async function getInsuranceCount(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`insurance:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('insurance:', username));
     return value ? parseInt(value, 10) : 0;
   } catch (error) {
     logError('getInsuranceCount', error, { username });
@@ -250,10 +252,11 @@ async function getInsuranceCount(username, env) {
 // OPTIMIZED: Set insurance directly when count is already known (avoids redundant KV read)
 async function setInsuranceCount(username, count, env) {
   try {
+    const key = kvKey('insurance:', username);
     if (count <= 0) {
-      await env.SLOTS_KV.delete(`insurance:${username.toLowerCase()}`);
+      await env.SLOTS_KV.delete(key);
     } else {
-      await env.SLOTS_KV.put(`insurance:${username.toLowerCase()}`, count.toString());
+      await env.SLOTS_KV.put(key, count.toString());
     }
   } catch (error) {
     logError('setInsuranceCount', error, { username, count });
@@ -263,7 +266,7 @@ async function setInsuranceCount(username, count, env) {
 // Win Multiplier
 async function addWinMultiplier(username, env) {
   try {
-    await env.SLOTS_KV.put(`winmulti:${username.toLowerCase()}`, KV_ACTIVE);
+    await env.SLOTS_KV.put(kvKey('winmulti:', username), KV_ACTIVE);
   } catch (error) {
     logError('addWinMultiplier', error, { username });
   }
@@ -271,7 +274,7 @@ async function addWinMultiplier(username, env) {
 
 async function consumeWinMultiplier(username, env) {
   try {
-    const key = `winmulti:${username.toLowerCase()}`;
+    const key = kvKey('winmulti:', username);
     const value = await env.SLOTS_KV.get(key);
     if (value === KV_ACTIVE) {
       await env.SLOTS_KV.delete(key);

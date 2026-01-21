@@ -21,14 +21,14 @@
  */
 
 import { DUEL_TIMEOUT_SECONDS, KV_TRUE } from '../constants.js';
-import { logError } from '../utils.js';
+import { logError, kvKey } from '../utils.js';
 
 /**
  * Create a new duel challenge
  */
 async function createDuel(challenger, target, amount, env) {
   try {
-    const key = `duel:${challenger.toLowerCase()}`;
+    const key = kvKey('duel:', challenger);
     const data = {
       target: target.toLowerCase(),
       amount,
@@ -49,7 +49,7 @@ async function createDuel(challenger, target, amount, env) {
  */
 async function getDuel(challenger, env) {
   try {
-    const key = `duel:${challenger.toLowerCase()}`;
+    const key = kvKey('duel:', challenger);
     const value = await env.SLOTS_KV.get(key);
     if (!value) return null;
 
@@ -106,7 +106,7 @@ async function findDuelForTarget(target, env) {
  */
 async function deleteDuel(challenger, env) {
   try {
-    const key = `duel:${challenger.toLowerCase()}`;
+    const key = kvKey('duel:', challenger);
     await env.SLOTS_KV.delete(key);
     return true;
   } catch (error) {
@@ -120,7 +120,7 @@ async function deleteDuel(challenger, env) {
  */
 async function acceptDuel(challenger, env) {
   try {
-    const key = `duel:${challenger.toLowerCase()}`;
+    const key = kvKey('duel:', challenger);
     const value = await env.SLOTS_KV.get(key);
     if (!value) return null;
 
@@ -161,7 +161,7 @@ async function hasActiveDuel(username, env) {
  */
 async function setDuelOptOut(username, optOut, env) {
   try {
-    const key = `duel_optout:${username.toLowerCase()}`;
+    const key = kvKey('duel_optout:', username);
     if (optOut) {
       await env.SLOTS_KV.put(key, KV_TRUE);
     } else {
@@ -179,7 +179,7 @@ async function setDuelOptOut(username, optOut, env) {
  */
 async function isDuelOptedOut(username, env) {
   try {
-    const key = `duel_optout:${username.toLowerCase()}`;
+    const key = kvKey('duel_optout:', username);
     const value = await env.SLOTS_KV.get(key);
     return value === KV_TRUE;
   } catch (error) {

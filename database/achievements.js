@@ -15,7 +15,7 @@
  */
 
 import { ACHIEVEMENTS, ACHIEVEMENTS_REWARDS_ENABLED, getAchievementById } from '../constants/achievements.js';
-import { logError } from '../utils.js';
+import { logError, kvKey } from '../utils.js';
 
 // Cache keys (defined early so they can be used in migrations)
 const STATS_CACHE_KEY = 'cache:achievement_stats_v3';
@@ -53,12 +53,11 @@ const DEFAULT_STATS = {
  */
 async function getPlayerAchievements(username, env) {
   try {
-    const lowerUsername = username.toLowerCase();
-    const value = await env.SLOTS_KV.get(`achievements:${lowerUsername}`);
+    const value = await env.SLOTS_KV.get(kvKey('achievements:', username));
 
     if (!value) {
       // New achievement record - check for legacy stats to migrate
-      const legacyStats = await env.SLOTS_KV.get(`stats:${lowerUsername}`);
+      const legacyStats = await env.SLOTS_KV.get(kvKey('stats:', username));
 
       if (legacyStats) {
         // Migrate existing player stats
@@ -84,7 +83,7 @@ async function getPlayerAchievements(username, env) {
 
         // Save the migrated data and increment global counters
         await Promise.all([
-          env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(migratedData)),
+          env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(migratedData)),
           ...unlockedIds.map(id => incrementAchievementCounter(id, env))
         ]);
 
@@ -118,7 +117,7 @@ async function getPlayerAchievements(username, env) {
     if (!data.shopMigrated) {
       const shopUnlockKeys = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'daily_boost', 'stats_tracker'];
       const unlockChecks = await Promise.all(
-        shopUnlockKeys.map(key => env.SLOTS_KV.get(`unlock:${lowerUsername}:${key}`))
+        shopUnlockKeys.map(key => env.SLOTS_KV.get(kvKey('unlock:', username, key)))
       );
 
       // Count how many unlocks the user has (each unlock = 1 shop purchase)
@@ -161,14 +160,14 @@ async function getPlayerAchievements(username, env) {
       data.shopMigrated = true;
       // Save migrated data and increment counters
       await Promise.all([
-        env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data)),
+        env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data)),
         ...counterPromises
       ]);
     }
 
     // Daily achievement catch-up: Check monthly login and unlock missed daily achievements
     // This runs every time (not one-time) because monthly days change throughout the month
-    const monthlyLoginData = await env.SLOTS_KV.get(`monthlylogin:${lowerUsername}`);
+    const monthlyLoginData = await env.SLOTS_KV.get(kvKey('monthlylogin:', username));
     if (monthlyLoginData) {
       try {
         const monthlyLogin = JSON.parse(monthlyLoginData);
@@ -214,7 +213,7 @@ async function getPlayerAchievements(username, env) {
 
           if (counterPromises.length > 0) {
             await Promise.all([
-              env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data)),
+              env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data)),
               ...counterPromises,
               // Invalidate stats cache so new unlocks are reflected immediately
               env.SLOTS_KV.delete(STATS_CACHE_KEY)
@@ -229,7 +228,7 @@ async function getPlayerAchievements(username, env) {
 
     // One-time balance achievement catch-up: Check current balance and unlock missed balance achievements
     if (!data.balanceMigrated) {
-      const balanceData = await env.SLOTS_KV.get(`user:${lowerUsername}`);
+      const balanceData = await env.SLOTS_KV.get(kvKey('user:', username));
       if (balanceData) {
         const balance = parseInt(balanceData, 10);
         if (!isNaN(balance) && balance > 0) {
@@ -267,19 +266,19 @@ async function getPlayerAchievements(username, env) {
           data.balanceMigrated = true;
           if (counterPromises.length > 0) {
             await Promise.all([
-              env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data)),
+              env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data)),
               ...counterPromises
             ]);
           } else {
-            await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+            await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
           }
         } else {
           data.balanceMigrated = true;
-          await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+          await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
         }
       } else {
         data.balanceMigrated = true;
-        await env.SLOTS_KV.put(`achievements:${lowerUsername}`, JSON.stringify(data));
+        await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
       }
     }
 
@@ -392,7 +391,7 @@ function migrateAchievementsFromStats(data) {
  */
 async function savePlayerAchievements(username, data, env) {
   try {
-    await env.SLOTS_KV.put(`achievements:${username.toLowerCase()}`, JSON.stringify(data));
+    await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
   } catch (error) {
     logError('savePlayerAchievements', error, { username });
   }

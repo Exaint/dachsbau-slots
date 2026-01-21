@@ -3,14 +3,14 @@
  */
 
 import { MAX_RETRIES } from '../constants.js';
-import { calculateWeekStart, exponentialBackoff, logError } from '../utils.js';
+import { calculateWeekStart, exponentialBackoff, logError, kvKey } from '../utils.js';
 
 // Spin Bundle Purchases
 async function getSpinBundlePurchases(username, env) {
   try {
     // Always use fresh week calculation for limit checks (no cache)
     const currentWeekStart = calculateWeekStart();
-    const value = await env.SLOTS_KV.get(`bundle_purchases:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('bundle_purchases:', username));
     if (!value) return { count: 0, weekStart: currentWeekStart };
     const data = JSON.parse(value);
 
@@ -27,7 +27,7 @@ async function getSpinBundlePurchases(username, env) {
 
 // Atomic increment with retry mechanism
 async function incrementSpinBundlePurchases(username, env, maxRetries = MAX_RETRIES) {
-  const key = `bundle_purchases:${username.toLowerCase()}`;
+  const key = kvKey('bundle_purchases:', username);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -58,7 +58,7 @@ async function getDachsBoostPurchases(username, env) {
   try {
     // Always use fresh week calculation for limit checks (no cache)
     const currentWeekStart = calculateWeekStart();
-    const value = await env.SLOTS_KV.get(`dachsboost_purchases:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('dachsboost_purchases:', username));
     if (!value) return { count: 0, weekStart: currentWeekStart };
     const data = JSON.parse(value);
 
@@ -75,7 +75,7 @@ async function getDachsBoostPurchases(username, env) {
 
 // Atomic increment with retry mechanism
 async function incrementDachsBoostPurchases(username, env, maxRetries = MAX_RETRIES) {
-  const key = `dachsboost_purchases:${username.toLowerCase()}`;
+  const key = kvKey('dachsboost_purchases:', username);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {

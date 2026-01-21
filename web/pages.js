@@ -277,7 +277,7 @@ async function handleLeaderboardPage(env, loggedInUser = null, showAll = false) 
 // ==================== DISCLAIMER ====================
 
 const DISCLAIMER_HTML = `
-<div class="disclaimer">
+<div class="disclaimer" id="disclaimer">
   <div class="disclaimer-icon">⚠️</div>
   <div class="disclaimer-content">
     <p><strong>Dachsbau Slots ist ein reines Unterhaltungsspiel.</strong> Es werden keine echten Geldbeträge verwendet.</p>
@@ -337,8 +337,8 @@ function baseTemplate(title, content, activePage = '', user = null) {
         <div class="disclaimer-warning-icon">⚠️</div>
         <div class="disclaimer-warning-content">
           <strong>Disclaimer nicht akzeptiert</strong>
-          <p>Du musst den Disclaimer akzeptieren, um Slots zu spielen und im Leaderboard angezeigt zu werden.</p>
-          <p>Schreibe <code>!slots</code> im Chat von <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener">frechhdachs</a>, um den Disclaimer zu akzeptieren.</p>
+          <p>Du musst den <a href="#disclaimer" style="color: inherit; text-decoration: underline;">Disclaimer</a> akzeptieren, um Slots zu spielen und im Leaderboard angezeigt zu werden.</p>
+          <button class="btn btn-accept-disclaimer" onclick="acceptDisclaimer()">Disclaimer akzeptieren</button>
         </div>
       </div>
     `
@@ -369,14 +369,14 @@ function baseTemplate(title, content, activePage = '', user = null) {
         <img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Slots.png" alt="Logo" class="logo-img">
         <span class="logo-text">Dachsbau Slots</span>
       </a>
-      <nav class="nav-bar">
+      <nav class="nav-bar" aria-label="Hauptnavigation">
         ${navHtml}
       </nav>
       <div class="header-right">
-        <form class="search-form" action="" method="get">
+        <form class="search-form" action="" method="get" role="search" aria-label="Spielersuche">
           <input type="hidden" name="page" value="profile">
-          <input type="text" name="user" placeholder="Spieler..." class="search-input" required>
-          <button type="submit" class="btn btn-search"><img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Suche.png" alt="Suchen" class="search-icon"></button>
+          <input type="text" name="user" placeholder="Spieler..." class="search-input" required aria-label="Spielername eingeben">
+          <button type="submit" class="btn btn-search" aria-label="Suchen"><img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Suche.png" alt="" class="search-icon" aria-hidden="true"></button>
         </form>
         ${userSectionHtml}
       </div>
@@ -387,7 +387,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
       </button>
     </div>
   </header>
-  <nav class="mobile-nav" id="mobileNav">
+  <nav class="mobile-nav" id="mobileNav" aria-label="Mobile Navigation">
     ${navHtml}
     ${user ? `<a href="?page=profile&user=${encodeURIComponent(user.username)}" class="nav-item">👤 Mein Profil</a><a href="/auth/logout" class="nav-item">🚪 Logout</a>` : `<a href="/auth/login" class="nav-item">🟣 Mit Twitch einloggen</a>`}
   </nav>
@@ -400,18 +400,18 @@ function baseTemplate(title, content, activePage = '', user = null) {
     <p>Dachsbau Slots - Made by Exaint für <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener" class="footer-link">@frechhdachs</a></p>
     <p class="footer-legal"><a href="?page=changelog">Changelog</a> · <a href="?page=impressum">Impressum</a> · <a href="?page=datenschutz">Datenschutz</a></p>
     <p class="footer-disclaimer">This website is not affiliated with or endorsed by Twitch.</p>
-    <button class="theme-toggle-footer" onclick="toggleTheme()" title="Theme wechseln">
-      <span class="theme-toggle-icon">🌙</span>
+    <button class="theme-toggle-footer" onclick="toggleTheme()" title="Theme wechseln" aria-label="Theme zwischen Hell und Dunkel wechseln">
+      <span class="theme-toggle-icon" aria-hidden="true">🌙</span>
       <span class="theme-toggle-label">Theme</span>
     </button>
   </footer>
 
   <!-- Achievement Detail Modal -->
-  <div class="modal-overlay" id="achievementModal" onclick="closeAchievementModal(event)">
+  <div class="modal-overlay" id="achievementModal" onclick="closeAchievementModal(event)" role="dialog" aria-modal="true" aria-labelledby="modalName" aria-hidden="true">
     <div class="modal-content" onclick="event.stopPropagation()">
-      <button class="modal-close" onclick="closeAchievementModal()">&times;</button>
+      <button class="modal-close" onclick="closeAchievementModal()" aria-label="Schließen">&times;</button>
       <div class="modal-header">
-        <div class="modal-icon" id="modalIcon"></div>
+        <div class="modal-icon" id="modalIcon" aria-hidden="true"></div>
         <h2 id="modalName"></h2>
       </div>
       <p class="modal-desc" id="modalDesc"></p>
@@ -460,6 +460,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
       }
 
       modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
     }
 
@@ -467,6 +468,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
       if (event && event.target !== event.currentTarget) return;
       const modal = document.getElementById('achievementModal');
       modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
     }
 
@@ -482,6 +484,35 @@ function baseTemplate(title, content, activePage = '', user = null) {
       hamburger.classList.toggle('active');
       mobileNav.classList.toggle('active');
       document.body.style.overflow = mobileNav.classList.contains('active') ? 'hidden' : '';
+    }
+
+    // Accept disclaimer function
+    async function acceptDisclaimer() {
+      const btn = document.querySelector('.btn-accept-disclaimer');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Wird akzeptiert...';
+      }
+      try {
+        const response = await fetch('/api/disclaimer/accept', { method: 'POST', credentials: 'same-origin' });
+        if (response.ok) {
+          // Reload page to reflect changes
+          window.location.reload();
+        } else {
+          const data = await response.json();
+          alert(data.error || 'Fehler beim Akzeptieren des Disclaimers');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Disclaimer akzeptieren';
+          }
+        }
+      } catch (error) {
+        alert('Netzwerkfehler. Bitte versuche es erneut.');
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Disclaimer akzeptieren';
+        }
+      }
     }
 
     // Theme toggle function
@@ -521,9 +552,13 @@ function baseTemplate(title, content, activePage = '', user = null) {
           btn.addEventListener('click', function() {
             const filter = this.dataset.filter;
 
-            // Update active button
-            filterBtns.forEach(b => b.classList.remove('active'));
+            // Update active button and aria-pressed
+            filterBtns.forEach(b => {
+              b.classList.remove('active');
+              b.setAttribute('aria-pressed', 'false');
+            });
             this.classList.add('active');
+            this.setAttribute('aria-pressed', 'true');
 
             // Filter achievements
             const achievements = document.querySelectorAll('.achievement');
@@ -558,9 +593,13 @@ function baseTemplate(title, content, activePage = '', user = null) {
           btn.addEventListener('click', function() {
             const sortType = this.dataset.sort;
 
-            // Update active button
-            sortBtns.forEach(b => b.classList.remove('active'));
+            // Update active button and aria-pressed
+            sortBtns.forEach(b => {
+              b.classList.remove('active');
+              b.setAttribute('aria-pressed', 'false');
+            });
             this.classList.add('active');
+            this.setAttribute('aria-pressed', 'true');
 
             if (sortType === 'category') {
               // Restore original category view
@@ -786,9 +825,9 @@ function renderHomePage(errorMessage = null, user = null) {
       <p class="hero-subtitle">Schau dir die Achievements und Stats von Spielern an!</p>
       ${errorHtml}
       <div class="hero-search">
-        <form class="search-form" action="" method="get">
+        <form class="search-form" action="" method="get" role="search" aria-label="Spielersuche">
           <input type="hidden" name="page" value="profile">
-          <input type="text" name="user" placeholder="Spielername eingeben..." class="search-input" required autofocus>
+          <input type="text" name="user" placeholder="Spielername eingeben..." class="search-input" required autofocus aria-label="Spielername eingeben">
           <button type="submit" class="btn">Profil anzeigen</button>
         </form>
       </div>
@@ -1117,17 +1156,17 @@ function renderProfilePage(data) {
     </script>
     ` : ''}
     <div class="achievement-controls">
-      <div class="achievement-filter">
-        <span class="filter-label">Filter:</span>
-        <button class="filter-btn active" data-filter="all">Alle</button>
-        <button class="filter-btn" data-filter="unlocked">Freigeschaltet</button>
-        <button class="filter-btn" data-filter="locked">Gesperrt</button>
+      <div class="achievement-filter" role="group" aria-label="Achievement Filter">
+        <span class="filter-label" id="filter-label">Filter:</span>
+        <button class="filter-btn active" data-filter="all" aria-pressed="true">Alle</button>
+        <button class="filter-btn" data-filter="unlocked" aria-pressed="false">Freigeschaltet</button>
+        <button class="filter-btn" data-filter="locked" aria-pressed="false">Gesperrt</button>
       </div>
-      <div class="achievement-sort">
-        <span class="filter-label">Sortierung:</span>
-        <button class="sort-btn active" data-sort="category">Kategorie</button>
-        <button class="sort-btn" data-sort="rarity-asc">Seltenste</button>
-        <button class="sort-btn" data-sort="rarity-desc">Häufigste</button>
+      <div class="achievement-sort" role="group" aria-label="Achievement Sortierung">
+        <span class="filter-label" id="sort-label">Sortierung:</span>
+        <button class="sort-btn active" data-sort="category" aria-pressed="true">Kategorie</button>
+        <button class="sort-btn" data-sort="rarity-asc" aria-pressed="false">Seltenste</button>
+        <button class="sort-btn" data-sort="rarity-desc" aria-pressed="false">Häufigste</button>
       </div>
     </div>
     <div class="categories">

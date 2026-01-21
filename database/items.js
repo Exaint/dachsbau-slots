@@ -3,12 +3,12 @@
  */
 
 import { MAX_RETRIES, KV_ACTIVE } from '../constants.js';
-import { exponentialBackoff, logError } from '../utils.js';
+import { exponentialBackoff, logError, kvKey } from '../utils.js';
 
 // Guaranteed Pair
 async function activateGuaranteedPair(username, env) {
   try {
-    await env.SLOTS_KV.put(`guaranteedpair:${username.toLowerCase()}`, KV_ACTIVE);
+    await env.SLOTS_KV.put(kvKey('guaranteedpair:', username), KV_ACTIVE);
   } catch (error) {
     logError('activateGuaranteedPair', error, { username });
   }
@@ -16,7 +16,7 @@ async function activateGuaranteedPair(username, env) {
 
 async function hasGuaranteedPair(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`guaranteedpair:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('guaranteedpair:', username));
     return value === KV_ACTIVE;
   } catch (error) {
     logError('hasGuaranteedPair', error, { username });
@@ -26,7 +26,7 @@ async function hasGuaranteedPair(username, env) {
 
 async function consumeGuaranteedPair(username, env) {
   try {
-    await env.SLOTS_KV.delete(`guaranteedpair:${username.toLowerCase()}`);
+    await env.SLOTS_KV.delete(kvKey('guaranteedpair:', username));
   } catch (error) {
     logError('consumeGuaranteedPair', error, { username });
   }
@@ -35,7 +35,7 @@ async function consumeGuaranteedPair(username, env) {
 // Wild Card
 async function activateWildCard(username, env) {
   try {
-    await env.SLOTS_KV.put(`wildcard:${username.toLowerCase()}`, KV_ACTIVE);
+    await env.SLOTS_KV.put(kvKey('wildcard:', username), KV_ACTIVE);
   } catch (error) {
     logError('activateWildCard', error, { username });
   }
@@ -43,7 +43,7 @@ async function activateWildCard(username, env) {
 
 async function hasWildCard(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`wildcard:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('wildcard:', username));
     return value === KV_ACTIVE;
   } catch (error) {
     logError('hasWildCard', error, { username });
@@ -53,7 +53,7 @@ async function hasWildCard(username, env) {
 
 async function consumeWildCard(username, env) {
   try {
-    await env.SLOTS_KV.delete(`wildcard:${username.toLowerCase()}`);
+    await env.SLOTS_KV.delete(kvKey('wildcard:', username));
   } catch (error) {
     logError('consumeWildCard', error, { username });
   }
@@ -62,7 +62,7 @@ async function consumeWildCard(username, env) {
 // Free Spins
 async function getFreeSpins(username, env) {
   try {
-    const value = await env.SLOTS_KV.get(`freespins:${username.toLowerCase()}`);
+    const value = await env.SLOTS_KV.get(kvKey('freespins:', username));
     if (!value || value === 'null' || value === 'undefined') return [];
 
     const parsed = JSON.parse(value);
@@ -106,7 +106,7 @@ async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
 
     freeSpins.sort((a, b) => a.multiplier - b.multiplier);
 
-    await env.SLOTS_KV.put(`freespins:${username.toLowerCase()}`, JSON.stringify(freeSpins));
+    await env.SLOTS_KV.put(kvKey('freespins:', username), JSON.stringify(freeSpins));
   } catch (error) {
     logError('addFreeSpinsWithMultiplier', error, { username, count, multiplier });
   }
@@ -114,7 +114,7 @@ async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
 
 // Atomic free spin consumption with retry mechanism (prevents race conditions)
 async function consumeFreeSpinWithMultiplier(username, env, maxRetries = MAX_RETRIES) {
-  const key = `freespins:${username.toLowerCase()}`;
+  const key = kvKey('freespins:', username);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {

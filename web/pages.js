@@ -801,13 +801,6 @@ function renderInfoPage(user = null) {
               <p>Schreibe zwischen zwei <code>!slots</code> immer eine andere Nachricht! Fossabot ignoriert identische aufeinanderfolgende Befehle.</p>
             </div>
           </div>
-          <div class="tip-item">
-            <span class="tip-icon">💡</span>
-            <div>
-              <strong>Keine Leerzeichen nach @</strong>
-              <p><code>!transfer @user 100</code> ✅ nicht <code>!transfer @ user 100</code> ❌</p>
-            </div>
-          </div>
         </div>
 
           <h3>🎰 Höhere Einsätze freischalten</h3>
@@ -1901,9 +1894,9 @@ async function renderShopPage(env, user = null) {
           <div class="duel-step">
             <span class="step-number">3</span>
             <div class="step-content">
-              <strong>Im Chat kaufen</strong>
-              <code>!shop buy [Nummer]</code>
-              <p>Beispiel: <code>!shop buy 38</code> kauft die Wild Card.</p>
+              <strong>Kaufen</strong>
+              <p><strong>Website:</strong> Klick auf "Kaufen" (wenn eingeloggt)<br>
+              <strong>Chat:</strong> <code>!shop buy [Nummer]</code></p>
             </div>
           </div>
         </div>
@@ -1916,6 +1909,18 @@ async function renderShopPage(env, user = null) {
               • Timed Buffs laufen nach Kauf-Zeitpunkt ab<br>
               • Spin Bundle: Max 3x/Woche (Reset: Montag 00:00 UTC)<br>
               • Dachs-Boost: Max 1x/Woche (Reset: Montag 00:00 UTC)</p>
+            </div>
+          </div>
+          <div class="tip-item">
+            <span class="tip-icon">💬</span>
+            <div>
+              <strong>Nur im Chat kaufbar</strong>
+              <p>Einige Items benötigen direkte Chat-Interaktion und sind daher nicht über die Website kaufbar:<br>
+              • <strong>Peek Token</strong> - Zeigt das nächste Ergebnis im Chat<br>
+              • <strong>Chaos/Reverse Chaos</strong> - Startet sofort einen Spin<br>
+              • <strong>Glücksrad</strong> - Dreht sofort das Rad<br>
+              • <strong>Mystery Box</strong> - Öffnet sofort die Box<br>
+              • <strong>Diamond Mine</strong> - Startet sofort die Mine</p>
             </div>
           </div>
         </div>

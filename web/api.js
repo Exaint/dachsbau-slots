@@ -255,7 +255,7 @@ async function handleSearchApi(query, env) {
     const matches = [];
     for (const key of listResult.keys) {
       const username = key.name.replace('user:', '');
-      if (username.toLowerCase().startsWith(searchQuery) && username.toLowerCase() !== 'dachsbank') {
+      if (username.toLowerCase().includes(searchQuery) && username.toLowerCase() !== 'dachsbank') {
         matches.push(username);
         if (matches.length >= 10) break; // Limit to 10 suggestions
       }

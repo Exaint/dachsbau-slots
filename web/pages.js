@@ -2363,14 +2363,24 @@ function renderErrorPage(user = null) {
 // ==================== HELPERS ====================
 
 /**
- * Create HTML response
+ * Create HTML response with security headers
  */
 function htmlResponse(html, status = 200) {
   return new Response(html, {
     status,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
+      // Content Security Policy - allows inline styles/scripts (needed for SSR), images from Twitch CDN
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://static-cdn.jtvnw.net data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      // Prevent MIME type sniffing
+      'X-Content-Type-Options': 'nosniff',
+      // Prevent clickjacking
+      'X-Frame-Options': 'DENY',
+      // Enable browser XSS filter
+      'X-XSS-Protection': '1; mode=block',
+      // Referrer policy for privacy
+      'Referrer-Policy': 'strict-origin-when-cross-origin'
     }
   });
 }

@@ -118,8 +118,7 @@ async function decrementBuffUses(username, buffKey, env, maxRetries = MAX_RETRIE
         await env.SLOTS_KV.delete(key);
       } else {
         const ttl = Math.max(BUFF_TTL_BUFFER_SECONDS, Math.floor((data.expireAt - Date.now()) / 1000) + BUFF_TTL_BUFFER_SECONDS);
-        const metadata = { lastUpdate: Date.now(), attempt };
-        await env.SLOTS_KV.put(key, JSON.stringify(updatedData), { expirationTtl: ttl, metadata });
+        await env.SLOTS_KV.put(key, JSON.stringify(updatedData), { expirationTtl: ttl });
       }
 
       // Verify the write succeeded

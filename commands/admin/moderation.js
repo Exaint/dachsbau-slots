@@ -3,16 +3,8 @@
  */
 
 import { RESPONSE_HEADERS, ALL_BUFF_KEYS, ALL_SYMBOLS, ALL_UNLOCK_KEYS } from '../../constants.js';
-import { isAdmin, validateAndCleanTarget, logError } from '../../utils.js';
+import { requireAdmin, validateAndCleanTarget, logError, logAudit } from '../../utils.js';
 import { setBalance, removeSelfBan } from '../../database.js';
-
-// Helper: Check admin permission
-function requireAdmin(username) {
-  if (!isAdmin(username)) {
-    return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-  }
-  return null;
-}
 
 async function handleBan(username, target, env) {
   try {
@@ -24,6 +16,7 @@ async function handleBan(username, target, env) {
     if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     await env.SLOTS_KV.put(`blacklist:${cleanTarget}`, 'true');
+    logAudit('ban', username, cleanTarget);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde vom Slots-Spiel ausgeschlossen. 🔨`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -45,6 +38,7 @@ async function handleUnban(username, target, env) {
       env.SLOTS_KV.delete(`blacklist:${cleanTarget}`),
       removeSelfBan(cleanTarget, env)
     ]);
+    logAudit('unban', username, cleanTarget);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde entbannt und kann wieder Slots spielen. ✅`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -63,6 +57,7 @@ async function handleFreeze(username, target, env) {
     if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     await env.SLOTS_KV.put(`frozen:${cleanTarget}`, 'true');
+    logAudit('freeze', username, cleanTarget);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde eingefroren. ❄️`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -81,6 +76,7 @@ async function handleUnfreeze(username, target, env) {
     if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     await env.SLOTS_KV.delete(`frozen:${cleanTarget}`);
+    logAudit('unfreeze', username, cleanTarget);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde aufgetaut. ✅`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -103,6 +99,7 @@ async function handleReset(username, target, env) {
       env.SLOTS_KV.delete(`stats:${cleanTarget}`),
       env.SLOTS_KV.delete(`streak:${cleanTarget}`)
     ]);
+    logAudit('reset', username, cleanTarget);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde zurückgesetzt (Balance & Stats auf 0). 🔄`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -147,6 +144,7 @@ async function handleWipe(username, target, env) {
     ];
 
     await Promise.all(deletePromises);
+    logAudit('wipe', username, cleanTarget);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde komplett gelöscht! (Alle Daten, Buffs, Unlocks) 💥`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -167,9 +165,11 @@ async function handleMaintenance(username, mode, env) {
 
     if (lowerMode === 'on') {
       await env.SLOTS_KV.put('maintenance_mode', 'true');
+      logAudit('maintenance_on', username, 'system');
       return new Response(`@${username} ✅ Wartungsmodus aktiviert! Nur Admins können spielen. 🔧`, { headers: RESPONSE_HEADERS });
     } else {
       await env.SLOTS_KV.delete('maintenance_mode');
+      logAudit('maintenance_off', username, 'system');
       return new Response(`@${username} ✅ Wartungsmodus deaktiviert! Alle können wieder spielen. ✅`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {

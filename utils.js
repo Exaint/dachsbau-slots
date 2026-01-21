@@ -63,6 +63,14 @@ function validateAndCleanTarget(target) {
   return { error: null, cleanTarget };
 }
 
+// Helper: Check admin permission (returns Response if not admin, null if admin)
+function requireAdmin(username) {
+  if (!isAdmin(username)) {
+    return createErrorResponse(username, 'Du hast keine Berechtigung für diesen Command!');
+  }
+  return null;
+}
+
 // Helper: Combined admin check with target validation (reduces boilerplate in admin commands)
 function requireAdminWithTarget(username, target, usageHint = '') {
   if (!isAdmin(username)) {
@@ -253,12 +261,48 @@ function formatTimeRemaining(ms) {
 // Structured error logging with context
 function logError(context, error, extra = {}) {
   const logEntry = {
+    level: 'error',
     context,
     message: error?.message || String(error),
     timestamp: new Date().toISOString(),
     ...extra
   };
   console.error(JSON.stringify(logEntry));
+}
+
+function logWarn(context, message, extra = {}) {
+  const logEntry = {
+    level: 'warn',
+    context,
+    message,
+    timestamp: new Date().toISOString(),
+    ...extra
+  };
+  console.warn(JSON.stringify(logEntry));
+}
+
+function logInfo(context, message, extra = {}) {
+  const logEntry = {
+    level: 'info',
+    context,
+    message,
+    timestamp: new Date().toISOString(),
+    ...extra
+  };
+  console.log(JSON.stringify(logEntry));
+}
+
+// Audit log for admin actions
+function logAudit(action, admin, target, extra = {}) {
+  const logEntry = {
+    level: 'audit',
+    action,
+    admin,
+    target,
+    timestamp: new Date().toISOString(),
+    ...extra
+  };
+  console.log(JSON.stringify(logEntry));
 }
 
 // Create standardized error response (uses RESPONSE_HEADERS by default)
@@ -284,6 +328,7 @@ export {
   getAdminList,
   sanitizeUsername,
   validateAndCleanTarget,
+  requireAdmin,
   requireAdminWithTarget,
   safeJsonParse,
   validateAmount,
@@ -299,6 +344,9 @@ export {
   exponentialBackoff,
   formatTimeRemaining,
   logError,
+  logWarn,
+  logInfo,
+  logAudit,
   createErrorResponse,
   createSuccessResponse,
   createInfoResponse,

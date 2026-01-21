@@ -18,7 +18,7 @@ import {
   SPIN_LOSS_MESSAGES,
   HOURLY_JACKPOT_AMOUNT
 } from '../../constants.js';
-import { getWeightedSymbol, secureRandom, secureRandomInt } from '../../utils.js';
+import { getWeightedSymbol, secureRandom, secureRandomInt, safeJsonParse } from '../../utils.js';
 import { consumeGuaranteedPair, consumeWildCard } from '../../database.js';
 
 /**
@@ -37,7 +37,11 @@ async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamon
 
   if (storedPeek) {
     await env.SLOTS_KV.delete(peekKey);
-    return JSON.parse(storedPeek);
+    const parsedPeek = safeJsonParse(storedPeek, null);
+    if (parsedPeek && Array.isArray(parsedPeek) && parsedPeek.length === GRID_SIZE) {
+      return parsedPeek;
+    }
+    // Invalid peek data, continue with normal grid generation
   }
 
   const grid = [];

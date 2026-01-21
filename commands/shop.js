@@ -51,7 +51,7 @@ import {
   SECONDS_PER_HOUR,
   KV_ACTIVE
 } from '../constants.js';
-import { getWeightedSymbol, secureRandom, secureRandomInt, logError } from '../utils.js';
+import { getWeightedSymbol, secureRandom, secureRandomInt, logError, safeJsonParse } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -308,18 +308,14 @@ async function handlePeekItem(username, item, itemId, balance, env) {
   let peekDachsChance = DACHS_BASE_CHANCE;
   if (hasLuckyCharm) peekDachsChance *= 2;
   if (dachsLocator) {
-    try {
-      const data = JSON.parse(dachsLocator);
-      if (Date.now() < data.expireAt && data.uses > 0) peekDachsChance *= 3;
-    } catch (e) { /* ignore parse errors */ }
+    const data = safeJsonParse(dachsLocator, null);
+    if (data && Date.now() < data.expireAt && data.uses > 0) peekDachsChance *= 3;
   }
   if (rageMode) {
-    try {
-      const data = JSON.parse(rageMode);
-      if (Date.now() < data.expireAt && data.stack > 0) {
-        peekDachsChance *= (1 + data.stack / 100);
-      }
-    } catch (e) { /* ignore parse errors */ }
+    const data = safeJsonParse(rageMode, null);
+    if (data && Date.now() < data.expireAt && data.stack > 0) {
+      peekDachsChance *= (1 + data.stack / 100);
+    }
   }
 
   const peekGrid = [];

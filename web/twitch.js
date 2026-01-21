@@ -5,6 +5,7 @@
  */
 
 import { logError } from '../utils.js';
+import { BROADCASTER_LOGIN } from '../constants.js';
 
 // Cache TTLs
 const AVATAR_CACHE_TTL = 86400; // 24 hours
@@ -18,9 +19,6 @@ const SESSION_TTL_SECONDS = 604800; // 7 days
 // Twitch API endpoints
 const TWITCH_API = 'https://api.twitch.tv/helix';
 const TWITCH_OAUTH = 'https://id.twitch.tv/oauth2/token';
-
-// Channel to fetch roles from
-const BROADCASTER_LOGIN = 'frechhdachs';
 
 /**
  * Get app access token (Client Credentials flow)

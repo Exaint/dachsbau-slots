@@ -3,7 +3,7 @@
  */
 
 import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY } from '../../constants.js';
-import { isAdmin, sanitizeUsername, logError } from '../../utils.js';
+import { requireAdmin, sanitizeUsername, logError, logAudit } from '../../utils.js';
 import {
   getBalance,
   setBalance,
@@ -26,14 +26,6 @@ import {
 
 // Dynamic shop item max (avoids hardcoded values)
 const SHOP_ITEM_MAX = Math.max(...Object.keys(SHOP_ITEMS).map(Number));
-
-// Helper: Check admin permission
-function requireAdmin(username) {
-  if (!isAdmin(username)) {
-    return new Response(`@${username} ❌ Du hast keine Berechtigung für diesen Command!`, { headers: RESPONSE_HEADERS });
-  }
-  return null;
-}
 
 async function handleGive(username, target, amount, env) {
   try {
@@ -61,6 +53,7 @@ async function handleGive(username, target, amount, env) {
     const currentBalance = await getBalance(cleanTarget, env);
     const newBalance = Math.min(currentBalance + parsedAmount, MAX_BALANCE);
     await setBalance(cleanTarget, newBalance, env);
+    logAudit('give', username, cleanTarget, { amount: parsedAmount, newBalance });
 
     return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gutgeschrieben! Neuer Kontostand: ${newBalance} 🦡💰`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -90,6 +83,7 @@ async function handleSetBalance(username, target, amount, env) {
 
     const newBalance = Math.min(parsedAmount, MAX_BALANCE);
     await setBalance(cleanTarget, newBalance, env);
+    logAudit('setbalance', username, cleanTarget, { newBalance });
 
     return new Response(`@${username} ✅ Balance von @${cleanTarget} auf ${newBalance} DachsTaler gesetzt! 💰`, { headers: RESPONSE_HEADERS });
   } catch (error) {

@@ -94,6 +94,12 @@ export const BANK_START_BALANCE = 444444;
 export const BANK_KEY = `user:${BANK_USERNAME}`;
 
 // ===========================================
+// 5b. Twitch Channel Settings
+// ===========================================
+
+export const BROADCASTER_LOGIN = 'frechhdachs';
+
+// ===========================================
 // 6. TTL Constants (in seconds)
 // ===========================================
 

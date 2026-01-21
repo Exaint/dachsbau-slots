@@ -153,7 +153,6 @@ body {
 
 /* Header */
 .header {
-  background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   padding: 12px 0;
   margin-bottom: 24px;
@@ -256,12 +255,8 @@ body {
   padding: 0 24px;
   display: flex;
   align-items: center;
-  gap: 24px;
-  overflow: hidden;
-}
-
-.header {
-  overflow-x: hidden;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .logo {
@@ -282,8 +277,8 @@ body {
 }
 
 .logo-img {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
@@ -298,10 +293,10 @@ body {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   color: var(--text-primary);
-  font-size: 0.9rem;
-  width: 180px;
+  font-size: 0.85rem;
+  width: 140px;
   transition: border-color 0.2s, box-shadow 0.2s, width 0.3s ease;
 }
 
@@ -309,7 +304,7 @@ body {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(145, 71, 255, 0.15);
-  width: 220px;
+  width: 180px;
 }
 
 .search-input::placeholder {
@@ -395,13 +390,13 @@ body {
 .btn-twitch-login {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: #9147ff;
   color: white;
   border: none;
   border-radius: 6px;
-  padding: 8px 14px;
-  font-size: 0.9rem;
+  padding: 8px 12px;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -421,7 +416,11 @@ body {
 .user-section {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  background: var(--bg-tertiary);
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
 }
 
 .user-profile-link {
@@ -430,18 +429,18 @@ body {
   gap: 8px;
   text-decoration: none;
   color: var(--text-primary);
-  padding: 6px 10px;
+  padding: 4px 8px;
   border-radius: 6px;
   transition: background 0.2s;
 }
 
 .user-profile-link:hover {
-  background: var(--bg-tertiary);
+  background: var(--bg-card);
 }
 
 .user-avatar-small {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--accent);
@@ -449,20 +448,20 @@ body {
 
 .user-display-name {
   font-weight: 600;
-  font-size: 0.9rem;
-  max-width: 120px;
+  font-size: 0.85rem;
+  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .btn-logout {
-  background: transparent;
+  background: var(--bg-card);
   color: var(--text-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.85rem;
+  padding: 5px 10px;
+  font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
   text-decoration: none;
@@ -1407,22 +1406,23 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-left: auto;
   flex-shrink: 0;
 }
 
 /* Navigation Bar (inline in header) */
 .nav-bar {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
+  justify-content: center;
+  min-width: 0;
 }
 
 .nav-item {
-  padding: 10px 16px;
+  padding: 8px 12px;
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
   border-radius: 8px;

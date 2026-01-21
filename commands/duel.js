@@ -24,9 +24,9 @@
  * 4. On decline/timeout: Challenge expires
  */
 
-import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
+import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
 import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStat, checkBalanceAchievements } from '../database.js';
-import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut } from '../database/duels.js';
+import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
 
 /**
@@ -143,6 +143,12 @@ async function handleDuel(username, args, env) {
       return `@${username} Du hast bereits eine aktive Herausforderung! Warte bis sie abläuft oder abgelehnt wird.`;
     }
 
+    // Check cooldown
+    const cooldownRemaining = await getDuelCooldown(username, env);
+    if (cooldownRemaining > 0) {
+      return `@${username} ⏳ Du musst noch ${cooldownRemaining} Sekunden warten bevor du ein neues Duell starten kannst.`;
+    }
+
     // Check if target has opted out
     if (await isDuelOptedOut(targetArg, env)) {
       return `@${username} @${targetArg} hat Duelle deaktiviert.`;
@@ -167,6 +173,9 @@ async function handleDuel(username, args, env) {
     if (!success) {
       return `@${username} Fehler beim Erstellen der Herausforderung. Bitte versuche es erneut.`;
     }
+
+    // Set cooldown for challenger
+    await setDuelCooldown(username, env);
 
     return `⚔️ @${username} fordert @${targetArg} zu einem Duell heraus! Einsatz: ${amountArg} DachsTaler | @${targetArg} schreibe !slots duelaccept oder !slots dueldecline (${DUEL_TIMEOUT_SECONDS}s)`;
   } catch (error) {

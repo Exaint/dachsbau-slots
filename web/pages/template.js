@@ -83,9 +83,11 @@ export function baseTemplate(title, content, activePage = '', user = null) {
   <link rel="icon" type="image/png" href="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Slots.png">
   <style>${CSS}</style>
   <script>
-    // Theme handling - check localStorage, default to dark
+    // Theme handling - check localStorage, then system preference, default to dark
     (function() {
-      const theme = localStorage.getItem('theme') || 'dark';
+      const stored = localStorage.getItem('theme');
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = stored || (systemPrefersDark ? 'dark' : 'light');
       if (theme === 'light') {
         document.documentElement.setAttribute('data-theme', 'light');
       }
@@ -117,9 +119,18 @@ export function baseTemplate(title, content, activePage = '', user = null) {
       </button>
     </div>
   </header>
+  <div class="mobile-nav-overlay" id="mobileNavOverlay" onclick="closeMobileNav()"></div>
   <nav class="mobile-nav" id="mobileNav" aria-label="Mobile Navigation">
-    ${navHtml}
-    ${user ? `<a href="?page=profile&user=${encodeURIComponent(user.username)}" class="nav-item">👤 Mein Profil</a><a href="/auth/logout" class="nav-item">🚪 Logout</a>` : `<a href="/auth/login" class="nav-item">🟣 Mit Twitch einloggen</a>`}
+    <div class="mobile-nav-content">
+      ${navHtml}
+      <div class="mobile-nav-divider"></div>
+      ${user ? `<a href="?page=profile&user=${encodeURIComponent(user.username)}" class="nav-item">👤 Mein Profil</a><a href="/auth/logout" class="nav-item">🚪 Logout</a>` : `<a href="/auth/login" class="nav-item">🟣 Mit Twitch einloggen</a>`}
+      <div class="mobile-nav-divider"></div>
+      <button class="nav-item mobile-theme-toggle" onclick="toggleTheme(); closeMobileNav();">
+        <span class="mobile-theme-icon">🌙</span>
+        <span class="mobile-theme-label">Theme wechseln</span>
+      </button>
+    </div>
   </nav>
   <main class="container">
     ${DISCLAIMER_HTML}
@@ -212,19 +223,92 @@ function getClientScripts() {
       document.body.style.overflow = '';
     }
 
-    // Close modal on Escape key
+    // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') closeAchievementModal();
+      // Skip if user is typing in an input field
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        // Allow Escape to blur input
+        if (e.key === 'Escape') {
+          e.target.blur();
+          closeMobileNav();
+        }
+        return;
+      }
+
+      switch (e.key) {
+        case 'Escape':
+          closeAchievementModal();
+          closeMobileNav();
+          break;
+        case '/':
+          // Focus search field
+          e.preventDefault();
+          const searchInput = document.querySelector('.search-input');
+          if (searchInput) searchInput.focus();
+          break;
+        case '?':
+          // Go to info page
+          if (!e.shiftKey) return; // Require Shift+? on most keyboards
+          window.location.href = '?page=info';
+          break;
+        case 'h':
+          // Go to home
+          window.location.href = '?page=home';
+          break;
+        case 'l':
+          // Go to leaderboard
+          window.location.href = '?page=leaderboard';
+          break;
+        case 's':
+          // Go to shop
+          window.location.href = '?page=shop';
+          break;
+        case 't':
+          // Toggle theme
+          toggleTheme();
+          break;
+      }
     });
 
     // Mobile navigation toggle
     function toggleMobileNav() {
       const hamburger = document.querySelector('.hamburger');
       const mobileNav = document.getElementById('mobileNav');
+      const overlay = document.getElementById('mobileNavOverlay');
+      const isOpening = !mobileNav.classList.contains('active');
+
       hamburger.classList.toggle('active');
       mobileNav.classList.toggle('active');
-      document.body.style.overflow = mobileNav.classList.contains('active') ? 'hidden' : '';
+      overlay.classList.toggle('active');
+      document.body.style.overflow = isOpening ? 'hidden' : '';
+
+      // Update mobile theme icon
+      if (isOpening) {
+        const theme = getEffectiveTheme();
+        const icon = mobileNav.querySelector('.mobile-theme-icon');
+        if (icon) icon.textContent = theme === 'light' ? '☀️' : '🌙';
+      }
     }
+
+    function closeMobileNav() {
+      const hamburger = document.querySelector('.hamburger');
+      const mobileNav = document.getElementById('mobileNav');
+      const overlay = document.getElementById('mobileNavOverlay');
+      hamburger.classList.remove('active');
+      mobileNav.classList.remove('active');
+      overlay.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    // Close mobile nav on nav link click
+    document.addEventListener('DOMContentLoaded', function() {
+      const mobileNav = document.getElementById('mobileNav');
+      if (mobileNav) {
+        mobileNav.querySelectorAll('.nav-item:not(.mobile-theme-toggle)').forEach(link => {
+          link.addEventListener('click', closeMobileNav);
+        });
+      }
+    });
 
     // Accept disclaimer function
     async function acceptDisclaimer() {
@@ -279,10 +363,30 @@ function getClientScripts() {
       }
     }
 
+    // Get effective theme (localStorage > system preference > dark)
+    function getEffectiveTheme() {
+      const stored = localStorage.getItem('theme');
+      if (stored) return stored;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
     // Update button on load
     document.addEventListener('DOMContentLoaded', function() {
-      const theme = localStorage.getItem('theme') || 'dark';
+      const theme = getEffectiveTheme();
       updateThemeButton(theme);
+
+      // Listen for system theme changes (only applies if no localStorage preference)
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+        if (!localStorage.getItem('theme')) {
+          const newTheme = e.matches ? 'dark' : 'light';
+          if (newTheme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+          } else {
+            document.documentElement.removeAttribute('data-theme');
+          }
+          updateThemeButton(newTheme);
+        }
+      });
 
       // Achievement filter functionality
       const filterBtns = document.querySelectorAll('.filter-btn');

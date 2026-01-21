@@ -502,9 +502,11 @@ function renderProfilePage(data) {
       ${statsHtml}
       <div class="achievement-summary">
         <div class="achievement-count">
-          <strong>${unlockedCount}</strong> / ${totalCount} Achievements
+          <span class="achievement-count-label">🏆 Achievements</span>
+          <span class="achievement-count-value"><strong>${unlockedCount}</strong> / ${totalCount}</span>
+          <span class="achievement-count-percent">(${progressPercent}%)</span>
         </div>
-        <div class="progress-bar">
+        <div class="progress-bar achievement-progress-bar">
           <div class="progress-fill" style="width: ${progressPercent}%"></div>
         </div>
       </div>
@@ -721,6 +723,7 @@ function renderInfoPage(user = null) {
           <a href="#bank" class="toc-item">🏦 DachsBank</a>
           <a href="#faq" class="toc-item">❓ FAQ</a>
           <a href="#hilfe" class="toc-item">📞 Hilfe</a>
+          <a href="#shortcuts" class="toc-item">⌨️ Tastaturkürzel</a>
         </div>
       </nav>
 
@@ -1437,6 +1440,10 @@ function renderInfoPage(user = null) {
             <span>Limit</span>
             <span>Eine aktive Herausforderung pro Spieler</span>
           </div>
+          <div class="command-item">
+            <span>Cooldown</span>
+            <span>60 Sekunden nach dem Erstellen eines Duells</span>
+          </div>
         </div>
 
         <h3>Wer gewinnt?</h3>
@@ -1490,6 +1497,10 @@ function renderInfoPage(user = null) {
           <div class="tip-item">
             <span class="tip-icon">💡</span>
             <p><strong>Opt-Out:</strong> Mit <code>!slots duelopt out</code> keine Herausforderungen mehr</p>
+          </div>
+          <div class="tip-item">
+            <span class="tip-icon">⏳</span>
+            <p><strong>Cooldown:</strong> Nach einem Duell musst du 60 Sekunden warten bevor du ein neues starten kannst</p>
           </div>
           </div>
         </section>
@@ -1637,6 +1648,45 @@ function renderInfoPage(user = null) {
         <div class="selfban-info">
           <code>!slots selfban</code>
             <p>Du wirst sofort vom Spielen ausgeschlossen. <strong>Nur Admins</strong> (exaint_, frechhdachs) können dich wieder freischalten. Der Zeitpunkt wird gespeichert.</p>
+          </div>
+        </section>
+      </details>
+
+      <!-- Keyboard Shortcuts -->
+      <details class="info-accordion">
+        <summary class="accordion-header"><h2>⌨️ Tastaturkürzel</h2></summary>
+        <section id="shortcuts" class="content-section accordion-content">
+          <p class="section-intro">Navigiere schneller mit der Tastatur!</p>
+
+          <div class="command-list compact">
+            <div class="command-item">
+              <kbd>/</kbd>
+              <span>Suche fokussieren</span>
+            </div>
+            <div class="command-item">
+              <kbd>H</kbd>
+              <span>Zur Startseite</span>
+            </div>
+            <div class="command-item">
+              <kbd>L</kbd>
+              <span>Zum Leaderboard</span>
+            </div>
+            <div class="command-item">
+              <kbd>S</kbd>
+              <span>Zum Shop</span>
+            </div>
+            <div class="command-item">
+              <kbd>T</kbd>
+              <span>Theme wechseln</span>
+            </div>
+            <div class="command-item">
+              <kbd>Shift + ?</kbd>
+              <span>Diese Info-Seite öffnen</span>
+            </div>
+            <div class="command-item">
+              <kbd>Esc</kbd>
+              <span>Modal/Menü schließen</span>
+            </div>
           </div>
         </section>
       </details>

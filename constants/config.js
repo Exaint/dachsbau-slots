@@ -125,7 +125,7 @@ export const LEADERBOARD_MIN_USERS = 100;
 
 export const DUEL_MIN_AMOUNT = 100;
 export const DUEL_TIMEOUT_SECONDS = 60;
-export const DUEL_COOLDOWN_SECONDS = 30;
+export const DUEL_COOLDOWN_SECONDS = 60;
 
 // ===========================================
 // 9. Validation Settings

@@ -867,12 +867,31 @@ body {
 }
 
 .achievement-count {
-  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
-.achievement-count strong {
+.achievement-count-label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.achievement-count-value strong {
   color: var(--success);
+  font-size: 1.1rem;
+}
+
+.achievement-count-percent {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.achievement-progress-bar {
+  height: 10px;
 }
 
 .progress-bar {
@@ -1639,28 +1658,83 @@ body {
   transform: rotate(-45deg) translate(4px, -4px);
 }
 
-.mobile-nav {
+.mobile-nav-overlay {
   display: none;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-nav-overlay.active {
+  display: block;
+  opacity: 1;
+}
+
+.mobile-nav {
+  display: none;
+  position: fixed;
+  top: 0;
+  right: -280px;
+  width: 280px;
+  height: 100%;
   background: var(--bg-primary);
   z-index: 1000;
   padding-top: 70px;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+  transition: right 0.3s ease;
 }
 
 .mobile-nav.active {
   display: flex;
+  right: 0;
+}
+
+.mobile-nav-content {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 4px;
+  overflow-y: auto;
 }
 
 .mobile-nav .nav-item {
-  font-size: 1.1rem;
-  padding: 12px 24px;
+  font-size: 1rem;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  width: 100%;
+  text-align: left;
+}
+
+.mobile-nav .nav-item:hover {
+  background: var(--bg-secondary);
+}
+
+.mobile-nav-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+
+.mobile-theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.mobile-theme-toggle:hover {
+  background: var(--bg-secondary);
 }
 
 /* Disclaimer */
@@ -1906,6 +1980,20 @@ body {
   white-space: nowrap;
   min-width: 260px;
   flex-shrink: 0;
+}
+
+.command-item kbd {
+  display: inline-block;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  min-width: 80px;
+  text-align: center;
+  box-shadow: 0 2px 0 var(--border);
 }
 
 .command-item span {

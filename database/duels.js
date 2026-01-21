@@ -20,7 +20,7 @@
  * - Only one active challenge per challenger
  */
 
-import { DUEL_TIMEOUT_SECONDS, KV_TRUE } from '../constants.js';
+import { DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, KV_TRUE } from '../constants.js';
 import { logError, kvKey } from '../utils.js';
 
 /**
@@ -188,6 +188,42 @@ async function isDuelOptedOut(username, env) {
   }
 }
 
+/**
+ * Check if user is on duel cooldown
+ * Returns remaining seconds if on cooldown, 0 if not
+ */
+async function getDuelCooldown(username, env) {
+  try {
+    const key = kvKey('duel_cooldown:', username);
+    const value = await env.SLOTS_KV.get(key);
+    if (!value) return 0;
+
+    const expiresAt = parseInt(value, 10);
+    const remaining = Math.ceil((expiresAt - Date.now()) / 1000);
+    return remaining > 0 ? remaining : 0;
+  } catch (error) {
+    logError('getDuelCooldown', error, { username });
+    return 0;
+  }
+}
+
+/**
+ * Set duel cooldown for user
+ */
+async function setDuelCooldown(username, env) {
+  try {
+    const key = kvKey('duel_cooldown:', username);
+    const expiresAt = Date.now() + (DUEL_COOLDOWN_SECONDS * 1000);
+    await env.SLOTS_KV.put(key, expiresAt.toString(), {
+      expirationTtl: DUEL_COOLDOWN_SECONDS + 10
+    });
+    return true;
+  } catch (error) {
+    logError('setDuelCooldown', error, { username });
+    return false;
+  }
+}
+
 export {
   createDuel,
   getDuel,
@@ -196,5 +232,7 @@ export {
   acceptDuel,
   hasActiveDuel,
   setDuelOptOut,
-  isDuelOptedOut
+  isDuelOptedOut,
+  getDuelCooldown,
+  setDuelCooldown
 };

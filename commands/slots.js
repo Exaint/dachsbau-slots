@@ -45,7 +45,7 @@ import {
   BUFF_TTL_BUFFER_SECONDS,
   FREE_SPIN_COST_THRESHOLD
 } from '../constants.js';
-import { calculateBuffTTL, logError } from '../utils.js';
+import { calculateBuffTTL, logError, logWarn } from '../utils.js';
 import { CUSTOM_MESSAGES } from '../config.js';
 import {
   getBalance,
@@ -547,7 +547,12 @@ async function handleSlot(username, amountParam, url, env) {
     // OPTIMIZED: Insurance check (pre-loaded insuranceCount and prestigeRank)
     if (!isFreeSpinUsed && result.points === 0 && !result.freeSpins && insuranceCount > 0) {
       const refund = Math.floor(spinCost * INSURANCE_REFUND_RATE);
-      const newBalanceWithRefund = Math.max(0, Math.min(currentBalance - spinCost + refund, MAX_BALANCE));
+      const uncappedBalance = currentBalance - spinCost + refund;
+      const newBalanceWithRefund = Math.max(0, Math.min(uncappedBalance, MAX_BALANCE));
+      // Log if balance was capped (edge case: extremely high balance)
+      if (uncappedBalance > MAX_BALANCE) {
+        logWarn('Insurance refund capped at MAX_BALANCE', { username, uncappedBalance, capped: MAX_BALANCE });
+      }
 
       await Promise.all([
         setBalance(username, newBalanceWithRefund, env),

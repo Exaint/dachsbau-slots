@@ -144,15 +144,27 @@ async function getStreak(username, env) {
   }
 }
 
-// Stats
+// Stats - with structure validation
+const DEFAULT_STATS = { totalSpins: 0, wins: 0, biggestWin: 0, totalWon: 0, totalLost: 0 };
+
 async function getStats(username, env) {
   try {
     const value = await env.SLOTS_KV.get(kvKey('stats:', username));
-    if (!value) return { totalSpins: 0, wins: 0, biggestWin: 0, totalWon: 0, totalLost: 0 };
-    return JSON.parse(value);
+    if (!value) return { ...DEFAULT_STATS };
+
+    const parsed = JSON.parse(value);
+
+    // Validate and sanitize each field
+    return {
+      totalSpins: typeof parsed.totalSpins === 'number' ? parsed.totalSpins : 0,
+      wins: typeof parsed.wins === 'number' ? parsed.wins : 0,
+      biggestWin: typeof parsed.biggestWin === 'number' ? parsed.biggestWin : 0,
+      totalWon: typeof parsed.totalWon === 'number' ? parsed.totalWon : 0,
+      totalLost: typeof parsed.totalLost === 'number' ? parsed.totalLost : 0
+    };
   } catch (error) {
     logError('getStats', error, { username });
-    return { totalSpins: 0, wins: 0, biggestWin: 0, totalWon: 0, totalLost: 0 };
+    return { ...DEFAULT_STATS };
   }
 }
 

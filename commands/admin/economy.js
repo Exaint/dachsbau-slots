@@ -3,7 +3,7 @@
  */
 
 import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, BANK_KEY } from '../../constants.js';
-import { requireAdmin, sanitizeUsername, logError, logAudit } from '../../utils.js';
+import { requireAdmin, requireAdminWithTarget, validateAmount, sanitizeUsername, logError, logAudit, createErrorResponse } from '../../utils.js';
 import {
   getBalance,
   setBalance,
@@ -29,66 +29,44 @@ const SHOP_ITEM_MAX = Math.max(...Object.keys(SHOP_ITEMS).map(Number));
 
 async function handleGive(username, target, amount, env) {
   try {
-    const adminCheck = requireAdmin(username);
-    if (adminCheck) return adminCheck;
+    const check = requireAdminWithTarget(username, target, 'Nutze: !slots give @user [Betrag]');
+    if (!check.valid) return check.response;
 
-    if (!target) {
-      return new Response(`@${username} ❌ Nutze: !slots give @user [Betrag]`, { headers: RESPONSE_HEADERS });
+    const parsedAmount = validateAmount(amount, 1, MAX_BALANCE);
+    if (!parsedAmount) {
+      return createErrorResponse(username, `Ungültiger Betrag! (1-${MAX_BALANCE})`);
     }
 
-    if (!amount) {
-      return new Response(`@${username} ❌ Nutze: !slots give @user [Betrag]`, { headers: RESPONSE_HEADERS });
-    }
-
-    const parsedAmount = parseInt(amount, 10);
-    if (isNaN(parsedAmount) || parsedAmount < 1 || parsedAmount > MAX_BALANCE) {
-      return new Response(`@${username} ❌ Ungültiger Betrag! (1-${MAX_BALANCE})`, { headers: RESPONSE_HEADERS });
-    }
-
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
-
-    const currentBalance = await getBalance(cleanTarget, env);
+    const currentBalance = await getBalance(check.cleanTarget, env);
     const newBalance = Math.min(currentBalance + parsedAmount, MAX_BALANCE);
-    await setBalance(cleanTarget, newBalance, env);
-    logAudit('give', username, cleanTarget, { amount: parsedAmount, newBalance });
+    await setBalance(check.cleanTarget, newBalance, env);
+    logAudit('give', username, check.cleanTarget, { amount: parsedAmount, newBalance });
 
-    return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gutgeschrieben! Neuer Kontostand: ${newBalance} 🦡💰`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${check.cleanTarget} gutgeschrieben! Neuer Kontostand: ${newBalance} 🦡💰`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     logError('handleGive', error, { username, target, amount });
-    return new Response(`@${username} ❌ Fehler beim Gutschreiben.`, { headers: RESPONSE_HEADERS });
+    return createErrorResponse(username, 'Fehler beim Gutschreiben.');
   }
 }
 
 async function handleSetBalance(username, target, amount, env) {
   try {
-    const adminCheck = requireAdmin(username);
-    if (adminCheck) return adminCheck;
+    const check = requireAdminWithTarget(username, target, 'Nutze: !slots setbalance @user [Betrag]');
+    if (!check.valid) return check.response;
 
-    if (!target || !amount) {
-      return new Response(`@${username} ❌ Nutze: !slots setbalance @user [Betrag]`, { headers: RESPONSE_HEADERS });
-    }
-
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
-
-    const parsedAmount = parseInt(amount, 10);
-    if (isNaN(parsedAmount) || parsedAmount < 0) {
-      return new Response(`@${username} ❌ Ungültiger Betrag!`, { headers: RESPONSE_HEADERS });
+    const parsedAmount = validateAmount(amount, 0, MAX_BALANCE);
+    if (parsedAmount === null) {
+      return createErrorResponse(username, 'Ungültiger Betrag!');
     }
 
     const newBalance = Math.min(parsedAmount, MAX_BALANCE);
-    await setBalance(cleanTarget, newBalance, env);
-    logAudit('setbalance', username, cleanTarget, { newBalance });
+    await setBalance(check.cleanTarget, newBalance, env);
+    logAudit('setbalance', username, check.cleanTarget, { newBalance });
 
-    return new Response(`@${username} ✅ Balance von @${cleanTarget} auf ${newBalance} DachsTaler gesetzt! 💰`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ Balance von @${check.cleanTarget} auf ${newBalance} DachsTaler gesetzt! 💰`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     logError('handleSetBalance', error, { username, target, amount });
-    return new Response(`@${username} ❌ Fehler beim Setzen der Balance.`, { headers: RESPONSE_HEADERS });
+    return createErrorResponse(username, 'Fehler beim Setzen der Balance.');
   }
 }
 
@@ -131,23 +109,18 @@ async function handleBankReset(username, env) {
 
 async function handleGiveBuff(username, target, shopNumber, env) {
   try {
-    const adminCheck = requireAdmin(username);
-    if (adminCheck) return adminCheck;
+    const check = requireAdminWithTarget(username, target, 'Nutze: !slots givebuff @user [Shopnummer]');
+    if (!check.valid) return check.response;
 
-    if (!target || !shopNumber) {
-      return new Response(`@${username} ❌ Nutze: !slots givebuff @user [Shopnummer]`, { headers: RESPONSE_HEADERS });
+    const itemId = validateAmount(shopNumber, 1, SHOP_ITEM_MAX);
+    if (!itemId) {
+      return createErrorResponse(username, `Ungültige Shopnummer! Nutze 1-${SHOP_ITEM_MAX}.`);
     }
 
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
-
-    const itemId = parseInt(shopNumber, 10);
+    const cleanTarget = check.cleanTarget;
     const item = SHOP_ITEMS[itemId];
-
     if (!item) {
-      return new Response(`@${username} ❌ Ungültige Shopnummer! Nutze 1-${SHOP_ITEM_MAX}.`, { headers: RESPONSE_HEADERS });
+      return createErrorResponse(username, `Shopnummer ${itemId} existiert nicht!`);
     }
 
     if (item.type === 'boost') {
@@ -198,17 +171,10 @@ async function handleGiveBuff(username, target, shopNumber, env) {
 
 async function handleRemoveBuff(username, target, shopNumber, env) {
   try {
-    const adminCheck = requireAdmin(username);
-    if (adminCheck) return adminCheck;
+    const check = requireAdminWithTarget(username, target, 'Nutze: !slots removebuff @user [Shopnummer]');
+    if (!check.valid) return check.response;
 
-    if (!target || !shopNumber) {
-      return new Response(`@${username} ❌ Nutze: !slots removebuff @user [Shopnummer]`, { headers: RESPONSE_HEADERS });
-    }
-
-    const cleanTarget = sanitizeUsername(target.replace('@', ''));
-    if (!cleanTarget) {
-      return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
-    }
+    const cleanTarget = check.cleanTarget;
 
     const itemId = parseInt(shopNumber, 10);
     const item = SHOP_ITEMS[itemId];

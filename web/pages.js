@@ -2373,7 +2373,7 @@ function htmlResponse(html, status = 200) {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-cache',
       // Content Security Policy - allows inline styles/scripts (needed for SSR), images from Twitch CDN
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://static-cdn.jtvnw.net https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://static-cdn.jtvnw.net https://assets.help.twitch.tv https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
       // Prevent MIME type sniffing
       'X-Content-Type-Options': 'nosniff',
       // Prevent clickjacking

@@ -163,7 +163,21 @@ async function getBuffWithStack(username, buffKey, env) {
     const value = await env.SLOTS_KV.get(key);
     if (!value) return { active: false, stack: 0, data: null };
 
-    const data = JSON.parse(value);
+    let data;
+    try {
+      data = JSON.parse(value);
+    } catch {
+      // Corrupted data, clean up
+      await env.SLOTS_KV.delete(key);
+      return { active: false, stack: 0, data: null };
+    }
+
+    // Validate data structure
+    if (!data || typeof data.expireAt !== 'number') {
+      await env.SLOTS_KV.delete(key);
+      return { active: false, stack: 0, data: null };
+    }
+
     // BUG FIX: Handle delete errors gracefully - log but don't fail the read
     if (Date.now() >= data.expireAt) {
       try {

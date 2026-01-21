@@ -448,27 +448,38 @@ async function handleInstantItem(username, item, itemId, balance, env) {
   return new Response(`@${username} ✅ ${item.name} gekauft! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
 }
 
-// Mystery Box has complex logic with rollback, extracted for clarity
+// Mystery Box has complex logic with rollback and timeout protection
+const MYSTERY_BOX_TIMEOUT_MS = 5000;
+
 async function handleMysteryBox(username, item, balance, env) {
   const mysteryItemId = MYSTERY_BOX_ITEMS[secureRandomInt(0, MYSTERY_BOX_ITEMS.length - 1)];
   const mysteryResult = SHOP_ITEMS[mysteryItemId];
 
   try {
-    if (mysteryResult.type === 'boost') {
-      await addBoost(username, mysteryResult.symbol, env);
-    } else if (mysteryResult.type === 'insurance') {
-      await addInsurance(username, 5, env);
-    } else if (mysteryResult.type === 'winmulti') {
-      await addWinMultiplier(username, env);
-    } else if (mysteryResult.type === 'timed') {
-      if (mysteryResult.uses) {
-        await activateBuffWithUses(username, mysteryResult.buffKey, mysteryResult.duration, mysteryResult.uses, env);
-      } else if (mysteryResult.buffKey === 'rage_mode') {
-        await activateBuffWithStack(username, mysteryResult.buffKey, mysteryResult.duration, env);
-      } else {
-        await activateBuff(username, mysteryResult.buffKey, mysteryResult.duration, env);
+    // Activation with timeout to prevent hanging operations
+    const activationPromise = (async () => {
+      if (mysteryResult.type === 'boost') {
+        await addBoost(username, mysteryResult.symbol, env);
+      } else if (mysteryResult.type === 'insurance') {
+        await addInsurance(username, 5, env);
+      } else if (mysteryResult.type === 'winmulti') {
+        await addWinMultiplier(username, env);
+      } else if (mysteryResult.type === 'timed') {
+        if (mysteryResult.uses) {
+          await activateBuffWithUses(username, mysteryResult.buffKey, mysteryResult.duration, mysteryResult.uses, env);
+        } else if (mysteryResult.buffKey === 'rage_mode') {
+          await activateBuffWithStack(username, mysteryResult.buffKey, mysteryResult.duration, env);
+        } else {
+          await activateBuff(username, mysteryResult.buffKey, mysteryResult.duration, env);
+        }
       }
-    }
+    })();
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Mystery Box activation timeout')), MYSTERY_BOX_TIMEOUT_MS)
+    );
+
+    await Promise.race([activationPromise, timeoutPromise]);
   } catch (activationError) {
     // Rollback: Refund balance and reverse bank update if activation failed
     logError('MysteryBox.activation', activationError, { username, mysteryItemId, mysteryItemName: mysteryResult.name });

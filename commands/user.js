@@ -427,9 +427,12 @@ async function handleTransfer(username, target, amount, env) {
         setBalance(cleanTarget, newReceiverBalance, env)
       ]);
 
-      // Verify the write succeeded
-      const verifySender = await getBalance(username, env);
-      if (verifySender === newSenderBalance) {
+      // Verify both balances were written correctly
+      const [verifySender, verifyReceiver] = await Promise.all([
+        getBalance(username, env),
+        getBalance(cleanTarget, env)
+      ]);
+      if (verifySender === newSenderBalance && verifyReceiver === newReceiverBalance) {
         // Track achievements (await to ensure they complete before response)
         await Promise.all([
           trackTransferAchievements(username, parsedAmount, env),

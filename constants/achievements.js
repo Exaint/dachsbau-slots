@@ -563,3 +563,36 @@ export function getVisibleAchievements() {
 export function getAllAchievements() {
   return Object.values(ACHIEVEMENTS);
 }
+
+// Map achievement IDs to stat keys for progress tracking
+const ACHIEVEMENT_STAT_MAPPING = {
+  // Spinning
+  'spin_100': 'totalSpins',
+  'spin_500': 'totalSpins',
+  'spin_1000': 'totalSpins',
+  'spin_5000': 'totalSpins',
+  'spin_10000': 'totalSpins',
+  // Winning
+  'win_100': 'wins',
+  'win_500': 'wins',
+  'win_1000': 'wins',
+  // Social
+  'transfer_1000': 'totalTransferred',
+  'transfer_10000': 'totalTransferred',
+  'duel_win_10': 'duelsWon',
+  'duel_win_50': 'duelsWon',
+  'duel_win_100': 'duelsWon',
+  // Dedication
+  'daily_7': 'dailysClaimed',
+  'daily_14': 'dailysClaimed',
+  'daily_21': 'dailysClaimed',
+  'daily_28': 'dailysClaimed',
+  // Shopping
+  'shop_10': 'shopPurchases',
+  'shop_50': 'shopPurchases',
+  'shop_100': 'shopPurchases'
+};
+
+export function getStatKeyForAchievement(achievementId) {
+  return ACHIEVEMENT_STAT_MAPPING[achievementId] || null;
+}

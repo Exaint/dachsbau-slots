@@ -19,12 +19,12 @@ import {
   isLeaderboardHidden,
   setLeaderboardHidden
 } from '../database.js';
-import { getAllAchievements, ACHIEVEMENT_CATEGORIES } from '../constants.js';
+import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
 import { logError, isAdmin, sanitizeUsername } from '../utils.js';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
-  'Access-Control-Allow-Origin': '*'
+  'Access-Control-Allow-Origin': 'https://dachsbau-slots.exaint.workers.dev'
 };
 
 /**
@@ -176,7 +176,6 @@ async function handleProfileApi(username, env) {
  * Get leaderboard data
  */
 async function handleLeaderboardApi(env) {
-  const LEADERBOARD_LIMIT = 1000;
   const BATCH_SIZE = 100;
 
   try {
@@ -220,49 +219,15 @@ async function handleLeaderboardApi(env) {
     // Sort by balance descending
     users.sort((a, b) => b.balance - a.balance);
 
-    // Return top 100
+    // Return top 100 with 60s cache
     return jsonResponse({
       players: users.slice(0, 100),
       total: users.length
-    });
+    }, 200, 60);
   } catch (error) {
     logError('handleLeaderboardApi', error);
     return jsonResponse({ error: 'Failed to load leaderboard' }, 500);
   }
-}
-
-/**
- * Map achievement IDs to stat keys for progress tracking
- */
-function getStatKeyForAchievement(achievementId) {
-  const mapping = {
-    // Spinning
-    'spin_100': 'totalSpins',
-    'spin_500': 'totalSpins',
-    'spin_1000': 'totalSpins',
-    'spin_5000': 'totalSpins',
-    'spin_10000': 'totalSpins',
-    // Winning
-    'win_100': 'wins',
-    'win_500': 'wins',
-    'win_1000': 'wins',
-    // Social
-    'transfer_1000': 'totalTransferred',
-    'transfer_10000': 'totalTransferred',
-    'duel_win_10': 'duelsWon',
-    'duel_win_50': 'duelsWon',
-    'duel_win_100': 'duelsWon',
-    // Dedication
-    'daily_7': 'dailysClaimed',
-    'daily_14': 'dailysClaimed',
-    'daily_21': 'dailysClaimed',
-    'daily_28': 'dailysClaimed',
-    // Shopping
-    'shop_10': 'shopPurchases',
-    'shop_50': 'shopPurchases',
-    'shop_100': 'shopPurchases'
-  };
-  return mapping[achievementId] || null;
 }
 
 /**
@@ -303,10 +268,14 @@ async function handleSearchApi(query, env) {
 /**
  * Helper: Create JSON response
  */
-function jsonResponse(data, status = 200) {
+function jsonResponse(data, status = 200, cacheSeconds = 0) {
+  const headers = { ...JSON_HEADERS };
+  if (cacheSeconds > 0) {
+    headers['Cache-Control'] = `public, max-age=${cacheSeconds}`;
+  }
   return new Response(JSON.stringify(data), {
     status,
-    headers: JSON_HEADERS
+    headers
   });
 }
 

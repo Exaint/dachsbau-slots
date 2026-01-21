@@ -96,6 +96,30 @@ const ADMIN_COMMANDS_TARGET_ONLY = {
   givewinmulti: handleGiveWinMulti
 };
 
+/**
+ * Check security constraints (blacklist, frozen, maintenance)
+ * Returns error Response if blocked, null if allowed
+ */
+async function checkSecurityConstraints(username, env) {
+  const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
+    isBlacklisted(username, env),
+    env.SLOTS_KV.get(`frozen:${username}`),
+    env.SLOTS_KV.get('maintenance_mode')
+  ]);
+
+  if (blacklisted) {
+    return new Response(`@${username} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
+  }
+  if (isFrozen === KV_TRUE) {
+    return new Response(`@${username} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
+  }
+  if (maintenanceMode === KV_TRUE && !isAdmin(username)) {
+    return new Response(`@${username} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
+  }
+
+  return null; // No security issues
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -191,22 +215,8 @@ export default {
 
           // OPTIMIZED: Skip security checks for safe read-only commands (saves 3 KV reads)
           if (!SAFE_COMMANDS.has(lower)) {
-            // Note: cleanUsername is already lowercase from sanitizeUsername()
-            const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
-              isBlacklisted(cleanUsername, env),
-              env.SLOTS_KV.get(`frozen:${cleanUsername}`),
-              env.SLOTS_KV.get('maintenance_mode')
-            ]);
-
-            if (blacklisted) {
-              return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
-            }
-            if (isFrozen === KV_TRUE) {
-              return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
-            }
-            if (maintenanceMode === KV_TRUE && !isAdmin(cleanUsername)) {
-              return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
-            }
+            const securityError = await checkSecurityConstraints(cleanUsername, env);
+            if (securityError) return securityError;
           }
 
           // Detect !slots buy mistake
@@ -340,22 +350,8 @@ export default {
       if (action === 'balance') return await handleBalance(cleanUsername, env);
 
       // Actions that modify state need security checks
-      // Note: cleanUsername is already lowercase from sanitizeUsername()
-      const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
-        isBlacklisted(cleanUsername, env),
-        env.SLOTS_KV.get(`frozen:${cleanUsername}`),
-        env.SLOTS_KV.get('maintenance_mode')
-      ]);
-
-      if (blacklisted) {
-        return new Response(`@${cleanUsername} ❌ Du bist vom Slots-Spiel ausgeschlossen.`, { headers: RESPONSE_HEADERS });
-      }
-      if (isFrozen === KV_TRUE) {
-        return new Response(`@${cleanUsername} ❄️ Dein Account ist eingefroren. Kontaktiere einen Admin.`, { headers: RESPONSE_HEADERS });
-      }
-      if (maintenanceMode === KV_TRUE && !isAdmin(cleanUsername)) {
-        return new Response(`@${cleanUsername} 🔧 Wartungsmodus aktiv! Nur Admins können spielen.`, { headers: RESPONSE_HEADERS });
-      }
+      const securityError = await checkSecurityConstraints(cleanUsername, env);
+      if (securityError) return securityError;
 
       if (action === 'daily') return await handleDaily(cleanUsername, env);
       if (action === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('amount'), env);

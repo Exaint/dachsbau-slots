@@ -76,7 +76,7 @@ export const DEBUG_MODE = false;
 export const DEBUG_DACHS_PAIR_CHANCE = 0.75;
 
 // Leaderboard Settings
-export const LEADERBOARD_LIMIT = 500; // Max users to fetch
+export const LEADERBOARD_LIMIT = 1000; // Max users to fetch for ranking
 export const LEADERBOARD_BATCH_SIZE = 50; // KV reads per batch
 export const LEADERBOARD_MIN_USERS = 100; // Early exit threshold
 

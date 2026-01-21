@@ -132,5 +132,6 @@ export {
   getAchievementById,
   getAchievementsByCategory,
   getVisibleAchievements,
-  getAllAchievements
+  getAllAchievements,
+  getStatKeyForAchievement
 } from './achievements.js';

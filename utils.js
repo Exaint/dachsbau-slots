@@ -94,6 +94,12 @@ function validateAmount(amount, min = 1, max = 100000) {
   return parsed;
 }
 
+// Helper to build KV keys with consistent lowercase username
+function kvKey(prefix, username, ...parts) {
+  const base = `${prefix}${username.toLowerCase()}`;
+  return parts.length ? `${base}:${parts.join(':')}` : base;
+}
+
 // Helper to get date parts in German timezone (Europe/Berlin)
 function getGermanDateParts() {
   const now = new Date();
@@ -281,6 +287,7 @@ export {
   requireAdminWithTarget,
   safeJsonParse,
   validateAmount,
+  kvKey,
   getCurrentMonth,
   getCurrentDate,
   getGermanDateFromTimestamp,

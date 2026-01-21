@@ -8,7 +8,7 @@ import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAccept
 import { isDuelOptedOut } from '../database/duels.js';
 import { isLeaderboardHidden } from '../database/core.js';
 import { getTwitchProfileData, getUserRole, getTwitchUser } from './twitch.js';
-import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
+import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
 import { logError, isAdmin } from '../utils.js';
 
 const CATEGORY_ICONS = {
@@ -185,7 +185,6 @@ async function handleProfilePage(url, env, loggedInUser = null) {
  * Leaderboard page handler
  */
 async function handleLeaderboardPage(env, loggedInUser = null, showAll = false) {
-  const LEADERBOARD_LIMIT = 1000;
   const BATCH_SIZE = 100;
 
   // Only admins can use showAll filter
@@ -273,35 +272,6 @@ async function handleLeaderboardPage(env, loggedInUser = null, showAll = false) 
     logError('handleLeaderboardPage', error);
     return htmlResponse(renderErrorPage(loggedInUser));
   }
-}
-
-/**
- * Map achievement IDs to stat keys
- */
-function getStatKeyForAchievement(achievementId) {
-  const mapping = {
-    'spin_100': 'totalSpins',
-    'spin_500': 'totalSpins',
-    'spin_1000': 'totalSpins',
-    'spin_5000': 'totalSpins',
-    'spin_10000': 'totalSpins',
-    'win_100': 'wins',
-    'win_500': 'wins',
-    'win_1000': 'wins',
-    'transfer_1000': 'totalTransferred',
-    'transfer_10000': 'totalTransferred',
-    'duel_win_10': 'duelsWon',
-    'duel_win_50': 'duelsWon',
-    'duel_win_100': 'duelsWon',
-    'daily_7': 'dailysClaimed',
-    'daily_14': 'dailysClaimed',
-    'daily_21': 'dailysClaimed',
-    'daily_28': 'dailysClaimed',
-    'shop_10': 'shopPurchases',
-    'shop_50': 'shopPurchases',
-    'shop_100': 'shopPurchases'
-  };
-  return mapping[achievementId] || null;
 }
 
 // ==================== DISCLAIMER ====================

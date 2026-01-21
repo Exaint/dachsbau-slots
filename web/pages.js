@@ -6,6 +6,7 @@
 import { CSS } from './styles.js';
 import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned, hasUnlock } from '../database.js';
 import { isDuelOptedOut } from '../database/duels.js';
+import { isLeaderboardHidden } from '../database/core.js';
 import { getTwitchProfileData, getUserRole, getTwitchUser } from './twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, SHOP_ITEMS } from '../constants.js';
 import { logError, isAdmin } from '../utils.js';
@@ -48,6 +49,12 @@ const PRESTIGE_RANK_NAMES = {
  */
 export async function handleWebPage(page, url, env, loggedInUser = null) {
   try {
+    // Check if logged-in user has accepted disclaimer
+    if (loggedInUser) {
+      const userHasDisclaimer = await hasAcceptedDisclaimer(loggedInUser.username, env);
+      loggedInUser = { ...loggedInUser, hasDisclaimer: userHasDisclaimer };
+    }
+
     switch (page) {
       case 'home':
         return htmlResponse(renderHomePage(null, loggedInUser));
@@ -100,7 +107,7 @@ async function handleProfilePage(url, env, loggedInUser = null) {
   }
 
   // Fetch remaining data in parallel (balance already fetched above)
-  const [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, twitchData] = await Promise.all([
+  const [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData] = await Promise.all([
     getPrestigeRank(username, env),
     getStats(username, env),
     getPlayerAchievements(username, env),
@@ -108,6 +115,7 @@ async function handleProfilePage(url, env, loggedInUser = null) {
     getAchievementStats(env),
     isDuelOptedOut(username, env),
     isSelfBanned(username, env),
+    isLeaderboardHidden(username, env),
     getTwitchProfileData(username, env)
   ]);
 
@@ -166,6 +174,7 @@ async function handleProfilePage(url, env, loggedInUser = null) {
     lastActive,
     duelOptOut,
     selfBanned,
+    leaderboardHidden,
     hasDisclaimer,
     twitchData,
     loggedInUser
@@ -351,6 +360,20 @@ function baseTemplate(title, content, activePage = '', user = null) {
       </a>
     `;
 
+  // Disclaimer warning for logged-in users without disclaimer
+  const disclaimerWarningHtml = (user && user.hasDisclaimer === false)
+    ? `
+      <div class="disclaimer-warning">
+        <div class="disclaimer-warning-icon">⚠️</div>
+        <div class="disclaimer-warning-content">
+          <strong>Disclaimer nicht akzeptiert</strong>
+          <p>Du musst den Disclaimer akzeptieren, um Slots zu spielen und im Leaderboard angezeigt zu werden.</p>
+          <p>Schreibe <code>!slots</code> im Chat von <a href="https://www.twitch.tv/frechhdachs" target="_blank" rel="noopener">frechhdachs</a>, um den Disclaimer zu akzeptieren.</p>
+        </div>
+      </div>
+    `
+    : '';
+
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -400,6 +423,7 @@ function baseTemplate(title, content, activePage = '', user = null) {
   </nav>
   <main class="container">
     ${DISCLAIMER_HTML}
+    ${disclaimerWarningHtml}
     ${content}
   </main>
   <footer class="footer">
@@ -755,6 +779,10 @@ function baseTemplate(title, content, activePage = '', user = null) {
       adminApiCall('setDuelOpt', { username, optedOut });
     }
 
+    function adminSetLeaderboardHidden(username, hidden) {
+      adminApiCall('setLeaderboardHidden', { username, hidden });
+    }
+
     function adminSetAchievement(username, unlocked) {
       const select = document.getElementById('adminAchievement');
       const achievementId = select.value;
@@ -825,7 +853,7 @@ const ROLE_BADGES = {
  * Profile page
  */
 function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, hasDisclaimer, twitchData, loggedInUser } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, leaderboardHidden, hasDisclaimer, twitchData, loggedInUser } = data;
 
   // Check if logged-in user is admin
   const showAdminPanel = loggedInUser && isAdmin(loggedInUser.username);
@@ -1071,6 +1099,13 @@ function renderProfilePage(data) {
             <div class="admin-toggle-group">
               <span class="admin-status ${duelOptOut ? 'danger' : 'active'}">${duelOptOut ? '✗ Deaktiviert' : '✓ Aktiviert'}</span>
               <button class="btn admin-btn" onclick="adminSetDuelOpt('${escapeHtml(username)}', ${!duelOptOut})">${duelOptOut ? 'Aktivieren' : 'Deaktivieren'}</button>
+            </div>
+          </div>
+          <div class="admin-control">
+            <label>Leaderboard</label>
+            <div class="admin-toggle-group">
+              <span class="admin-status ${leaderboardHidden ? 'danger' : 'active'}">${leaderboardHidden ? '✗ Versteckt' : '✓ Sichtbar'}</span>
+              <button class="btn admin-btn" onclick="adminSetLeaderboardHidden('${escapeHtml(username)}', ${!leaderboardHidden})">${leaderboardHidden ? 'Anzeigen' : 'Verstecken'}</button>
             </div>
           </div>
           <div class="admin-control admin-control-wide">
@@ -1477,15 +1512,15 @@ const ITEM_DESCRIPTIONS = {
   19: 'Schaltet !slots 30 frei - setze bis zu 30 DT pro Spin',
   20: '1 Stunde lang höhere Chance auf seltene Symbole',
   21: 'Schaltet !slots 50 frei - setze bis zu 50 DT pro Spin',
-  22: 'Silber Prestige-Rang mit 🥈 Badge (benötigt Bronze)',
+  22: 'Silber Prestige-Rang mit 🥈 Badge',
   23: 'Schaltet !slots 100 frei - setze bis zu 100 DT pro Spin',
   24: '1 Stunde lang +100% auf alle Gewinne',
   25: 'Schaltet !slots all frei - setze alles auf einen Spin',
-  26: 'Gold Prestige-Rang mit 🥇 Badge (benötigt Silber)',
+  26: 'Gold Prestige-Rang mit 🥇 Badge',
   27: 'Permanenter Bonus auf tägliche Belohnungen',
   28: 'Eigene Gewinn-Nachricht bei großen Wins',
-  29: 'Diamant Prestige-Rang mit 💎 Badge (benötigt Gold)',
-  30: 'Legendärer Prestige-Rang mit 👑 Badge (benötigt Diamant)',
+  29: 'Diamant Prestige-Rang mit 💎 Badge',
+  30: 'Legendärer Prestige-Rang mit 👑 Badge',
   31: 'Kehrt den letzten Chaos Spin um',
   32: '1 Stunde lang erhöhte ⭐ Stern-Chance',
   33: '10 Spins mit erhöhter 🦡 Dachs-Chance',

@@ -30,7 +30,9 @@ export {
   removeSelfBan,
   isBlacklisted,
   getLastActive,
-  setLastActive
+  setLastActive,
+  isLeaderboardHidden,
+  setLeaderboardHidden
 } from './core.js';
 
 // Buff system

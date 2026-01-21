@@ -161,6 +161,32 @@ async function setLastActive(username, env) {
   }
 }
 
+// Leaderboard Visibility
+async function isLeaderboardHidden(username, env) {
+  try {
+    const value = await env.SLOTS_KV.get(`leaderboard_hidden:${username.toLowerCase()}`);
+    return value === KV_TRUE;
+  } catch (error) {
+    logError('isLeaderboardHidden', error, { username });
+    return false;
+  }
+}
+
+async function setLeaderboardHidden(username, hidden, env) {
+  try {
+    const key = `leaderboard_hidden:${username.toLowerCase()}`;
+    if (hidden) {
+      await env.SLOTS_KV.put(key, KV_TRUE);
+    } else {
+      await env.SLOTS_KV.delete(key);
+    }
+    return true;
+  } catch (error) {
+    logError('setLeaderboardHidden', error, { username, hidden });
+    return false;
+  }
+}
+
 export {
   getBalance,
   setBalance,
@@ -175,5 +201,7 @@ export {
   removeSelfBan,
   isBlacklisted,
   getLastActive,
-  setLastActive
+  setLastActive,
+  isLeaderboardHidden,
+  setLeaderboardHidden
 };

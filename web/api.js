@@ -15,7 +15,9 @@ import {
   removeSelfBan,
   setDuelOptOut,
   unlockAchievement,
-  lockAchievement
+  lockAchievement,
+  isLeaderboardHidden,
+  setLeaderboardHidden
 } from '../database.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES } from '../constants.js';
 import { logError, isAdmin, sanitizeUsername } from '../utils.js';
@@ -186,20 +188,26 @@ async function handleLeaderboardApi(env) {
 
     const users = [];
 
-    // Batch fetch balances
+    // Batch fetch balances and check visibility
     for (let i = 0; i < listResult.keys.length; i += BATCH_SIZE) {
       const batch = listResult.keys.slice(i, i + BATCH_SIZE);
-      const balances = await Promise.all(
-        batch.map(key => env.SLOTS_KV.get(key.name))
-      );
+      const usernames = batch.map(key => key.name.replace('user:', ''));
+
+      // Fetch balances and hidden status in parallel
+      const [balances, hiddenStatuses] = await Promise.all([
+        Promise.all(batch.map(key => env.SLOTS_KV.get(key.name))),
+        Promise.all(usernames.map(username => isLeaderboardHidden(username, env)))
+      ]);
 
       for (let j = 0; j < batch.length; j++) {
         if (balances[j]) {
           const balance = parseInt(balances[j], 10);
-          const username = batch[j].name.replace('user:', '');
+          const username = usernames[j];
           const lowerUsername = username.toLowerCase();
-          // Filter out DachsBank and "Spieler" (not real players)
-          if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler') {
+          const isHidden = hiddenStatuses[j];
+
+          // Filter out DachsBank, "Spieler", and hidden users
+          if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler' && !isHidden) {
             users.push({
               username,
               balance
@@ -352,6 +360,8 @@ async function handleAdminApi(url, env, loggedInUser, request) {
         return await handleAdminSetSelfBan(targetUser, body.banned, env);
       case 'setDuelOpt':
         return await handleAdminSetDuelOpt(targetUser, body.optedOut, env);
+      case 'setLeaderboardHidden':
+        return await handleAdminSetLeaderboardHidden(targetUser, body.hidden, env);
       case 'setAchievement':
         return await handleAdminSetAchievement(targetUser, body.achievementId, body.unlocked, env);
       default:
@@ -418,6 +428,18 @@ async function handleAdminSetDuelOpt(username, optedOut, env) {
 
   await setDuelOptOut(username, optedOut, env);
   return jsonResponse({ success: true, username, optedOut });
+}
+
+/**
+ * Admin: Set leaderboard visibility
+ */
+async function handleAdminSetLeaderboardHidden(username, hidden, env) {
+  if (typeof hidden !== 'boolean') {
+    return jsonResponse({ error: 'Invalid hidden value' }, 400);
+  }
+
+  await setLeaderboardHidden(username, hidden, env);
+  return jsonResponse({ success: true, username, hidden });
 }
 
 /**

@@ -843,7 +843,6 @@ function renderInfoPage(user = null) {
             <span class="unlock-price">4.444 DT</span>
           </div>
         </div>
-          <p class="section-note">Gesamt: <strong>12.694 DachsTaler</strong> für alle Unlocks</p>
         </section>
       </details>
 

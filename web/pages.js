@@ -724,39 +724,42 @@ function renderInfoPage(user = null) {
       </nav>
 
       <!-- Schnellstart -->
-      <section id="schnellstart" class="content-section">
-        <h2>🚀 Schnellstart</h2>
-        <p class="section-intro">Neu hier? In 4 Schritten loslegen:</p>
-        <div class="info-table">
-          <div class="info-row">
-            <span class="info-step">1. Starten</span>
-            <code>!slots</code>
-            <span>Zeigt Willkommensnachricht & Disclaimer</span>
+      <details class="info-accordion">
+        <summary class="accordion-header"><h2>🚀 Schnellstart</h2></summary>
+        <section id="schnellstart" class="content-section accordion-content">
+          <p class="section-intro">Neu hier? In 4 Schritten loslegen:</p>
+          <div class="info-table">
+            <div class="info-row">
+              <span class="info-step">1. Starten</span>
+              <code>!slots</code>
+              <span>Zeigt Willkommensnachricht & Disclaimer</span>
+            </div>
+            <div class="info-row">
+              <span class="info-step">2. Akzeptieren</span>
+              <code>!slots accept</code>
+              <span>Disclaimer akzeptieren, Account erstellen (100 DT)</span>
+            </div>
+            <div class="info-row">
+              <span class="info-step">3. Spielen</span>
+              <code>!slots</code>
+              <span>Dein erster Spin!</span>
+            </div>
+            <div class="info-row">
+              <span class="info-step">4. Daily holen</span>
+              <code>!slots daily</code>
+              <span>+50 DachsTaler alle 24 Stunden</span>
+            </div>
           </div>
-          <div class="info-row">
-            <span class="info-step">2. Akzeptieren</span>
-            <code>!slots accept</code>
-            <span>Disclaimer akzeptieren, Account erstellen (100 DT)</span>
-          </div>
-          <div class="info-row">
-            <span class="info-step">3. Spielen</span>
-            <code>!slots</code>
-            <span>Dein erster Spin!</span>
-          </div>
-          <div class="info-row">
-            <span class="info-step">4. Daily holen</span>
-            <code>!slots daily</code>
-            <span>+50 DachsTaler alle 24 Stunden</span>
-          </div>
-        </div>
-      </section>
+        </section>
+      </details>
 
       <!-- Wichtig zu wissen -->
-      <section id="wichtig" class="content-section">
-        <h2>⚠️ Wichtig zu wissen</h2>
-        <p class="section-intro">Diese Infos solltest du kennen, bevor du loslegst!</p>
+      <details class="info-accordion" open>
+        <summary class="accordion-header"><h2>⚠️ Wichtig zu wissen</h2></summary>
+        <section id="wichtig" class="content-section accordion-content">
+          <p class="section-intro">Diese Infos solltest du kennen, bevor du loslegst!</p>
 
-        <h3>💰 Einsatz & Kosten</h3>
+          <h3>💰 Einsatz & Kosten</h3>
         <div class="info-grid compact">
           <div class="info-card">
             <span class="info-label">Mindesteinsatz</span>
@@ -847,14 +850,15 @@ function renderInfoPage(user = null) {
             <span class="unlock-price">4.444 DT</span>
           </div>
         </div>
-        <p class="section-note">Gesamt: <strong>12.694 DachsTaler</strong> für alle Unlocks</p>
-      </section>
+          <p class="section-note">Gesamt: <strong>12.694 DachsTaler</strong> für alle Unlocks</p>
+        </section>
+      </details>
 
       <!-- Commands -->
-      <section id="commands" class="content-section">
-        <h2>📋 Commands</h2>
-
-        <h3>Haupt-Commands</h3>
+      <details class="info-accordion" open>
+        <summary class="accordion-header"><h2>📋 Commands</h2></summary>
+        <section id="commands" class="content-section accordion-content">
+          <h3>Haupt-Commands</h3>
         <div class="command-list">
           <div class="command-item">
             <code>!slots</code>
@@ -964,13 +968,15 @@ function renderInfoPage(user = null) {
             <code>!slots duelopt in</code>
             <span>Duelle wieder aktivieren</span>
           </div>
-        </div>
-      </section>
+          </div>
+        </section>
+      </details>
 
       <!-- Gewinne & Chancen -->
-      <section id="gewinne" class="content-section">
-        <h2>💎 Gewinne & Symbole</h2>
-        <p class="section-intro">Je höher das Symbol in der Liste, desto wertvoller! Der Dachs ist das seltenste und wertvollste Symbol.</p>
+      <details class="info-accordion">
+        <summary class="accordion-header"><h2>💎 Gewinne & Symbole</h2></summary>
+        <section id="gewinne" class="content-section accordion-content">
+          <p class="section-intro">Je höher das Symbol in der Liste, desto wertvoller! Der Dachs ist das seltenste und wertvollste Symbol.</p>
         <div class="symbol-grid">
           <div class="symbol-card jackpot">
             <div class="symbol-icon">🦡</div>
@@ -1146,14 +1152,15 @@ function renderInfoPage(user = null) {
               </div>
             </div>
           </div>
-        </details>
-      </section>
+          </details>
+        </section>
+      </details>
 
       <!-- Multiplier-System -->
-      <section id="multiplier" class="content-section">
-        <h2>📈 Multiplier-System</h2>
-
-        <h3>🔥 Streak-Multiplier (Kostenlos!)</h3>
+      <details class="info-accordion">
+        <summary class="accordion-header"><h2>📈 Multiplier-System</h2></summary>
+        <section id="multiplier" class="content-section accordion-content">
+          <h3>🔥 Streak-Multiplier (Kostenlos!)</h3>
         <p>Jeder Gewinn in Folge erhöht deinen Multiplier automatisch:</p>
         <div class="streak-table">
           <div class="streak-row header">
@@ -1187,14 +1194,15 @@ function renderInfoPage(user = null) {
             <span>+200% ✨</span>
           </div>
         </div>
-        <p class="section-warning">⚠️ Bei Verlust: Reset auf 1.0×</p>
-      </section>
+          <p class="section-warning">⚠️ Bei Verlust: Reset auf 1.0×</p>
+        </section>
+      </details>
 
       <!-- Bonus-Systeme -->
-      <section id="bonus" class="content-section">
-        <h2>🎁 Bonus-Systeme</h2>
-
-        <h3>📅 Monthly Login</h3>
+      <details class="info-accordion">
+        <summary class="accordion-header"><h2>🎁 Bonus-Systeme</h2></summary>
+        <section id="bonus" class="content-section accordion-content">
+          <h3>📅 Monthly Login</h3>
         <p>Sammle Login-Tage im Monat (keine Streak nötig!):</p>
         <div class="bonus-table">
           <div class="bonus-row header">
@@ -1266,15 +1274,17 @@ function renderInfoPage(user = null) {
               <p>Zufällige "Lucky Second" pro Stunde = +100 DT</p>
             </div>
           </div>
-        </div>
-      </section>
+          </div>
+        </section>
+      </details>
 
       <!-- Duell-System -->
-      <section id="duell" class="content-section">
-        <h2>⚔️ Duell-System</h2>
-        <p class="section-intro">Fordere andere Spieler zum direkten Slot-Duell heraus!</p>
+      <details class="info-accordion">
+        <summary class="accordion-header"><h2>⚔️ Duell-System</h2></summary>
+        <section id="duell" class="content-section accordion-content">
+          <p class="section-intro">Fordere andere Spieler zum direkten Slot-Duell heraus!</p>
 
-        <h3>So funktioniert's</h3>
+          <h3>So funktioniert's</h3>
         <div class="duel-steps">
           <div class="duel-step">
             <span class="step-number">1</span>
@@ -1377,15 +1387,17 @@ function renderInfoPage(user = null) {
             <span class="tip-icon">💡</span>
             <p><strong>Opt-Out:</strong> Mit <code>!slots duelopt out</code> keine Herausforderungen mehr</p>
           </div>
-        </div>
-      </section>
+          </div>
+        </section>
+      </details>
 
       <!-- DachsBank -->
-      <section id="bank" class="content-section">
-        <h2>🏦 DachsBank</h2>
-        <p class="section-intro">Die DachsBank trackt die gesamte Casino-Ökonomie.</p>
+      <details class="info-accordion">
+        <summary class="accordion-header"><h2>🏦 DachsBank</h2></summary>
+        <section id="bank" class="content-section accordion-content">
+          <p class="section-intro">Die DachsBank trackt die gesamte Casino-Ökonomie.</p>
 
-        <div class="bank-grid">
+          <div class="bank-grid">
           <div class="bank-card income">
             <h4>Bank erhält</h4>
             <ul>
@@ -1414,14 +1426,15 @@ function renderInfoPage(user = null) {
             <span>Spenden</span>
           </div>
         </div>
-        <p class="section-note"><strong>Startguthaben:</strong> 444.444 DachsTaler • Kann ins Minus gehen!</p>
-      </section>
+          <p class="section-note"><strong>Startguthaben:</strong> 444.444 DachsTaler • Kann ins Minus gehen!</p>
+        </section>
+      </details>
 
       <!-- FAQ -->
-      <section id="faq" class="content-section">
-        <h2>❓ FAQ</h2>
-
-        <details class="faq-item">
+      <details class="info-accordion">
+        <summary class="accordion-header"><h2>❓ FAQ</h2></summary>
+        <section id="faq" class="content-section accordion-content">
+          <details class="faq-item">
           <summary>💰 Wie bekomme ich mehr DachsTaler?</summary>
           <div class="faq-content">
             <ol>
@@ -1493,13 +1506,15 @@ function renderInfoPage(user = null) {
             </ul>
             <p>⚠️ Wild zählt <strong>nicht</strong> für 💎 Free Spins</p>
           </div>
-        </details>
-      </section>
+          </details>
+        </section>
+      </details>
 
       <!-- Hilfe -->
-      <section id="hilfe" class="content-section">
-        <h2>📞 Hilfe bei Glücksspielproblemen</h2>
-        <div class="help-table">
+      <details class="info-accordion">
+        <summary class="accordion-header"><h2>📞 Hilfe bei Glücksspielproblemen</h2></summary>
+        <section id="hilfe" class="content-section accordion-content">
+          <div class="help-table">
           <div class="help-row">
             <span>🇩🇪 Deutschland</span>
             <span>0800 - 1 37 27 00</span>
@@ -1520,9 +1535,10 @@ function renderInfoPage(user = null) {
         <h3>🚫 Selbstausschluss (Selfban)</h3>
         <div class="selfban-info">
           <code>!slots selfban</code>
-          <p>Du wirst sofort vom Spielen ausgeschlossen. <strong>Nur Admins</strong> (exaint_, frechhdachs) können dich wieder freischalten. Der Zeitpunkt wird gespeichert.</p>
-        </div>
-      </section>
+            <p>Du wirst sofort vom Spielen ausgeschlossen. <strong>Nur Admins</strong> (exaint_, frechhdachs) können dich wieder freischalten. Der Zeitpunkt wird gespeichert.</p>
+          </div>
+        </section>
+      </details>
     </div>
   `;
 
@@ -1753,7 +1769,6 @@ async function renderShopPage(env, user = null) {
           <a href="#unlocks" class="toc-item">🔓 Freischaltungen</a>
           <a href="#prestige" class="toc-item">👑 Prestige-Ränge</a>
           <a href="#combos" class="toc-item">💡 Buff-Kombinationen</a>
-          <a href="#guide" class="toc-item">📈 Investment-Guide</a>
         </div>
       </nav>
 
@@ -1842,49 +1857,6 @@ async function renderShopPage(env, user = null) {
         </div>
       </section>
 
-      <!-- Investment-Guide -->
-      <section id="guide" class="content-section">
-        <h2>📈 Investment-Guide</h2>
-        <p class="section-intro">Empfohlene Kauf-Reihenfolge für maximalen Nutzen:</p>
-        <div class="investment-guide">
-          <div class="investment-tier">
-            <span class="tier-label">🌱 Start</span>
-            <div class="tier-content">
-              <strong>Stats Tracker (#18)</strong> - 1.250 DT
-              <p>Verfolge deinen Fortschritt von Anfang an!</p>
-            </div>
-          </div>
-          <div class="investment-tier">
-            <span class="tier-label">🌿 Early Game</span>
-            <div class="tier-content">
-              <strong>!slots 20 & 30 (#13, #19)</strong> - 2.500 DT gesamt
-              <p>2×-3× Gewinne - der erste große Sprung!</p>
-            </div>
-          </div>
-          <div class="investment-tier">
-            <span class="tier-label">🌳 Mid Game</span>
-            <div class="tier-content">
-              <strong>!slots 50 & 100 (#21, #23)</strong> - 5.750 DT gesamt
-              <p>5×-10× Gewinne - jetzt wird's interessant!</p>
-            </div>
-          </div>
-          <div class="investment-tier">
-            <span class="tier-label">🔥 End Game</span>
-            <div class="tier-content">
-              <strong>!slots all (#25)</strong> - 4.444 DT
-              <p>All-In Power - für die mutigen Spieler!</p>
-            </div>
-          </div>
-          <div class="investment-tier">
-            <span class="tier-label">👑 Late Game</span>
-            <div class="tier-content">
-              <strong>Daily Boost (#27)</strong> - 10.000 DT
-              <p>5× Daily Bonus - passives Einkommen!</p>
-            </div>
-          </div>
-        </div>
-        <p class="section-note"><strong>Gesamt-Kosten alle Multiplier-Unlocks:</strong> 12.694 DachsTaler</p>
-      </section>
     </div>
   `;
 

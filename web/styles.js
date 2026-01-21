@@ -3452,6 +3452,66 @@ body {
   background: linear-gradient(135deg, var(--bg-tertiary), rgba(248, 113, 113, 0.05));
 }
 
+/* Info Accordion */
+.info-accordion {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.info-accordion .accordion-header {
+  padding: var(--space-md) var(--space-lg);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.2s ease;
+  user-select: none;
+}
+
+.info-accordion .accordion-header::-webkit-details-marker {
+  display: none;
+}
+
+.info-accordion .accordion-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.info-accordion .accordion-header::after {
+  content: '▼';
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  transition: transform 0.3s ease;
+}
+
+.info-accordion[open] .accordion-header::after {
+  transform: rotate(180deg);
+}
+
+.info-accordion .accordion-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.info-accordion .accordion-content {
+  padding: 0 var(--space-lg) var(--space-lg);
+  animation: accordionSlide 0.3s ease;
+}
+
+@keyframes accordionSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* FAQ */
 .faq-item {
   background: var(--bg-tertiary);

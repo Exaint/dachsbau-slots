@@ -38,3 +38,4 @@ invocation_logs = true
 # limits = { cpu_ms = 50 }
 
 # Worker renamed to dachsbau-slots (v2)
+# D1 Migration completed 2025-01

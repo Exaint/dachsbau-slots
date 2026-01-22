@@ -2282,6 +2282,12 @@ body {
   margin-bottom: var(--space-lg);
 }
 
+/* Override content-section styles when used with collapsible */
+.collapsible-section.content-section {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 .collapsible-header {
   display: flex;
   justify-content: space-between;

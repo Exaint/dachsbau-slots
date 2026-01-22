@@ -555,10 +555,14 @@ async function markTripleCollected(username, symbol, env) {
     const data = await getPlayerAchievements(username, env);
     const symbolKey = getTripleKey(symbol);
 
-    if (!symbolKey || data.stats.triplesCollected[symbolKey]) {
+    if (!symbolKey || data.stats.triplesCollected?.[symbolKey]) {
       return []; // Already collected or unknown symbol
     }
 
+    // Ensure triplesCollected exists before setting
+    if (!data.stats.triplesCollected) {
+      data.stats.triplesCollected = { ...DEFAULT_STATS.triplesCollected };
+    }
     data.stats.triplesCollected[symbolKey] = true;
 
     const unlockedAchievements = [];
@@ -585,7 +589,7 @@ async function markTripleCollected(username, symbol, env) {
 
     // Check FRUIT_COLLECTOR (all fruit triples)
     const fruitKeys = ['watermelon', 'grapes', 'orange', 'lemon', 'cherry'];
-    const allFruitsCollected = fruitKeys.every(k => data.stats.triplesCollected[k]);
+    const allFruitsCollected = fruitKeys.every(k => data.stats.triplesCollected?.[k])
     if (allFruitsCollected && !data.unlockedAt[ACHIEVEMENTS.FRUIT_COLLECTOR.id]) {
       data.unlockedAt[ACHIEVEMENTS.FRUIT_COLLECTOR.id] = Date.now();
       const reward = ACHIEVEMENTS_REWARDS_ENABLED ? (ACHIEVEMENTS.FRUIT_COLLECTOR.reward || 0) : 0;
@@ -597,7 +601,7 @@ async function markTripleCollected(username, symbol, env) {
 
     // Check ALL_TRIPLES (every triple)
     const allKeys = Object.keys(DEFAULT_STATS.triplesCollected);
-    const allTriplesCollected = allKeys.every(k => data.stats.triplesCollected[k]);
+    const allTriplesCollected = allKeys.every(k => data.stats.triplesCollected?.[k]);
     if (allTriplesCollected && !data.unlockedAt[ACHIEVEMENTS.ALL_TRIPLES.id]) {
       data.unlockedAt[ACHIEVEMENTS.ALL_TRIPLES.id] = Date.now();
       const reward = ACHIEVEMENTS_REWARDS_ENABLED ? (ACHIEVEMENTS.ALL_TRIPLES.reward || 0) : 0;

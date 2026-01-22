@@ -62,19 +62,33 @@ async function getBankBalance(env) {
   }
 }
 
-// Hourly Jackpot
+// German timezone formatter for hourly jackpot (consistent with rest of codebase)
+const GERMAN_TIME_FORMATTER = new Intl.DateTimeFormat('de-DE', {
+  timeZone: 'Europe/Berlin',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  day: '2-digit',
+  month: '2-digit',
+  hour12: false
+});
+
+// Hourly Jackpot - Uses German timezone for consistency
 async function checkAndClaimHourlyJackpot(env) {
   const now = new Date();
-  const currentSecond = now.getUTCSeconds();
-  const currentHour = now.getUTCHours();
-  const currentDay = now.getUTCDate();
-  const currentMonth = now.getUTCMonth();
+  const parts = GERMAN_TIME_FORMATTER.formatToParts(now);
+
+  const currentSecond = parseInt(parts.find(p => p.type === 'second').value, 10);
+  const currentHour = parseInt(parts.find(p => p.type === 'hour').value, 10);
+  const currentDay = parseInt(parts.find(p => p.type === 'day').value, 10);
+  const currentMonth = parseInt(parts.find(p => p.type === 'month').value, 10);
+
   const seed = currentDay * 100 + currentMonth * 10 + currentHour;
   const luckySecond = seed % 60;
 
   if (currentSecond !== luckySecond) return false;
 
-  // Check if already claimed this hour
+  // Check if already claimed this hour (German time)
   const key = `jackpot:${currentDay}-${currentMonth}-${currentHour}`;
   const claimed = await env.SLOTS_KV.get(key);
   if (claimed) return false;

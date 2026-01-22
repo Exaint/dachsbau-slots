@@ -8,6 +8,7 @@ import { setDisclaimerAccepted } from '../database.js';
 
 /**
  * Validate CSRF protection for POST requests
+ * Checks Origin header first, falls back to Referer if Origin is missing
  * @param {Request} request - Incoming request
  * @param {URL} url - Request URL
  * @returns {Response|null} Error response or null if valid
@@ -15,12 +16,44 @@ import { setDisclaimerAccepted } from '../database.js';
 export function validateCsrf(request, url) {
   if (request.method === 'POST' && url.pathname.startsWith('/api/')) {
     const origin = request.headers.get('Origin');
-    if (!origin || !origin.startsWith(url.origin)) {
-      return new Response(JSON.stringify({ error: 'Invalid origin' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const referer = request.headers.get('Referer');
+
+    // Check Origin header first (preferred)
+    if (origin) {
+      if (!origin.startsWith(url.origin)) {
+        return new Response(JSON.stringify({ error: 'Invalid origin' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return null; // Valid Origin
     }
+
+    // Fallback to Referer header if Origin is missing
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        if (refererUrl.origin !== url.origin) {
+          return new Response(JSON.stringify({ error: 'Invalid referer' }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        return null; // Valid Referer
+      } catch {
+        // Invalid Referer URL
+        return new Response(JSON.stringify({ error: 'Invalid referer' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Neither Origin nor Referer present - block the request
+    return new Response(JSON.stringify({ error: 'Missing origin header' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
   return null;
 }

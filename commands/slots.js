@@ -298,8 +298,9 @@ async function handleSlot(username, amountParam, url, env) {
       ]);
       const rankSymbol = prestigeRank ? `${prestigeRank} ` : '';
 
-      // Fire-and-forget achievement tracking (insurance used)
-      trackSlotAchievements(username, originalGrid, grid, result, newBalanceWithRefund, isFreeSpinUsed, isAllIn, hasWildCardToken, true, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env);
+      // Fire-and-forget achievement tracking (insurance used) - with error handling
+      trackSlotAchievements(username, originalGrid, grid, result, newBalanceWithRefund, isFreeSpinUsed, isAllIn, hasWildCardToken, true, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env)
+        .catch(err => logError('trackSlotAchievements.insurance', err, { username }));
 
       return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
     }
@@ -363,8 +364,9 @@ async function handleSlot(username, amountParam, url, env) {
       grid: grid.join(' ')
     });
 
-    // Fire-and-forget achievement tracking
-    trackSlotAchievements(username, originalGrid, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env);
+    // Fire-and-forget achievement tracking - with error handling
+    trackSlotAchievements(username, originalGrid, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env)
+      .catch(err => logError('trackSlotAchievements', err, { username }));
 
     if (customMsg) {
       return new Response(`@${username} [ ${grid.join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DachsTaler`, { headers: RESPONSE_HEADERS });

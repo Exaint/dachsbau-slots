@@ -166,8 +166,11 @@ function calculateWin(grid) {
     return { points: 0, message: '💎💎💎 DIAMANTEN JACKPOT! +5 FREE SPINS!', freeSpins: 5 };
   }
 
-  if ((grid[0] === '💎' && grid[1] === '💎' && grid[2] !== '💎' && grid[2] !== '🃏') ||
-    (grid[1] === '💎' && grid[2] === '💎' && grid[0] !== '💎' && grid[0] !== '🃏')) {
+  // Diamond pairs: Check ALL three pair positions (0-1, 1-2, 0-2)
+  // Count real diamonds (not wilds)
+  const realDiamondCount = grid.filter(s => s === '💎').length;
+  if (realDiamondCount === 2) {
+    // Exactly 2 diamonds gives 1 free spin (regardless of position)
     return { points: 0, message: '💎💎 Diamanten! +1 FREE SPIN!', freeSpins: 1 };
   }
 

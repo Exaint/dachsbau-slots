@@ -718,6 +718,12 @@ body {
   color: var(--prestige-color, var(--dachs-gold));
 }
 
+/* Light mode prestige badge adjustments for better contrast */
+[data-theme="light"] .profile-prestige-badge {
+  filter: brightness(0.7) saturate(1.2);
+  font-weight: 600;
+}
+
 /* Profile Role Badges */
 .profile-role-badge {
   display: inline-flex;
@@ -2853,6 +2859,16 @@ body {
   .command-item code {
     min-width: auto;
     width: 100%;
+  }
+
+  /* Help table mobile fixes */
+  .help-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .help-row > *:first-child {
+    font-weight: 600;
   }
 
   /* Info table mobile fixes */

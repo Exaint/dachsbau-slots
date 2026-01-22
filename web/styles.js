@@ -1023,6 +1023,12 @@ body {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
+.category-icon-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .category-header:hover .category-icon {
   transform: scale(1.15) rotate(5deg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);

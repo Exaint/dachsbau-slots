@@ -472,10 +472,27 @@ async function handleD1Migrate(body, env) {
  * Admin: Get D1 migration status
  */
 async function handleD1Status(env) {
+  // Debug: Check what bindings are available
+  const bindings = {
+    hasDB: !!env.DB,
+    hasKV: !!env.SLOTS_KV,
+    envKeys: Object.keys(env || {})
+  };
+
+  if (!env.DB) {
+    return jsonResponse({
+      success: false,
+      error: 'D1 database not bound to worker',
+      debug: bindings,
+      d1Enabled: D1_ENABLED
+    });
+  }
+
   const status = await getMigrationStatus(env);
   return jsonResponse({
     ...status,
-    d1Enabled: D1_ENABLED
+    d1Enabled: D1_ENABLED,
+    debug: bindings
   });
 }
 

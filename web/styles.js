@@ -2274,6 +2274,44 @@ body {
   margin-right: 6px;
 }
 
+/* Collapsible sections */
+.collapsible-section {
+  border: 2px solid var(--primary);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 16px 20px;
+  margin: 0;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark, #7c3aed) 100%);
+  color: white;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.collapsible-header:hover {
+  background: linear-gradient(135deg, var(--primary-dark, #7c3aed) 0%, var(--primary) 100%);
+}
+
+.collapse-icon {
+  font-size: 0.9rem;
+  transition: transform 0.3s ease;
+}
+
+.collapsible-section.expanded .collapse-icon {
+  transform: rotate(180deg);
+}
+
+.collapsible-content {
+  padding: 20px;
+  background: var(--bg-secondary);
+}
+
 .shop-item-content {
   flex: 1;
   min-width: 0;

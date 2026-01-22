@@ -249,9 +249,13 @@ export async function renderShopPage(env, user = null) {
         </div>
       </nav>
 
-      <!-- Kaufanleitung -->
-      <section id="kaufanleitung" class="content-section">
-        <h2>📋 Kaufanleitung</h2>
+      <!-- Kaufanleitung (einklappbar) -->
+      <section id="kaufanleitung" class="content-section collapsible-section">
+        <h2 class="collapsible-header" onclick="toggleSection(this)">
+          <span>📋 Kaufanleitung</span>
+          <span class="collapse-icon">▼</span>
+        </h2>
+        <div class="collapsible-content" style="display: none;">
         <div class="duel-steps">
           <div class="duel-step">
             <span class="step-number">1</span>
@@ -299,6 +303,7 @@ export async function renderShopPage(env, user = null) {
               • <strong>Diamond Mine</strong> - Startet sofort die Mine</p>
             </div>
           </div>
+        </div>
         </div>
       </section>
 

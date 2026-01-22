@@ -727,6 +727,21 @@ function getClientScripts() {
       }
     }
 
+    // Collapsible section toggle
+    function toggleSection(header) {
+      const section = header.closest('.collapsible-section');
+      const content = section.querySelector('.collapsible-content');
+      const isExpanded = section.classList.contains('expanded');
+
+      if (isExpanded) {
+        section.classList.remove('expanded');
+        content.style.display = 'none';
+      } else {
+        section.classList.add('expanded');
+        content.style.display = 'block';
+      }
+    }
+
     // Shop purchase function
     async function buyItem(itemId, itemName, price) {
       const feedback = document.getElementById('purchaseFeedback');

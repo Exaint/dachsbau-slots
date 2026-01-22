@@ -51,13 +51,27 @@ const ITEM_DESCRIPTIONS = {
   39: '1 Stunde lang erhöhte 💎 Diamant-Chance für Free Spins'
 };
 
+// R2 base URL for assets
+const R2_BASE = 'https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev';
+
 // Item icons for shop
 const ITEM_ICONS = {
-  1: '👁️', 2: '🍒', 3: '🍋', 4: '🍊', 5: '🍇', 6: '🍉', 7: '⭐', 8: '🦡',
-  9: '🛡️', 10: '✖️', 11: '🌀', 12: '🎡', 13: '🔓', 14: '🎉', 15: '📦',
-  16: '🎁', 17: '🥉', 18: '📊', 19: '🔓', 20: '🍀', 21: '🔓', 22: '🥈',
-  23: '🔓', 24: '✨', 25: '🔓', 26: '🥇', 27: '💰', 28: '💬', 29: '💎',
-  30: '👑', 31: '🔄', 32: '🌟', 33: '🦡', 34: '<img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Rage.png" alt="Rage Mode" class="shop-item-img">', 35: '📈', 36: '💎',
+  1: `<img src="${R2_BASE}/Peek.png" alt="Peek Token" class="shop-item-img">`,
+  2: '🍒', 3: '🍋', 4: '🍊', 5: '🍇', 6: '🍉', 7: '⭐', 8: '🦡',
+  9: `<img src="${R2_BASE}/Hingabe.png" alt="Insurance" class="shop-item-img">`,
+  10: '✖️',
+  11: `<img src="${R2_BASE}/Chaos.png" alt="Chaos Spin" class="shop-item-img">`,
+  12: '🎡', 13: '🔓', 14: '🎉', 15: '📦',
+  16: `<img src="${R2_BASE}/Mystery.png" alt="Mystery Box" class="shop-item-img">`,
+  17: '🥉', 18: '📊', 19: '🔓', 20: '🍀', 21: '🔓', 22: '🥈',
+  23: '🔓',
+  24: `<img src="${R2_BASE}/HappyHour.png" alt="Happy Hour" class="shop-item-img">`,
+  25: '🔓', 26: '🥇', 27: '💰', 28: '💬', 29: '💎',
+  30: '👑',
+  31: `<img src="${R2_BASE}/Reverse.png" alt="Reverse Spin" class="shop-item-img">`,
+  32: '🌟', 33: '🦡',
+  34: `<img src="${R2_BASE}/Rage.png" alt="Rage Mode" class="shop-item-img">`,
+  35: '📈', 36: '💎',
   37: '🎯', 38: '🃏', 39: '💎'
 };
 
@@ -307,7 +321,7 @@ export async function renderShopPage(env, user = null) {
 
       <!-- Buff-Kombinationen -->
       <section id="combos" class="content-section">
-        <h2>💡 Buff-Kombinationen</h2>
+        <h2><img src="${R2_BASE}/BuffKombination.png" alt="Buff Kombinationen" class="section-title-img"> Buff-Kombinationen</h2>
         <p class="section-intro">Diese Kombinationen sind besonders effektiv:</p>
         <div class="combo-cards">
           <div class="combo-card">

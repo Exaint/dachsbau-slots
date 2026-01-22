@@ -2266,6 +2266,14 @@ body {
   object-fit: contain;
 }
 
+.section-title-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
 .shop-item-content {
   flex: 1;
   min-width: 0;

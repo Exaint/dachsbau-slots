@@ -19,7 +19,16 @@ import {
   isLeaderboardHidden,
   setLeaderboardHidden
 } from '../database.js';
-import { migrateAllUsersToD1, verifyMigration, getMigrationStatus } from '../database/migration.js';
+import {
+  migrateAllUsersToD1,
+  verifyMigration,
+  getMigrationStatus,
+  migrateAchievementsToD1,
+  migrateUnlocksToD1,
+  migrateMonthlyLoginToD1,
+  runFullMigration,
+  getFullMigrationStatus
+} from '../database/migration.js';
 import { getLeaderboard as getD1Leaderboard, D1_ENABLED } from '../database/d1.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
 import { logError, isAdmin, sanitizeUsername } from '../utils.js';
@@ -335,7 +344,7 @@ async function handleAdminApi(url, env, loggedInUser, request) {
     }
 
     // D1 migration actions don't require a target user
-    const d1Actions = ['d1-migrate', 'd1-status', 'd1-verify'];
+    const d1Actions = ['d1-migrate', 'd1-status', 'd1-verify', 'd1-migrate-achievements', 'd1-migrate-unlocks', 'd1-migrate-monthly', 'd1-migrate-full', 'd1-full-status'];
     if (d1Actions.includes(action)) {
       // Handle D1 actions without targetUser requirement
     } else {
@@ -369,6 +378,16 @@ async function handleAdminApi(url, env, loggedInUser, request) {
         return await handleD1Status(env);
       case 'd1-verify':
         return await handleD1Verify(body, env);
+      case 'd1-migrate-achievements':
+        return await handleD1MigrateAchievements(body, env);
+      case 'd1-migrate-unlocks':
+        return await handleD1MigrateUnlocks(body, env);
+      case 'd1-migrate-monthly':
+        return await handleD1MigrateMonthly(body, env);
+      case 'd1-migrate-full':
+        return await handleD1MigrateFull(body, env);
+      case 'd1-full-status':
+        return await handleD1FullStatus(env);
       default:
         return jsonResponse({ error: 'Unknown admin action' }, 400);
     }
@@ -517,5 +536,53 @@ async function handleD1Verify(body, env) {
   const { sampleSize = 50 } = body;
 
   const result = await verifyMigration(env, sampleSize);
+  return jsonResponse(result);
+}
+
+/**
+ * Admin: Migrate achievements from KV to D1
+ */
+async function handleD1MigrateAchievements(body, env) {
+  const { batchSize = 50, maxUsers = null, dryRun = false } = body;
+
+  const result = await migrateAchievementsToD1(env, { batchSize, maxUsers, dryRun });
+  return jsonResponse(result);
+}
+
+/**
+ * Admin: Migrate unlocks from KV to D1
+ */
+async function handleD1MigrateUnlocks(body, env) {
+  const { dryRun = false } = body;
+
+  const result = await migrateUnlocksToD1(env, { dryRun });
+  return jsonResponse(result);
+}
+
+/**
+ * Admin: Migrate monthly login from KV to D1
+ */
+async function handleD1MigrateMonthly(body, env) {
+  const { dryRun = false } = body;
+
+  const result = await migrateMonthlyLoginToD1(env, { dryRun });
+  return jsonResponse(result);
+}
+
+/**
+ * Admin: Run full migration (users + achievements + unlocks + monthly)
+ */
+async function handleD1MigrateFull(body, env) {
+  const { batchSize = 50, dryRun = false } = body;
+
+  const result = await runFullMigration(env, { batchSize, dryRun });
+  return jsonResponse(result);
+}
+
+/**
+ * Admin: Get comprehensive D1 migration status
+ */
+async function handleD1FullStatus(env) {
+  const result = await getFullMigrationStatus(env);
   return jsonResponse(result);
 }

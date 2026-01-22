@@ -28,7 +28,7 @@ jobs:
         run: |
           wrangler deploy
 
-          # Fix KV binding (Wrangler bug workaround)
+          # Fix bindings (Wrangler bug workaround) - includes both KV and D1
           curl -X PATCH "https://api.cloudflare.com/client/v4/accounts/a532928aecc69ee43a6aafa158d4d788/workers/scripts/dachsbau-slots/settings" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -F 'settings={"bindings":[{"type":"kv_namespace","name":"SLOTS_KV","namespace_id":"69477a8fb2aa400d9da5496bf6d52ef7"}]}'
+            -F 'settings={"bindings":[{"type":"kv_namespace","name":"SLOTS_KV","namespace_id":"69477a8fb2aa400d9da5496bf6d52ef7"},{"type":"d1","name":"DB","id":"f0129de7-504a-4287-bad2-4b499a341942"}]}'

@@ -8,7 +8,23 @@
 // ============================================================================
 
 // Spin loss messages (random selection)
-export const SPIN_LOSS_MESSAGES = ['Leider verloren! 😢', 'Nächstes Mal!', 'Fast! Versuch es nochmal!', 'Kein Glück diesmal...'];
+export const SPIN_LOSS_MESSAGES = [
+  'Knapp daneben!',
+  'Nicht dein Spin!',
+  'Der Dachs versteckt sich...',
+  'Nichts getroffen!',
+  'Nächstes Mal!',
+  'Kein Treffer!',
+  'Pech gehabt!',
+  'Fast!',
+  'Leer ausgegangen!',
+  'Kein Glück diesmal!',
+  'Vorbei gedreht!',
+  'Daneben!',
+  'Leider nichts!',
+  'Der Dachs schaut weg...',
+  'Keine Kombo!'
+];
 
 // ============================================================================
 // Error Messages - User facing

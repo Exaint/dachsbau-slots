@@ -197,7 +197,7 @@ function calculateWin(grid) {
  * Build response message in D2 format
  * Format: [ Grid ] Result! +X DachsTaler 💰 ║ Natural Bonuses ║ 🛒 Shop Buffs ║ Kontostand: X DachsTaler
  */
-function buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage) {
+function buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage, spinCost = 0) {
   const rankSymbol = rank ? `${rank} ` : '';
   const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DachsTaler)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
   const middleRow = grid.join(' ');
@@ -208,9 +208,10 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
   if (result.freeSpins && result.freeSpins > 0) {
     messageParts.push(result.message);
   }
-  // Win
-  else if (totalWin > 0) {
-    messageParts.push(`${result.message} +${totalWin} DachsTaler 💰`);
+  // Net win (payout >= spin cost)
+  else if (totalWin > 0 && totalWin >= spinCost) {
+    const netWin = totalWin - spinCost;
+    messageParts.push(`${result.message} +${netWin} DT 💰`);
 
     // Hourly Jackpot (special natural bonus)
     if (hourlyJackpotWon) {
@@ -232,9 +233,14 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
       messageParts.push(`║ 🛒 ${shopBuffs.join(', ')}`);
     }
   }
-  // Loss
+  // Partial win (payout > 0 but < spin cost) = net loss
+  else if (totalWin > 0 && totalWin < spinCost) {
+    const netLoss = spinCost - totalWin;
+    messageParts.push(`${result.message} ${totalWin} von ${spinCost} DT zurück • -${netLoss} DT 💸`);
+  }
+  // Total loss
   else {
-    messageParts.push(`${result.message} 💸`);
+    messageParts.push(`${result.message} -${spinCost} DT 💸`);
   }
 
   messageParts.push(`║ Kontostand: ${newBalance} DachsTaler`);

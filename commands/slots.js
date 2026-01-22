@@ -372,7 +372,7 @@ async function handleSlot(username, amountParam, url, env) {
 
     // Build response
     const totalWin = result.points + totalBonuses;
-    const message = buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage);
+    const message = buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage, spinCost);
     return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {
     logError('handleSlot', error, { username, amountParam });

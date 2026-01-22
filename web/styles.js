@@ -2392,6 +2392,19 @@ body {
   border: 1px solid #f44336;
 }
 
+/* Item-level error message (shown directly at the shop item) */
+.item-error {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(244, 67, 54, 0.15);
+  color: var(--error);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }

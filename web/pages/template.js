@@ -706,26 +706,42 @@ function getClientScripts() {
           // Update all buy buttons based on new balance
           updateBuyButtons(result.newBalance);
         } else {
-          // Show error message
-          if (feedback) {
-            feedback.className = 'purchase-feedback error';
-            feedback.textContent = '✗ ' + (result.error || 'Fehler beim Kauf');
-            feedback.style.display = 'block';
-            setTimeout(() => { feedback.style.display = 'none'; }, 4000);
-          }
+          // Show error message near the item
+          showItemError(btn, result.error || 'Fehler beim Kauf');
           btn.disabled = false;
           btn.textContent = 'Kaufen';
         }
       } catch (error) {
-        if (feedback) {
-          feedback.className = 'purchase-feedback error';
-          feedback.textContent = '✗ Netzwerkfehler';
-          feedback.style.display = 'block';
-          setTimeout(() => { feedback.style.display = 'none'; }, 4000);
-        }
+        showItemError(btn, 'Netzwerkfehler');
         btn.disabled = false;
         btn.textContent = 'Kaufen';
       }
+    }
+
+    // Show error message directly at the item
+    function showItemError(btn, message) {
+      const itemEl = btn.closest('.shop-item');
+      if (!itemEl) return;
+
+      // Remove existing error if any
+      const existingError = itemEl.querySelector('.item-error');
+      if (existingError) existingError.remove();
+
+      // Create error element
+      const errorEl = document.createElement('div');
+      errorEl.className = 'item-error';
+      errorEl.textContent = '✗ ' + message;
+
+      // Insert after the meta section
+      const meta = itemEl.querySelector('.shop-item-meta');
+      if (meta) {
+        meta.parentNode.insertBefore(errorEl, meta.nextSibling);
+      } else {
+        itemEl.appendChild(errorEl);
+      }
+
+      // Auto-remove after 4 seconds
+      setTimeout(() => { errorEl.remove(); }, 4000);
     }
 
     // Update all buy buttons based on new balance

@@ -1,9 +1,13 @@
 /**
  * Progression System - Streaks, Stats, Monthly Login, Prestige, Unlocks
+ *
+ * Uses DUAL_WRITE pattern: writes go to both KV and D1 for consistency
  */
 
 import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, KV_TRUE, MAX_RETRIES } from '../constants.js';
 import { getCurrentMonth, getCurrentDate, logError, kvKey, exponentialBackoff } from '../utils.js';
+import { D1_ENABLED, DUAL_WRITE, upsertUser } from './d1.js';
+import { addUnlockD1, updateMonthlyLoginD1, incrementStatD1, updateBiggestWinD1 } from './d1-achievements.js';
 
 // Streak Multiplier
 async function getStreakMultiplier(username, env) {
@@ -66,6 +70,11 @@ async function getPrestigeRank(username, env) {
 async function setPrestigeRank(username, rank, env) {
   try {
     await env.SLOTS_KV.put(kvKey('rank:', username), rank);
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await upsertUser(username, { prestige_rank: rank }, env);
+    }
   } catch (error) {
     logError('setPrestigeRank', error, { username, rank });
   }
@@ -85,6 +94,11 @@ async function hasUnlock(username, unlockKey, env) {
 async function setUnlock(username, unlockKey, env) {
   try {
     await env.SLOTS_KV.put(kvKey('unlock:', username, unlockKey), 'true');
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await addUnlockD1(username, unlockKey, env);
+    }
   } catch (error) {
     logError('setUnlock', error, { username, unlockKey });
   }
@@ -143,6 +157,12 @@ async function updateMonthlyLogin(username, env) {
     }
 
     await env.SLOTS_KV.put(kvKey('monthlylogin:', username), JSON.stringify(monthlyLogin));
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await updateMonthlyLoginD1(username, monthlyLogin, env);
+    }
+
     return monthlyLogin;
   } catch (error) {
     logError('updateMonthlyLogin', error, { username });
@@ -159,6 +179,11 @@ async function markMilestoneClaimed(username, milestone, env, monthlyLogin = nul
     if (!data.claimedMilestones.includes(milestone)) {
       data.claimedMilestones.push(milestone);
       await env.SLOTS_KV.put(kvKey('monthlylogin:', username), JSON.stringify(data));
+
+      // DUAL_WRITE: Also update D1
+      if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        await updateMonthlyLoginD1(username, data, env);
+      }
     }
   } catch (error) {
     logError('markMilestoneClaimed', error, { username, milestone });
@@ -204,15 +229,32 @@ async function getStats(username, env) {
 async function updateStats(username, isWin, winAmount, lostAmount, env) {
   try {
     const stats = await getStats(username, env);
+    const wasNewBiggestWin = isWin && winAmount > stats.biggestWin;
+
     stats.totalSpins++;
     if (isWin) {
       stats.wins++;
       stats.totalWon += winAmount;
-      if (winAmount > stats.biggestWin) stats.biggestWin = winAmount;
+      if (wasNewBiggestWin) stats.biggestWin = winAmount;
     } else {
       stats.totalLost += lostAmount;
     }
     await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      // Increment individual stats in D1
+      await incrementStatD1(username, 'totalSpins', 1, env);
+      if (isWin) {
+        await incrementStatD1(username, 'wins', 1, env);
+        await incrementStatD1(username, 'totalWon', winAmount, env);
+        if (wasNewBiggestWin) {
+          await updateBiggestWinD1(username, winAmount, env);
+        }
+      } else {
+        await incrementStatD1(username, 'totalLost', lostAmount, env);
+      }
+    }
   } catch (error) {
     logError('updateStats', error, { username });
   }

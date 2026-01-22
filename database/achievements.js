@@ -16,6 +16,8 @@
 
 import { ACHIEVEMENTS, ACHIEVEMENTS_REWARDS_ENABLED, getAchievementById } from '../constants/achievements.js';
 import { logError, kvKey } from '../utils.js';
+import { D1_ENABLED, DUAL_WRITE } from './d1.js';
+import { unlockAchievementD1, lockAchievementD1, incrementStatD1, updatePlayerStatsD1 } from './d1-achievements.js';
 
 // Cache keys (defined early so they can be used in migrations)
 const STATS_CACHE_KEY = 'cache:achievement_stats_v3';
@@ -425,6 +427,14 @@ function migrateAchievementsFromStats(data) {
 async function savePlayerAchievements(username, data, env) {
   try {
     await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
+
+    // DUAL_WRITE: Also update D1 stats
+    if (D1_ENABLED && DUAL_WRITE && env.DB && data.stats) {
+      await updatePlayerStatsD1(username, {
+        ...data.stats,
+        pendingRewards: data.pendingRewards || 0
+      }, env);
+    }
   } catch (error) {
     logError('savePlayerAchievements', error, { username });
   }
@@ -460,10 +470,17 @@ async function lockAchievement(username, achievementId, env) {
     delete data.unlockedAt[achievementId];
 
     // Save and decrement global counter in parallel
-    await Promise.all([
+    const promises = [
       savePlayerAchievements(username, data, env),
       decrementAchievementCounter(achievementId, env)
-    ]);
+    ];
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      promises.push(lockAchievementD1(username, achievementId, env));
+    }
+
+    await Promise.all(promises);
 
     return { locked: true, wasUnlocked: true };
   } catch (error) {
@@ -522,10 +539,17 @@ async function unlockAchievement(username, achievementId, env, existingData = nu
     }
 
     // Save player achievements and increment global counter in parallel
-    await Promise.all([
+    const promises = [
       savePlayerAchievements(username, data, env),
       incrementAchievementCounter(achievementId, env)
-    ]);
+    ];
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      promises.push(unlockAchievementD1(username, achievementId, env));
+    }
+
+    await Promise.all(promises);
 
     return {
       unlocked: true,
@@ -578,6 +602,12 @@ async function updateAchievementStat(username, statKey, increment, env) {
     }
 
     await savePlayerAchievements(username, data, env);
+
+    // DUAL_WRITE: Also increment stat in D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await incrementStatD1(username, statKey, increment, env);
+    }
+
     return unlockedAchievements;
   } catch (error) {
     logError('updateAchievementStat', error, { username, statKey, increment });

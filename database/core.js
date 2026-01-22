@@ -1,9 +1,12 @@
 /**
  * Core Database Functions - Balance, Daily, Cooldown, Disclaimer, Selfban
+ *
+ * Uses DUAL_WRITE pattern: writes go to both KV and D1 for consistency
  */
 
 import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE, COOLDOWN_TTL_SECONDS, KV_TRUE, KV_ACCEPTED } from '../constants.js';
 import { logError, kvKey } from '../utils.js';
+import { D1_ENABLED, DUAL_WRITE, updateBalance as updateBalanceD1, upsertUser } from './d1.js';
 
 // Balance Functions
 async function getBalance(username, env) {
@@ -25,7 +28,14 @@ async function getBalance(username, env) {
 async function setBalance(username, balance, env) {
   try {
     const safeBalance = Math.max(0, Math.min(balance, MAX_BALANCE));
+
+    // Write to KV (primary)
     await env.SLOTS_KV.put(kvKey('user:', username), safeBalance.toString());
+
+    // DUAL_WRITE: Also write to D1 for consistency
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await updateBalanceD1(username, safeBalance, env);
+    }
   } catch (error) {
     logError('setBalance', error, { username, balance });
   }
@@ -83,6 +93,11 @@ async function hasAcceptedDisclaimer(username, env) {
 async function setDisclaimerAccepted(username, env) {
   try {
     await env.SLOTS_KV.put(kvKey('disclaimer:', username), KV_ACCEPTED);
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await upsertUser(username, { disclaimer_accepted: true }, env);
+    }
   } catch (error) {
     logError('setDisclaimerAccepted', error, { username });
   }
@@ -118,6 +133,11 @@ async function setSelfBan(username, env) {
     };
 
     await env.SLOTS_KV.put(kvKey('selfban:', username), JSON.stringify(banData));
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await upsertUser(username, { selfban_timestamp: now }, env);
+    }
   } catch (error) {
     logError('setSelfBan', error, { username });
   }
@@ -126,6 +146,11 @@ async function setSelfBan(username, env) {
 async function removeSelfBan(username, env) {
   try {
     await env.SLOTS_KV.delete(kvKey('selfban:', username));
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await upsertUser(username, { selfban_timestamp: null }, env);
+    }
   } catch (error) {
     logError('removeSelfBan', error, { username });
   }
@@ -155,7 +180,13 @@ async function getLastActive(username, env) {
 
 async function setLastActive(username, env) {
   try {
-    await env.SLOTS_KV.put(kvKey('lastActive:', username), Date.now().toString());
+    const now = Date.now();
+    await env.SLOTS_KV.put(kvKey('lastActive:', username), now.toString());
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await upsertUser(username, { last_active_at: now }, env);
+    }
   } catch (error) {
     logError('setLastActive', error, { username });
   }
@@ -180,6 +211,12 @@ async function setLeaderboardHidden(username, hidden, env) {
     } else {
       await env.SLOTS_KV.delete(key);
     }
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await upsertUser(username, { leaderboard_hidden: hidden }, env);
+    }
+
     return true;
   } catch (error) {
     logError('setLeaderboardHidden', error, { username, hidden });

@@ -221,6 +221,25 @@ async function getPlayerAchievements(username, env) {
       }
     }
 
+    // One-time transfer achievement catch-up: Unlock FIRST_TRANSFER if user has totalTransferred > 0
+    if (!data.transferMigrated) {
+      if ((data.stats.totalTransferred || 0) > 0 && !data.unlockedAt[ACHIEVEMENTS.FIRST_TRANSFER.id]) {
+        const now = Date.now();
+        data.unlockedAt[ACHIEVEMENTS.FIRST_TRANSFER.id] = now;
+        if (!ACHIEVEMENTS_REWARDS_ENABLED && ACHIEVEMENTS.FIRST_TRANSFER.reward > 0) {
+          data.pendingRewards = (data.pendingRewards || 0) + ACHIEVEMENTS.FIRST_TRANSFER.reward;
+        }
+        await Promise.all([
+          env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify({ ...data, transferMigrated: true })),
+          incrementAchievementCounter(ACHIEVEMENTS.FIRST_TRANSFER.id, env)
+        ]);
+        data.transferMigrated = true;
+      } else {
+        data.transferMigrated = true;
+        await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
+      }
+    }
+
     // One-time balance achievement catch-up: Check current balance and unlock missed balance achievements
     if (!data.balanceMigrated) {
       const balanceData = await env.SLOTS_KV.get(kvKey('user:', username));

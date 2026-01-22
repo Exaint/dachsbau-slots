@@ -6,7 +6,7 @@ import { hasAcceptedDisclaimer } from '../../database.js';
 import { isSelfBanned } from '../../database.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getUserRole, getTwitchUser } from '../twitch.js';
-import { LEADERBOARD_LIMIT } from '../../constants.js';
+import { LEADERBOARD_LIMIT, LEADERBOARD_DISPLAY_LIMIT } from '../../constants.js';
 import { isAdmin, logError } from '../../utils.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { ROLE_BADGES } from './constants.js';
@@ -84,23 +84,46 @@ export async function handleLeaderboardPage(env, loggedInUser = null, showAll = 
     // Sort by balance descending
     users.sort((a, b) => b.balance - a.balance);
 
-    // Get top 100 for display
-    const top100 = users.slice(0, 100);
+    // Get top N for display (LEADERBOARD_DISPLAY_LIMIT = 25)
+    const topN = users.slice(0, LEADERBOARD_DISPLAY_LIMIT);
 
-    // Fetch Twitch roles and avatars for all top 100 players in parallel
+    // Find logged-in user's rank if they exist and are not in top N
+    let currentUserRank = null;
+    if (loggedInUser) {
+      const userIndex = users.findIndex(u => u.username.toLowerCase() === loggedInUser.username.toLowerCase());
+      if (userIndex >= LEADERBOARD_DISPLAY_LIMIT) {
+        // User is not in top N, get their data
+        currentUserRank = {
+          ...users[userIndex],
+          rank: userIndex + 1
+        };
+      }
+    }
+
+    // Fetch Twitch roles and avatars for top N players
+    // Also fetch for current user if they're not in top N
+    const usersToFetch = currentUserRank ? [...topN, currentUserRank] : topN;
+
     const [roles, twitchUsers] = await Promise.all([
-      Promise.all(top100.map(user => getUserRole(user.username, env))),
-      Promise.all(top100.map(user => getTwitchUser(user.username, env)))
+      Promise.all(usersToFetch.map(user => getUserRole(user.username, env))),
+      Promise.all(usersToFetch.map(user => getTwitchUser(user.username, env)))
     ]);
 
-    // Add roles and avatars to user objects
-    const playersWithRoles = top100.map((user, index) => ({
+    // Add roles and avatars to top N
+    const playersWithRoles = topN.map((user, index) => ({
       ...user,
       role: roles[index],
       avatar: twitchUsers[index]?.avatar || null
     }));
 
-    return htmlResponse(renderLeaderboardPage(playersWithRoles, loggedInUser, actualShowAll, isAdminUser));
+    // Add roles and avatar to current user if exists
+    if (currentUserRank) {
+      const userFetchIndex = topN.length; // Last item in usersToFetch
+      currentUserRank.role = roles[userFetchIndex];
+      currentUserRank.avatar = twitchUsers[userFetchIndex]?.avatar || null;
+    }
+
+    return htmlResponse(renderLeaderboardPage(playersWithRoles, loggedInUser, actualShowAll, isAdminUser, currentUserRank));
   } catch (error) {
     logError('handleLeaderboardPage', error);
     const { renderErrorPage } = await import('./errors.js');
@@ -110,13 +133,18 @@ export async function handleLeaderboardPage(env, loggedInUser = null, showAll = 
 
 /**
  * Leaderboard page renderer
+ * @param {Array} players - Top N players
+ * @param {Object|null} user - Logged in user
+ * @param {boolean} showAll - Admin show all mode
+ * @param {boolean} isAdminUser - Is admin
+ * @param {Object|null} currentUserRank - Current user's rank data if not in top N
  */
-export function renderLeaderboardPage(players, user = null, showAll = false, isAdminUser = false) {
-  const getRankDisplay = (index) => {
-    if (index === 0) return '🥇';
-    if (index === 1) return '🥈';
-    if (index === 2) return '🥉';
-    return `#${index + 1}`;
+export function renderLeaderboardPage(players, user = null, showAll = false, isAdminUser = false, currentUserRank = null) {
+  const getRankDisplay = (rank) => {
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return `#${rank}`;
   };
 
   // Get role badge HTML for a player
@@ -142,30 +170,43 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
     return '';
   };
 
+  // Helper to render a single leaderboard item
+  const renderPlayerItem = (player, rank, extraClass = '') => {
+    const roleBadgeHtml = getRoleBadge(player.username, player.role);
+    const avatarHtml = player.avatar
+      ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar">`
+      : `<div class="leaderboard-avatar-placeholder">👤</div>`;
+    const noDisclaimerBadge = showAll && !player.hasDisclaimer
+      ? '<span class="no-disclaimer-badge" title="Kein Disclaimer akzeptiert">⚠️</span>'
+      : '';
+    const noDisclaimerClass = showAll && !player.hasDisclaimer ? ' no-disclaimer' : '';
+    return `
+      <div class="leaderboard-item${noDisclaimerClass}${extraClass}">
+        <div class="leaderboard-rank">${getRankDisplay(rank)}</div>
+        ${avatarHtml}
+        <div class="leaderboard-user">
+          <a href="?page=profile&user=${encodeURIComponent(player.username)}" class="leaderboard-username-link">${escapeHtml(player.username)}</a>
+          ${noDisclaimerBadge}
+          ${roleBadgeHtml ? `<span class="leaderboard-role">${roleBadgeHtml}</span>` : ''}
+        </div>
+        <div class="leaderboard-balance">${formatNumber(player.balance)} DT</div>
+      </div>
+    `;
+  };
+
   const playersHtml = players.length === 0
     ? '<p style="text-align: center; color: var(--text-muted); padding: 40px;">Noch keine Spieler gefunden.</p>'
-    : players.map((player, index) => {
-        const roleBadgeHtml = getRoleBadge(player.username, player.role);
-        const avatarHtml = player.avatar
-          ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar">`
-          : `<div class="leaderboard-avatar-placeholder">👤</div>`;
-        // Show warning icon for users without disclaimer (only visible in admin showAll mode)
-        const noDisclaimerBadge = showAll && !player.hasDisclaimer
-          ? '<span class="no-disclaimer-badge" title="Kein Disclaimer akzeptiert">⚠️</span>'
-          : '';
-        return `
-        <div class="leaderboard-item${showAll && !player.hasDisclaimer ? ' no-disclaimer' : ''}">
-          <div class="leaderboard-rank">${getRankDisplay(index)}</div>
-          ${avatarHtml}
-          <div class="leaderboard-user">
-            <a href="?page=profile&user=${encodeURIComponent(player.username)}" class="leaderboard-username-link">${escapeHtml(player.username)}</a>
-            ${noDisclaimerBadge}
-            ${roleBadgeHtml ? `<span class="leaderboard-role">${roleBadgeHtml}</span>` : ''}
-          </div>
-          <div class="leaderboard-balance">${formatNumber(player.balance)} DT</div>
-        </div>
-      `;
-      }).join('');
+    : players.map((player, index) => renderPlayerItem(player, index + 1)).join('');
+
+  // Render current user's rank section if they're not in top N
+  const currentUserHtml = currentUserRank ? `
+    <div class="leaderboard-user-section">
+      <div class="leaderboard-user-divider">
+        <span>Dein Rang</span>
+      </div>
+      ${renderPlayerItem(currentUserRank, currentUserRank.rank, ' current-user')}
+    </div>
+  ` : '';
 
   // Admin filter toggle (only shown to admins)
   const adminFilterHtml = isAdminUser ? `
@@ -202,6 +243,7 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
       <div class="leaderboard-list">
         ${playersHtml}
       </div>
+      ${currentUserHtml}
     </div>
   `;
 

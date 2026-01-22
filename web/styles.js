@@ -1365,6 +1365,38 @@ body {
   border-left: 3px solid orange;
 }
 
+/* Current user rank section */
+.leaderboard-user-section {
+  margin-top: 24px;
+}
+
+.leaderboard-user-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.leaderboard-user-divider::before,
+.leaderboard-user-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.leaderboard-user-divider span {
+  white-space: nowrap;
+}
+
+.leaderboard-item.current-user {
+  background: rgba(145, 71, 255, 0.15);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+}
+
 /* Home Page */
 .hero {
   text-align: center;

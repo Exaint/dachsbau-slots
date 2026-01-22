@@ -115,7 +115,8 @@ export const LEADERBOARD_CACHE_TTL = 300;
 // 7. Leaderboard Settings
 // ===========================================
 
-export const LEADERBOARD_LIMIT = 1000;
+export const LEADERBOARD_LIMIT = 500; // Max users to fetch from KV for ranking
+export const LEADERBOARD_DISPLAY_LIMIT = 25; // Top N to display on leaderboard
 export const LEADERBOARD_BATCH_SIZE = 50;
 export const LEADERBOARD_MIN_USERS = 100;
 

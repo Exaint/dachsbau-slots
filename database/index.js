@@ -116,6 +116,7 @@ export {
   lockAchievement,
   updateAchievementStat,
   markTripleCollected,
+  recordDachsHit,
   checkAndUnlockAchievement,
   checkBalanceAchievements,
   checkBigWinAchievements,
@@ -124,3 +125,9 @@ export {
   getUnlockedAchievementCount,
   getAchievementStats
 } from './achievements.js';
+
+// D1 Triple tracking (direct D1 access for admin/display)
+export {
+  getPlayerTriplesD1,
+  getTripleStatsD1
+} from './d1-achievements.js';

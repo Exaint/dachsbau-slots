@@ -26,6 +26,7 @@ import {
   consumeBoost,
   updateAchievementStat,
   markTripleCollected,
+  recordDachsHit,
   checkAndUnlockAchievement,
   checkBalanceAchievements,
   checkBigWinAchievements,
@@ -91,6 +92,10 @@ export async function trackSlotAchievements(username, originalGrid, displayGrid,
       const dachsCount = originalGrid.filter(s => s === '🦡').length;
       if (dachsCount === 2) {
         achievementsToUnlock.push(ACHIEVEMENTS.DACHS_PAIR.id);
+      }
+      // Record dachs single/double to D1 (triple is recorded via markTripleCollected)
+      if (dachsCount < 3) {
+        recordDachsHit(username, dachsCount, env);
       }
     }
 

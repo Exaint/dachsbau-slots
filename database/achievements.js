@@ -17,7 +17,7 @@
 import { ACHIEVEMENTS, ACHIEVEMENTS_REWARDS_ENABLED, getAchievementById } from '../constants/achievements.js';
 import { logError, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE } from './d1.js';
-import { unlockAchievementD1, lockAchievementD1, incrementStatD1, updatePlayerStatsD1 } from './d1-achievements.js';
+import { unlockAchievementD1, lockAchievementD1, incrementStatD1, updatePlayerStatsD1, recordTripleHitD1 } from './d1-achievements.js';
 
 // Cache keys (defined early so they can be used in migrations)
 const STATS_CACHE_KEY = 'cache:achievement_stats_v3';
@@ -617,14 +617,27 @@ async function updateAchievementStat(username, statKey, increment, env) {
 
 /**
  * Mark a triple as collected and check for collection achievements
+ * Also records to D1 for detailed tracking with timestamps and counters
  */
 async function markTripleCollected(username, symbol, env) {
   try {
     const data = await getPlayerAchievements(username, env);
     const symbolKey = getTripleKey(symbol);
 
-    if (!symbolKey || data.stats.triplesCollected?.[symbolKey]) {
-      return []; // Already collected or unknown symbol
+    if (!symbolKey) {
+      return []; // Unknown symbol
+    }
+
+    // DUAL_WRITE: Always record to D1 (increments counter even if already collected)
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      // For dachs triples, use dachs_triple key
+      const d1Key = symbolKey === 'dachs' ? 'dachs_triple' : symbolKey;
+      await recordTripleHitD1(username, d1Key, env);
+    }
+
+    // Check if already collected in KV (for achievement tracking)
+    if (data.stats.triplesCollected?.[symbolKey]) {
+      return []; // Already collected, but D1 counter was incremented above
     }
 
     // Ensure triplesCollected exists before setting
@@ -684,6 +697,24 @@ async function markTripleCollected(username, symbol, env) {
   } catch (error) {
     logError('markTripleCollected', error, { username, symbol });
     return [];
+  }
+}
+
+/**
+ * Record a dachs hit (single or double) to D1
+ * Called from slots helpers for non-triple dachs appearances
+ */
+async function recordDachsHit(username, count, env) {
+  if (!D1_ENABLED || !DUAL_WRITE || !env.DB) return;
+
+  try {
+    if (count === 1) {
+      await recordTripleHitD1(username, 'dachs_single', env);
+    } else if (count === 2) {
+      await recordTripleHitD1(username, 'dachs_double', env);
+    }
+  } catch (error) {
+    logError('recordDachsHit', error, { username, count });
   }
 }
 
@@ -1032,6 +1063,7 @@ export {
   lockAchievement,
   updateAchievementStat,
   markTripleCollected,
+  recordDachsHit,
   checkAndUnlockAchievement,
   checkBalanceAchievements,
   checkBigWinAchievements,

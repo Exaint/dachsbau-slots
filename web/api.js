@@ -623,24 +623,23 @@ async function handleAdminGetRefundableItems(username, env) {
   const items = [];
 
   // Add prestige ranks
+  const rankOrder = ['🥉', '🥈', '🥇', '💎', '👑'];
+  const currentRankIndex = rankOrder.indexOf(currentRank);
+
   for (const [itemKey, item] of Object.entries(REFUNDABLE_ITEMS)) {
     if (item.type === 'prestige') {
-      const owned = currentRank === item.rank;
-      // Check if blocked by higher rank
-      const blockedByHigherRank = item.blockedBy.some(higherRank => {
-        // User has a higher rank that blocks this refund
-        const rankOrder = ['🥉', '🥈', '🥇', '💎', '👑'];
-        const currentIndex = rankOrder.indexOf(currentRank);
-        const higherIndex = rankOrder.indexOf(higherRank);
-        return currentIndex >= higherIndex && currentIndex !== -1;
-      });
+      const itemRankIndex = rankOrder.indexOf(item.rank);
+      // User owns this rank if their current rank is equal or higher
+      const owned = currentRankIndex >= itemRankIndex && currentRankIndex !== -1;
+      // Can only refund the current (highest) rank
+      const canRefund = currentRank === item.rank;
 
       items.push({
         key: itemKey,
         ...item,
         owned,
-        canRefund: owned && !blockedByHigherRank,
-        blockedReason: owned && blockedByHigherRank ? `Muss zuerst höheren Rang refunden` : null
+        canRefund,
+        blockedReason: owned && !canRefund ? `Muss zuerst höheren Rang refunden` : null
       });
     } else if (item.type === 'unlock') {
       const owned = ownedUnlocks[item.unlockKey] || false;

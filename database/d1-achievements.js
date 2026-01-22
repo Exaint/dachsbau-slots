@@ -624,6 +624,82 @@ async function rebuildAchievementStats(env) {
 }
 
 // ============================================
+// Triple Tracking
+// ============================================
+
+/**
+ * Record a triple hit for a player
+ * Creates entry if first hit, otherwise increments counter
+ */
+async function recordTripleHitD1(username, tripleKey, env) {
+  if (!D1_ENABLED || !env.DB) return null;
+
+  try {
+    const now = Date.now();
+    const usernameLower = username.toLowerCase();
+
+    // Try to insert, on conflict update hit_count and last_hit_at
+    await env.DB.prepare(`
+      INSERT INTO player_triples (username, triple_key, first_hit_at, hit_count, last_hit_at)
+      VALUES (?, ?, ?, 1, ?)
+      ON CONFLICT(username, triple_key) DO UPDATE SET
+        hit_count = hit_count + 1,
+        last_hit_at = excluded.last_hit_at
+    `).bind(usernameLower, tripleKey, now, now).run();
+
+    return true;
+  } catch (error) {
+    logError('d1.recordTripleHit', error, { username, tripleKey });
+    return false;
+  }
+}
+
+/**
+ * Get all triples for a player
+ */
+async function getPlayerTriplesD1(username, env) {
+  if (!D1_ENABLED || !env.DB) return null;
+
+  try {
+    const result = await env.DB.prepare(`
+      SELECT triple_key, first_hit_at, hit_count, last_hit_at
+      FROM player_triples
+      WHERE username = ?
+      ORDER BY first_hit_at ASC
+    `).bind(username.toLowerCase()).all();
+
+    return result.results || [];
+  } catch (error) {
+    logError('d1.getPlayerTriples', error, { username });
+    return null;
+  }
+}
+
+/**
+ * Get global triple statistics (how many players hit each triple)
+ */
+async function getTripleStatsD1(env) {
+  if (!D1_ENABLED || !env.DB) return null;
+
+  try {
+    const result = await env.DB.prepare(`
+      SELECT
+        triple_key,
+        COUNT(DISTINCT username) as player_count,
+        SUM(hit_count) as total_hits,
+        MIN(first_hit_at) as first_global_hit
+      FROM player_triples
+      GROUP BY triple_key
+    `).all();
+
+    return result.results || [];
+  } catch (error) {
+    logError('d1.getTripleStats', error);
+    return null;
+  }
+}
+
+// ============================================
 // Exports
 // ============================================
 
@@ -649,6 +725,11 @@ export {
   // Monthly Login
   getMonthlyLoginD1,
   updateMonthlyLoginD1,
+
+  // Triples
+  recordTripleHitD1,
+  getPlayerTriplesD1,
+  getTripleStatsD1,
 
   // Migration
   batchMigrateAchievements,

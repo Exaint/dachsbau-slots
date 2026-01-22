@@ -3043,7 +3043,7 @@ body {
   padding: 0 20px 20px;
   border-top: 1px solid rgba(139, 92, 246, 0.2);
   transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
-  max-height: 600px;
+  max-height: 2000px;
   opacity: 1;
 }
 

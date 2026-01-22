@@ -653,10 +653,9 @@ function getClientScripts() {
       container.style.display = 'block';
 
       try {
-        const response = await fetch('/api/admin?action=getRefundableItems', {
+        const response = await fetch('?api=admin&action=getRefundableItems', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
           body: JSON.stringify({ username })
         });
         const result = await response.json();

@@ -2276,9 +2276,10 @@ body {
 
 /* Collapsible sections */
 .collapsible-section {
-  border: 2px solid var(--primary);
+  border: 2px solid var(--accent);
   border-radius: 12px;
   overflow: hidden;
+  margin-bottom: var(--space-lg);
 }
 
 .collapsible-header {
@@ -2288,14 +2289,14 @@ body {
   cursor: pointer;
   padding: 16px 20px;
   margin: 0;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark, #7c3aed) 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
   color: white;
   transition: background 0.2s;
   user-select: none;
 }
 
 .collapsible-header:hover {
-  background: linear-gradient(135deg, var(--primary-dark, #7c3aed) 0%, var(--primary) 100%);
+  background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 100%);
 }
 
 .collapse-icon {

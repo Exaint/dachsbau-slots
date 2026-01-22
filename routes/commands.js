@@ -142,13 +142,18 @@ export async function handleSlotSubcommands(cleanUsername, lower, url, env) {
     return new Response(`@${cleanUsername} ❓ Meintest du !shop buy [Nummer]? (z.B. !shop buy 1)`, { headers: RESPONSE_HEADERS });
   }
 
-  // Admin: response time test
+  // Admin: response time test (KV + D1)
   if (lower === 'ping' && isAdmin(cleanUsername)) {
     const start = Date.now();
-    // Do a representative KV read to measure actual latency
     await env.SLOTS_KV.get(`balance:${cleanUsername}`);
     const kvTime = Date.now() - start;
-    return new Response(`@${cleanUsername} pong! KV: ${kvTime}ms | Total: ${Date.now() - start}ms`, { headers: RESPONSE_HEADERS });
+    let d1Time = '-';
+    if (env.DB) {
+      const d1Start = Date.now();
+      await env.DB.prepare('SELECT 1').first();
+      d1Time = `${Date.now() - d1Start}ms`;
+    }
+    return new Response(`@${cleanUsername} pong! KV: ${kvTime}ms | D1: ${d1Time} | Total: ${Date.now() - start}ms`, { headers: RESPONSE_HEADERS });
   }
 
   // Read-only info commands

@@ -335,6 +335,7 @@ async function getTwitchProfileData(username, env) {
 async function handleOAuthCallback(url, env) {
   const code = url.searchParams.get('code');
   const error = url.searchParams.get('error');
+  const state = url.searchParams.get('state');
 
   if (error) {
     return new Response(`Authorization failed: ${error}`, { status: 400 });
@@ -343,6 +344,20 @@ async function handleOAuthCallback(url, env) {
   if (!code) {
     return new Response('Missing authorization code', { status: 400 });
   }
+
+  // Validate state parameter (CSRF protection)
+  if (!state) {
+    return new Response('Missing state parameter', { status: 400 });
+  }
+
+  const stateKey = `oauth_state:broadcaster:${state}`;
+  const storedState = await env.SLOTS_KV.get(stateKey);
+  if (!storedState) {
+    return new Response('Invalid or expired state parameter', { status: 400 });
+  }
+
+  // Delete used state (one-time use)
+  await env.SLOTS_KV.delete(stateKey);
 
   try {
     // Exchange code for tokens
@@ -407,14 +422,29 @@ async function handleOAuthCallback(url, env) {
 }
 
 /**
- * Generate OAuth authorization URL
+ * Generate a cryptographically secure state parameter for OAuth
  */
-function getAuthorizationUrl(env, origin) {
+function generateOAuthState() {
+  const buffer = new Uint8Array(32);
+  crypto.getRandomValues(buffer);
+  return Array.from(buffer, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Generate OAuth authorization URL with CSRF protection
+ */
+async function getAuthorizationUrl(env, origin) {
+  const state = generateOAuthState();
+
+  // Store state in KV with short TTL (10 minutes)
+  await env.SLOTS_KV.put(`oauth_state:broadcaster:${state}`, 'valid', { expirationTtl: 600 });
+
   const params = new URLSearchParams({
     client_id: env.TWITCH_CLIENT_ID,
     redirect_uri: `${origin}/auth/callback`,
     response_type: 'code',
-    scope: 'moderation:read channel:read:vips'
+    scope: 'moderation:read channel:read:vips',
+    state
   });
 
   return `https://id.twitch.tv/oauth2/authorize?${params}`;
@@ -543,14 +573,20 @@ async function getUserFromRequest(request, env) {
 }
 
 /**
- * Generate user login URL
+ * Generate user login URL with CSRF protection
  */
-function getUserLoginUrl(env, origin) {
+async function getUserLoginUrl(env, origin) {
+  const state = generateOAuthState();
+
+  // Store state in KV with short TTL (10 minutes)
+  await env.SLOTS_KV.put(`oauth_state:user:${state}`, 'valid', { expirationTtl: 600 });
+
   const params = new URLSearchParams({
     client_id: env.TWITCH_CLIENT_ID,
     redirect_uri: `${origin}/auth/user/callback`,
     response_type: 'code',
-    scope: '' // No special scopes needed for basic user info
+    scope: '', // No special scopes needed for basic user info
+    state
   });
 
   return `https://id.twitch.tv/oauth2/authorize?${params}`;
@@ -562,6 +598,7 @@ function getUserLoginUrl(env, origin) {
 async function handleUserOAuthCallback(url, env) {
   const code = url.searchParams.get('code');
   const error = url.searchParams.get('error');
+  const state = url.searchParams.get('state');
 
   if (error) {
     // User cancelled or error occurred
@@ -576,6 +613,20 @@ async function handleUserOAuthCallback(url, env) {
   if (!code) {
     return new Response('Missing authorization code', { status: 400 });
   }
+
+  // Validate state parameter (CSRF protection)
+  if (!state) {
+    return new Response('Missing state parameter', { status: 400 });
+  }
+
+  const stateKey = `oauth_state:user:${state}`;
+  const storedState = await env.SLOTS_KV.get(stateKey);
+  if (!storedState) {
+    return new Response('Invalid or expired state parameter', { status: 400 });
+  }
+
+  // Delete used state (one-time use)
+  await env.SLOTS_KV.delete(stateKey);
 
   try {
     // Exchange code for tokens

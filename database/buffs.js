@@ -65,14 +65,16 @@ async function getBuffWithUses(username, buffKey, env) {
     let data;
     try {
       data = JSON.parse(value);
-    } catch {
-      // Corrupted data, clean up
+    } catch (parseError) {
+      // Corrupted data, log and clean up
+      logError('getBuffWithUses.corruptedJSON', parseError, { username, buffKey, rawValue: value?.substring(0, 100) });
       await env.SLOTS_KV.delete(key);
       return { active: false, uses: 0, data: null };
     }
 
     // Validate data structure
     if (!data || typeof data.expireAt !== 'number' || typeof data.uses !== 'number') {
+      logError('getBuffWithUses.invalidStructure', new Error('Invalid buff data structure'), { username, buffKey, data });
       await env.SLOTS_KV.delete(key);
       return { active: false, uses: 0, data: null };
     }
@@ -166,14 +168,16 @@ async function getBuffWithStack(username, buffKey, env) {
     let data;
     try {
       data = JSON.parse(value);
-    } catch {
-      // Corrupted data, clean up
+    } catch (parseError) {
+      // Corrupted data, log and clean up
+      logError('getBuffWithStack.corruptedJSON', parseError, { username, buffKey, rawValue: value?.substring(0, 100) });
       await env.SLOTS_KV.delete(key);
       return { active: false, stack: 0, data: null };
     }
 
     // Validate data structure
     if (!data || typeof data.expireAt !== 'number') {
+      logError('getBuffWithStack.invalidStructure', new Error('Invalid buff data structure'), { username, buffKey, data });
       await env.SLOTS_KV.delete(key);
       return { active: false, stack: 0, data: null };
     }
@@ -262,6 +266,40 @@ async function getInsuranceCount(username, env) {
   }
 }
 
+// Atomic insurance decrement with retry mechanism (prevents race conditions)
+async function decrementInsuranceCount(username, env, maxRetries = MAX_RETRIES) {
+  const key = kvKey('insurance:', username);
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const current = await getInsuranceCount(username, env);
+      if (current <= 0) return; // Already at 0
+
+      const newCount = current - 1;
+
+      if (newCount <= 0) {
+        await env.SLOTS_KV.delete(key);
+        // Verify deletion
+        const verify = await env.SLOTS_KV.get(key);
+        if (verify === null) return; // Success
+      } else {
+        await env.SLOTS_KV.put(key, newCount.toString());
+        // Verify write
+        const verifyCount = await getInsuranceCount(username, env);
+        if (verifyCount === newCount) return; // Success
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await exponentialBackoff(attempt);
+      }
+    } catch (error) {
+      logError('decrementInsuranceCount', error, { username, attempt: attempt + 1 });
+      if (attempt === maxRetries - 1) return;
+    }
+  }
+}
+
 // OPTIMIZED: Set insurance directly when count is already known (avoids redundant KV read)
 async function setInsuranceCount(username, count, env) {
   try {
@@ -319,6 +357,7 @@ export {
   addInsurance,
   getInsuranceCount,
   setInsuranceCount,
+  decrementInsuranceCount,
   addWinMultiplier,
   consumeWinMultiplier
 };

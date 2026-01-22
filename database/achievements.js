@@ -859,15 +859,35 @@ function getTripleKey(symbol) {
 
 /**
  * Increment global counter when an achievement is unlocked
+ * Uses retry mechanism to handle race conditions
  */
-async function incrementAchievementCounter(achievementId, env) {
-  try {
-    const key = `achievement_count:${achievementId}`;
-    const current = await env.SLOTS_KV.get(key);
-    const newCount = (parseInt(current, 10) || 0) + 1;
-    await env.SLOTS_KV.put(key, newCount.toString());
-  } catch (error) {
-    logError('incrementAchievementCounter', error, { achievementId });
+async function incrementAchievementCounter(achievementId, env, maxRetries = 3) {
+  const key = `achievement_count:${achievementId}`;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const current = await env.SLOTS_KV.get(key);
+      const currentCount = parseInt(current, 10) || 0;
+      const newCount = currentCount + 1;
+      await env.SLOTS_KV.put(key, newCount.toString());
+
+      // Verify the write succeeded
+      const verifyValue = await env.SLOTS_KV.get(key);
+      const verifyCount = parseInt(verifyValue, 10) || 0;
+
+      // Check if the count increased (might be higher due to concurrent increments, that's OK)
+      if (verifyCount >= newCount) {
+        return; // Success
+      }
+
+      // Verification failed, retry with backoff
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 50 * Math.pow(2, attempt)));
+      }
+    } catch (error) {
+      logError('incrementAchievementCounter', error, { achievementId, attempt: attempt + 1 });
+      if (attempt === maxRetries - 1) return;
+    }
   }
 }
 

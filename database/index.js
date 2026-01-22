@@ -49,6 +49,7 @@ export {
   addInsurance,
   getInsuranceCount,
   setInsuranceCount,
+  decrementInsuranceCount,
   addWinMultiplier,
   consumeWinMultiplier
 } from './buffs.js';

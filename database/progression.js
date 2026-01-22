@@ -100,7 +100,23 @@ async function getMonthlyLogin(username, env) {
       return { month: currentMonth, days: [], claimedMilestones: [] };
     }
 
-    const data = JSON.parse(value);
+    let data;
+    try {
+      data = JSON.parse(value);
+    } catch (parseError) {
+      logError('getMonthlyLogin.corruptedJSON', parseError, { username, rawValue: value?.substring(0, 100) });
+      return { month: currentMonth, days: [], claimedMilestones: [] };
+    }
+
+    // Validate structure - ensure days and claimedMilestones are arrays
+    if (!Array.isArray(data.days)) {
+      logError('getMonthlyLogin.invalidDays', new Error('days is not an array'), { username, data });
+      data.days = [];
+    }
+    if (!Array.isArray(data.claimedMilestones)) {
+      logError('getMonthlyLogin.invalidMilestones', new Error('claimedMilestones is not an array'), { username, data });
+      data.claimedMilestones = [];
+    }
 
     // Reset if new month
     if (data.month !== currentMonth) {

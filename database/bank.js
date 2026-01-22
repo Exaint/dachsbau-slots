@@ -24,16 +24,17 @@ async function updateBankBalance(amount, env, maxRetries = MAX_RETRIES) {
       const newBalance = bankBalance + amount;
       await env.SLOTS_KV.put(key, newBalance.toString());
 
-      // Verify the write (bank is high-traffic, verify atomicity)
+      // Verify the write with exact equality check
       const verifyValue = await env.SLOTS_KV.get(key);
       const verifyBalance = parseInt(verifyValue, 10);
 
-      // Allow some tolerance for concurrent updates (just verify it changed in the right direction)
-      if ((amount >= 0 && verifyBalance >= bankBalance) || (amount < 0 && verifyBalance <= bankBalance)) {
+      // Exact equality check - if concurrent update happened, the balance won't match
+      if (verifyBalance === newBalance) {
         return verifyBalance;
       }
 
-      // Verification suspicious, retry with backoff
+      // Concurrent update detected - retry with backoff
+      // The concurrent update already changed the balance, so on retry we'll read the new value
       if (attempt < maxRetries - 1) {
         await exponentialBackoff(attempt);
       }

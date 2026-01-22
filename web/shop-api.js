@@ -5,7 +5,7 @@
  * Items like Chaos Spin, Mystery Box, etc. require chat interaction.
  */
 
-import { logError } from '../utils.js';
+import { logError, exponentialBackoff } from '../utils.js';
 import { SHOP_ITEMS, PREREQUISITE_NAMES, PRESTIGE_RANKS } from '../constants.js';
 import {
   getBalance,
@@ -156,69 +156,89 @@ export async function handleShopBuyAPI(request, env, user) {
 }
 
 /**
+ * Atomic balance deduction with retry mechanism
+ * Prevents TOCTOU race conditions by verifying balance after deduction
+ * @returns {{ success: boolean, newBalance?: number, error?: string }}
+ */
+async function atomicBalanceDeduction(username, price, env, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const balance = await getBalance(username, env);
+
+    if (balance < price) {
+      return {
+        success: false,
+        error: `Nicht genug DachsTaler! Kostet ${price}, du hast ${balance}.`
+      };
+    }
+
+    const newBalance = balance - price;
+    await setBalance(username, newBalance, env);
+
+    // Verify the balance was set correctly (detect race condition)
+    const verifyBalance = await getBalance(username, env);
+    if (verifyBalance === newBalance) {
+      return { success: true, newBalance };
+    }
+
+    // Race condition detected - retry with backoff
+    if (attempt < maxRetries - 1) {
+      await exponentialBackoff(attempt);
+    }
+  }
+
+  return { success: false, error: 'Kauf fehlgeschlagen, bitte erneut versuchen.' };
+}
+
+/**
  * Process a web purchase
  * Returns { success, message, newBalance } or { success: false, error }
  */
 async function processWebPurchase(username, itemId, env) {
   const item = SHOP_ITEMS[itemId];
 
-  // Load balance and type-specific data in parallel
-  let balance, currentRank, hasPrerequisite, hasExistingUnlock;
+  // Load type-specific data first (without balance - that's checked atomically)
+  let currentRank, hasPrerequisite, hasExistingUnlock;
 
   if (item.type === 'prestige') {
-    [balance, currentRank] = await Promise.all([
-      getBalance(username, env),
-      getPrestigeRank(username, env)
-    ]);
+    currentRank = await getPrestigeRank(username, env);
   } else if (item.type === 'unlock') {
-    const promises = [getBalance(username, env)];
+    const promises = [];
     if (item.requires) promises.push(hasUnlock(username, item.requires, env));
     promises.push(hasUnlock(username, item.unlockKey, env));
 
     const results = await Promise.all(promises);
-    balance = results[0];
     if (item.requires) {
-      hasPrerequisite = results[1];
-      hasExistingUnlock = results[2];
-    } else {
+      hasPrerequisite = results[0];
       hasExistingUnlock = results[1];
+    } else {
+      hasExistingUnlock = results[0];
     }
-  } else {
-    balance = await getBalance(username, env);
   }
 
-  // Balance check
-  if (balance < item.price) {
-    return {
-      success: false,
-      error: `Nicht genug DachsTaler! ${item.name} kostet ${item.price}, du hast ${balance}.`
-    };
-  }
-
-  // Type-specific purchase logic
+  // Type-specific purchase logic (all now use atomic balance deduction)
   switch (item.type) {
     case 'prestige':
-      return await purchasePrestige(username, item, itemId, balance, currentRank, env);
+      return await purchasePrestige(username, item, itemId, currentRank, env);
     case 'unlock':
-      return await purchaseUnlock(username, item, itemId, balance, hasPrerequisite, hasExistingUnlock, env);
+      return await purchaseUnlock(username, item, itemId, hasPrerequisite, hasExistingUnlock, env);
     case 'timed':
-      return await purchaseTimed(username, item, balance, env);
+      return await purchaseTimed(username, item, env);
     case 'boost':
-      return await purchaseBoost(username, item, balance, env);
+      return await purchaseBoost(username, item, env);
     case 'insurance':
-      return await purchaseInsurance(username, item, balance, env);
+      return await purchaseInsurance(username, item, env);
     case 'winmulti':
-      return await purchaseWinMulti(username, item, balance, env);
+      return await purchaseWinMulti(username, item, env);
     case 'bundle':
-      return await purchaseBundle(username, item, balance, env);
+      return await purchaseBundle(username, item, env);
     case 'instant':
-      return await purchaseSpinToken(username, item, itemId, balance, env);
+      return await purchaseSpinToken(username, item, itemId, env);
     default:
       return { success: false, error: 'Unbekannter Item-Typ' };
   }
 }
 
-async function purchasePrestige(username, item, itemId, balance, currentRank, env) {
+async function purchasePrestige(username, item, itemId, currentRank, env) {
   const currentIndex = currentRank ? PRESTIGE_RANKS.indexOf(currentRank) : -1;
   const newIndex = PRESTIGE_RANKS.indexOf(item.rank);
 
@@ -233,21 +253,25 @@ async function purchasePrestige(username, item, itemId, balance, currentRank, en
     }
   }
 
-  const newBalance = balance - item.price;
+  // Atomic balance deduction with race condition protection
+  const deduction = await atomicBalanceDeduction(username, item.price, env);
+  if (!deduction.success) {
+    return { success: false, error: deduction.error };
+  }
+
   await Promise.all([
     setPrestigeRank(username, item.rank, env),
-    setBalance(username, newBalance, env),
     updateBankBalance(item.price, env)
   ]);
 
   return {
     success: true,
     message: `${item.name} gekauft! Dein neuer Rang: ${item.rank}`,
-    newBalance
+    newBalance: deduction.newBalance
   };
 }
 
-async function purchaseUnlock(username, item, itemId, balance, hasPrerequisite, hasExistingUnlock, env) {
+async function purchaseUnlock(username, item, itemId, hasPrerequisite, hasExistingUnlock, env) {
   if (item.requires && !hasPrerequisite) {
     return { success: false, error: `Du musst zuerst ${PREREQUISITE_NAMES[item.requires]} freischalten!` };
   }
@@ -256,34 +280,39 @@ async function purchaseUnlock(username, item, itemId, balance, hasPrerequisite, 
     return { success: false, error: `Du hast ${item.name} bereits freigeschaltet!` };
   }
 
-  const newBalance = balance - item.price;
+  // Atomic balance deduction with race condition protection
+  const deduction = await atomicBalanceDeduction(username, item.price, env);
+  if (!deduction.success) {
+    return { success: false, error: deduction.error };
+  }
+
   await Promise.all([
     setUnlock(username, item.unlockKey, env),
-    setBalance(username, newBalance, env),
     updateBankBalance(item.price, env)
   ]);
 
   return {
     success: true,
     message: `${item.name} freigeschaltet!`,
-    newBalance
+    newBalance: deduction.newBalance
   };
 }
 
-async function purchaseTimed(username, item, balance, env) {
-  const newBalance = balance - item.price;
+async function purchaseTimed(username, item, env) {
+  // Atomic balance deduction with race condition protection
+  const deduction = await atomicBalanceDeduction(username, item.price, env);
+  if (!deduction.success) {
+    return { success: false, error: deduction.error };
+  }
 
-  await Promise.all([
-    setBalance(username, newBalance, env),
-    updateBankBalance(item.price, env)
-  ]);
+  await updateBankBalance(item.price, env);
 
   if (item.uses) {
     await activateBuffWithUses(username, item.buffKey, item.duration, item.uses, env);
     return {
       success: true,
       message: `${item.name} aktiviert für ${item.uses} Spins!`,
-      newBalance
+      newBalance: deduction.newBalance
     };
   }
 
@@ -293,7 +322,7 @@ async function purchaseTimed(username, item, balance, env) {
     return {
       success: true,
       message: `${item.name} aktiviert für ${minutes} Minuten!`,
-      newBalance
+      newBalance: deduction.newBalance
     };
   }
 
@@ -305,11 +334,11 @@ async function purchaseTimed(username, item, balance, env) {
   return {
     success: true,
     message: `${item.name} aktiviert für ${duration}!`,
-    newBalance
+    newBalance: deduction.newBalance
   };
 }
 
-async function purchaseBoost(username, item, balance, env) {
+async function purchaseBoost(username, item, env) {
   const lowerUsername = username.toLowerCase();
 
   // Weekly limit check for Dachs-Boost
@@ -328,9 +357,13 @@ async function purchaseBoost(username, item, balance, env) {
       return { success: false, error: `Wöchentliches Limit erreicht! Max. ${WEEKLY_DACHS_BOOST_LIMIT} Dachs-Boost pro Woche.` };
     }
 
-    const newBalance = balance - item.price;
+    // Atomic balance deduction with race condition protection
+    const deduction = await atomicBalanceDeduction(username, item.price, env);
+    if (!deduction.success) {
+      return { success: false, error: deduction.error };
+    }
+
     await Promise.all([
-      setBalance(username, newBalance, env),
       addBoost(username, item.symbol, env),
       incrementDachsBoostPurchases(username, env),
       updateBankBalance(item.price, env)
@@ -339,13 +372,17 @@ async function purchaseBoost(username, item, balance, env) {
     return {
       success: true,
       message: `${item.name} aktiviert! Nächster ${item.symbol}-Gewinn wird verdoppelt!`,
-      newBalance
+      newBalance: deduction.newBalance
     };
   }
 
-  const newBalance = balance - item.price;
+  // Atomic balance deduction with race condition protection
+  const deduction = await atomicBalanceDeduction(username, item.price, env);
+  if (!deduction.success) {
+    return { success: false, error: deduction.error };
+  }
+
   await Promise.all([
-    setBalance(username, newBalance, env),
     addBoost(username, item.symbol, env),
     updateBankBalance(item.price, env)
   ]);
@@ -353,14 +390,18 @@ async function purchaseBoost(username, item, balance, env) {
   return {
     success: true,
     message: `${item.name} aktiviert! Nächster ${item.symbol}-Gewinn wird verdoppelt!`,
-    newBalance
+    newBalance: deduction.newBalance
   };
 }
 
-async function purchaseInsurance(username, item, balance, env) {
-  const newBalance = balance - item.price;
+async function purchaseInsurance(username, item, env) {
+  // Atomic balance deduction with race condition protection
+  const deduction = await atomicBalanceDeduction(username, item.price, env);
+  if (!deduction.success) {
+    return { success: false, error: deduction.error };
+  }
+
   await Promise.all([
-    setBalance(username, newBalance, env),
     addInsurance(username, 5, env),
     updateBankBalance(item.price, env)
   ]);
@@ -368,14 +409,18 @@ async function purchaseInsurance(username, item, balance, env) {
   return {
     success: true,
     message: 'Insurance Pack erhalten! 5 Verluste geben 50% zurück!',
-    newBalance
+    newBalance: deduction.newBalance
   };
 }
 
-async function purchaseWinMulti(username, item, balance, env) {
-  const newBalance = balance - item.price;
+async function purchaseWinMulti(username, item, env) {
+  // Atomic balance deduction with race condition protection
+  const deduction = await atomicBalanceDeduction(username, item.price, env);
+  if (!deduction.success) {
+    return { success: false, error: deduction.error };
+  }
+
   await Promise.all([
-    setBalance(username, newBalance, env),
     addWinMultiplier(username, env),
     updateBankBalance(item.price, env)
   ]);
@@ -383,19 +428,23 @@ async function purchaseWinMulti(username, item, balance, env) {
   return {
     success: true,
     message: 'Win Multiplier aktiviert! Nächster Gewinn wird x2!',
-    newBalance
+    newBalance: deduction.newBalance
   };
 }
 
-async function purchaseBundle(username, item, balance, env) {
+async function purchaseBundle(username, item, env) {
   const purchases = await getSpinBundlePurchases(username, env);
   if (purchases.count >= WEEKLY_SPIN_BUNDLE_LIMIT) {
     return { success: false, error: `Wöchentliches Limit erreicht! Max. ${WEEKLY_SPIN_BUNDLE_LIMIT} Spin Bundles pro Woche.` };
   }
 
-  const newBalance = balance - item.price;
+  // Atomic balance deduction with race condition protection
+  const deduction = await atomicBalanceDeduction(username, item.price, env);
+  if (!deduction.success) {
+    return { success: false, error: deduction.error };
+  }
+
   await Promise.all([
-    setBalance(username, newBalance, env),
     addFreeSpinsWithMultiplier(username, SPIN_BUNDLE_COUNT, SPIN_BUNDLE_MULTIPLIER, env),
     incrementSpinBundlePurchases(username, env),
     updateBankBalance(item.price, env)
@@ -405,17 +454,20 @@ async function purchaseBundle(username, item, balance, env) {
   return {
     success: true,
     message: `Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins! (Noch ${remainingPurchases} diese Woche)`,
-    newBalance
+    newBalance: deduction.newBalance
   };
 }
 
-async function purchaseSpinToken(username, item, itemId, balance, env) {
-  const newBalance = balance - item.price;
+async function purchaseSpinToken(username, item, itemId, env) {
+  // Atomic balance deduction with race condition protection
+  const deduction = await atomicBalanceDeduction(username, item.price, env);
+  if (!deduction.success) {
+    return { success: false, error: deduction.error };
+  }
 
   // Guaranteed Pair (ID 37)
   if (itemId === 37) {
     await Promise.all([
-      setBalance(username, newBalance, env),
       activateGuaranteedPair(username, env),
       updateBankBalance(item.price, env)
     ]);
@@ -423,14 +475,13 @@ async function purchaseSpinToken(username, item, itemId, balance, env) {
     return {
       success: true,
       message: 'Guaranteed Pair aktiviert! Dein nächster Spin hat garantiert ein Pair!',
-      newBalance
+      newBalance: deduction.newBalance
     };
   }
 
   // Wild Card (ID 38)
   if (itemId === 38) {
     await Promise.all([
-      setBalance(username, newBalance, env),
       activateWildCard(username, env),
       updateBankBalance(item.price, env)
     ]);
@@ -438,7 +489,7 @@ async function purchaseSpinToken(username, item, itemId, balance, env) {
     return {
       success: true,
       message: 'Wild Card aktiviert! Dein nächster Spin enthält ein 🃏 Wild!',
-      newBalance
+      newBalance: deduction.newBalance
     };
   }
 

@@ -393,45 +393,92 @@ async function handleTransfer(username, target, amount, env) {
       return new Response(`@${username} ❌ @${cleanTarget} hat noch nie gespielt! Der Empfänger muss zuerst !slots spielen, um einen Account zu erstellen.`, { headers: RESPONSE_HEADERS });
     }
 
-    // Atomic transfer with retry mechanism to prevent race conditions
+    // Atomic transfer with lock mechanism to prevent double-spend race conditions
+    const lockKey = `transfer_lock:${lowerUsername}`;
     const maxRetries = MAX_RETRIES;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const [senderBalance, receiverBalance] = await Promise.all([
-        getBalance(username, env),
-        getBalance(cleanTarget, env)
-      ]);
+      // Try to acquire lock (short TTL to prevent deadlock)
+      const lockValue = `${Date.now()}:${Math.random()}`;
+      const existingLock = await env.SLOTS_KV.get(lockKey);
 
-      if (senderBalance < parsedAmount) {
-        return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderBalance}.`, { headers: RESPONSE_HEADERS });
+      if (existingLock) {
+        // Lock exists - wait and retry
+        if (attempt < maxRetries - 1) {
+          await exponentialBackoff(attempt);
+          continue;
+        }
+        return new Response(`@${username} ❌ Transfer wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
       }
 
-      const newSenderBalance = senderBalance - parsedAmount;
-      const newReceiverBalance = Math.min(receiverBalance + parsedAmount, MAX_BALANCE);
+      // Acquire lock (5 second TTL)
+      await env.SLOTS_KV.put(lockKey, lockValue, { expirationTtl: 5 });
 
-      // Write both balances
-      await Promise.all([
-        setBalance(username, newSenderBalance, env),
-        setBalance(cleanTarget, newReceiverBalance, env)
-      ]);
+      try {
+        // Verify we got the lock
+        const verifyLock = await env.SLOTS_KV.get(lockKey);
+        if (verifyLock !== lockValue) {
+          // Another request got the lock first
+          if (attempt < maxRetries - 1) {
+            await exponentialBackoff(attempt);
+            continue;
+          }
+          return new Response(`@${username} ❌ Transfer wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
+        }
 
-      // Verify both balances were written correctly
-      const [verifySender, verifyReceiver] = await Promise.all([
-        getBalance(username, env),
-        getBalance(cleanTarget, env)
-      ]);
-      if (verifySender === newSenderBalance && verifyReceiver === newReceiverBalance) {
-        // Track achievements (await to ensure they complete before response)
+        // Now perform the transfer atomically
+        const senderBalance = await getBalance(username, env);
+
+        if (senderBalance < parsedAmount) {
+          await env.SLOTS_KV.delete(lockKey);
+          return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderBalance}.`, { headers: RESPONSE_HEADERS });
+        }
+
+        const newSenderBalance = senderBalance - parsedAmount;
+
+        // Deduct from sender first
+        await setBalance(username, newSenderBalance, env);
+
+        // Verify sender balance was correctly deducted
+        const verifySender = await getBalance(username, env);
+        if (verifySender !== newSenderBalance) {
+          // Race condition - restore and retry
+          await env.SLOTS_KV.delete(lockKey);
+          if (attempt < maxRetries - 1) {
+            await exponentialBackoff(attempt);
+            continue;
+          }
+          return new Response(`@${username} ❌ Transfer fehlgeschlagen, bitte versuche es erneut.`, { headers: RESPONSE_HEADERS });
+        }
+
+        // Now credit receiver (after sender is confirmed deducted)
+        const receiverBalance = await getBalance(cleanTarget, env);
+        const newReceiverBalance = Math.min(receiverBalance + parsedAmount, MAX_BALANCE);
+
+        // Warn if amount was capped
+        const actualReceived = newReceiverBalance - receiverBalance;
+        const wasCapped = actualReceived < parsedAmount;
+
+        await setBalance(cleanTarget, newReceiverBalance, env);
+
+        // Release lock
+        await env.SLOTS_KV.delete(lockKey);
+
+        // Track achievements
         await Promise.all([
           trackTransferAchievements(username, parsedAmount, env),
           checkBalanceAchievements(cleanTarget, newReceiverBalance, env)
         ]);
-        return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸`, { headers: RESPONSE_HEADERS });
-      }
 
-      // Verification failed, retry with backoff
-      if (attempt < maxRetries - 1) {
-        await exponentialBackoff(attempt);
+        if (wasCapped) {
+          return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! ⚠️ ${parsedAmount - actualReceived} DachsTaler wurden nicht gutgeschrieben (Max-Balance erreicht) | Dein Kontostand: ${newSenderBalance} 💸`, { headers: RESPONSE_HEADERS });
+        }
+
+        return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸`, { headers: RESPONSE_HEADERS });
+      } catch (error) {
+        // Ensure lock is released on error
+        await env.SLOTS_KV.delete(lockKey);
+        throw error;
       }
     }
 

@@ -14,7 +14,11 @@ import { setDisclaimerAccepted } from '../database.js';
  * @returns {Response|null} Error response or null if valid
  */
 export function validateCsrf(request, url) {
-  if (request.method === 'POST' && url.pathname.startsWith('/api/')) {
+  // Check for /api/ paths OR ?api= query parameter (admin API)
+  const isApiPath = url.pathname.startsWith('/api/');
+  const isApiQuery = url.searchParams.has('api');
+
+  if (request.method === 'POST' && (isApiPath || isApiQuery)) {
     const origin = request.headers.get('Origin');
     const referer = request.headers.get('Referer');
 

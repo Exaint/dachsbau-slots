@@ -502,6 +502,10 @@ function getClientScripts() {
           debounceTimer = setTimeout(async () => {
             try {
               const response = await fetch('?api=search&q=' + encodeURIComponent(query));
+              if (!response.ok) {
+                suggestionsContainer.style.display = 'none';
+                return;
+              }
               const data = await response.json();
 
               if (data.players && data.players.length > 0) {

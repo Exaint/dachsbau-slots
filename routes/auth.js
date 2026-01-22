@@ -14,7 +14,7 @@ import { getUserLoginUrl, handleUserOAuthCallback, createLogoutResponse, handleO
 export async function handleAuthRoutes(pathname, url, env) {
   // User login - redirect to Twitch OAuth
   if (pathname === '/auth/login') {
-    const loginUrl = getUserLoginUrl(env, url.origin);
+    const loginUrl = await getUserLoginUrl(env, url.origin);
     return Response.redirect(loginUrl, 302);
   }
 

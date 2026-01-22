@@ -36,7 +36,7 @@ import {
   RAGE_MODE_MAX_STACK,
   FREE_SPIN_COST_THRESHOLD
 } from '../constants.js';
-import { calculateBuffTTL, logError, logWarn, kvKey } from '../utils.js';
+import { logError, logWarn, getCurrentDate, getGermanDateFromTimestamp } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -52,8 +52,9 @@ import {
   isBuffActive,
   getBuffWithUses,
   getBuffWithStack,
+  decrementBuffUses,
   getInsuranceCount,
-  setInsuranceCount,
+  decrementInsuranceCount,
   getStreakMultiplier,
   incrementStreakMultiplier,
   resetStreakMultiplier,
@@ -219,16 +220,9 @@ async function handleSlot(username, amountParam, url, env) {
       hasDailyBoost
     ] = await stage2Promise;
 
-    // Decrement Dachs Locator uses
-    if (hasDachsLocator.active && hasDachsLocator.data) {
-      const data = hasDachsLocator.data;
-      data.uses--;
-      const dachsLocatorKey = kvKey('buff:', lowerUsername, 'dachs_locator');
-      if (data.uses <= 0) {
-        await env.SLOTS_KV.delete(dachsLocatorKey);
-      } else {
-        await env.SLOTS_KV.put(dachsLocatorKey, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) });
-      }
+    // Decrement Dachs Locator uses (using atomic function with retry mechanism)
+    if (hasDachsLocator.active) {
+      await decrementBuffUses(username, 'dachs_locator', env);
     }
 
     // Apply special items
@@ -294,7 +288,7 @@ async function handleSlot(username, amountParam, url, env) {
       await Promise.all([
         setBalance(username, newBalanceWithRefund, env),
         updateStats(username, false, result.points, spinCost, env),
-        setInsuranceCount(username, insuranceCount - 1, env)
+        decrementInsuranceCount(username, env)
       ]);
       const rankSymbol = prestigeRank ? `${prestigeRank} ` : '';
 
@@ -336,15 +330,14 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     // OPTIMIZED: Low Balance Warning (lastDaily and hasDailyBoost pre-loaded)
+    // Fixed: Use German timezone consistently (same as handleDaily)
     if (newBalance < LOW_BALANCE_WARNING) {
-      const nowDate = new Date(now);
-      const todayUTC = Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate());
+      const todayGerman = getCurrentDate();
 
       let dailyAvailable = !lastDaily;
       if (lastDaily) {
-        const lastDailyDate = new Date(lastDaily);
-        const lastDailyUTC = Date.UTC(lastDailyDate.getUTCFullYear(), lastDailyDate.getUTCMonth(), lastDailyDate.getUTCDate());
-        dailyAvailable = todayUTC !== lastDailyUTC;
+        const lastDailyGerman = getGermanDateFromTimestamp(lastDaily);
+        dailyAvailable = todayGerman !== lastDailyGerman;
       }
 
       if (dailyAvailable) {

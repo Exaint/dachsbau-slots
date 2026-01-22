@@ -19,6 +19,8 @@ import {
   isLeaderboardHidden,
   setLeaderboardHidden
 } from '../database.js';
+import { migrateAllUsersToD1, verifyMigration, getMigrationStatus } from '../database/migration.js';
+import { getLeaderboard as getD1Leaderboard, D1_ENABLED } from '../database/d1.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
 import { logError, isAdmin, sanitizeUsername } from '../utils.js';
 
@@ -318,10 +320,20 @@ async function handleAdminApi(url, env, loggedInUser, request) {
       }
     }
 
-    const targetUser = sanitizeUsername(body.username || '');
-    if (!targetUser) {
-      return jsonResponse({ error: 'Target username required' }, 400);
+    // D1 migration actions don't require a target user
+    const d1Actions = ['d1-migrate', 'd1-status', 'd1-verify'];
+    if (d1Actions.includes(action)) {
+      // Handle D1 actions without targetUser requirement
+    } else {
+      const targetUser = sanitizeUsername(body.username || '');
+      if (!targetUser) {
+        return jsonResponse({ error: 'Target username required' }, 400);
+      }
+      // Re-assign for use in switch
+      body._targetUser = targetUser;
     }
+
+    const targetUser = body._targetUser || '';
 
     switch (action) {
       case 'setBalance':
@@ -336,6 +348,13 @@ async function handleAdminApi(url, env, loggedInUser, request) {
         return await handleAdminSetLeaderboardHidden(targetUser, body.hidden, env);
       case 'setAchievement':
         return await handleAdminSetAchievement(targetUser, body.achievementId, body.unlocked, env);
+      // D1 Migration endpoints (no targetUser required)
+      case 'd1-migrate':
+        return await handleD1Migrate(body, env);
+      case 'd1-status':
+        return await handleD1Status(env);
+      case 'd1-verify':
+        return await handleD1Verify(body, env);
       default:
         return jsonResponse({ error: 'Unknown admin action' }, 400);
     }
@@ -435,4 +454,37 @@ async function handleAdminSetAchievement(username, achievementId, unlocked, env)
     const result = await lockAchievement(username, achievementId, env);
     return jsonResponse({ success: true, username, achievementId, unlocked: false, wasUnlocked: result.wasUnlocked });
   }
+}
+
+// ==================== D1 MIGRATION API ====================
+
+/**
+ * Admin: Migrate users from KV to D1
+ */
+async function handleD1Migrate(body, env) {
+  const { batchSize = 100, maxUsers = null, dryRun = false } = body;
+
+  const result = await migrateAllUsersToD1(env, { batchSize, maxUsers, dryRun });
+  return jsonResponse(result);
+}
+
+/**
+ * Admin: Get D1 migration status
+ */
+async function handleD1Status(env) {
+  const status = await getMigrationStatus(env);
+  return jsonResponse({
+    ...status,
+    d1Enabled: D1_ENABLED
+  });
+}
+
+/**
+ * Admin: Verify D1 migration
+ */
+async function handleD1Verify(body, env) {
+  const { sampleSize = 50 } = body;
+
+  const result = await verifyMigration(env, sampleSize);
+  return jsonResponse(result);
 }

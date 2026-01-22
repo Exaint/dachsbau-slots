@@ -428,12 +428,12 @@ async function savePlayerAchievements(username, data, env) {
   try {
     await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
 
-    // DUAL_WRITE: Also update D1 stats
+    // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB && data.stats) {
-      await updatePlayerStatsD1(username, {
+      updatePlayerStatsD1(username, {
         ...data.stats,
         pendingRewards: data.pendingRewards || 0
-      }, env);
+      }, env).catch(err => logError('savePlayerAchievements.d1', err, { username }));
     }
   } catch (error) {
     logError('savePlayerAchievements', error, { username });
@@ -470,17 +470,15 @@ async function lockAchievement(username, achievementId, env) {
     delete data.unlockedAt[achievementId];
 
     // Save and decrement global counter in parallel
-    const promises = [
+    await Promise.all([
       savePlayerAchievements(username, data, env),
       decrementAchievementCounter(achievementId, env)
-    ];
+    ]);
 
-    // DUAL_WRITE: Also update D1
+    // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      promises.push(lockAchievementD1(username, achievementId, env));
+      lockAchievementD1(username, achievementId, env).catch(err => logError('lockAchievement.d1', err, { username, achievementId }));
     }
-
-    await Promise.all(promises);
 
     return { locked: true, wasUnlocked: true };
   } catch (error) {
@@ -539,17 +537,15 @@ async function unlockAchievement(username, achievementId, env, existingData = nu
     }
 
     // Save player achievements and increment global counter in parallel
-    const promises = [
+    await Promise.all([
       savePlayerAchievements(username, data, env),
       incrementAchievementCounter(achievementId, env)
-    ];
+    ]);
 
-    // DUAL_WRITE: Also update D1
+    // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      promises.push(unlockAchievementD1(username, achievementId, env));
+      unlockAchievementD1(username, achievementId, env).catch(err => logError('unlockAchievement.d1', err, { username, achievementId }));
     }
-
-    await Promise.all(promises);
 
     return {
       unlocked: true,
@@ -603,9 +599,9 @@ async function updateAchievementStat(username, statKey, increment, env) {
 
     await savePlayerAchievements(username, data, env);
 
-    // DUAL_WRITE: Also increment stat in D1
+    // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      await incrementStatD1(username, statKey, increment, env);
+      incrementStatD1(username, statKey, increment, env).catch(err => logError('updateAchievementStat.d1', err, { username, statKey }));
     }
 
     return unlockedAchievements;
@@ -642,9 +638,10 @@ async function updateAchievementStatBatch(username, updates, env) {
 
     await savePlayerAchievements(username, data, env);
 
-    // DUAL_WRITE: batch D1 updates
+    // DUAL_WRITE: Fire-and-forget D1 writes
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      await Promise.all(updates.map(([key, amt]) => incrementStatD1(username, key, amt, env)));
+      Promise.all(updates.map(([key, amt]) => incrementStatD1(username, key, amt, env)))
+        .catch(err => logError('updateAchievementStatBatch.d1', err, { username }));
     }
   } catch (error) {
     logError('updateAchievementStatBatch', error, { username, updates: updates.map(u => u[0]) });
@@ -664,11 +661,10 @@ async function markTripleCollected(username, symbol, env) {
       return []; // Unknown symbol
     }
 
-    // DUAL_WRITE: Always record to D1 (increments counter even if already collected)
+    // DUAL_WRITE: Fire-and-forget D1 write (increments counter even if already collected)
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      // For dachs triples, use dachs_triple key
       const d1Key = symbolKey === 'dachs' ? 'dachs_triple' : symbolKey;
-      await recordTripleHitD1(username, d1Key, env);
+      recordTripleHitD1(username, d1Key, env).catch(err => logError('markTripleCollected.d1', err, { username, symbolKey }));
     }
 
     // Check if already collected in KV (for achievement tracking)
@@ -740,17 +736,13 @@ async function markTripleCollected(username, symbol, env) {
  * Record a dachs hit (single or double) to D1
  * Called from slots helpers for non-triple dachs appearances
  */
-async function recordDachsHit(username, count, env) {
+function recordDachsHit(username, count, env) {
   if (!D1_ENABLED || !DUAL_WRITE || !env.DB) return;
 
-  try {
-    if (count === 1) {
-      await recordTripleHitD1(username, 'dachs_single', env);
-    } else if (count === 2) {
-      await recordTripleHitD1(username, 'dachs_double', env);
-    }
-  } catch (error) {
-    logError('recordDachsHit', error, { username, count });
+  // Fire-and-forget D1 write
+  const key = count === 1 ? 'dachs_single' : count === 2 ? 'dachs_double' : null;
+  if (key) {
+    recordTripleHitD1(username, key, env).catch(err => logError('recordDachsHit.d1', err, { username, count }));
   }
 }
 

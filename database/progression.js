@@ -71,9 +71,9 @@ async function setPrestigeRank(username, rank, env) {
   try {
     await env.SLOTS_KV.put(kvKey('rank:', username), rank);
 
-    // DUAL_WRITE: Also update D1
+    // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      await upsertUser(username, { prestige_rank: rank }, env);
+      upsertUser(username, { prestige_rank: rank }, env).catch(err => logError('setPrestigeRank.d1', err, { username }));
     }
   } catch (error) {
     logError('setPrestigeRank', error, { username, rank });
@@ -84,9 +84,9 @@ async function removePrestigeRank(username, env) {
   try {
     await env.SLOTS_KV.delete(kvKey('rank:', username));
 
-    // DUAL_WRITE: Also update D1
+    // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      await upsertUser(username, { prestige_rank: null }, env);
+      upsertUser(username, { prestige_rank: null }, env).catch(err => logError('removePrestigeRank.d1', err, { username }));
     }
     return true;
   } catch (error) {
@@ -110,9 +110,9 @@ async function setUnlock(username, unlockKey, env) {
   try {
     await env.SLOTS_KV.put(kvKey('unlock:', username, unlockKey), 'true');
 
-    // DUAL_WRITE: Also update D1
+    // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      await addUnlockD1(username, unlockKey, env);
+      addUnlockD1(username, unlockKey, env).catch(err => logError('setUnlock.d1', err, { username, unlockKey }));
     }
   } catch (error) {
     logError('setUnlock', error, { username, unlockKey });
@@ -123,9 +123,9 @@ async function removeUnlock(username, unlockKey, env) {
   try {
     await env.SLOTS_KV.delete(kvKey('unlock:', username, unlockKey));
 
-    // DUAL_WRITE: Also update D1
+    // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      await removeUnlockD1(username, unlockKey, env);
+      removeUnlockD1(username, unlockKey, env).catch(err => logError('removeUnlock.d1', err, { username, unlockKey }));
     }
     return true;
   } catch (error) {
@@ -188,9 +188,9 @@ async function updateMonthlyLogin(username, env) {
 
     await env.SLOTS_KV.put(kvKey('monthlylogin:', username), JSON.stringify(monthlyLogin));
 
-    // DUAL_WRITE: Also update D1
+    // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      await updateMonthlyLoginD1(username, monthlyLogin, env);
+      updateMonthlyLoginD1(username, monthlyLogin, env).catch(err => logError('updateMonthlyLogin.d1', err, { username }));
     }
 
     return monthlyLogin;
@@ -210,9 +210,9 @@ async function markMilestoneClaimed(username, milestone, env, monthlyLogin = nul
       data.claimedMilestones.push(milestone);
       await env.SLOTS_KV.put(kvKey('monthlylogin:', username), JSON.stringify(data));
 
-      // DUAL_WRITE: Also update D1
+      // DUAL_WRITE: Fire-and-forget D1 write
       if (D1_ENABLED && DUAL_WRITE && env.DB) {
-        await updateMonthlyLoginD1(username, data, env);
+        updateMonthlyLoginD1(username, data, env).catch(err => logError('markMilestoneClaimed.d1', err, { username }));
       }
     }
   } catch (error) {
@@ -299,20 +299,18 @@ async function updateStats(username, isWin, winAmount, lostAmount, env) {
     }
     await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
 
-    // DUAL_WRITE: Also update D1
+    // DUAL_WRITE: Fire-and-forget D1 writes (batch all D1 updates)
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      // Increment individual stats in D1
-      await incrementStatD1(username, 'totalSpins', 1, env);
+      const d1Ops = [incrementStatD1(username, 'totalSpins', 1, env)];
       if (isWin) {
-        await incrementStatD1(username, 'wins', 1, env);
-        await incrementStatD1(username, 'totalWon', winAmount, env);
-        if (wasNewBiggestWin) {
-          await updateBiggestWinD1(username, winAmount, env);
-        }
+        d1Ops.push(incrementStatD1(username, 'wins', 1, env));
+        d1Ops.push(incrementStatD1(username, 'totalWon', winAmount, env));
+        if (wasNewBiggestWin) d1Ops.push(updateBiggestWinD1(username, winAmount, env));
       } else {
-        await incrementStatD1(username, 'losses', 1, env);
-        await incrementStatD1(username, 'totalLost', lostAmount, env);
+        d1Ops.push(incrementStatD1(username, 'losses', 1, env));
+        d1Ops.push(incrementStatD1(username, 'totalLost', lostAmount, env));
       }
+      Promise.all(d1Ops).catch(err => logError('updateStats.d1', err, { username }));
     }
   } catch (error) {
     logError('updateStats', error, { username });
@@ -330,9 +328,9 @@ async function incrementStat(username, statKey, amount, env) {
       stats[statKey] += amount;
       await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
 
-      // DUAL_WRITE: Also update D1
+      // DUAL_WRITE: Fire-and-forget D1 write
       if (D1_ENABLED && DUAL_WRITE && env.DB) {
-        await incrementStatD1(username, statKey, amount, env);
+        incrementStatD1(username, statKey, amount, env).catch(err => logError('incrementStat.d1', err, { username, statKey }));
       }
     }
   } catch (error) {
@@ -347,13 +345,13 @@ async function setStat(username, statKey, value, env) {
   try {
     const stats = await getStats(username, env);
     if (statKey in stats) {
+      const delta = value - stats[statKey];
       stats[statKey] = value;
       await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
 
-      // DUAL_WRITE: Also update D1 (use increment with delta for simplicity)
+      // DUAL_WRITE: Fire-and-forget D1 write
       if (D1_ENABLED && DUAL_WRITE && env.DB) {
-        // For "max" values, we need a special update
-        await incrementStatD1(username, statKey, value - (stats[statKey] || 0), env);
+        incrementStatD1(username, statKey, delta, env).catch(err => logError('setStat.d1', err, { username, statKey }));
       }
     }
   } catch (error) {
@@ -383,8 +381,10 @@ async function incrementStats(username, updates, env) {
 
     await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
 
+    // DUAL_WRITE: Fire-and-forget D1 writes
     if (D1_ENABLED && DUAL_WRITE && env.DB && d1Updates.length > 0) {
-      await Promise.all(d1Updates.map(([key, amt]) => incrementStatD1(username, key, amt, env)));
+      Promise.all(d1Updates.map(([key, amt]) => incrementStatD1(username, key, amt, env)))
+        .catch(err => logError('incrementStats.d1', err, { username }));
     }
   } catch (error) {
     logError('incrementStats', error, { username, updates: updates.map(u => u[0]) });
@@ -425,8 +425,10 @@ async function batchUpdateStats(username, increments, maxUpdates, env) {
 
     await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
 
+    // DUAL_WRITE: Fire-and-forget D1 writes
     if (D1_ENABLED && DUAL_WRITE && env.DB && d1Promises.length > 0) {
-      await Promise.all(d1Promises.map(fn => fn()));
+      Promise.all(d1Promises.map(fn => fn()))
+        .catch(err => logError('batchUpdateStats.d1', err, { username }));
     }
   } catch (error) {
     logError('batchUpdateStats', error, { username });
@@ -443,13 +445,13 @@ async function updateMaxStat(username, statKey, newValue, env) {
       stats[statKey] = newValue;
       await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
 
-      // DUAL_WRITE: D1 handled separately
+      // DUAL_WRITE: Fire-and-forget D1 write
       if (D1_ENABLED && DUAL_WRITE && env.DB) {
-        // For max values, we set directly
-        await env.DB.prepare(`
+        env.DB.prepare(`
           UPDATE player_stats SET ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} = ?
           WHERE username = ? AND ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} < ?
-        `).bind(newValue, username.toLowerCase(), newValue).run();
+        `).bind(newValue, username.toLowerCase(), newValue).run()
+          .catch(err => logError('updateMaxStat.d1', err, { username, statKey }));
       }
     }
   } catch (error) {

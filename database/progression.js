@@ -233,7 +233,32 @@ async function getStreak(username, env) {
 }
 
 // Stats - with structure validation
-const DEFAULT_STATS = { totalSpins: 0, wins: 0, biggestWin: 0, totalWon: 0, totalLost: 0 };
+const DEFAULT_STATS = {
+  // Core stats
+  totalSpins: 0, wins: 0, biggestWin: 0, totalWon: 0, totalLost: 0,
+  // Loss tracking
+  losses: 0, biggestLoss: 0, maxLossStreak: 0,
+  // Item/Buff usage
+  chaosSpins: 0, reverseChaosSpins: 0, wheelSpins: 0, mysteryBoxes: 0,
+  peekTokens: 0, insuranceTriggers: 0, wildCardsUsed: 0, guaranteedPairsUsed: 0,
+  freeSpinsUsed: 0, diamondMines: 0,
+  // Duel extended
+  duelsPlayed: 0, duelsWon: 0, duelsLost: 0, maxDuelStreak: 0, totalDuelWinnings: 0,
+  // Transfer extended
+  totalTransferred: 0, transfersReceived: 0, transfersSentCount: 0, bankDonations: 0,
+  // Time/Activity
+  playDays: 0, firstSpinAt: 0, maxDailyStreak: 0,
+  // Spin types
+  allInSpins: 0, highBetSpins: 0,
+  // Dachs tracking
+  totalDachsSeen: 0,
+  // Hourly jackpot
+  hourlyJackpots: 0,
+  // Shop
+  shopPurchases: 0,
+  // Daily
+  dailysClaimed: 0
+};
 
 async function getStats(username, env) {
   try {
@@ -242,14 +267,14 @@ async function getStats(username, env) {
 
     const parsed = JSON.parse(value);
 
-    // Validate and sanitize each field
-    return {
-      totalSpins: typeof parsed.totalSpins === 'number' ? parsed.totalSpins : 0,
-      wins: typeof parsed.wins === 'number' ? parsed.wins : 0,
-      biggestWin: typeof parsed.biggestWin === 'number' ? parsed.biggestWin : 0,
-      totalWon: typeof parsed.totalWon === 'number' ? parsed.totalWon : 0,
-      totalLost: typeof parsed.totalLost === 'number' ? parsed.totalLost : 0
-    };
+    // Validate and sanitize each field - merge with defaults for backwards compatibility
+    const stats = { ...DEFAULT_STATS };
+    for (const key of Object.keys(DEFAULT_STATS)) {
+      if (typeof parsed[key] === 'number') {
+        stats[key] = parsed[key];
+      }
+    }
+    return stats;
   } catch (error) {
     logError('getStats', error, { username });
     return { ...DEFAULT_STATS };
@@ -260,6 +285,7 @@ async function updateStats(username, isWin, winAmount, lostAmount, env) {
   try {
     const stats = await getStats(username, env);
     const wasNewBiggestWin = isWin && winAmount > stats.biggestWin;
+    const wasNewBiggestLoss = !isWin && lostAmount > stats.biggestLoss;
 
     stats.totalSpins++;
     if (isWin) {
@@ -267,7 +293,9 @@ async function updateStats(username, isWin, winAmount, lostAmount, env) {
       stats.totalWon += winAmount;
       if (wasNewBiggestWin) stats.biggestWin = winAmount;
     } else {
+      stats.losses++;
       stats.totalLost += lostAmount;
+      if (wasNewBiggestLoss) stats.biggestLoss = lostAmount;
     }
     await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
 
@@ -282,11 +310,78 @@ async function updateStats(username, isWin, winAmount, lostAmount, env) {
           await updateBiggestWinD1(username, winAmount, env);
         }
       } else {
+        await incrementStatD1(username, 'losses', 1, env);
         await incrementStatD1(username, 'totalLost', lostAmount, env);
       }
     }
   } catch (error) {
     logError('updateStats', error, { username });
+  }
+}
+
+/**
+ * Increment a specific stat by a given amount
+ * Used for tracking item usage, special events, etc.
+ */
+async function incrementStat(username, statKey, amount, env) {
+  try {
+    const stats = await getStats(username, env);
+    if (statKey in stats) {
+      stats[statKey] += amount;
+      await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
+
+      // DUAL_WRITE: Also update D1
+      if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        await incrementStatD1(username, statKey, amount, env);
+      }
+    }
+  } catch (error) {
+    logError('incrementStat', error, { username, statKey, amount });
+  }
+}
+
+/**
+ * Set a specific stat to a value (for max values, timestamps, etc.)
+ */
+async function setStat(username, statKey, value, env) {
+  try {
+    const stats = await getStats(username, env);
+    if (statKey in stats) {
+      stats[statKey] = value;
+      await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
+
+      // DUAL_WRITE: Also update D1 (use increment with delta for simplicity)
+      if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        // For "max" values, we need a special update
+        await incrementStatD1(username, statKey, value - (stats[statKey] || 0), env);
+      }
+    }
+  } catch (error) {
+    logError('setStat', error, { username, statKey, value });
+  }
+}
+
+/**
+ * Update max stat if new value is higher
+ */
+async function updateMaxStat(username, statKey, newValue, env) {
+  try {
+    const stats = await getStats(username, env);
+    if (statKey in stats && newValue > stats[statKey]) {
+      stats[statKey] = newValue;
+      await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
+
+      // DUAL_WRITE: D1 handled separately
+      if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        // For max values, we set directly
+        await env.DB.prepare(`
+          UPDATE player_stats SET ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} = ?
+          WHERE username = ? AND ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} < ?
+        `).bind(newValue, username.toLowerCase(), newValue).run();
+      }
+    }
+  } catch (error) {
+    logError('updateMaxStat', error, { username, statKey, newValue });
   }
 }
 
@@ -305,5 +400,8 @@ export {
   markMilestoneClaimed,
   getStreak,
   getStats,
-  updateStats
+  updateStats,
+  incrementStat,
+  setStat,
+  updateMaxStat
 };

@@ -293,7 +293,7 @@ async function handleSlot(username, amountParam, url, env) {
       const rankSymbol = prestigeRank ? `${prestigeRank} ` : '';
 
       // Fire-and-forget achievement tracking (insurance used) - with error handling
-      trackSlotAchievements(username, originalGrid, grid, result, newBalanceWithRefund, isFreeSpinUsed, isAllIn, hasWildCardToken, true, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env)
+      trackSlotAchievements(username, originalGrid, grid, result, newBalanceWithRefund, isFreeSpinUsed, isAllIn, hasWildCardToken, true, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, { spinCost })
         .catch(err => logError('trackSlotAchievements.insurance', err, { username }));
 
       return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
@@ -358,7 +358,12 @@ async function handleSlot(username, amountParam, url, env) {
     });
 
     // Fire-and-forget achievement tracking - with error handling
-    trackSlotAchievements(username, originalGrid, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env)
+    // Pass extended data for tracking loss streaks and spin costs
+    const extendedData = {
+      spinCost,
+      currentLossStreak: !isWin ? streakBonusResult.newStreak?.losses || 0 : 0
+    };
+    trackSlotAchievements(username, originalGrid, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, extendedData)
       .catch(err => logError('trackSlotAchievements', err, { username }));
 
     if (customMsg) {

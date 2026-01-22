@@ -83,7 +83,10 @@ export {
   markMilestoneClaimed,
   getStreak,
   getStats,
-  updateStats
+  updateStats,
+  incrementStat,
+  setStat,
+  updateMaxStat
 } from './progression.js';
 
 // Shop

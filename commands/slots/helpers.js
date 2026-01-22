@@ -30,7 +30,9 @@ import {
   checkAndUnlockAchievement,
   checkBalanceAchievements,
   checkBigWinAchievements,
-  addFreeSpinsWithMultiplier
+  addFreeSpinsWithMultiplier,
+  incrementStat,
+  updateMaxStat
 } from '../../database.js';
 
 // Unlock prices for error messages
@@ -52,14 +54,57 @@ const UNLOCK_PRICES = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
  * @param {boolean} hotStreakTriggered - Whether hot streak bonus was triggered
  * @param {boolean} comebackTriggered - Whether comeback bonus was triggered
  * @param {object} env - Environment bindings
+ * @param {object} extendedData - Extended tracking data (optional)
  */
-export async function trackSlotAchievements(username, originalGrid, displayGrid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env) {
+export async function trackSlotAchievements(username, originalGrid, displayGrid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, extendedData = {}) {
   try {
     // Stat updates (these modify achievement data)
     await updateAchievementStat(username, 'totalSpins', 1, env);
 
     if (result.points > 0) {
       await updateAchievementStat(username, 'wins', 1, env);
+    }
+
+    // Extended stats tracking (fire-and-forget)
+    const extendedPromises = [];
+
+    // Track all-in and high-bet spins
+    if (isAllIn) {
+      extendedPromises.push(incrementStat(username, 'allInSpins', 1, env));
+    }
+    if (extendedData.spinCost && extendedData.spinCost >= 50) {
+      extendedPromises.push(incrementStat(username, 'highBetSpins', 1, env));
+    }
+
+    // Track free spins used
+    if (isFreeSpinUsed) {
+      extendedPromises.push(incrementStat(username, 'freeSpinsUsed', 1, env));
+    }
+
+    // Track insurance triggers
+    if (insuranceUsed) {
+      extendedPromises.push(incrementStat(username, 'insuranceTriggers', 1, env));
+    }
+
+    // Track hourly jackpots
+    if (hourlyJackpotWon) {
+      extendedPromises.push(incrementStat(username, 'hourlyJackpots', 1, env));
+    }
+
+    // Track dachs seen (total count)
+    const dachsCount = originalGrid.filter(s => s === '🦡').length;
+    if (dachsCount > 0) {
+      extendedPromises.push(incrementStat(username, 'totalDachsSeen', dachsCount, env));
+    }
+
+    // Track loss streak
+    if (extendedData.currentLossStreak && extendedData.currentLossStreak > 0) {
+      extendedPromises.push(updateMaxStat(username, 'maxLossStreak', extendedData.currentLossStreak, env));
+    }
+
+    // Run extended tracking in parallel (non-blocking)
+    if (extendedPromises.length > 0) {
+      Promise.all(extendedPromises).catch(err => logError('trackSlotAchievements.extended', err, { username }));
     }
 
     // Collect all one-time achievements to unlock
@@ -89,7 +134,6 @@ export async function trackSlotAchievements(username, originalGrid, displayGrid,
     // Dachs tracking - use originalGrid (before special items may have overwritten dachs)
     if (originalGrid.includes('🦡')) {
       achievementsToUnlock.push(ACHIEVEMENTS.FIRST_DACHS.id);
-      const dachsCount = originalGrid.filter(s => s === '🦡').length;
       if (dachsCount === 2) {
         achievementsToUnlock.push(ACHIEVEMENTS.DACHS_PAIR.id);
       }

@@ -78,7 +78,8 @@ import {
   updateAchievementStat,
   checkAndUnlockAchievement,
   getPlayerAchievements,
-  savePlayerAchievements
+  savePlayerAchievements,
+  incrementStat
 } from '../database.js';
 import { ACHIEVEMENTS } from '../constants.js';
 import { calculateWin } from './slots.js';
@@ -101,6 +102,34 @@ async function trackShopAchievements(username, itemId, item, extraData, env) {
 
     // FIRST_PURCHASE
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_PURCHASE.id, env));
+
+    // Track item-specific stats for extended tracking
+    switch (itemId) {
+      case 1: // Peek Token
+        promises.push(incrementStat(username, 'peekTokens', 1, env));
+        break;
+      case 11: // Chaos Spin
+        promises.push(incrementStat(username, 'chaosSpins', 1, env));
+        break;
+      case 12: // Glücksrad
+        promises.push(incrementStat(username, 'wheelSpins', 1, env));
+        break;
+      case 16: // Mystery Box
+        promises.push(incrementStat(username, 'mysteryBoxes', 1, env));
+        break;
+      case 31: // Reverse Chaos
+        promises.push(incrementStat(username, 'reverseChaosSpins', 1, env));
+        break;
+      case 36: // Diamond Mine
+        promises.push(incrementStat(username, 'diamondMines', 1, env));
+        break;
+      case 37: // Guaranteed Pair
+        promises.push(incrementStat(username, 'guaranteedPairsUsed', 1, env));
+        break;
+      case 38: // Wild Card
+        promises.push(incrementStat(username, 'wildCardsUsed', 1, env));
+        break;
+    }
 
     // Check for UNLOCK_ALL_SLOTS when buying an unlock
     if (item.type === 'unlock') {

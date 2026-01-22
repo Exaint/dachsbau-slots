@@ -41,7 +41,8 @@ import {
   hasAcceptedDisclaimer,
   checkAndUnlockAchievement,
   updateAchievementStat,
-  checkBalanceAchievements
+  checkBalanceAchievements,
+  incrementStat
 } from '../database.js';
 
 /**
@@ -54,6 +55,9 @@ async function trackDailyAchievements(username, monthlyDays, env) {
 
     // FIRST_DAILY
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_DAILY.id, env));
+
+    // Track dailysClaimed stat
+    promises.push(incrementStat(username, 'dailysClaimed', 1, env));
 
     // DAILY_7/14/21/28 - Check and unlock based on monthly login days
     if (monthlyDays >= 7) {
@@ -74,8 +78,12 @@ async function trackDailyAchievements(username, monthlyDays, env) {
 
 /**
  * Track transfer achievements (fire-and-forget)
+ * @param {string} username - Sender username
+ * @param {number} amount - Transfer amount
+ * @param {boolean} isBankDonation - Whether this is a donation to DachsBank
+ * @param {object} env - Environment with KV binding
  */
-async function trackTransferAchievements(username, amount, env) {
+async function trackTransferAchievements(username, amount, isBankDonation, env) {
   try {
     const promises = [];
 
@@ -85,9 +93,27 @@ async function trackTransferAchievements(username, amount, env) {
     // Track totalTransferred for TRANSFER_1000/10000 achievements
     promises.push(updateAchievementStat(username, 'totalTransferred', amount, env));
 
+    // Track extended stats
+    promises.push(incrementStat(username, 'transfersSentCount', 1, env));
+
+    if (isBankDonation) {
+      promises.push(incrementStat(username, 'bankDonations', amount, env));
+    }
+
     await Promise.all(promises);
   } catch (error) {
     logError('trackTransferAchievements', error, { username, amount });
+  }
+}
+
+/**
+ * Track transfer received stats for receiver (fire-and-forget)
+ */
+async function trackTransferReceived(username, amount, env) {
+  try {
+    await incrementStat(username, 'transfersReceived', amount, env);
+  } catch (error) {
+    logError('trackTransferReceived', error, { username, amount });
   }
 }
 
@@ -382,7 +408,7 @@ async function handleTransfer(username, target, amount, env) {
       ]);
 
       // Track achievements (await to ensure they complete before response)
-      await trackTransferAchievements(username, parsedAmount, env);
+      await trackTransferAchievements(username, parsedAmount, true, env);
 
       return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DachsTaler 🏦`, { headers: RESPONSE_HEADERS });
     }
@@ -466,7 +492,8 @@ async function handleTransfer(username, target, amount, env) {
 
         // Track achievements
         await Promise.all([
-          trackTransferAchievements(username, parsedAmount, env),
+          trackTransferAchievements(username, parsedAmount, false, env),
+          trackTransferReceived(cleanTarget, actualReceived, env),
           checkBalanceAchievements(cleanTarget, newReceiverBalance, env)
         ]);
 

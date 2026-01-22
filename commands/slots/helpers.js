@@ -24,15 +24,14 @@ import {
   hasUnlock,
   consumeWinMultiplier,
   consumeBoost,
-  updateAchievementStat,
+  updateAchievementStatBatch,
   markTripleCollected,
   recordDachsHit,
   checkAndUnlockAchievement,
   checkBalanceAchievements,
   checkBigWinAchievements,
   addFreeSpinsWithMultiplier,
-  incrementStat,
-  updateMaxStat
+  batchUpdateStats
 } from '../../database.js';
 
 // Unlock prices for error messages
@@ -58,53 +57,32 @@ const UNLOCK_PRICES = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
  */
 export async function trackSlotAchievements(username, originalGrid, displayGrid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, extendedData = {}) {
   try {
-    // Stat updates (these modify achievement data)
-    await updateAchievementStat(username, 'totalSpins', 1, env);
-
+    // Batch achievement stat updates (single read-modify-write instead of sequential calls)
+    const achievementStats = [['totalSpins', 1]];
     if (result.points > 0) {
-      await updateAchievementStat(username, 'wins', 1, env);
+      achievementStats.push(['wins', 1]);
     }
+    await updateAchievementStatBatch(username, achievementStats, env);
 
-    // Extended stats tracking (fire-and-forget)
-    const extendedPromises = [];
-
-    // Track all-in and high-bet spins
-    if (isAllIn) {
-      extendedPromises.push(incrementStat(username, 'allInSpins', 1, env));
-    }
-    if (extendedData.spinCost && extendedData.spinCost >= 50) {
-      extendedPromises.push(incrementStat(username, 'highBetSpins', 1, env));
-    }
-
-    // Track free spins used
-    if (isFreeSpinUsed) {
-      extendedPromises.push(incrementStat(username, 'freeSpinsUsed', 1, env));
-    }
-
-    // Track insurance triggers
-    if (insuranceUsed) {
-      extendedPromises.push(incrementStat(username, 'insuranceTriggers', 1, env));
-    }
-
-    // Track hourly jackpots
-    if (hourlyJackpotWon) {
-      extendedPromises.push(incrementStat(username, 'hourlyJackpots', 1, env));
-    }
-
-    // Track dachs seen (total count)
+    // Batch extended stats (single read-modify-write instead of parallel individual calls)
     const dachsCount = originalGrid.filter(s => s === '🦡').length;
-    if (dachsCount > 0) {
-      extendedPromises.push(incrementStat(username, 'totalDachsSeen', dachsCount, env));
-    }
+    const statIncrements = [];
+    const maxUpdates = [];
 
-    // Track loss streak
+    if (isAllIn) statIncrements.push(['allInSpins', 1]);
+    if (extendedData.spinCost && extendedData.spinCost >= 50) statIncrements.push(['highBetSpins', 1]);
+    if (isFreeSpinUsed) statIncrements.push(['freeSpinsUsed', 1]);
+    if (insuranceUsed) statIncrements.push(['insuranceTriggers', 1]);
+    if (hourlyJackpotWon) statIncrements.push(['hourlyJackpots', 1]);
+    if (dachsCount > 0) statIncrements.push(['totalDachsSeen', dachsCount]);
     if (extendedData.currentLossStreak && extendedData.currentLossStreak > 0) {
-      extendedPromises.push(updateMaxStat(username, 'maxLossStreak', extendedData.currentLossStreak, env));
+      maxUpdates.push(['maxLossStreak', extendedData.currentLossStreak]);
     }
 
-    // Run extended tracking in parallel (non-blocking)
-    if (extendedPromises.length > 0) {
-      Promise.all(extendedPromises).catch(err => logError('trackSlotAchievements.extended', err, { username }));
+    // Fire-and-forget: single atomic batch update
+    if (statIncrements.length > 0 || maxUpdates.length > 0) {
+      batchUpdateStats(username, statIncrements, maxUpdates, env)
+        .catch(err => logError('trackSlotAchievements.extended', err, { username }));
     }
 
     // Collect all one-time achievements to unlock
@@ -224,15 +202,17 @@ export async function parseSpinAmount(username, amountParam, currentBalance, isF
 
   const lower = amountParam.toLowerCase();
 
+  // "all" = bet entire balance (requires slots_all unlock)
   if (lower === 'all') {
     if (!await hasUnlock(username, 'slots_all', env)) {
       return { error: `@${username} ❌ !slots all nicht freigeschaltet! Du musst es für ${UNLOCK_PRICES.all} DachsTaler im Shop kaufen! Weitere Infos: ${URLS.UNLOCK}` };
     }
-    if (currentBalance < BASE_SPIN_COST) {
-      return { error: `@${username} ❌ Du brauchst mindestens ${BASE_SPIN_COST} DachsTaler für !slots all!` };
+    if (currentBalance < 1) {
+      return { error: `@${username} ❌ Du brauchst mindestens 1 DachsTaler für !slots all!` };
     }
-    const multiplier = Math.floor(currentBalance / BASE_SPIN_COST);
-    return { spinCost: multiplier * BASE_SPIN_COST, multiplier };
+    // Bet entire balance, multiplier = balance / 10 (rounded down, min 1)
+    const multiplier = Math.max(1, Math.floor(currentBalance / BASE_SPIN_COST));
+    return { spinCost: currentBalance, multiplier };
   }
 
   const customAmount = parseInt(amountParam, 10);
@@ -240,11 +220,28 @@ export async function parseSpinAmount(username, amountParam, currentBalance, isF
     return { spinCost: BASE_SPIN_COST, multiplier: 1 };
   }
 
+  // Check if user has slots_all unlock - allows any amount from 1 to balance
+  const hasCustomUnlock = await hasUnlock(username, 'slots_all', env);
+
+  if (hasCustomUnlock) {
+    // With slots_all: any amount from 1 to balance is allowed
+    if (customAmount < 1) {
+      return { error: `@${username} ❌ Minimum ist !slots 1!` };
+    }
+    if (customAmount > currentBalance) {
+      return { error: `@${username} ❌ Du hast nur ${currentBalance} DachsTaler! Verfügbar: !slots 1-${currentBalance} oder !slots all` };
+    }
+    // Multiplier = amount / 10 (rounded down, min 1)
+    const multiplier = Math.max(1, Math.floor(customAmount / BASE_SPIN_COST));
+    return { spinCost: customAmount, multiplier };
+  }
+
+  // Without slots_all: only predefined amounts (10, 20, 30, 50, 100)
   if (customAmount < BASE_SPIN_COST) {
-    return { error: `@${username} ❌ Minimum ist !slots ${BASE_SPIN_COST}! Verfügbar: 10, 20, 30, 50, 100, all 💡` };
+    return { error: `@${username} ❌ Minimum ist !slots ${BASE_SPIN_COST}! Verfügbar: 10, 20, 30, 50, 100 | Für freie Beträge: !slots all freischalten 💡` };
   }
   if (customAmount > 100) {
-    return { error: `@${username} ❌ Maximum ist !slots 100! Verfügbar: 10, 20, 30, 50, 100, all 💡` };
+    return { error: `@${username} ❌ Maximum ist !slots 100! Für freie Beträge: !slots all freischalten 💡` };
   }
   if (customAmount === BASE_SPIN_COST) {
     return { spinCost: BASE_SPIN_COST, multiplier: 1 };
@@ -257,7 +254,7 @@ export async function parseSpinAmount(username, amountParam, currentBalance, isF
     return { error: `@${username} ❌ !slots ${customAmount} nicht freigeschaltet! Du musst es für ${UNLOCK_PRICES[customAmount]} DachsTaler im Shop kaufen! Weitere Infos: ${URLS.UNLOCK}` };
   }
 
-  return { error: `@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all | Info: ${URLS.UNLOCK}` };
+  return { error: `@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100 | Für freie Beträge: !slots all freischalten | Info: ${URLS.UNLOCK}` };
 }
 
 /**
@@ -363,7 +360,9 @@ export async function calculateStreakBonuses(lowerUsername, username, isWin, pre
     ? { wins: 0, losses: 0 }
     : { wins: isWin ? previousStreak.wins + 1 : 0, losses: isWin ? 0 : previousStreak.losses + 1 };
 
-  await env.SLOTS_KV.put(kvKey('streak:', lowerUsername), JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS });
+  // Fire-and-forget: streak state only affects next spin, not current response
+  env.SLOTS_KV.put(kvKey('streak:', lowerUsername), JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS })
+    .catch(err => logError('calculateStreakBonuses.streakWrite', err, { username: lowerUsername }));
 
   // Combo Bonus
   if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {

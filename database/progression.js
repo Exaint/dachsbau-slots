@@ -362,6 +362,78 @@ async function setStat(username, statKey, value, env) {
 }
 
 /**
+ * Batch increment multiple stats in a single read-modify-write cycle
+ * Prevents race conditions from parallel incrementStat calls on the same key
+ * @param {string} username - Player username
+ * @param {Array<[string, number]>} updates - Array of [statKey, amount] pairs
+ * @param {object} env - Environment bindings
+ */
+async function incrementStats(username, updates, env) {
+  try {
+    if (!updates || updates.length === 0) return;
+    const stats = await getStats(username, env);
+    const d1Updates = [];
+
+    for (const [statKey, amount] of updates) {
+      if (statKey in stats) {
+        stats[statKey] += amount;
+        d1Updates.push([statKey, amount]);
+      }
+    }
+
+    await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB && d1Updates.length > 0) {
+      await Promise.all(d1Updates.map(([key, amt]) => incrementStatD1(username, key, amt, env)));
+    }
+  } catch (error) {
+    logError('incrementStats', error, { username, updates: updates.map(u => u[0]) });
+  }
+}
+
+/**
+ * Batch increment stats + update max stat in a single read-modify-write
+ * @param {string} username - Player username
+ * @param {Array<[string, number]>} increments - Array of [statKey, amount] pairs
+ * @param {Array<[string, number]>} maxUpdates - Array of [statKey, newValue] pairs for max updates
+ * @param {object} env - Environment bindings
+ */
+async function batchUpdateStats(username, increments, maxUpdates, env) {
+  try {
+    if ((!increments || increments.length === 0) && (!maxUpdates || maxUpdates.length === 0)) return;
+    const stats = await getStats(username, env);
+    const d1Promises = [];
+
+    for (const [statKey, amount] of (increments || [])) {
+      if (statKey in stats) {
+        stats[statKey] += amount;
+        d1Promises.push(() => incrementStatD1(username, statKey, amount, env));
+      }
+    }
+
+    for (const [statKey, newValue] of (maxUpdates || [])) {
+      if (statKey in stats && newValue > stats[statKey]) {
+        stats[statKey] = newValue;
+        d1Promises.push(() =>
+          env.DB.prepare(`
+            UPDATE player_stats SET ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} = ?
+            WHERE username = ? AND ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} < ?
+          `).bind(newValue, username.toLowerCase(), newValue).run()
+        );
+      }
+    }
+
+    await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB && d1Promises.length > 0) {
+      await Promise.all(d1Promises.map(fn => fn()));
+    }
+  } catch (error) {
+    logError('batchUpdateStats', error, { username });
+  }
+}
+
+/**
  * Update max stat if new value is higher
  */
 async function updateMaxStat(username, statKey, newValue, env) {
@@ -402,6 +474,8 @@ export {
   getStats,
   updateStats,
   incrementStat,
+  incrementStats,
+  batchUpdateStats,
   setStat,
   updateMaxStat
 };

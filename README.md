@@ -41,7 +41,8 @@ Ein vollwertiges Slot-Machine-Spiel für den Twitch-Chat von [twitch.tv/frechhda
 |---------|-------------|
 | `!slots` | Spiele einen Spin (10 DT) |
 | `!slots [Betrag]` | Spiele mit Multiplikator (z.B. `!slots 50`) |
-| `!slots all` | Setze alles (benötigt Unlock) |
+| `!slots [1-∞]` | Freie Beträge (benötigt !slots all Unlock) |
+| `!slots all` | Setze gesamtes Guthaben (benötigt Unlock) |
 | `!slots accept` | Akzeptiere die Spielbedingungen (einmalig) |
 
 ### Informationen
@@ -121,7 +122,7 @@ Verdoppeln den nächsten Gewinn mit dem jeweiligen Symbol.
 | 19 | !slots 30 | 2000 DT | slots_20 |
 | 21 | !slots 50 | 2500 DT | slots_30 |
 | 23 | !slots 100 | 3250 DT | slots_50 |
-| 25 | !slots all | 4444 DT | slots_100 |
+| 25 | Freie Einsätze (!slots 1-∞) | 4444 DT | slots_100 |
 | 27 | Daily Interest Boost | 10000 DT | - |
 | 28 | Custom Win Message | 10000 DT | - |
 

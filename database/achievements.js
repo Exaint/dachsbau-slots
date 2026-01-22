@@ -616,6 +616,42 @@ async function updateAchievementStat(username, statKey, increment, env) {
 }
 
 /**
+ * Batch update multiple achievement stats in a single read-modify-write cycle
+ * @param {string} username - Player username
+ * @param {Array<[string, number]>} updates - Array of [statKey, increment] pairs
+ * @param {object} env
+ */
+async function updateAchievementStatBatch(username, updates, env) {
+  try {
+    const data = await getPlayerAchievements(username, env);
+
+    for (const [statKey, increment] of updates) {
+      const newValue = (data.stats[statKey] || 0) + increment;
+      data.stats[statKey] = newValue;
+
+      // Check stat-based achievements for each updated stat
+      const achievementsToCheck = getAchievementsForStat(statKey);
+      for (const achKey of achievementsToCheck) {
+        const achievement = ACHIEVEMENTS[achKey];
+        if (!achievement || data.unlockedAt[achievement.id]) continue;
+        if (newValue >= (achievement.requirement || 1)) {
+          await unlockAchievement(username, achievement.id, env, data);
+        }
+      }
+    }
+
+    await savePlayerAchievements(username, data, env);
+
+    // DUAL_WRITE: batch D1 updates
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await Promise.all(updates.map(([key, amt]) => incrementStatD1(username, key, amt, env)));
+    }
+  } catch (error) {
+    logError('updateAchievementStatBatch', error, { username, updates: updates.map(u => u[0]) });
+  }
+}
+
+/**
  * Mark a triple as collected and check for collection achievements
  * Also records to D1 for detailed tracking with timestamps and counters
  */
@@ -1062,6 +1098,7 @@ export {
   unlockAchievement,
   lockAchievement,
   updateAchievementStat,
+  updateAchievementStatBatch,
   markTripleCollected,
   recordDachsHit,
   checkAndUnlockAchievement,

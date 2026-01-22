@@ -62,7 +62,7 @@ export const ACHIEVEMENTS_ALIASES = new Set(['erfolge', 'achievements']);
 
 // Commands that don't need security checks (read-only info commands)
 export const SAFE_COMMANDS = new Set([
-  'stats', 'buffs', 'bank',
+  'stats', 'buffs', 'bank', 'ping',
   ...LEADERBOARD_ALIASES, ...BALANCE_ALIASES, ...INFO_ALIASES,
   ...WEBSITE_ALIASES, ...ACHIEVEMENTS_ALIASES
 ]);
@@ -140,6 +140,15 @@ export async function handleSlotSubcommands(cleanUsername, lower, url, env) {
       return new Response(`@${cleanUsername} ❓ Meintest du !shop buy ${itemNumber}?`, { headers: RESPONSE_HEADERS });
     }
     return new Response(`@${cleanUsername} ❓ Meintest du !shop buy [Nummer]? (z.B. !shop buy 1)`, { headers: RESPONSE_HEADERS });
+  }
+
+  // Admin: response time test
+  if (lower === 'ping' && isAdmin(cleanUsername)) {
+    const start = Date.now();
+    // Do a representative KV read to measure actual latency
+    await env.SLOTS_KV.get(`balance:${cleanUsername}`);
+    const kvTime = Date.now() - start;
+    return new Response(`@${cleanUsername} pong! KV: ${kvTime}ms | Total: ${Date.now() - start}ms`, { headers: RESPONSE_HEADERS });
   }
 
   // Read-only info commands

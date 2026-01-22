@@ -85,6 +85,8 @@ export {
   getStats,
   updateStats,
   incrementStat,
+  incrementStats,
+  batchUpdateStats,
   setStat,
   updateMaxStat
 } from './progression.js';
@@ -118,6 +120,7 @@ export {
   unlockAchievement,
   lockAchievement,
   updateAchievementStat,
+  updateAchievementStatBatch,
   markTripleCollected,
   recordDachsHit,
   checkAndUnlockAchievement,

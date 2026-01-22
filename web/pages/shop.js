@@ -34,7 +34,7 @@ const ITEM_DESCRIPTIONS = {
   22: 'Silber Prestige-Rang mit 🥈 Badge',
   23: 'Schaltet !slots 100 frei - setze bis zu 100 DT pro Spin',
   24: '1 Stunde lang +100% auf alle Gewinne',
-  25: 'Schaltet !slots all frei - setze alles auf einen Spin',
+  25: 'Schaltet freie Einsätze frei - !slots 1 bis !slots all (jeder Betrag)',
   26: 'Gold Prestige-Rang mit 🥇 Badge',
   27: 'Permanenter Bonus auf tägliche Belohnungen',
   28: 'Eigene Gewinn-Nachricht bei großen Wins',

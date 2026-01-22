@@ -141,7 +141,7 @@ export function renderInfoPage(user = null) {
           <div class="unlock-item">
             <code>!shop buy 25</code>
             <span class="unlock-arrow">→</span>
-            <code>!slots all</code>
+            <code>!slots 1-∞</code>
             <span class="unlock-price">4.444 DT</span>
           </div>
         </div>
@@ -159,8 +159,12 @@ export function renderInfoPage(user = null) {
             <span>Spin für 10 DachsTaler (30 Sek Cooldown)</span>
           </div>
           <div class="command-item">
-            <code>!slots [20/30/50/100/all]</code>
+            <code>!slots [20/30/50/100]</code>
             <span>Höhere Einsätze (benötigt Unlock)</span>
+          </div>
+          <div class="command-item">
+            <code>!slots [1-∞] / !slots all</code>
+            <span>Freie Beträge (benötigt !slots all Unlock)</span>
           </div>
           <div class="command-item">
             <code>!slots daily</code>

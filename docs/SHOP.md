@@ -183,8 +183,11 @@
 | **19** | !slots 30 Unlock | 2.000 DachsTaler | !slots 20 | 3x | `!shop buy 19` |
 | **21** | !slots 50 Unlock | 2.500 DachsTaler | !slots 30 | 5x | `!shop buy 21` |
 | **23** | !slots 100 Unlock | 3.250 DachsTaler | !slots 50 | 10x | `!shop buy 23` |
-| **25** | !slots all Unlock | 4.444 DachsTaler | !slots 100 | Variable (Balance/10) | `!shop buy 25` |
+| **25** | Freie Einsätze Unlock | 4.444 DachsTaler | !slots 100 | Variable (Betrag/10) | `!shop buy 25` |
 
+> **Freie Einsätze (#25):** Erlaubt jeden beliebigen Einsatz von 1 bis zu deiner gesamten Balance!
+> `!slots 1`, `!slots 17`, `!slots 250`, `!slots all` - alles möglich!
+>
 > **Gesamt-Kosten:** 12.694 DachsTaler für alle Multiplier-Unlocks
 
 ### 🎁 Special Unlocks
@@ -199,7 +202,7 @@
 > 1. **Start:** Stats Tracker (#18) - 1.250 DachsTaler → Verfolge deinen Progress!
 > 2. **Early Game:** !slots 20 & 30 (#13, #19) - 2.500 DachsTaler gesamt → 2x-3x Gewinne
 > 3. **Mid Game:** !slots 50 & 100 (#21, #23) - 5.750 DachsTaler gesamt → 5x-10x Gewinne
-> 4. **End Game:** !slots all (#25) - 4.444 DachsTaler → Ultimative Power
+> 4. **End Game:** Freie Einsätze (#25) - 4.444 DachsTaler → !slots 1-∞ (jeder Betrag)
 > 5. **Late Game:** Daily Boost (#27) - 10.000 DachsTaler → Passive Income x5
 
 ---

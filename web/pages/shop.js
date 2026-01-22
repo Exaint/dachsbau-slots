@@ -250,7 +250,7 @@ export async function renderShopPage(env, user = null) {
       </nav>
 
       <!-- Kaufanleitung (einklappbar) -->
-      <section id="kaufanleitung" class="content-section collapsible-section">
+      <section id="kaufanleitung" class="collapsible-section">
         <h2 class="collapsible-header" onclick="toggleSection(this)">
           <span>📋 Kaufanleitung</span>
           <span class="collapse-icon">▼</span>

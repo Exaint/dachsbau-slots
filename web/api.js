@@ -9,6 +9,10 @@ import {
   getBalance,
   setBalance,
   getPrestigeRank,
+  setPrestigeRank,
+  removePrestigeRank,
+  hasUnlock,
+  removeUnlock,
   hasAcceptedDisclaimer,
   setDisclaimerAccepted,
   setSelfBan,
@@ -19,6 +23,7 @@ import {
   isLeaderboardHidden,
   setLeaderboardHidden
 } from '../database.js';
+import { REFUNDABLE_ITEMS, getPreviousPrestigeRank } from '../constants/refund.js';
 import {
   migrateAllUsersToD1,
   verifyMigration,
@@ -371,6 +376,10 @@ async function handleAdminApi(url, env, loggedInUser, request) {
         return await handleAdminSetLeaderboardHidden(targetUser, body.hidden, env);
       case 'setAchievement':
         return await handleAdminSetAchievement(targetUser, body.achievementId, body.unlocked, env);
+      case 'refund':
+        return await handleAdminRefund(targetUser, body.itemKey, env);
+      case 'getRefundableItems':
+        return await handleAdminGetRefundableItems(targetUser, env);
       // D1 Migration endpoints (no targetUser required)
       case 'd1-migrate':
         return await handleD1Migrate(body, env);
@@ -585,4 +594,165 @@ async function handleD1MigrateFull(body, env) {
 async function handleD1FullStatus(env) {
   const result = await getFullMigrationStatus(env);
   return jsonResponse(result);
+}
+
+// ==================== REFUND API ====================
+
+/**
+ * Admin: Get refundable items for a user
+ * Returns items the user owns and whether they can be refunded
+ */
+async function handleAdminGetRefundableItems(username, env) {
+  const [currentRank, balance] = await Promise.all([
+    getPrestigeRank(username, env),
+    getBalance(username, env)
+  ]);
+
+  // Check all unlocks in parallel
+  const unlockKeys = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all', 'daily_boost', 'custom_message'];
+  const unlockChecks = await Promise.all(
+    unlockKeys.map(key => hasUnlock(username, key, env))
+  );
+
+  const ownedUnlocks = {};
+  unlockKeys.forEach((key, i) => {
+    ownedUnlocks[key] = unlockChecks[i];
+  });
+
+  // Build list of refundable items with status
+  const items = [];
+
+  // Add prestige ranks
+  for (const [itemKey, item] of Object.entries(REFUNDABLE_ITEMS)) {
+    if (item.type === 'prestige') {
+      const owned = currentRank === item.rank;
+      // Check if blocked by higher rank
+      const blockedByHigherRank = item.blockedBy.some(higherRank => {
+        // User has a higher rank that blocks this refund
+        const rankOrder = ['🥉', '🥈', '🥇', '💎', '👑'];
+        const currentIndex = rankOrder.indexOf(currentRank);
+        const higherIndex = rankOrder.indexOf(higherRank);
+        return currentIndex >= higherIndex && currentIndex !== -1;
+      });
+
+      items.push({
+        key: itemKey,
+        ...item,
+        owned,
+        canRefund: owned && !blockedByHigherRank,
+        blockedReason: owned && blockedByHigherRank ? `Muss zuerst höheren Rang refunden` : null
+      });
+    } else if (item.type === 'unlock') {
+      const owned = ownedUnlocks[item.unlockKey] || false;
+      // Check if blocked by higher unlock
+      const blockedByHigherUnlock = item.blockedBy.some(higherKey => ownedUnlocks[higherKey]);
+
+      items.push({
+        key: itemKey,
+        ...item,
+        owned,
+        canRefund: owned && !blockedByHigherUnlock,
+        blockedReason: owned && blockedByHigherUnlock ? `Muss zuerst höheres Unlock refunden` : null
+      });
+    }
+  }
+
+  return jsonResponse({
+    success: true,
+    username,
+    balance,
+    currentRank,
+    items
+  });
+}
+
+/**
+ * Admin: Refund an item to a user
+ * Removes the item and refunds the purchase price
+ */
+async function handleAdminRefund(username, itemKey, env) {
+  if (!itemKey || typeof itemKey !== 'string') {
+    return jsonResponse({ error: 'Invalid itemKey' }, 400);
+  }
+
+  const item = REFUNDABLE_ITEMS[itemKey];
+  if (!item) {
+    return jsonResponse({ error: 'Item not found' }, 404);
+  }
+
+  // Get current state
+  const [currentRank, currentBalance] = await Promise.all([
+    getPrestigeRank(username, env),
+    getBalance(username, env)
+  ]);
+
+  // Validate based on item type
+  if (item.type === 'prestige') {
+    // Check if user has this rank
+    if (currentRank !== item.rank) {
+      return jsonResponse({
+        error: 'User does not have this rank',
+        currentRank,
+        requestedRank: item.rank
+      }, 400);
+    }
+
+    // Check if blocked by higher rank
+    const rankOrder = ['🥉', '🥈', '🥇', '💎', '👑'];
+    const currentIndex = rankOrder.indexOf(currentRank);
+    for (const higherRank of item.blockedBy) {
+      const higherIndex = rankOrder.indexOf(higherRank);
+      if (currentIndex >= higherIndex) {
+        return jsonResponse({
+          error: `Cannot refund: User still has higher rank ${higherRank}`,
+          blockedBy: higherRank
+        }, 400);
+      }
+    }
+
+    // Perform refund: Set to previous rank or remove entirely
+    const previousRank = getPreviousPrestigeRank(item.rank);
+    if (previousRank) {
+      await setPrestigeRank(username, previousRank, env);
+    } else {
+      await removePrestigeRank(username, env);
+    }
+
+  } else if (item.type === 'unlock') {
+    // Check if user has this unlock
+    const hasThisUnlock = await hasUnlock(username, item.unlockKey, env);
+    if (!hasThisUnlock) {
+      return jsonResponse({
+        error: 'User does not have this unlock',
+        unlockKey: item.unlockKey
+      }, 400);
+    }
+
+    // Check if blocked by higher unlock
+    for (const higherKey of item.blockedBy) {
+      const hasHigher = await hasUnlock(username, higherKey, env);
+      if (hasHigher) {
+        return jsonResponse({
+          error: `Cannot refund: User still has higher unlock ${higherKey}`,
+          blockedBy: higherKey
+        }, 400);
+      }
+    }
+
+    // Perform refund: Remove the unlock
+    await removeUnlock(username, item.unlockKey, env);
+  }
+
+  // Add refund amount to balance
+  const newBalance = currentBalance + item.price;
+  await setBalance(username, newBalance, env);
+
+  return jsonResponse({
+    success: true,
+    username,
+    refundedItem: item.name,
+    refundAmount: item.price,
+    oldBalance: currentBalance,
+    newBalance
+  });
 }

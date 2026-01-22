@@ -383,6 +383,25 @@ async function addUnlockD1(username, unlockKey, env) {
 }
 
 /**
+ * Remove an unlock from a player
+ */
+async function removeUnlockD1(username, unlockKey, env) {
+  if (!D1_ENABLED || !env.DB) return false;
+
+  try {
+    await env.DB.prepare(`
+      DELETE FROM player_unlocks
+      WHERE username = ? AND unlock_key = ?
+    `).bind(username.toLowerCase(), unlockKey).run();
+
+    return true;
+  } catch (error) {
+    logError('d1.removeUnlock', error, { username, unlockKey });
+    return false;
+  }
+}
+
+/**
  * Get all unlocks for a player
  */
 async function getUnlocksD1(username, env) {
@@ -624,6 +643,7 @@ export {
   // Unlocks
   hasUnlockD1,
   addUnlockD1,
+  removeUnlockD1,
   getUnlocksD1,
 
   // Monthly Login

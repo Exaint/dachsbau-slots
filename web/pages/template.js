@@ -645,6 +645,89 @@ function getClientScripts() {
       });
     }
 
+    // Refund functions
+    async function loadRefundableItems(username) {
+      const container = document.getElementById('refundItemsContainer');
+      const msgEl = document.getElementById('adminMessage');
+      container.innerHTML = '<div class="admin-loading">Lade Items...</div>';
+      container.style.display = 'block';
+
+      try {
+        const response = await fetch('/api/admin?action=getRefundableItems', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ username })
+        });
+        const result = await response.json();
+
+        if (!result.success) {
+          container.innerHTML = '<div class="admin-error">Fehler: ' + (result.error || 'Unbekannt') + '</div>';
+          return;
+        }
+
+        // Group items by type
+        const prestigeItems = result.items.filter(i => i.type === 'prestige');
+        const unlockItems = result.items.filter(i => i.type === 'unlock');
+
+        let html = '<div class="refund-groups">';
+
+        // Prestige Ranks
+        html += '<div class="refund-group"><h4>Prestige Ränge</h4><div class="refund-items">';
+        for (const item of prestigeItems) {
+          const statusClass = item.owned ? (item.canRefund ? 'refundable' : 'blocked') : 'not-owned';
+          html += \`
+            <div class="refund-item \${statusClass}">
+              <span class="refund-item-name">\${item.symbol} \${item.name}</span>
+              <span class="refund-item-price">+\${item.price.toLocaleString('de-DE')} DT</span>
+              \${item.owned ? (item.canRefund
+                ? \`<button class="btn admin-btn danger btn-sm" onclick="refundItem('\${username}', '\${item.key}', '\${item.name}', \${item.price})">Refund</button>\`
+                : \`<span class="refund-blocked">\${item.blockedReason}</span>\`
+              ) : '<span class="refund-not-owned">Nicht gekauft</span>'}
+            </div>
+          \`;
+        }
+        html += '</div></div>';
+
+        // Slot Unlocks
+        html += '<div class="refund-group"><h4>Slot Unlocks</h4><div class="refund-items">';
+        for (const item of unlockItems) {
+          const statusClass = item.owned ? (item.canRefund ? 'refundable' : 'blocked') : 'not-owned';
+          html += \`
+            <div class="refund-item \${statusClass}">
+              <span class="refund-item-name">\${item.symbol} \${item.name}</span>
+              <span class="refund-item-price">+\${item.price.toLocaleString('de-DE')} DT</span>
+              \${item.owned ? (item.canRefund
+                ? \`<button class="btn admin-btn danger btn-sm" onclick="refundItem('\${username}', '\${item.key}', '\${item.name}', \${item.price})">Refund</button>\`
+                : \`<span class="refund-blocked">\${item.blockedReason}</span>\`
+              ) : '<span class="refund-not-owned">Nicht gekauft</span>'}
+            </div>
+          \`;
+        }
+        html += '</div></div>';
+        html += '</div>';
+
+        container.innerHTML = html;
+      } catch (e) {
+        container.innerHTML = '<div class="admin-error">Netzwerkfehler</div>';
+      }
+    }
+
+    async function refundItem(username, itemKey, itemName, price) {
+      if (!confirm(\`"\${itemName}" wirklich refunden?\\nDer Spieler erhält \${price.toLocaleString('de-DE')} DT zurück.\`)) return;
+
+      const result = await adminApiCall('refund', { username, itemKey });
+      if (result && result.success) {
+        // Reload refundable items to update UI
+        loadRefundableItems(username);
+        // Update balance display if on profile
+        const balanceEl = document.querySelector('.stat-value');
+        if (balanceEl && result.newBalance !== undefined) {
+          balanceEl.textContent = result.newBalance.toLocaleString('de-DE');
+        }
+      }
+    }
+
     // Shop purchase function
     async function buyItem(itemId, itemName, price) {
       const feedback = document.getElementById('purchaseFeedback');

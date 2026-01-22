@@ -7,7 +7,7 @@
 import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, KV_TRUE, MAX_RETRIES } from '../constants.js';
 import { getCurrentMonth, getCurrentDate, logError, kvKey, exponentialBackoff } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, upsertUser } from './d1.js';
-import { addUnlockD1, updateMonthlyLoginD1, incrementStatD1, updateBiggestWinD1 } from './d1-achievements.js';
+import { addUnlockD1, removeUnlockD1, updateMonthlyLoginD1, incrementStatD1, updateBiggestWinD1 } from './d1-achievements.js';
 
 // Streak Multiplier
 async function getStreakMultiplier(username, env) {
@@ -80,6 +80,21 @@ async function setPrestigeRank(username, rank, env) {
   }
 }
 
+async function removePrestigeRank(username, env) {
+  try {
+    await env.SLOTS_KV.delete(kvKey('rank:', username));
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await upsertUser(username, { prestige_rank: null }, env);
+    }
+    return true;
+  } catch (error) {
+    logError('removePrestigeRank', error, { username });
+    return false;
+  }
+}
+
 // Unlocks
 async function hasUnlock(username, unlockKey, env) {
   try {
@@ -101,6 +116,21 @@ async function setUnlock(username, unlockKey, env) {
     }
   } catch (error) {
     logError('setUnlock', error, { username, unlockKey });
+  }
+}
+
+async function removeUnlock(username, unlockKey, env) {
+  try {
+    await env.SLOTS_KV.delete(kvKey('unlock:', username, unlockKey));
+
+    // DUAL_WRITE: Also update D1
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      await removeUnlockD1(username, unlockKey, env);
+    }
+    return true;
+  } catch (error) {
+    logError('removeUnlock', error, { username, unlockKey });
+    return false;
   }
 }
 
@@ -266,8 +296,10 @@ export {
   resetStreakMultiplier,
   getPrestigeRank,
   setPrestigeRank,
+  removePrestigeRank,
   hasUnlock,
   setUnlock,
+  removeUnlock,
   getMonthlyLogin,
   updateMonthlyLogin,
   markMilestoneClaimed,

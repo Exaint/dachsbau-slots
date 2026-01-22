@@ -355,6 +355,13 @@ export function renderProfilePage(data) {
               <button class="btn admin-btn danger" onclick="adminSetAchievement('${escapeHtml(username)}', false)">Sperren</button>
             </div>
           </div>
+          <div class="admin-control admin-control-wide">
+            <label>💸 Shop-Refund</label>
+            <div class="admin-refund-section">
+              <button class="btn admin-btn" onclick="loadRefundableItems('${escapeHtml(username)}')">Refund-Items laden</button>
+              <div id="refundItemsContainer" class="admin-refund-items" style="display: none;"></div>
+            </div>
+          </div>
         </div>
         <div id="adminMessage" class="admin-message"></div>
       </div>

@@ -3184,6 +3184,99 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+/* Refund Section */
+.admin-refund-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-refund-items {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.admin-loading, .admin-error {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.admin-error {
+  color: var(--error);
+}
+
+.refund-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.refund-group h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
+}
+
+.refund-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.refund-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.refund-item.refundable {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.refund-item.blocked {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.refund-item.not-owned {
+  opacity: 0.5;
+}
+
+.refund-item-name {
+  flex: 1;
+}
+
+.refund-item-price {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.refund-blocked {
+  font-size: 0.75rem;
+  color: #ffc107;
+  max-width: 120px;
+  text-align: right;
+}
+
+.refund-not-owned {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.btn-sm {
+  padding: 4px 8px !important;
+  font-size: 0.75rem !important;
+}
+
 @media (max-width: 600px) {
   .admin-panel-grid {
     grid-template-columns: 1fr;

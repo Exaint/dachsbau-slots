@@ -1034,12 +1034,7 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.category-spinning .category-icon { background: var(--cat-spinning); }
-.category-winning .category-icon { background: var(--cat-winning); }
-.category-collecting .category-icon { background: var(--cat-collecting); }
-.category-social .category-icon { background: var(--cat-social); }
-.category-dedication .category-icon { background: var(--cat-dedication); }
-.category-shopping .category-icon { background: var(--cat-shopping); }
+/* Only special category keeps background (uses emoji, not image) */
 .category-special .category-icon { background: var(--cat-special); }
 
 .category-progress {

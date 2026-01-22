@@ -178,15 +178,28 @@ async function handleProfileApi(username, env) {
 
 /**
  * Get leaderboard data
+ * Uses D1 for efficient single-query leaderboard (replaces 2500+ KV operations)
  */
 async function handleLeaderboardApi(env) {
-  const BATCH_SIZE = 100;
-
   try {
+    // Try D1 first (single query, much faster)
+    if (D1_ENABLED && env.DB) {
+      const players = await getD1Leaderboard(100, env);
+      if (players !== null) {
+        return jsonResponse({
+          players,
+          total: players.length,
+          source: 'd1'
+        }, 200, 60);
+      }
+    }
+
+    // Fallback to KV if D1 is disabled or fails
+    const BATCH_SIZE = 100;
     const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
 
     if (!listResult.keys || listResult.keys.length === 0) {
-      return jsonResponse({ players: [] });
+      return jsonResponse({ players: [], source: 'kv' });
     }
 
     const users = [];
@@ -226,7 +239,8 @@ async function handleLeaderboardApi(env) {
     // Return top 100 with 60s cache
     return jsonResponse({
       players: users.slice(0, 100),
-      total: users.length
+      total: users.length,
+      source: 'kv'
     }, 200, 60);
   } catch (error) {
     logError('handleLeaderboardApi', error);

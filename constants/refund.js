@@ -39,6 +39,7 @@ export const REFUNDABLE_ITEMS = {
   prestige_bronze: {
     type: 'prestige',
     rank: '🥉',
+    symbol: '🥉',
     shopId: 17,
     name: 'Bronze Dachs Rang',
     price: SHOP_ITEMS[17].price,
@@ -47,6 +48,7 @@ export const REFUNDABLE_ITEMS = {
   prestige_silver: {
     type: 'prestige',
     rank: '🥈',
+    symbol: '🥈',
     shopId: 22,
     name: 'Silber Dachs Rang',
     price: SHOP_ITEMS[22].price,
@@ -55,6 +57,7 @@ export const REFUNDABLE_ITEMS = {
   prestige_gold: {
     type: 'prestige',
     rank: '🥇',
+    symbol: '🥇',
     shopId: 26,
     name: 'Gold Dachs Rang',
     price: SHOP_ITEMS[26].price,
@@ -63,6 +66,7 @@ export const REFUNDABLE_ITEMS = {
   prestige_platin: {
     type: 'prestige',
     rank: '💎',
+    symbol: '💎',
     shopId: 29,
     name: 'Platin Dachs Rang',
     price: SHOP_ITEMS[29].price,
@@ -71,6 +75,7 @@ export const REFUNDABLE_ITEMS = {
   prestige_legendary: {
     type: 'prestige',
     rank: '👑',
+    symbol: '👑',
     shopId: 30,
     name: 'Legendary Dachs Rang',
     price: SHOP_ITEMS[30].price,
@@ -80,6 +85,7 @@ export const REFUNDABLE_ITEMS = {
   slots_20: {
     type: 'unlock',
     unlockKey: 'slots_20',
+    symbol: '🎰',
     shopId: 13,
     name: '!slots 20 Unlock',
     price: SHOP_ITEMS[13].price,
@@ -88,6 +94,7 @@ export const REFUNDABLE_ITEMS = {
   slots_30: {
     type: 'unlock',
     unlockKey: 'slots_30',
+    symbol: '🎰',
     shopId: 19,
     name: '!slots 30 Unlock',
     price: SHOP_ITEMS[19].price,
@@ -96,6 +103,7 @@ export const REFUNDABLE_ITEMS = {
   slots_50: {
     type: 'unlock',
     unlockKey: 'slots_50',
+    symbol: '🎰',
     shopId: 21,
     name: '!slots 50 Unlock',
     price: SHOP_ITEMS[21].price,
@@ -104,6 +112,7 @@ export const REFUNDABLE_ITEMS = {
   slots_100: {
     type: 'unlock',
     unlockKey: 'slots_100',
+    symbol: '🎰',
     shopId: 23,
     name: '!slots 100 Unlock',
     price: SHOP_ITEMS[23].price,
@@ -112,6 +121,7 @@ export const REFUNDABLE_ITEMS = {
   slots_all: {
     type: 'unlock',
     unlockKey: 'slots_all',
+    symbol: '🎰',
     shopId: 25,
     name: '!slots all Unlock',
     price: SHOP_ITEMS[25].price,
@@ -121,6 +131,7 @@ export const REFUNDABLE_ITEMS = {
   daily_boost: {
     type: 'unlock',
     unlockKey: 'daily_boost',
+    symbol: '📈',
     shopId: 27,
     name: 'Daily Interest Boost',
     price: SHOP_ITEMS[27].price,
@@ -129,6 +140,7 @@ export const REFUNDABLE_ITEMS = {
   custom_message: {
     type: 'unlock',
     unlockKey: 'custom_message',
+    symbol: '💬',
     shopId: 28,
     name: 'Custom Win Message',
     price: SHOP_ITEMS[28].price,

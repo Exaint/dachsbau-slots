@@ -28,7 +28,7 @@ export function renderInfoPage(user = null) {
           <a href="#bank" class="toc-item">🏦 DachsBank</a>
           <a href="#faq" class="toc-item">❓ FAQ</a>
           <a href="#hilfe" class="toc-item">📞 Hilfe</a>
-          <a href="#shortcuts" class="toc-item">⌨️ Tastaturkürzel</a>
+          <a href="#shortcuts" class="toc-item desktop-only">⌨️ Tastaturkürzel</a>
         </div>
       </nav>
 
@@ -957,8 +957,8 @@ export function renderInfoPage(user = null) {
         </section>
       </details>
 
-      <!-- Keyboard Shortcuts -->
-      <details class="info-accordion">
+      <!-- Keyboard Shortcuts (Desktop only) -->
+      <details class="info-accordion desktop-only">
         <summary class="accordion-header"><h2>⌨️ Tastaturkürzel</h2></summary>
         <section id="shortcuts" class="content-section accordion-content">
           <p class="section-intro">Navigiere schneller mit der Tastatur!</p>

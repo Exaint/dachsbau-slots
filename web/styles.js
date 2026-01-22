@@ -2736,6 +2736,11 @@ body {
 
 /* Responsive */
 @media (max-width: 768px) {
+  /* Hide desktop-only elements on mobile */
+  .desktop-only {
+    display: none !important;
+  }
+
   .header-content {
     flex-wrap: wrap;
   }

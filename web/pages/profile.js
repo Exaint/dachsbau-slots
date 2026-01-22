@@ -254,12 +254,15 @@ export function renderProfilePage(data) {
 
     return `
       <div class="category ${catClass}">
-        <div class="category-header">
+        <div class="category-header" onclick="toggleCategory(this)">
           <div class="category-title">
             <div class="category-icon">${CATEGORY_ICONS[category] || '🎯'}</div>
             <span>${CATEGORY_NAMES[category] || category}</span>
           </div>
-          <div class="category-progress">${catUnlocked}/${catTotal}</div>
+          <div class="category-header-right">
+            <div class="category-progress">${catUnlocked}/${catTotal}</div>
+            <span class="collapse-icon">▼</span>
+          </div>
         </div>
         <div class="category-content">
           <div class="achievement-list">

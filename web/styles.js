@@ -1043,8 +1043,32 @@ body {
   font-weight: 500;
 }
 
+.category-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.category-header .collapse-icon {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  transition: transform 0.3s ease;
+}
+
+.category.collapsed .category-header .collapse-icon {
+  transform: rotate(-90deg);
+}
+
 .category-content {
   padding: 0 20px 20px;
+  transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+  overflow: hidden;
+}
+
+.category.collapsed .category-content {
+  max-height: 0;
+  opacity: 0;
+  padding: 0 20px;
 }
 
 /* Achievement Items */

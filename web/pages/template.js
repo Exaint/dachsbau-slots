@@ -742,6 +742,12 @@ function getClientScripts() {
       }
     }
 
+    // Category collapse toggle (profile achievements)
+    function toggleCategory(header) {
+      const category = header.closest('.category');
+      category.classList.toggle('collapsed');
+    }
+
     // Shop purchase function
     async function buyItem(itemId, itemName, price) {
       const feedback = document.getElementById('purchaseFeedback');

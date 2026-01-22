@@ -240,6 +240,25 @@ async function getPlayerAchievements(username, env) {
       }
     }
 
+    // One-time duel achievement catch-up: Unlock FIRST_DUEL if user has duelsWon > 0
+    if (!data.duelMigrated) {
+      if ((data.stats.duelsWon || 0) > 0 && !data.unlockedAt[ACHIEVEMENTS.FIRST_DUEL.id]) {
+        const now = Date.now();
+        data.unlockedAt[ACHIEVEMENTS.FIRST_DUEL.id] = now;
+        if (!ACHIEVEMENTS_REWARDS_ENABLED && ACHIEVEMENTS.FIRST_DUEL.reward > 0) {
+          data.pendingRewards = (data.pendingRewards || 0) + ACHIEVEMENTS.FIRST_DUEL.reward;
+        }
+        await Promise.all([
+          env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify({ ...data, duelMigrated: true })),
+          incrementAchievementCounter(ACHIEVEMENTS.FIRST_DUEL.id, env)
+        ]);
+        data.duelMigrated = true;
+      } else {
+        data.duelMigrated = true;
+        await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
+      }
+    }
+
     // One-time balance achievement catch-up: Check current balance and unlock missed balance achievements
     if (!data.balanceMigrated) {
       const balanceData = await env.SLOTS_KV.get(kvKey('user:', username));
@@ -903,63 +922,52 @@ async function migrateAllPlayersToAchievements(env) {
 
 /**
  * Get global achievement statistics (how many players have each achievement)
- * Uses KV caching for 5 minutes to reduce load
+ * Uses the achievement_count:{id} counters for real-time accuracy
+ * Total players is cached for 5 minutes to reduce load
  */
 async function getAchievementStats(env) {
   try {
-    // Check cache first
-    const cached = await env.SLOTS_KV.get(STATS_CACHE_KEY);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
     // Run migration to ensure all players have achievement entries
     await migrateAllPlayersToAchievements(env);
 
-    // Get all achievement records
-    const achievementList = await env.SLOTS_KV.list({ prefix: 'achievements:', limit: 1000 });
-    const achievementKeys = achievementList.keys || [];
-
-    // Initialize counts
+    // Get all achievement IDs
     const achievementIds = Object.values(ACHIEVEMENTS).map(a => a.id);
-    const counts = {};
-    for (const id of achievementIds) {
-      counts[id] = 0;
-    }
 
-    // Count achievements from all players
-    const totalPlayers = achievementKeys.length;
+    // Fetch all achievement counts in parallel (these are always up-to-date)
+    const countPromises = achievementIds.map(id =>
+      env.SLOTS_KV.get(`achievement_count:${id}`)
+    );
 
-    // Fetch all player achievement data in parallel (batch of 10 for performance)
-    const batchSize = 10;
-    for (let i = 0; i < achievementKeys.length; i += batchSize) {
-      const batch = achievementKeys.slice(i, i + batchSize);
-      const promises = batch.map(k => env.SLOTS_KV.get(k.name));
-      const results = await Promise.all(promises);
-
-      for (const data of results) {
-        if (!data) continue;
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.unlockedAt) {
-            for (const achievementId of Object.keys(parsed.unlockedAt)) {
-              if (counts[achievementId] !== undefined) {
-                counts[achievementId]++;
-              }
-            }
-          }
-        } catch {
-          // Skip invalid data
-        }
+    // Check cached total players count
+    let totalPlayers = 0;
+    const cachedTotal = await env.SLOTS_KV.get(STATS_CACHE_KEY);
+    if (cachedTotal) {
+      try {
+        const parsed = JSON.parse(cachedTotal);
+        totalPlayers = parsed.totalPlayers || 0;
+      } catch {
+        // Invalid cache, recalculate
       }
     }
 
-    const stats = { totalPlayers, counts };
+    // If no cached total, count achievement records
+    if (totalPlayers === 0) {
+      const achievementList = await env.SLOTS_KV.list({ prefix: 'achievements:', limit: 1000 });
+      totalPlayers = achievementList.keys?.length || 0;
+      // Cache just the total players count
+      await env.SLOTS_KV.put(STATS_CACHE_KEY, JSON.stringify({ totalPlayers }), { expirationTtl: STATS_CACHE_TTL });
+    }
 
-    // Cache the result for 5 minutes
-    await env.SLOTS_KV.put(STATS_CACHE_KEY, JSON.stringify(stats), { expirationTtl: STATS_CACHE_TTL });
+    // Wait for all count fetches
+    const countResults = await Promise.all(countPromises);
 
-    return stats;
+    // Build counts object
+    const counts = {};
+    for (let i = 0; i < achievementIds.length; i++) {
+      counts[achievementIds[i]] = parseInt(countResults[i] || '0', 10);
+    }
+
+    return { totalPlayers, counts };
   } catch (error) {
     logError('getAchievementStats', error);
     return { totalPlayers: 0, counts: {} };

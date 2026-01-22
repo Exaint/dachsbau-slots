@@ -425,6 +425,10 @@ export function renderProfilePage(data) {
         <button class="sort-btn" data-sort="rarity-asc" aria-pressed="false">Seltenste</button>
         <button class="sort-btn" data-sort="rarity-desc" aria-pressed="false">Häufigste</button>
       </div>
+      <div class="achievement-collapse-controls" role="group" aria-label="Kategorien ein-/ausklappen">
+        <button class="collapse-all-btn" onclick="collapseAllCategories()">Alle einklappen</button>
+        <button class="collapse-all-btn" onclick="expandAllCategories()">Alle ausklappen</button>
+      </div>
     </div>
     <div class="categories">
       ${categoriesHtml}

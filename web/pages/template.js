@@ -748,6 +748,15 @@ function getClientScripts() {
       category.classList.toggle('collapsed');
     }
 
+    // Collapse/expand all categories
+    function collapseAllCategories() {
+      document.querySelectorAll('.category').forEach(cat => cat.classList.add('collapsed'));
+    }
+
+    function expandAllCategories() {
+      document.querySelectorAll('.category').forEach(cat => cat.classList.remove('collapsed'));
+    }
+
     // Shop purchase function
     async function buyItem(itemId, itemName, price) {
       const feedback = document.getElementById('purchaseFeedback');

@@ -925,7 +925,8 @@ body {
 }
 
 .achievement-filter,
-.achievement-sort {
+.achievement-sort,
+.achievement-collapse-controls {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -939,7 +940,8 @@ body {
 }
 
 .filter-btn,
-.sort-btn {
+.sort-btn,
+.collapse-all-btn {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -951,7 +953,8 @@ body {
 }
 
 .filter-btn:hover,
-.sort-btn:hover {
+.sort-btn:hover,
+.collapse-all-btn:hover {
   background: var(--bg-card);
   color: var(--text-primary);
 }

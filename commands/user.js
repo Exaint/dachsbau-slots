@@ -93,7 +93,8 @@ async function trackTransferAchievements(username, amount, isBankDonation, env) 
     // Track totalTransferred for TRANSFER_1000/10000 achievements
     promises.push(updateAchievementStat(username, 'totalTransferred', amount, env));
 
-    // Track extended stats
+    // Track transfer count for TRANSFER_COUNT_10/50/100 achievements
+    promises.push(updateAchievementStat(username, 'transfersSentCount', 1, env));
     promises.push(incrementStat(username, 'transfersSentCount', 1, env));
 
     if (isBankDonation) {

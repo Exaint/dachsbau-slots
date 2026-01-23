@@ -121,6 +121,7 @@ export {
   lockAchievement,
   updateAchievementStat,
   updateAchievementStatBatch,
+  setMaxAchievementStat,
   markTripleCollected,
   recordDachsHit,
   checkAndUnlockAchievement,

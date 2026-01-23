@@ -103,21 +103,25 @@ async function trackShopAchievements(username, itemId, item, extraData, env) {
     // FIRST_PURCHASE
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_PURCHASE.id, env));
 
-    // Track item-specific stats for extended tracking
+    // Track item-specific stats for extended tracking & achievements
     switch (itemId) {
       case 1: // Peek Token
         promises.push(incrementStat(username, 'peekTokens', 1, env));
         break;
       case 11: // Chaos Spin
+        promises.push(updateAchievementStat(username, 'chaosSpins', 1, env));
         promises.push(incrementStat(username, 'chaosSpins', 1, env));
         break;
       case 12: // Glücksrad
+        promises.push(updateAchievementStat(username, 'wheelSpins', 1, env));
         promises.push(incrementStat(username, 'wheelSpins', 1, env));
         break;
       case 16: // Mystery Box
+        promises.push(updateAchievementStat(username, 'mysteryBoxes', 1, env));
         promises.push(incrementStat(username, 'mysteryBoxes', 1, env));
         break;
       case 31: // Reverse Chaos
+        promises.push(updateAchievementStat(username, 'reverseChaosSpins', 1, env));
         promises.push(incrementStat(username, 'reverseChaosSpins', 1, env));
         break;
       case 36: // Diamond Mine
@@ -127,6 +131,7 @@ async function trackShopAchievements(username, itemId, item, extraData, env) {
         promises.push(incrementStat(username, 'guaranteedPairsUsed', 1, env));
         break;
       case 38: // Wild Card
+        promises.push(updateAchievementStat(username, 'wildCardsUsed', 1, env));
         promises.push(incrementStat(username, 'wildCardsUsed', 1, env));
         break;
     }

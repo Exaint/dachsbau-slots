@@ -25,7 +25,7 @@
  */
 
 import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
-import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStat, checkBalanceAchievements, incrementStat, updateMaxStat } from '../database.js';
+import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStat, setMaxAchievementStat, checkBalanceAchievements, incrementStat, updateMaxStat } from '../database.js';
 import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
 
@@ -47,15 +47,43 @@ async function trackDuelAchievements(player, isWinner, winnings, env) {
     if (isWinner) {
       // Winner stats
       promises.push(updateAchievementStat(player, 'duelsWon', 1, env));
+      promises.push(updateAchievementStat(player, 'totalDuelWinnings', winnings, env));
       promises.push(incrementStat(player, 'totalDuelWinnings', winnings, env));
+
+      // Track duel win streak
+      promises.push(trackDuelStreak(player, true, env));
     } else {
       // Loser stats
+      promises.push(updateAchievementStat(player, 'duelsLost', 1, env));
       promises.push(incrementStat(player, 'duelsLost', 1, env));
+
+      // Reset duel win streak on loss
+      promises.push(trackDuelStreak(player, false, env));
     }
 
     await Promise.all(promises);
   } catch (error) {
     logError('trackDuelAchievements', error, { player, isWinner });
+  }
+}
+
+/**
+ * Track duel win streak and check streak achievements
+ */
+async function trackDuelStreak(player, isWin, env) {
+  try {
+    const key = `duelStreak:${player.toLowerCase()}`;
+    if (isWin) {
+      const current = parseInt(await env.SLOTS_KV.get(key) || '0', 10);
+      const newStreak = current + 1;
+      await env.SLOTS_KV.put(key, String(newStreak), { expirationTtl: 86400 * 30 });
+      await setMaxAchievementStat(player, 'maxDuelStreak', newStreak, env);
+      updateMaxStat(player, 'maxDuelStreak', newStreak, env).catch(() => {});
+    } else {
+      await env.SLOTS_KV.put(key, '0', { expirationTtl: 86400 * 30 });
+    }
+  } catch (error) {
+    logError('trackDuelStreak', error, { player, isWin });
   }
 }
 

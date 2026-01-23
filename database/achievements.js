@@ -27,14 +27,32 @@ const STATS_CACHE_TTL = 300; // 5 minutes in seconds
 const DEFAULT_STATS = {
   totalSpins: 0,
   wins: 0,
+  losses: 0,
+  maxLossStreak: 0,
   biggestWin: 0,
   totalWon: 0,
   totalLost: 0,
   totalTransferred: 0,
+  transfersSentCount: 0,
   shopPurchases: 0,
   duelsPlayed: 0,
   duelsWon: 0,
+  duelsLost: 0,
+  maxDuelStreak: 0,
+  totalDuelWinnings: 0,
   dailysClaimed: 0,
+  playDays: 0,
+  // Item usage
+  chaosSpins: 0,
+  reverseChaosSpins: 0,
+  wheelSpins: 0,
+  mysteryBoxes: 0,
+  insuranceTriggers: 0,
+  wildCardsUsed: 0,
+  freeSpinsUsed: 0,
+  // Dachs & Jackpot
+  totalDachsSeen: 0,
+  hourlyJackpots: 0,
   // Triple tracking for FRUIT_COLLECTOR and ALL_TRIPLES
   triplesCollected: {
     dachs: false,
@@ -649,6 +667,40 @@ async function updateAchievementStatBatch(username, updates, env) {
 }
 
 /**
+ * Set a max-value achievement stat (only updates if new value is higher)
+ * Used for stats like maxLossStreak, maxDuelStreak where we track the maximum
+ */
+async function setMaxAchievementStat(username, statKey, newValue, env) {
+  try {
+    const data = await getPlayerAchievements(username, env);
+    const currentValue = data.stats[statKey] || 0;
+
+    if (newValue <= currentValue) return [];
+
+    data.stats[statKey] = newValue;
+    const unlockedAchievements = [];
+
+    const achievementsToCheck = getAchievementsForStat(statKey);
+    for (const achKey of achievementsToCheck) {
+      const achievement = ACHIEVEMENTS[achKey];
+      if (!achievement || data.unlockedAt[achievement.id]) continue;
+      if (newValue >= (achievement.requirement || 1)) {
+        const result = await unlockAchievement(username, achievement.id, env, data);
+        if (result.unlocked) {
+          unlockedAchievements.push({ achievement: result.achievement, reward: result.reward });
+        }
+      }
+    }
+
+    await savePlayerAchievements(username, data, env);
+    return unlockedAchievements;
+  } catch (error) {
+    logError('setMaxAchievementStat', error, { username, statKey, newValue });
+    return [];
+  }
+}
+
+/**
  * Mark a triple as collected and check for collection achievements
  * Also records to D1 for detailed tracking with timestamps and counters
  */
@@ -917,10 +969,26 @@ function getAchievementsForStat(statKey) {
   const mapping = {
     totalSpins: ['SPIN_100', 'SPIN_500', 'SPIN_1000', 'SPIN_5000', 'SPIN_10000'],
     wins: ['WIN_100', 'WIN_500', 'WIN_1000'],
+    losses: ['LOSS_100', 'LOSS_500', 'LOSS_1000'],
+    maxLossStreak: ['LOSS_STREAK_5', 'LOSS_STREAK_10', 'LOSS_STREAK_15'],
     totalTransferred: ['TRANSFER_1000', 'TRANSFER_10000'],
+    transfersSentCount: ['TRANSFER_COUNT_10', 'TRANSFER_COUNT_50', 'TRANSFER_COUNT_100'],
     shopPurchases: ['SHOP_10', 'SHOP_50', 'SHOP_100'],
     duelsWon: ['DUEL_WIN_10', 'DUEL_WIN_50', 'DUEL_WIN_100'],
-    dailysClaimed: ['DAILY_7', 'DAILY_14', 'DAILY_20']
+    duelsLost: ['DUEL_LOSS_10', 'DUEL_LOSS_50', 'DUEL_LOSS_100'],
+    maxDuelStreak: ['DUEL_STREAK_5', 'DUEL_STREAK_10', 'DUEL_STREAK_20'],
+    totalDuelWinnings: ['DUEL_WINNINGS_1000', 'DUEL_WINNINGS_5000', 'DUEL_WINNINGS_10000'],
+    dailysClaimed: ['DAILY_7', 'DAILY_14', 'DAILY_20'],
+    playDays: ['PLAY_DAYS_7', 'PLAY_DAYS_30', 'PLAY_DAYS_100', 'PLAY_DAYS_365'],
+    hourlyJackpots: ['HOURLY_JACKPOT_3', 'HOURLY_JACKPOT_10', 'HOURLY_JACKPOT_25'],
+    totalDachsSeen: ['DACHS_SEEN_10', 'DACHS_SEEN_50', 'DACHS_SEEN_100', 'DACHS_SEEN_500'],
+    chaosSpins: ['CHAOS_SPIN_10', 'CHAOS_SPIN_50', 'CHAOS_SPIN_100'],
+    reverseChaosSpins: ['REVERSE_CHAOS_10'],
+    wheelSpins: ['WHEEL_SPIN_10'],
+    mysteryBoxes: ['MYSTERY_BOX_10'],
+    insuranceTriggers: ['INSURANCE_5'],
+    wildCardsUsed: ['WILD_CARD_10'],
+    freeSpinsUsed: ['FREE_SPIN_10', 'FREE_SPIN_50', 'FREE_SPIN_100']
   };
   return mapping[statKey] || [];
 }
@@ -1091,6 +1159,7 @@ export {
   lockAchievement,
   updateAchievementStat,
   updateAchievementStatBatch,
+  setMaxAchievementStat,
   markTripleCollected,
   recordDachsHit,
   checkAndUnlockAchievement,

@@ -24,7 +24,9 @@ import {
   hasUnlock,
   consumeWinMultiplier,
   consumeBoost,
+  updateAchievementStat,
   updateAchievementStatBatch,
+  setMaxAchievementStat,
   markTripleCollected,
   recordDachsHit,
   checkAndUnlockAchievement,
@@ -58,14 +60,26 @@ const UNLOCK_PRICES = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
 export async function trackSlotAchievements(username, originalGrid, displayGrid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, extendedData = {}) {
   try {
     // Batch achievement stat updates (single read-modify-write instead of sequential calls)
+    const dachsCount = originalGrid.filter(s => s === '🦡').length;
     const achievementStats = [['totalSpins', 1]];
     if (result.points > 0) {
       achievementStats.push(['wins', 1]);
+    } else {
+      achievementStats.push(['losses', 1]);
     }
+    if (isFreeSpinUsed) achievementStats.push(['freeSpinsUsed', 1]);
+    if (insuranceUsed) achievementStats.push(['insuranceTriggers', 1]);
+    if (hourlyJackpotWon) achievementStats.push(['hourlyJackpots', 1]);
+    if (dachsCount > 0) achievementStats.push(['totalDachsSeen', dachsCount]);
     await updateAchievementStatBatch(username, achievementStats, env);
 
-    // Batch extended stats (single read-modify-write instead of parallel individual calls)
-    const dachsCount = originalGrid.filter(s => s === '🦡').length;
+    // Max-value stats (loss streak) - only update if higher
+    if (extendedData.currentLossStreak && extendedData.currentLossStreak > 0) {
+      setMaxAchievementStat(username, 'maxLossStreak', extendedData.currentLossStreak, env)
+        .catch(err => logError('trackSlotAchievements.maxLossStreak', err, { username }));
+    }
+
+    // Batch extended stats (D1/progression tracking, fire-and-forget)
     const statIncrements = [];
     const maxUpdates = [];
 
@@ -79,11 +93,14 @@ export async function trackSlotAchievements(username, originalGrid, displayGrid,
       maxUpdates.push(['maxLossStreak', extendedData.currentLossStreak]);
     }
 
-    // Fire-and-forget: single atomic batch update
+    // Fire-and-forget: single atomic batch update for D1/progression
     if (statIncrements.length > 0 || maxUpdates.length > 0) {
       batchUpdateStats(username, statIncrements, maxUpdates, env)
         .catch(err => logError('trackSlotAchievements.extended', err, { username }));
     }
+
+    // PlayDays tracking (check if player already played today, fire-and-forget)
+    trackPlayDay(username, env).catch(err => logError('trackSlotAchievements.playDay', err, { username }));
 
     // Collect all one-time achievements to unlock
     const achievementsToUnlock = [];
@@ -161,6 +178,24 @@ export async function trackSlotAchievements(username, originalGrid, displayGrid,
   } catch (error) {
     // Silently fail - achievements should never break the game
     logError('trackSlotAchievements', error, { username });
+  }
+}
+
+/**
+ * Track unique play days for playDays achievement stat
+ * Uses a KV key with today's date to avoid double-counting
+ */
+async function trackPlayDay(username, env) {
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const key = kvKey('playDay:', `${username}:${today}`);
+    const existing = await env.SLOTS_KV.get(key);
+    if (!existing) {
+      await env.SLOTS_KV.put(key, '1', { expirationTtl: 86400 * 2 }); // 2 day TTL
+      await updateAchievementStat(username, 'playDays', 1, env);
+    }
+  } catch (error) {
+    logError('trackPlayDay', error, { username });
   }
 }
 

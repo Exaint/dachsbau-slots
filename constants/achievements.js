@@ -25,10 +25,12 @@ export const ACHIEVEMENTS_REWARDS_ENABLED = false;
 export const ACHIEVEMENT_CATEGORIES = {
   SPINNING: 'spinning',
   WINNING: 'winning',
+  LOSING: 'losing',
   COLLECTING: 'collecting',
   SOCIAL: 'social',
   DEDICATION: 'dedication',
   SHOPPING: 'shopping',
+  ITEMS: 'items',
   SPECIAL: 'special'
 };
 
@@ -200,6 +202,91 @@ export const ACHIEVEMENTS = {
     reward: 50,
     hidden: false
   },
+  HOURLY_JACKPOT_3: {
+    id: 'hourly_jackpot_3',
+    name: 'Jackpot-Sammler',
+    description: 'Gewinne 3 Hourly Jackpots',
+    category: ACHIEVEMENT_CATEGORIES.WINNING,
+    reward: 75,
+    hidden: false,
+    requirement: 3
+  },
+  HOURLY_JACKPOT_10: {
+    id: 'hourly_jackpot_10',
+    name: 'Jackpot-Magnet',
+    description: 'Gewinne 10 Hourly Jackpots',
+    category: ACHIEVEMENT_CATEGORIES.WINNING,
+    reward: 200,
+    hidden: false,
+    requirement: 10
+  },
+  HOURLY_JACKPOT_25: {
+    id: 'hourly_jackpot_25',
+    name: 'Jackpot-Legende',
+    description: 'Gewinne 25 Hourly Jackpots',
+    category: ACHIEVEMENT_CATEGORIES.WINNING,
+    reward: 500,
+    hidden: false,
+    requirement: 25
+  },
+
+  // ========================================
+  // LOSING - Loss Milestones & Streaks
+  // ========================================
+  LOSS_100: {
+    id: 'loss_100',
+    name: 'Pechvogel',
+    description: 'Verliere 100 Mal',
+    category: ACHIEVEMENT_CATEGORIES.LOSING,
+    reward: 50,
+    hidden: false,
+    requirement: 100
+  },
+  LOSS_500: {
+    id: 'loss_500',
+    name: 'Leidgeprüft',
+    description: 'Verliere 500 Mal',
+    category: ACHIEVEMENT_CATEGORIES.LOSING,
+    reward: 150,
+    hidden: false,
+    requirement: 500
+  },
+  LOSS_1000: {
+    id: 'loss_1000',
+    name: 'Stehaufmännchen',
+    description: 'Verliere 1.000 Mal',
+    category: ACHIEVEMENT_CATEGORIES.LOSING,
+    reward: 300,
+    hidden: false,
+    requirement: 1000
+  },
+  LOSS_STREAK_5: {
+    id: 'loss_streak_5',
+    name: 'Pechsträhne',
+    description: 'Verliere 5 Mal in Folge',
+    category: ACHIEVEMENT_CATEGORIES.LOSING,
+    reward: 50,
+    hidden: false,
+    requirement: 5
+  },
+  LOSS_STREAK_10: {
+    id: 'loss_streak_10',
+    name: 'Schwarzer Tag',
+    description: 'Verliere 10 Mal in Folge',
+    category: ACHIEVEMENT_CATEGORIES.LOSING,
+    reward: 100,
+    hidden: false,
+    requirement: 10
+  },
+  LOSS_STREAK_15: {
+    id: 'loss_streak_15',
+    name: 'Unzerstörbar',
+    description: 'Verliere 15 Mal in Folge',
+    category: ACHIEVEMENT_CATEGORIES.LOSING,
+    reward: 200,
+    hidden: false,
+    requirement: 15
+  },
 
   // ========================================
   // COLLECTING - Symbol Collection
@@ -259,6 +346,42 @@ export const ACHIEVEMENTS = {
     category: ACHIEVEMENT_CATEGORIES.COLLECTING,
     reward: 1000,
     hidden: true
+  },
+  DACHS_SEEN_10: {
+    id: 'dachs_seen_10',
+    name: 'Dachs-Spotter',
+    description: 'Sieh insgesamt 10 Dachse in deinen Spins',
+    category: ACHIEVEMENT_CATEGORIES.COLLECTING,
+    reward: 25,
+    hidden: false,
+    requirement: 10
+  },
+  DACHS_SEEN_50: {
+    id: 'dachs_seen_50',
+    name: 'Dachs-Freund',
+    description: 'Sieh insgesamt 50 Dachse in deinen Spins',
+    category: ACHIEVEMENT_CATEGORIES.COLLECTING,
+    reward: 75,
+    hidden: false,
+    requirement: 50
+  },
+  DACHS_SEEN_100: {
+    id: 'dachs_seen_100',
+    name: 'Dachs-Magnet',
+    description: 'Sieh insgesamt 100 Dachse in deinen Spins',
+    category: ACHIEVEMENT_CATEGORIES.COLLECTING,
+    reward: 200,
+    hidden: false,
+    requirement: 100
+  },
+  DACHS_SEEN_500: {
+    id: 'dachs_seen_500',
+    name: 'Dachs-Flüsterer',
+    description: 'Sieh insgesamt 500 Dachse in deinen Spins',
+    category: ACHIEVEMENT_CATEGORIES.COLLECTING,
+    reward: 500,
+    hidden: false,
+    requirement: 500
   },
 
   // ========================================
@@ -325,6 +448,114 @@ export const ACHIEVEMENTS = {
     hidden: false,
     requirement: 100
   },
+  DUEL_LOSS_10: {
+    id: 'duel_loss_10',
+    name: 'Guter Verlierer',
+    description: 'Verliere 10 Duelle',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 50,
+    hidden: false,
+    requirement: 10
+  },
+  DUEL_LOSS_50: {
+    id: 'duel_loss_50',
+    name: 'Ehrenhaft',
+    description: 'Verliere 50 Duelle',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 150,
+    hidden: false,
+    requirement: 50
+  },
+  DUEL_LOSS_100: {
+    id: 'duel_loss_100',
+    name: 'Unerschütterlich',
+    description: 'Verliere 100 Duelle',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 300,
+    hidden: false,
+    requirement: 100
+  },
+  DUEL_STREAK_5: {
+    id: 'duel_streak_5',
+    name: 'Duell-Serie',
+    description: 'Gewinne 5 Duelle in Folge',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 100,
+    hidden: false,
+    requirement: 5
+  },
+  DUEL_STREAK_10: {
+    id: 'duel_streak_10',
+    name: 'Duell-Dominator',
+    description: 'Gewinne 10 Duelle in Folge',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 250,
+    hidden: false,
+    requirement: 10
+  },
+  DUEL_STREAK_20: {
+    id: 'duel_streak_20',
+    name: 'Unbesiegbar',
+    description: 'Gewinne 20 Duelle in Folge',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 500,
+    hidden: false,
+    requirement: 20
+  },
+  DUEL_WINNINGS_1000: {
+    id: 'duel_winnings_1000',
+    name: 'Duell-Profiteur',
+    description: 'Gewinne insgesamt 1.000 DT in Duellen',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 100,
+    hidden: false,
+    requirement: 1000
+  },
+  DUEL_WINNINGS_5000: {
+    id: 'duel_winnings_5000',
+    name: 'Duell-Abräumer',
+    description: 'Gewinne insgesamt 5.000 DT in Duellen',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 250,
+    hidden: false,
+    requirement: 5000
+  },
+  DUEL_WINNINGS_10000: {
+    id: 'duel_winnings_10000',
+    name: 'Duell-Tycoon',
+    description: 'Gewinne insgesamt 10.000 DT in Duellen',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 500,
+    hidden: false,
+    requirement: 10000
+  },
+  TRANSFER_COUNT_10: {
+    id: 'transfer_count_10',
+    name: 'Überweiser',
+    description: 'Tätige 10 Überweisungen',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 50,
+    hidden: false,
+    requirement: 10
+  },
+  TRANSFER_COUNT_50: {
+    id: 'transfer_count_50',
+    name: 'Bankberater',
+    description: 'Tätige 50 Überweisungen',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 150,
+    hidden: false,
+    requirement: 50
+  },
+  TRANSFER_COUNT_100: {
+    id: 'transfer_count_100',
+    name: 'Finanzexperte',
+    description: 'Tätige 100 Überweisungen',
+    category: ACHIEVEMENT_CATEGORIES.SOCIAL,
+    reward: 300,
+    hidden: false,
+    requirement: 100
+  },
 
   // ========================================
   // DEDICATION - Login & Activity
@@ -363,6 +594,42 @@ export const ACHIEVEMENTS = {
     reward: 200,
     hidden: false,
     requirement: 20
+  },
+  PLAY_DAYS_7: {
+    id: 'play_days_7',
+    name: 'Erste Woche',
+    description: 'Spiele an 7 verschiedenen Tagen',
+    category: ACHIEVEMENT_CATEGORIES.DEDICATION,
+    reward: 25,
+    hidden: false,
+    requirement: 7
+  },
+  PLAY_DAYS_30: {
+    id: 'play_days_30',
+    name: 'Monatspass',
+    description: 'Spiele an 30 verschiedenen Tagen',
+    category: ACHIEVEMENT_CATEGORIES.DEDICATION,
+    reward: 100,
+    hidden: false,
+    requirement: 30
+  },
+  PLAY_DAYS_100: {
+    id: 'play_days_100',
+    name: 'Treuer Spieler',
+    description: 'Spiele an 100 verschiedenen Tagen',
+    category: ACHIEVEMENT_CATEGORIES.DEDICATION,
+    reward: 300,
+    hidden: false,
+    requirement: 100
+  },
+  PLAY_DAYS_365: {
+    id: 'play_days_365',
+    name: 'Jahreskarte',
+    description: 'Spiele an 365 verschiedenen Tagen',
+    category: ACHIEVEMENT_CATEGORIES.DEDICATION,
+    reward: 1000,
+    hidden: false,
+    requirement: 365
   },
   BALANCE_1000: {
     id: 'balance_1000',
@@ -455,6 +722,109 @@ export const ACHIEVEMENTS = {
     category: ACHIEVEMENT_CATEGORIES.SHOPPING,
     reward: 500,
     hidden: false
+  },
+
+  // ========================================
+  // ITEMS - Item & Buff Usage
+  // ========================================
+  CHAOS_SPIN_10: {
+    id: 'chaos_spin_10',
+    name: 'Chaos-Fan',
+    description: 'Nutze 10 Chaos-Spins',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 50,
+    hidden: false,
+    requirement: 10
+  },
+  CHAOS_SPIN_50: {
+    id: 'chaos_spin_50',
+    name: 'Chaos-Liebhaber',
+    description: 'Nutze 50 Chaos-Spins',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 150,
+    hidden: false,
+    requirement: 50
+  },
+  CHAOS_SPIN_100: {
+    id: 'chaos_spin_100',
+    name: 'Chaos-Süchtig',
+    description: 'Nutze 100 Chaos-Spins',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 300,
+    hidden: false,
+    requirement: 100
+  },
+  REVERSE_CHAOS_10: {
+    id: 'reverse_chaos_10',
+    name: 'Reverse-Enthusiast',
+    description: 'Nutze 10 Reverse-Chaos-Spins',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 75,
+    hidden: false,
+    requirement: 10
+  },
+  WHEEL_SPIN_10: {
+    id: 'wheel_spin_10',
+    name: 'Glücksrad-Dreher',
+    description: 'Nutze 10 Glücksrad-Spins',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 50,
+    hidden: false,
+    requirement: 10
+  },
+  MYSTERY_BOX_10: {
+    id: 'mystery_box_10',
+    name: 'Mystery-Sammler',
+    description: 'Öffne 10 Mystery-Boxen',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 50,
+    hidden: false,
+    requirement: 10
+  },
+  INSURANCE_5: {
+    id: 'insurance_5',
+    name: 'Gut versichert',
+    description: 'Werde 5 Mal von Insurance gerettet',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 50,
+    hidden: false,
+    requirement: 5
+  },
+  WILD_CARD_10: {
+    id: 'wild_card_10',
+    name: 'Wild-Experte',
+    description: 'Nutze 10 Wild-Cards',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 50,
+    hidden: false,
+    requirement: 10
+  },
+  FREE_SPIN_10: {
+    id: 'free_spin_10',
+    name: 'Freeloader',
+    description: 'Nutze 10 Free-Spins',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 50,
+    hidden: false,
+    requirement: 10
+  },
+  FREE_SPIN_50: {
+    id: 'free_spin_50',
+    name: 'Freigeist',
+    description: 'Nutze 50 Free-Spins',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 150,
+    hidden: false,
+    requirement: 50
+  },
+  FREE_SPIN_100: {
+    id: 'free_spin_100',
+    name: 'Gratis-König',
+    description: 'Nutze 100 Free-Spins',
+    category: ACHIEVEMENT_CATEGORIES.ITEMS,
+    reward: 300,
+    hidden: false,
+    requirement: 100
   },
 
   // ========================================
@@ -567,20 +937,63 @@ const ACHIEVEMENT_STAT_MAPPING = {
   'win_100': 'wins',
   'win_500': 'wins',
   'win_1000': 'wins',
+  'hourly_jackpot_3': 'hourlyJackpots',
+  'hourly_jackpot_10': 'hourlyJackpots',
+  'hourly_jackpot_25': 'hourlyJackpots',
+  // Losing
+  'loss_100': 'losses',
+  'loss_500': 'losses',
+  'loss_1000': 'losses',
+  'loss_streak_5': 'maxLossStreak',
+  'loss_streak_10': 'maxLossStreak',
+  'loss_streak_15': 'maxLossStreak',
+  // Collecting
+  'dachs_seen_10': 'totalDachsSeen',
+  'dachs_seen_50': 'totalDachsSeen',
+  'dachs_seen_100': 'totalDachsSeen',
+  'dachs_seen_500': 'totalDachsSeen',
   // Social
   'transfer_1000': 'totalTransferred',
   'transfer_10000': 'totalTransferred',
+  'transfer_count_10': 'transfersSentCount',
+  'transfer_count_50': 'transfersSentCount',
+  'transfer_count_100': 'transfersSentCount',
   'duel_win_10': 'duelsWon',
   'duel_win_50': 'duelsWon',
   'duel_win_100': 'duelsWon',
+  'duel_loss_10': 'duelsLost',
+  'duel_loss_50': 'duelsLost',
+  'duel_loss_100': 'duelsLost',
+  'duel_streak_5': 'maxDuelStreak',
+  'duel_streak_10': 'maxDuelStreak',
+  'duel_streak_20': 'maxDuelStreak',
+  'duel_winnings_1000': 'totalDuelWinnings',
+  'duel_winnings_5000': 'totalDuelWinnings',
+  'duel_winnings_10000': 'totalDuelWinnings',
   // Dedication
   'daily_7': 'dailysClaimed',
   'daily_14': 'dailysClaimed',
   'daily_20': 'dailysClaimed',
+  'play_days_7': 'playDays',
+  'play_days_30': 'playDays',
+  'play_days_100': 'playDays',
+  'play_days_365': 'playDays',
   // Shopping
   'shop_10': 'shopPurchases',
   'shop_50': 'shopPurchases',
-  'shop_100': 'shopPurchases'
+  'shop_100': 'shopPurchases',
+  // Items
+  'chaos_spin_10': 'chaosSpins',
+  'chaos_spin_50': 'chaosSpins',
+  'chaos_spin_100': 'chaosSpins',
+  'reverse_chaos_10': 'reverseChaosSpins',
+  'wheel_spin_10': 'wheelSpins',
+  'mystery_box_10': 'mysteryBoxes',
+  'insurance_5': 'insuranceTriggers',
+  'wild_card_10': 'wildCardsUsed',
+  'free_spin_10': 'freeSpinsUsed',
+  'free_spin_50': 'freeSpinsUsed',
+  'free_spin_100': 'freeSpinsUsed'
 };
 
 export function getStatKeyForAchievement(achievementId) {

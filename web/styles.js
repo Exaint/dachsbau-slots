@@ -27,10 +27,12 @@ export const CSS = `
   /* Category colors */
   --cat-spinning: #a855f7;
   --cat-winning: #00f593;
+  --cat-losing: #ef4444;
   --cat-collecting: #ffb800;
   --cat-social: #ff6b9d;
   --cat-dedication: #00bfff;
   --cat-shopping: #ff7f50;
+  --cat-items: #06b6d4;
   --cat-special: #e040fb;
 
   /* Spacing scale */
@@ -76,10 +78,12 @@ export const CSS = `
   /* Category colors adjusted for light mode */
   --cat-spinning: #7c3aed;
   --cat-winning: #059669;
+  --cat-losing: #dc2626;
   --cat-collecting: #b45309;
   --cat-social: #db2777;
   --cat-dedication: #0284c7;
   --cat-shopping: #ea580c;
+  --cat-items: #0891b2;
   --cat-special: #c026d3;
 }
 
@@ -1037,7 +1041,9 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Only special category keeps background (uses emoji, not image) */
+/* Categories using emoji (not image) need background */
+.category-losing .category-icon { background: var(--cat-losing); }
+.category-items .category-icon { background: var(--cat-items); }
 .category-special .category-icon { background: var(--cat-special); }
 
 .category-progress {

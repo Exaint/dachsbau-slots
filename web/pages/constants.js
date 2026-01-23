@@ -11,10 +11,12 @@ const R2_BASE = 'https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev';
 export const CATEGORY_ICONS = {
   [ACHIEVEMENT_CATEGORIES.SPINNING]: `<img src="${R2_BASE}/Slots.png" alt="Spinning" class="category-icon-img">`,
   [ACHIEVEMENT_CATEGORIES.WINNING]: `<img src="${R2_BASE}/Winning.png" alt="Winning" class="category-icon-img">`,
+  [ACHIEVEMENT_CATEGORIES.LOSING]: '📉',
   [ACHIEVEMENT_CATEGORIES.COLLECTING]: `<img src="${R2_BASE}/Sammeln.png" alt="Sammeln" class="category-icon-img">`,
   [ACHIEVEMENT_CATEGORIES.SOCIAL]: `<img src="${R2_BASE}/Social.png" alt="Social" class="category-icon-img">`,
   [ACHIEVEMENT_CATEGORIES.DEDICATION]: `<img src="${R2_BASE}/Hingabe.png" alt="Hingabe" class="category-icon-img">`,
   [ACHIEVEMENT_CATEGORIES.SHOPPING]: `<img src="${R2_BASE}/Shopping.png" alt="Shopping" class="category-icon-img">`,
+  [ACHIEVEMENT_CATEGORIES.ITEMS]: '🧪',
   [ACHIEVEMENT_CATEGORIES.SPECIAL]: '⭐'
 };
 
@@ -22,10 +24,12 @@ export const CATEGORY_ICONS = {
 export const CATEGORY_NAMES = {
   [ACHIEVEMENT_CATEGORIES.SPINNING]: 'Spinning',
   [ACHIEVEMENT_CATEGORIES.WINNING]: 'Winning',
+  [ACHIEVEMENT_CATEGORIES.LOSING]: 'Pech',
   [ACHIEVEMENT_CATEGORIES.COLLECTING]: 'Sammeln',
   [ACHIEVEMENT_CATEGORIES.SOCIAL]: 'Social',
   [ACHIEVEMENT_CATEGORIES.DEDICATION]: 'Hingabe',
   [ACHIEVEMENT_CATEGORIES.SHOPPING]: 'Shopping',
+  [ACHIEVEMENT_CATEGORIES.ITEMS]: 'Items',
   [ACHIEVEMENT_CATEGORIES.SPECIAL]: 'Spezial'
 };
 

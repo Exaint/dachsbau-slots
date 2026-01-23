@@ -5,26 +5,26 @@
 import { ACHIEVEMENT_CATEGORIES } from '../../constants.js';
 
 // R2 base URL for assets
-const R2_BASE = 'https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev';
+export const R2_BASE = 'https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev';
 
 // Achievement category icons (using R2 images)
 export const CATEGORY_ICONS = {
   [ACHIEVEMENT_CATEGORIES.SPINNING]: `<img src="${R2_BASE}/Slots.png" alt="Spinning" class="category-icon-img">`,
   [ACHIEVEMENT_CATEGORIES.WINNING]: `<img src="${R2_BASE}/Winning.png" alt="Winning" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.LOSING]: '📉',
+  [ACHIEVEMENT_CATEGORIES.LOSING]: `<img src="${R2_BASE}/Loosing.png" alt="Loosing" class="category-icon-img">`,
   [ACHIEVEMENT_CATEGORIES.COLLECTING]: `<img src="${R2_BASE}/Sammeln.png" alt="Sammeln" class="category-icon-img">`,
   [ACHIEVEMENT_CATEGORIES.SOCIAL]: `<img src="${R2_BASE}/Social.png" alt="Social" class="category-icon-img">`,
   [ACHIEVEMENT_CATEGORIES.DEDICATION]: `<img src="${R2_BASE}/Hingabe.png" alt="Hingabe" class="category-icon-img">`,
   [ACHIEVEMENT_CATEGORIES.SHOPPING]: `<img src="${R2_BASE}/Shopping.png" alt="Shopping" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.ITEMS]: '🧪',
-  [ACHIEVEMENT_CATEGORIES.SPECIAL]: '⭐'
+  [ACHIEVEMENT_CATEGORIES.ITEMS]: `<img src="${R2_BASE}/Items.png" alt="Items" class="category-icon-img">`,
+  [ACHIEVEMENT_CATEGORIES.SPECIAL]: `<img src="${R2_BASE}/Spezial.png" alt="Spezial" class="category-icon-img">`
 };
 
 // Achievement category names (German)
 export const CATEGORY_NAMES = {
   [ACHIEVEMENT_CATEGORIES.SPINNING]: 'Spinning',
   [ACHIEVEMENT_CATEGORIES.WINNING]: 'Winning',
-  [ACHIEVEMENT_CATEGORIES.LOSING]: 'Pech',
+  [ACHIEVEMENT_CATEGORIES.LOSING]: 'Loosing',
   [ACHIEVEMENT_CATEGORIES.COLLECTING]: 'Sammeln',
   [ACHIEVEMENT_CATEGORIES.SOCIAL]: 'Social',
   [ACHIEVEMENT_CATEGORIES.DEDICATION]: 'Hingabe',

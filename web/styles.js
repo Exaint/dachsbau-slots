@@ -1041,10 +1041,7 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Categories using emoji (not image) need background */
-.category-losing .category-icon { background: var(--cat-losing); }
-.category-items .category-icon { background: var(--cat-items); }
-.category-special .category-icon { background: var(--cat-special); }
+/* All categories now use R2 images */
 
 .category-progress {
   font-size: 1rem;
@@ -1287,6 +1284,12 @@ body {
   width: 40px;
   text-align: center;
   flex-shrink: 0;
+}
+
+.leaderboard-rank-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
 }
 
 .leaderboard-avatar {

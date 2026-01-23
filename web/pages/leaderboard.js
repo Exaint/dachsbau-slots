@@ -9,7 +9,7 @@ import { getUserRole, getTwitchUser } from '../twitch.js';
 import { LEADERBOARD_LIMIT, LEADERBOARD_DISPLAY_LIMIT } from '../../constants.js';
 import { isAdmin, logError } from '../../utils.js';
 import { escapeHtml, formatNumber } from './utils.js';
-import { ROLE_BADGES } from './constants.js';
+import { ROLE_BADGES, R2_BASE } from './constants.js';
 import { baseTemplate, htmlResponse } from './template.js';
 
 /**
@@ -141,9 +141,9 @@ export async function handleLeaderboardPage(env, loggedInUser = null, showAll = 
  */
 export function renderLeaderboardPage(players, user = null, showAll = false, isAdminUser = false, currentUserRank = null) {
   const getRankDisplay = (rank) => {
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
+    if (rank >= 1 && rank <= 10) {
+      return `<img src="${R2_BASE}/Platz${rank}.png" alt="#${rank}" class="leaderboard-rank-img">`;
+    }
     return `#${rank}`;
   };
 

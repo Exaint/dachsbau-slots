@@ -4,6 +4,7 @@
 
 import { MAX_RETRIES } from '../constants.js';
 import { calculateWeekStart, exponentialBackoff, logError, kvKey } from '../utils.js';
+import { D1_ENABLED, DUAL_WRITE, upsertPurchaseLimit } from './d1.js';
 
 // Spin Bundle Purchases
 async function getSpinBundlePurchases(username, env) {
@@ -39,6 +40,9 @@ async function incrementSpinBundlePurchases(username, env, maxRetries = MAX_RETR
       // Verify the write succeeded
       const verifyData = await getSpinBundlePurchases(username, env);
       if (verifyData.count === expectedCount) {
+        if (D1_ENABLED && DUAL_WRITE && env.DB) {
+          upsertPurchaseLimit(username, 'bundle', expectedCount, data.weekStart, env).catch(err => logError('incrementSpinBundle.d1', err, { username }));
+        }
         return;
       }
 
@@ -87,6 +91,9 @@ async function incrementDachsBoostPurchases(username, env, maxRetries = MAX_RETR
       // Verify the write succeeded
       const verifyData = await getDachsBoostPurchases(username, env);
       if (verifyData.count === expectedCount) {
+        if (D1_ENABLED && DUAL_WRITE && env.DB) {
+          upsertPurchaseLimit(username, 'dachsboost', expectedCount, data.weekStart, env).catch(err => logError('incrementDachsBoost.d1', err, { username }));
+        }
         return;
       }
 

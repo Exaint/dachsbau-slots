@@ -22,6 +22,7 @@
 
 import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES, KV_ACTIVE } from '../constants.js';
 import { exponentialBackoff, logError, kvKey } from '../utils.js';
+import { D1_ENABLED, DUAL_WRITE, upsertItem, deleteItem } from './d1.js';
 
 // Buffs (timed)
 async function activateBuff(username, buffKey, duration, env) {
@@ -242,6 +243,9 @@ async function addInsurance(username, count, env, maxRetries = MAX_RETRIES) {
       // Verify the write succeeded
       const verifyCount = await getInsuranceCount(username, env);
       if (verifyCount === newCount) {
+        if (D1_ENABLED && DUAL_WRITE && env.DB) {
+          upsertItem(username, 'insurance', newCount.toString(), env).catch(err => logError('addInsurance.d1', err, { username }));
+        }
         return;
       }
 
@@ -281,12 +285,22 @@ async function decrementInsuranceCount(username, env, maxRetries = MAX_RETRIES) 
         await env.SLOTS_KV.delete(key);
         // Verify deletion
         const verify = await env.SLOTS_KV.get(key);
-        if (verify === null) return; // Success
+        if (verify === null) {
+          if (D1_ENABLED && DUAL_WRITE && env.DB) {
+            deleteItem(username, 'insurance', env).catch(err => logError('decrementInsurance.d1', err, { username }));
+          }
+          return; // Success
+        }
       } else {
         await env.SLOTS_KV.put(key, newCount.toString());
         // Verify write
         const verifyCount = await getInsuranceCount(username, env);
-        if (verifyCount === newCount) return; // Success
+        if (verifyCount === newCount) {
+          if (D1_ENABLED && DUAL_WRITE && env.DB) {
+            upsertItem(username, 'insurance', newCount.toString(), env).catch(err => logError('decrementInsurance.d1', err, { username }));
+          }
+          return; // Success
+        }
       }
 
       // Verification failed, retry with backoff
@@ -306,8 +320,14 @@ async function setInsuranceCount(username, count, env) {
     const key = kvKey('insurance:', username);
     if (count <= 0) {
       await env.SLOTS_KV.delete(key);
+      if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        deleteItem(username, 'insurance', env).catch(err => logError('setInsuranceCount.d1', err, { username }));
+      }
     } else {
       await env.SLOTS_KV.put(key, count.toString());
+      if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        upsertItem(username, 'insurance', count.toString(), env).catch(err => logError('setInsuranceCount.d1', err, { username }));
+      }
     }
   } catch (error) {
     logError('setInsuranceCount', error, { username, count });
@@ -318,6 +338,10 @@ async function setInsuranceCount(username, count, env) {
 async function addWinMultiplier(username, env) {
   try {
     await env.SLOTS_KV.put(kvKey('winmulti:', username), KV_ACTIVE);
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      upsertItem(username, 'winmulti', KV_ACTIVE, env).catch(err => logError('addWinMultiplier.d1', err, { username }));
+    }
   } catch (error) {
     logError('addWinMultiplier', error, { username });
   }
@@ -332,6 +356,9 @@ async function consumeWinMultiplier(username, env) {
       // Verify deletion succeeded (prevents race condition double-consume)
       const verify = await env.SLOTS_KV.get(key);
       if (verify === null) {
+        if (D1_ENABLED && DUAL_WRITE && env.DB) {
+          deleteItem(username, 'winmulti', env).catch(err => logError('consumeWinMultiplier.d1', err, { username }));
+        }
         return true; // Successfully consumed
       }
       // Another request consumed it first

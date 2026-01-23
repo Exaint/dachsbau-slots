@@ -4,6 +4,7 @@
 
 import { BANK_USERNAME, BANK_START_BALANCE, JACKPOT_CLAIM_TTL, MAX_RETRIES } from '../constants.js';
 import { logError, exponentialBackoff } from '../utils.js';
+import { D1_ENABLED, DUAL_WRITE, updateBalance as updateBalanceD1 } from './d1.js';
 
 // DachsBank Helper Functions
 async function updateBankBalance(amount, env, maxRetries = MAX_RETRIES) {
@@ -30,6 +31,9 @@ async function updateBankBalance(amount, env, maxRetries = MAX_RETRIES) {
 
       // Exact equality check - if concurrent update happened, the balance won't match
       if (verifyBalance === newBalance) {
+        if (D1_ENABLED && DUAL_WRITE && env.DB) {
+          updateBalanceD1(BANK_USERNAME, newBalance, env).catch(err => logError('updateBankBalance.d1', err, { newBalance }));
+        }
         return verifyBalance;
       }
 

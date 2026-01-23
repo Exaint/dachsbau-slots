@@ -1060,6 +1060,25 @@ body {
   font-weight: 500;
 }
 
+.category-progress-bar {
+  width: 80px;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.category-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--primary));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.category-progress-fill.complete {
+  background: linear-gradient(90deg, var(--success), #4ade80);
+}
+
 .category-header-right {
   display: flex;
   align-items: center;
@@ -1217,19 +1236,34 @@ body {
   white-space: nowrap;
 }
 
-.achievement-progress {
-  width: 80px;
+.achievement-progress-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  width: 100%;
 }
 
-.achievement-progress .progress-bar {
-  height: 6px;
-  margin-bottom: 4px;
+.achievement-progress-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  overflow: hidden;
+  max-width: 160px;
 }
 
-.achievement-progress-text {
+.achievement-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--primary));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.achievement-progress-label {
   font-size: 0.75rem;
   color: var(--text-muted);
-  text-align: center;
+  white-space: nowrap;
 }
 
 /* Leaderboard */
@@ -2981,9 +3015,8 @@ body {
     flex-wrap: wrap;
   }
 
-  .achievement-progress {
-    width: 100%;
-    margin-top: 8px;
+  .achievement-progress-bar-track {
+    max-width: 120px;
   }
 
   /* Profile mobile fixes */
@@ -4403,27 +4436,7 @@ div[id] {
   opacity: 0.9;
 }
 
-/* Improved Achievement Progress Bars */
-.achievement-progress {
-  width: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-.achievement-progress .progress-bar {
-  height: 8px;
-  margin-bottom: 2px;
-  width: 100%;
-}
-
-.achievement-progress-text {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  text-align: right;
-  white-space: nowrap;
-}
+/* Achievement Progress Bar - Mobile Override */
 
 /* Modal Progress Bar */
 .modal-progress-bar {
@@ -4643,10 +4656,6 @@ div[id] {
 
   .toast {
     max-width: 100%;
-  }
-
-  .achievement-progress {
-    width: 100px;
   }
 
   .leaderboard-filter-bar {

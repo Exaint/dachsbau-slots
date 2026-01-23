@@ -4,11 +4,16 @@
 
 import { MAX_RETRIES, KV_ACTIVE } from '../constants.js';
 import { exponentialBackoff, logError, kvKey } from '../utils.js';
+import { D1_ENABLED, DUAL_WRITE, upsertItem, deleteItem } from './d1.js';
 
 // Guaranteed Pair
 async function activateGuaranteedPair(username, env) {
   try {
     await env.SLOTS_KV.put(kvKey('guaranteedpair:', username), KV_ACTIVE);
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      upsertItem(username, 'guaranteedpair', KV_ACTIVE, env).catch(err => logError('activateGuaranteedPair.d1', err, { username }));
+    }
   } catch (error) {
     logError('activateGuaranteedPair', error, { username });
   }
@@ -27,6 +32,10 @@ async function hasGuaranteedPair(username, env) {
 async function consumeGuaranteedPair(username, env) {
   try {
     await env.SLOTS_KV.delete(kvKey('guaranteedpair:', username));
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      deleteItem(username, 'guaranteedpair', env).catch(err => logError('consumeGuaranteedPair.d1', err, { username }));
+    }
   } catch (error) {
     logError('consumeGuaranteedPair', error, { username });
   }
@@ -36,6 +45,10 @@ async function consumeGuaranteedPair(username, env) {
 async function activateWildCard(username, env) {
   try {
     await env.SLOTS_KV.put(kvKey('wildcard:', username), KV_ACTIVE);
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      upsertItem(username, 'wildcard', KV_ACTIVE, env).catch(err => logError('activateWildCard.d1', err, { username }));
+    }
   } catch (error) {
     logError('activateWildCard', error, { username });
   }
@@ -54,6 +67,10 @@ async function hasWildCard(username, env) {
 async function consumeWildCard(username, env) {
   try {
     await env.SLOTS_KV.delete(kvKey('wildcard:', username));
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      deleteItem(username, 'wildcard', env).catch(err => logError('consumeWildCard.d1', err, { username }));
+    }
   } catch (error) {
     logError('consumeWildCard', error, { username });
   }
@@ -106,7 +123,12 @@ async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
 
     freeSpins.sort((a, b) => a.multiplier - b.multiplier);
 
-    await env.SLOTS_KV.put(kvKey('freespins:', username), JSON.stringify(freeSpins));
+    const jsonValue = JSON.stringify(freeSpins);
+    await env.SLOTS_KV.put(kvKey('freespins:', username), jsonValue);
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      upsertItem(username, 'freespins', jsonValue, env).catch(err => logError('addFreeSpinsWithMultiplier.d1', err, { username }));
+    }
   } catch (error) {
     logError('addFreeSpinsWithMultiplier', error, { username, count, multiplier });
   }
@@ -168,6 +190,13 @@ async function consumeFreeSpinWithMultiplier(username, env, maxRetries = MAX_RET
 
       if (verifySpins.length === updatedFreeSpins.length &&
           (updatedFreeSpins.length === 0 || expectedCount === actualCount)) {
+        if (D1_ENABLED && DUAL_WRITE && env.DB) {
+          if (updatedFreeSpins.length === 0) {
+            deleteItem(username, 'freespins', env).catch(err => logError('consumeFreeSpin.d1', err, { username }));
+          } else {
+            upsertItem(username, 'freespins', JSON.stringify(updatedFreeSpins), env).catch(err => logError('consumeFreeSpin.d1', err, { username }));
+          }
+        }
         return { used: true, multiplier: multiplierToReturn };
       }
 

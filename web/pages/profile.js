@@ -208,11 +208,11 @@ export function renderProfilePage(data) {
       let progressHtml = '';
       if (ach.progress && !ach.unlocked) {
         progressHtml = `
-          <div class="achievement-progress">
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: ${ach.progress.percent}%"></div>
+          <div class="achievement-progress-inline">
+            <div class="achievement-progress-bar-track">
+              <div class="achievement-progress-bar-fill" style="width: ${ach.progress.percent}%"></div>
             </div>
-            <div class="achievement-progress-text">${formatNumber(ach.progress.current)}/${formatNumber(ach.progress.required)} (${ach.progress.percent}%)</div>
+            <span class="achievement-progress-label">${formatNumber(ach.progress.current)} / ${formatNumber(ach.progress.required)}</span>
           </div>
         `;
       }
@@ -251,10 +251,10 @@ export function renderProfilePage(data) {
           <div class="achievement-info">
             <div class="achievement-name">${escapeHtml(ach.name)}</div>
             <div class="achievement-desc">${escapeHtml(ach.description)}</div>
+            ${progressHtml}
             ${rarityHtml}
           </div>
           ${ach.reward ? `<div class="achievement-reward">+${formatNumber(ach.reward)} DT</div>` : ''}
-          ${progressHtml}
         </div>
       `;
     }).join('');
@@ -268,6 +268,9 @@ export function renderProfilePage(data) {
           </div>
           <div class="category-header-right">
             <div class="category-progress">${catUnlocked}/${catTotal}</div>
+            <div class="category-progress-bar">
+              <div class="category-progress-fill${catUnlocked === catTotal ? ' complete' : ''}" style="width: ${Math.round((catUnlocked / catTotal) * 100)}%"></div>
+            </div>
             <span class="collapse-icon">▼</span>
           </div>
         </div>

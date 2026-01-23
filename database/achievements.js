@@ -80,21 +80,43 @@ async function getPlayerAchievements(username, env) {
       const legacyStats = await env.SLOTS_KV.get(kvKey('stats:', username));
 
       if (legacyStats) {
-        // Migrate existing player stats
+        // Migrate existing player stats (pull ALL available fields)
         const legacy = JSON.parse(legacyStats);
         const migratedData = {
           unlockedAt: {},
           stats: {
             ...DEFAULT_STATS,
             triplesCollected: { ...DEFAULT_STATS.triplesCollected },
-            // Migrate legacy stats
+            // Migrate all available stats
             totalSpins: legacy.totalSpins || 0,
             wins: legacy.wins || 0,
             biggestWin: legacy.biggestWin || 0,
             totalWon: legacy.totalWon || 0,
-            totalLost: legacy.totalLost || 0
+            totalLost: legacy.totalLost || 0,
+            losses: legacy.losses || 0,
+            maxLossStreak: legacy.maxLossStreak || 0,
+            totalDachsSeen: legacy.totalDachsSeen || 0,
+            hourlyJackpots: legacy.hourlyJackpots || 0,
+            chaosSpins: legacy.chaosSpins || 0,
+            reverseChaosSpins: legacy.reverseChaosSpins || 0,
+            wheelSpins: legacy.wheelSpins || 0,
+            mysteryBoxes: legacy.mysteryBoxes || 0,
+            insuranceTriggers: legacy.insuranceTriggers || 0,
+            wildCardsUsed: legacy.wildCardsUsed || 0,
+            freeSpinsUsed: legacy.freeSpinsUsed || 0,
+            duelsPlayed: legacy.duelsPlayed || 0,
+            duelsWon: legacy.duelsWon || 0,
+            duelsLost: legacy.duelsLost || 0,
+            maxDuelStreak: legacy.maxDuelStreak || 0,
+            totalDuelWinnings: legacy.totalDuelWinnings || 0,
+            totalTransferred: legacy.totalTransferred || 0,
+            transfersSentCount: legacy.transfersSentCount || 0,
+            shopPurchases: legacy.shopPurchases || 0,
+            dailysClaimed: legacy.dailysClaimed || 0,
+            playDays: legacy.playDays || 0
           },
           pendingRewards: 0,
+          statsSynced: true,
           migratedAt: Date.now()
         };
 
@@ -256,6 +278,73 @@ async function getPlayerAchievements(username, env) {
         data.transferMigrated = true;
       } else {
         data.transferMigrated = true;
+        await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
+      }
+    }
+
+    // One-time stats sync: Pull all stats from stats:{username} into achievement stats
+    // This catches retroactive achievements for losses, dachs, items, duels, etc.
+    if (!data.statsSynced) {
+      const fullStats = await env.SLOTS_KV.get(kvKey('stats:', username));
+      if (fullStats) {
+        try {
+          const legacy = JSON.parse(fullStats);
+          const now = Date.now();
+          let addedRewards = 0;
+          const counterPromises = [];
+
+          // Sync all stat fields from stats:{username} that might be ahead of achievement stats
+          const syncFields = [
+            'losses', 'maxLossStreak', 'totalDachsSeen', 'hourlyJackpots',
+            'chaosSpins', 'reverseChaosSpins', 'wheelSpins', 'mysteryBoxes',
+            'insuranceTriggers', 'wildCardsUsed', 'freeSpinsUsed',
+            'duelsWon', 'duelsLost', 'maxDuelStreak', 'totalDuelWinnings',
+            'transfersSentCount', 'totalTransferred', 'playDays',
+            'shopPurchases', 'dailysClaimed', 'totalSpins', 'wins'
+          ];
+
+          for (const field of syncFields) {
+            const legacyVal = legacy[field] || 0;
+            const currentVal = data.stats[field] || 0;
+            if (legacyVal > currentVal) {
+              data.stats[field] = legacyVal;
+            }
+          }
+
+          // Now check ALL stat-based achievements against synced values
+          for (const field of syncFields) {
+            const value = data.stats[field] || 0;
+            if (value <= 0) continue;
+
+            const achievementsToCheck = getAchievementsForStat(field);
+            for (const achKey of achievementsToCheck) {
+              const achievement = ACHIEVEMENTS[achKey];
+              if (!achievement || data.unlockedAt[achievement.id]) continue;
+              const requirement = achievement.requirement || 1;
+              if (value >= requirement) {
+                data.unlockedAt[achievement.id] = now;
+                addedRewards += achievement.reward || 0;
+                counterPromises.push(incrementAchievementCounter(achievement.id, env));
+              }
+            }
+          }
+
+          if (addedRewards > 0 && !ACHIEVEMENTS_REWARDS_ENABLED) {
+            data.pendingRewards = (data.pendingRewards || 0) + addedRewards;
+          }
+
+          data.statsSynced = true;
+          await Promise.all([
+            env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data)),
+            ...counterPromises
+          ]);
+        } catch (e) {
+          logError('statsSyncMigration', e, { username });
+          data.statsSynced = true;
+          await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
+        }
+      } else {
+        data.statsSynced = true;
         await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
       }
     }
@@ -431,6 +520,32 @@ function migrateAchievementsFromStats(data) {
     unlockedAt[ACHIEVEMENTS.BIG_WIN_10000.id] = now;
     pendingRewards += ACHIEVEMENTS.BIG_WIN_10000.reward || 0;
     unlockedIds.push(ACHIEVEMENTS.BIG_WIN_10000.id);
+  }
+
+  // Check ALL stat-based achievements using the general mapping
+  const statFields = [
+    'losses', 'maxLossStreak', 'totalDachsSeen', 'hourlyJackpots',
+    'chaosSpins', 'reverseChaosSpins', 'wheelSpins', 'mysteryBoxes',
+    'insuranceTriggers', 'wildCardsUsed', 'freeSpinsUsed',
+    'duelsWon', 'duelsLost', 'maxDuelStreak', 'totalDuelWinnings',
+    'transfersSentCount', 'totalTransferred', 'playDays',
+    'shopPurchases', 'dailysClaimed'
+  ];
+
+  for (const field of statFields) {
+    const value = stats[field] || 0;
+    if (value <= 0) continue;
+
+    const achievementsToCheck = getAchievementsForStat(field);
+    for (const achKey of achievementsToCheck) {
+      const achievement = ACHIEVEMENTS[achKey];
+      if (!achievement || unlockedAt[achievement.id]) continue;
+      if (value >= (achievement.requirement || 1)) {
+        unlockedAt[achievement.id] = now;
+        pendingRewards += achievement.reward || 0;
+        unlockedIds.push(achievement.id);
+      }
+    }
   }
 
   // Store pending rewards (paid out when ACHIEVEMENTS_REWARDS_ENABLED = true)

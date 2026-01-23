@@ -6,7 +6,7 @@
 
 import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, KV_TRUE, MAX_RETRIES } from '../constants.js';
 import { getCurrentMonth, getCurrentDate, logError, kvKey, exponentialBackoff } from '../utils.js';
-import { D1_ENABLED, DUAL_WRITE, upsertUser } from './d1.js';
+import { D1_ENABLED, DUAL_WRITE, upsertUser, updateStreakMultiplier as updateStreakMultiplierD1 } from './d1.js';
 import { addUnlockD1, removeUnlockD1, updateMonthlyLoginD1, incrementStatD1, updateBiggestWinD1 } from './d1-achievements.js';
 
 // Streak Multiplier
@@ -32,6 +32,9 @@ async function incrementStreakMultiplier(username, env, maxRetries = MAX_RETRIES
       // Verify the write succeeded
       const verifyValue = await env.SLOTS_KV.get(key);
       if (verifyValue === newValue) {
+        if (D1_ENABLED && DUAL_WRITE && env.DB) {
+          updateStreakMultiplierD1(username, newMultiplier, env).catch(err => logError('incrementStreakMultiplier.d1', err, { username }));
+        }
         return newMultiplier;
       }
 
@@ -50,6 +53,10 @@ async function incrementStreakMultiplier(username, env, maxRetries = MAX_RETRIES
 async function resetStreakMultiplier(username, env) {
   try {
     await env.SLOTS_KV.delete(kvKey('streakmultiplier:', username));
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      updateStreakMultiplierD1(username, 1.0, env).catch(err => logError('resetStreakMultiplier.d1', err, { username }));
+    }
   } catch (error) {
     logError('resetStreakMultiplier', error, { username });
   }

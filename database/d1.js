@@ -238,6 +238,123 @@ async function searchUsers(query, limit = 10, env) {
 }
 
 // ============================================
+// Player Items Operations
+// ============================================
+
+/**
+ * Upsert a player item in D1
+ * @param {string} username
+ * @param {string} itemKey - 'insurance', 'wildcard', 'guaranteedpair', 'winmulti', 'freespins'
+ * @param {string} value - count, 'active', or JSON string
+ */
+async function upsertItem(username, itemKey, value, env) {
+  if (!D1_ENABLED || !env.DB) return false;
+
+  try {
+    const now = Date.now();
+    await env.DB.prepare(`
+      INSERT INTO player_items (username, item_key, value, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(username, item_key) DO UPDATE SET value = ?, updated_at = ?
+    `).bind(username.toLowerCase(), itemKey, value, now, value, now).run();
+
+    return true;
+  } catch (error) {
+    logError('d1.upsertItem', error, { username, itemKey });
+    return false;
+  }
+}
+
+/**
+ * Delete a player item from D1 (consumed/expired)
+ */
+async function deleteItem(username, itemKey, env) {
+  if (!D1_ENABLED || !env.DB) return false;
+
+  try {
+    await env.DB.prepare(
+      'DELETE FROM player_items WHERE username = ? AND item_key = ?'
+    ).bind(username.toLowerCase(), itemKey).run();
+
+    return true;
+  } catch (error) {
+    logError('d1.deleteItem', error, { username, itemKey });
+    return false;
+  }
+}
+
+// ============================================
+// Purchase Limits Operations
+// ============================================
+
+/**
+ * Update weekly purchase limit count in D1
+ */
+async function upsertPurchaseLimit(username, itemType, count, weekStart, env) {
+  if (!D1_ENABLED || !env.DB) return false;
+
+  try {
+    const now = Date.now();
+    await env.DB.prepare(`
+      INSERT INTO purchase_limits (username, item_type, count, week_start, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(username, item_type) DO UPDATE SET count = ?, week_start = ?, updated_at = ?
+    `).bind(username.toLowerCase(), itemType, count, weekStart, now, count, weekStart, now).run();
+
+    return true;
+  } catch (error) {
+    logError('d1.upsertPurchaseLimit', error, { username, itemType });
+    return false;
+  }
+}
+
+// ============================================
+// Streak Operations
+// ============================================
+
+/**
+ * Update streak win/loss counts in D1
+ */
+async function updateStreakCounts(username, wins, losses, env) {
+  if (!D1_ENABLED || !env.DB) return false;
+
+  try {
+    const now = Date.now();
+    await env.DB.prepare(`
+      INSERT INTO users (username, streak_wins, streak_losses, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(username) DO UPDATE SET streak_wins = ?, streak_losses = ?, updated_at = ?
+    `).bind(username.toLowerCase(), wins, losses, now, now, wins, losses, now).run();
+
+    return true;
+  } catch (error) {
+    logError('d1.updateStreakCounts', error, { username });
+    return false;
+  }
+}
+
+/**
+ * Update streak multiplier in D1
+ */
+async function updateStreakMultiplier(username, multiplier, env) {
+  if (!D1_ENABLED || !env.DB) return false;
+
+  try {
+    const now = Date.now();
+    await env.DB.prepare(`
+      INSERT INTO users (username, streak_multiplier, created_at, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(username) DO UPDATE SET streak_multiplier = ?, updated_at = ?
+    `).bind(username.toLowerCase(), multiplier, now, now, multiplier, now).run();
+
+    return true;
+  } catch (error) {
+    logError('d1.updateStreakMultiplier', error, { username });
+    return false;
+  }
+}
+
+// ============================================
 // Migration Helpers
 // ============================================
 
@@ -357,6 +474,17 @@ export {
   getLeaderboard,
   getUserRank,
   searchUsers,
+
+  // Player items
+  upsertItem,
+  deleteItem,
+
+  // Purchase limits
+  upsertPurchaseLimit,
+
+  // Streaks
+  updateStreakCounts,
+  updateStreakMultiplier,
 
   // Migration helpers
   migrateUserFromKV,

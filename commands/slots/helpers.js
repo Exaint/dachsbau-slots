@@ -19,6 +19,7 @@ import {
   ACHIEVEMENTS
 } from '../../constants.js';
 import { logError, kvKey } from '../../utils.js';
+import { D1_ENABLED, DUAL_WRITE, updateStreakCounts } from '../../database/d1.js';
 import { CUSTOM_MESSAGES } from '../../config.js';
 import {
   hasUnlock,
@@ -398,6 +399,11 @@ export async function calculateStreakBonuses(lowerUsername, username, isWin, pre
   // Fire-and-forget: streak state only affects next spin, not current response
   env.SLOTS_KV.put(kvKey('streak:', lowerUsername), JSON.stringify(newStreak), { expirationTtl: STREAK_TTL_SECONDS })
     .catch(err => logError('calculateStreakBonuses.streakWrite', err, { username: lowerUsername }));
+
+  if (D1_ENABLED && DUAL_WRITE && env.DB) {
+    updateStreakCounts(lowerUsername, newStreak.wins, newStreak.losses, env)
+      .catch(err => logError('calculateStreakBonuses.d1', err, { username: lowerUsername }));
+  }
 
   // Combo Bonus
   if (isWin && newStreak.wins >= 2 && newStreak.wins < 5) {

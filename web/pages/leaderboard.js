@@ -123,7 +123,10 @@ export async function handleLeaderboardPage(env, loggedInUser = null, showAll = 
       currentUserRank.avatar = twitchUsers[userFetchIndex]?.avatar || null;
     }
 
-    return htmlResponse(renderLeaderboardPage(playersWithRoles, loggedInUser, actualShowAll, isAdminUser, currentUserRank));
+    // Pass all users (username + balance + rank) for search functionality
+    const allUsers = users.map((u, i) => ({ username: u.username, balance: u.balance, rank: i + 1 }));
+
+    return htmlResponse(renderLeaderboardPage(playersWithRoles, loggedInUser, actualShowAll, isAdminUser, currentUserRank, allUsers));
   } catch (error) {
     logError('handleLeaderboardPage', error);
     const { renderErrorPage } = await import('./errors.js');
@@ -138,8 +141,9 @@ export async function handleLeaderboardPage(env, loggedInUser = null, showAll = 
  * @param {boolean} showAll - Admin show all mode
  * @param {boolean} isAdminUser - Is admin
  * @param {Object|null} currentUserRank - Current user's rank data if not in top N
+ * @param {Array} allUsers - All users (username, balance, rank) for search
  */
-export function renderLeaderboardPage(players, user = null, showAll = false, isAdminUser = false, currentUserRank = null) {
+export function renderLeaderboardPage(players, user = null, showAll = false, isAdminUser = false, currentUserRank = null, allUsers = []) {
   const getRankDisplay = (rank) => {
     if (rank >= 1 && rank <= 10) {
       return `<img src="${R2_BASE}/Platz${rank}.png" alt="#${rank}" class="leaderboard-rank-img">`;
@@ -196,7 +200,10 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
 
   const playersHtml = players.length === 0
     ? '<p style="text-align: center; color: var(--text-muted); padding: 40px;">Noch keine Spieler gefunden.</p>'
-    : players.map((player, index) => renderPlayerItem(player, index + 1)).join('');
+    : players.map((player, index) => {
+        const isCurrentUser = user && player.username.toLowerCase() === user.username.toLowerCase();
+        return renderPlayerItem(player, index + 1, isCurrentUser ? ' current-user' : '');
+      }).join('');
 
   // Render current user's rank section if they're not in top N
   const currentUserHtml = currentUserRank ? `
@@ -242,26 +249,61 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
       </div>
       <div class="leaderboard-filter-bar">
         <input type="text" class="leaderboard-search" placeholder="Spieler suchen..." aria-label="Leaderboard durchsuchen" id="leaderboardSearch">
-        <span class="leaderboard-count" id="leaderboardCount">${players.length} Spieler</span>
+        <span class="leaderboard-count" id="leaderboardCount">${allUsers.length} Spieler</span>
       </div>
       <div class="leaderboard-list" id="leaderboardList">
         ${playersHtml}
       </div>
+      <div class="leaderboard-search-results" id="searchResults" style="display: none;">
+        <div class="leaderboard-user-divider"><span>Weitere Treffer</span></div>
+        <div id="searchResultsList"></div>
+      </div>
       ${currentUserHtml}
     </div>
     <script>
+      const allUsers = ${JSON.stringify(allUsers.map(u => ({ u: u.username, b: u.balance, r: u.rank })))};
+      const topN = ${players.length};
+
       document.getElementById('leaderboardSearch').addEventListener('input', function() {
         const query = this.value.toLowerCase().trim();
-        const items = document.querySelectorAll('.leaderboard-item');
-        let visible = 0;
+        const items = document.querySelectorAll('#leaderboardList .leaderboard-item');
+        const searchResults = document.getElementById('searchResults');
+        const searchResultsList = document.getElementById('searchResultsList');
+        let visibleTop = 0;
+
+        // Filter visible top N items
         items.forEach(item => {
           const username = item.querySelector('.leaderboard-username-link');
           if (!username) return;
           const match = !query || username.textContent.toLowerCase().includes(query);
           item.style.display = match ? '' : 'none';
-          if (match) visible++;
+          if (match) visibleTop++;
         });
-        document.getElementById('leaderboardCount').textContent = visible + ' von ${players.length} Spieler' + (query ? ' (gefiltert)' : '');
+
+        // Search in full list for players outside top N
+        if (query.length >= 2) {
+          const extraResults = allUsers.filter(p => p.r > topN && p.u.toLowerCase().includes(query));
+          if (extraResults.length > 0) {
+            searchResultsList.innerHTML = extraResults.slice(0, 10).map(p =>
+              '<div class="leaderboard-item search-result-item">' +
+                '<div class="leaderboard-rank">#' + p.r + '</div>' +
+                '<div class="leaderboard-avatar-placeholder">👤</div>' +
+                '<div class="leaderboard-user"><a href="?page=profile&user=' + encodeURIComponent(p.u) + '" class="leaderboard-username-link">' + p.u.replace(/</g, '&lt;') + '</a></div>' +
+                '<div class="leaderboard-balance">' + p.b.toLocaleString('de-DE') + ' DT</div>' +
+              '</div>'
+            ).join('');
+            searchResults.style.display = '';
+          } else {
+            searchResults.style.display = 'none';
+          }
+        } else {
+          searchResults.style.display = 'none';
+        }
+
+        const totalVisible = visibleTop + (searchResults.style.display !== 'none' ? Math.min(allUsers.filter(p => p.r > topN && p.u.toLowerCase().includes(query)).length, 10) : 0);
+        document.getElementById('leaderboardCount').textContent = query
+          ? totalVisible + ' von ' + allUsers.length + ' Spieler (gefiltert)'
+          : allUsers.length + ' Spieler';
       });
     </script>
   `;

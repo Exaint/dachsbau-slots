@@ -36,18 +36,25 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
     return htmlResponse(renderNotFoundPage(username, loggedInUser));
   }
 
-  // Fetch remaining data in parallel (balance already fetched above)
-  const [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData] = await Promise.all([
-    getPrestigeRank(username, env),
-    getStats(username, env),
-    getPlayerAchievements(username, env),
-    getLastActive(username, env),
-    getAchievementStats(env),
-    isDuelOptedOut(username, env),
-    isSelfBanned(username, env),
-    isLeaderboardHidden(username, env),
-    getTwitchProfileData(username, env)
-  ]);
+  // Fetch remaining data in parallel with error fallback
+  let rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData;
+  try {
+    [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData] = await Promise.all([
+      getPrestigeRank(username, env).catch(() => null),
+      getStats(username, env).catch(() => ({})),
+      getPlayerAchievements(username, env).catch(() => ({ unlockedAt: {}, stats: {}, pendingRewards: 0 })),
+      getLastActive(username, env).catch(() => null),
+      getAchievementStats(env).catch(() => ({ totalPlayers: 0, counts: {} })),
+      isDuelOptedOut(username, env).catch(() => false),
+      isSelfBanned(username, env).catch(() => false),
+      isLeaderboardHidden(username, env).catch(() => false),
+      getTwitchProfileData(username, env).catch(() => null)
+    ]);
+  } catch (e) {
+    rank = null; stats = {}; achievementData = { unlockedAt: {}, stats: {}, pendingRewards: 0 };
+    lastActive = null; achievementStats = { totalPlayers: 0, counts: {} };
+    duelOptOut = false; selfBanned = false; leaderboardHidden = false; twitchData = null;
+  }
 
   const allAchievements = getAllAchievements();
 
@@ -205,7 +212,7 @@ export function renderProfilePage(data) {
             <div class="progress-bar">
               <div class="progress-fill" style="width: ${ach.progress.percent}%"></div>
             </div>
-            <div class="achievement-progress-text">${formatNumber(ach.progress.current)}/${formatNumber(ach.progress.required)}</div>
+            <div class="achievement-progress-text">${formatNumber(ach.progress.current)}/${formatNumber(ach.progress.required)} (${ach.progress.percent}%)</div>
           </div>
         `;
       }
@@ -295,7 +302,7 @@ export function renderProfilePage(data) {
   // Generate role badges HTML
   const roleBadgesHtml = roleBadges.map(badge =>
     `<span class="profile-role-badge" style="--role-color: ${badge.color}">
-      <img src="${badge.icon}" alt="${badge.label}" class="profile-role-icon">
+      <img src="${badge.icon}" alt="${badge.label}" class="profile-role-icon" loading="lazy" width="18" height="18">
       <span>${badge.label}</span>
     </span>`
   ).join('');
@@ -305,7 +312,7 @@ export function renderProfilePage(data) {
 
   // Admin panel HTML
   const adminPanelHtml = showAdminPanel ? `
-    <div class="admin-panel collapsed" id="adminPanel">
+    <div class="admin-panel collapsed" id="adminPanel" data-username="${escapeHtml(username)}">
       <div class="admin-panel-header" onclick="toggleAdminPanel()">
         <h3>🔧 Admin Panel</h3>
         <span class="admin-panel-user">Spieler: <strong>${escapeHtml(username)}</strong></span>
@@ -316,36 +323,36 @@ export function renderProfilePage(data) {
           <div class="admin-control">
             <label>Balance</label>
             <div class="admin-input-group">
-              <input type="number" id="adminBalance" value="${balance}" min="0" class="admin-input">
-              <button class="btn admin-btn" onclick="adminSetBalance('${escapeHtml(username)}')">Setzen</button>
+              <input type="number" id="adminBalance" value="${balance}" min="0" max="1000000" class="admin-input">
+              <button class="btn admin-btn" onclick="adminSetBalance()">Setzen</button>
             </div>
           </div>
           <div class="admin-control">
             <label>Disclaimer</label>
             <div class="admin-toggle-group">
               <span class="admin-status ${hasDisclaimer ? 'active' : ''}">${hasDisclaimer ? '✓ Akzeptiert' : '✗ Nicht akzeptiert'}</span>
-              <button class="btn admin-btn ${hasDisclaimer ? 'danger' : 'success'}" onclick="adminSetDisclaimer('${escapeHtml(username)}', ${!hasDisclaimer})">${hasDisclaimer ? 'Entfernen' : 'Setzen'}</button>
+              <button class="btn admin-btn ${hasDisclaimer ? 'danger' : 'success'}" onclick="adminSetDisclaimer(${!hasDisclaimer})">${hasDisclaimer ? 'Entfernen' : 'Setzen'}</button>
             </div>
           </div>
           <div class="admin-control">
             <label>Self-Ban</label>
             <div class="admin-toggle-group">
               <span class="admin-status ${selfBanned ? 'active danger' : ''}">${selfBanned ? '🚫 Gesperrt' : '✓ Nicht gesperrt'}</span>
-              <button class="btn admin-btn ${selfBanned ? 'success' : 'danger'}" onclick="adminSetSelfBan('${escapeHtml(username)}', ${!selfBanned})">${selfBanned ? 'Entsperren' : 'Sperren'}</button>
+              <button class="btn admin-btn ${selfBanned ? 'success' : 'danger'}" onclick="adminSetSelfBan(${!selfBanned})">${selfBanned ? 'Entsperren' : 'Sperren'}</button>
             </div>
           </div>
           <div class="admin-control">
             <label>Duelle</label>
             <div class="admin-toggle-group">
               <span class="admin-status ${duelOptOut ? 'danger' : 'active'}">${duelOptOut ? '✗ Deaktiviert' : '✓ Aktiviert'}</span>
-              <button class="btn admin-btn" onclick="adminSetDuelOpt('${escapeHtml(username)}', ${!duelOptOut})">${duelOptOut ? 'Aktivieren' : 'Deaktivieren'}</button>
+              <button class="btn admin-btn" onclick="adminSetDuelOpt(${!duelOptOut})">${duelOptOut ? 'Aktivieren' : 'Deaktivieren'}</button>
             </div>
           </div>
           <div class="admin-control">
             <label>Leaderboard</label>
             <div class="admin-toggle-group">
               <span class="admin-status ${leaderboardHidden ? 'danger' : 'active'}">${leaderboardHidden ? '✗ Versteckt' : '✓ Sichtbar'}</span>
-              <button class="btn admin-btn" onclick="adminSetLeaderboardHidden('${escapeHtml(username)}', ${!leaderboardHidden})">${leaderboardHidden ? 'Anzeigen' : 'Verstecken'}</button>
+              <button class="btn admin-btn" onclick="adminSetLeaderboardHidden(${!leaderboardHidden})">${leaderboardHidden ? 'Anzeigen' : 'Verstecken'}</button>
             </div>
           </div>
           <div class="admin-control admin-control-wide">
@@ -354,14 +361,14 @@ export function renderProfilePage(data) {
               <select id="adminAchievement" class="admin-input admin-select">
                 ${achievements.map(a => `<option value="${a.id}" data-unlocked="${a.unlocked}">${a.unlocked ? '✓' : '○'} ${escapeHtml(a.name)}</option>`).join('')}
               </select>
-              <button class="btn admin-btn success" onclick="adminSetAchievement('${escapeHtml(username)}', true)">Freischalten</button>
-              <button class="btn admin-btn danger" onclick="adminSetAchievement('${escapeHtml(username)}', false)">Sperren</button>
+              <button class="btn admin-btn success" onclick="adminSetAchievement(true)">Freischalten</button>
+              <button class="btn admin-btn danger" onclick="adminSetAchievement(false)">Sperren</button>
             </div>
           </div>
           <div class="admin-control admin-control-wide">
             <label>💸 Shop-Refund</label>
             <div class="admin-refund-section">
-              <button class="btn admin-btn" onclick="loadRefundableItems('${escapeHtml(username)}')">Refund-Items laden</button>
+              <button class="btn admin-btn" onclick="loadRefundableItems()">Refund-Items laden</button>
               <div id="refundItemsContainer" class="admin-refund-items" style="display: none;"></div>
             </div>
           </div>
@@ -383,7 +390,7 @@ export function renderProfilePage(data) {
     ${isComplete ? '<div class="confetti-container" id="confetti"></div>' : ''}
     <div class="profile-header${isComplete ? ' complete' : ''}">
       <div class="profile-top">
-        ${avatarUrl ? `<img src="${avatarUrl}" alt="${escapeHtml(displayName)}" class="profile-avatar">` : ''}
+        ${avatarUrl ? `<img src="${avatarUrl}" alt="${escapeHtml(displayName)}" class="profile-avatar" loading="lazy" width="80" height="80">` : ''}
         <div class="profile-info">
           <div class="profile-name">
             ${escapeHtml(displayName)}

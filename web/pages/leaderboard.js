@@ -174,7 +174,7 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
   const renderPlayerItem = (player, rank, extraClass = '') => {
     const roleBadgeHtml = getRoleBadge(player.username, player.role);
     const avatarHtml = player.avatar
-      ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar">`
+      ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar" loading="lazy" width="32" height="32">`
       : `<div class="leaderboard-avatar-placeholder">👤</div>`;
     const noDisclaimerBadge = showAll && !player.hasDisclaimer
       ? '<span class="no-disclaimer-badge" title="Kein Disclaimer akzeptiert">⚠️</span>'
@@ -240,11 +240,30 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
         <span class="leaderboard-info">${infoText}</span>
         ${adminFilterHtml}
       </div>
-      <div class="leaderboard-list">
+      <div class="leaderboard-filter-bar">
+        <input type="text" class="leaderboard-search" placeholder="Spieler suchen..." aria-label="Leaderboard durchsuchen" id="leaderboardSearch">
+        <span class="leaderboard-count" id="leaderboardCount">${players.length} Spieler</span>
+      </div>
+      <div class="leaderboard-list" id="leaderboardList">
         ${playersHtml}
       </div>
       ${currentUserHtml}
     </div>
+    <script>
+      document.getElementById('leaderboardSearch').addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        const items = document.querySelectorAll('.leaderboard-item');
+        let visible = 0;
+        items.forEach(item => {
+          const username = item.querySelector('.leaderboard-username-link');
+          if (!username) return;
+          const match = !query || username.textContent.toLowerCase().includes(query);
+          item.style.display = match ? '' : 'none';
+          if (match) visible++;
+        });
+        document.getElementById('leaderboardCount').textContent = visible + ' von ${players.length} Spieler' + (query ? ' (gefiltert)' : '');
+      });
+    </script>
   `;
 
   return baseTemplate('Leaderboard', content, 'leaderboard', user);

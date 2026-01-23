@@ -58,17 +58,17 @@ export async function handleWebPage(page, url, env, loggedInUser = null) {
         const showAll = url.searchParams.get('showAll') === 'true';
         return await handleLeaderboardPage(env, loggedInUser, showAll);
       case 'info':
-        return htmlResponse(renderInfoPage(loggedInUser));
+        return htmlResponse(renderInfoPage(loggedInUser), 200, { cacheSeconds: 300 });
       case 'shop':
         return htmlResponse(await renderShopPage(env, loggedInUser));
       case 'changelog':
-        return htmlResponse(renderChangelogPage(loggedInUser));
+        return htmlResponse(renderChangelogPage(loggedInUser), 200, { cacheSeconds: 3600 });
       case 'stats':
         return await handleGlobalStatsPage(env, loggedInUser);
       case 'impressum':
-        return htmlResponse(renderImpressumPage(loggedInUser));
+        return htmlResponse(renderImpressumPage(loggedInUser), 200, { cacheSeconds: 3600 });
       case 'datenschutz':
-        return htmlResponse(renderDatenschutzPage(loggedInUser));
+        return htmlResponse(renderDatenschutzPage(loggedInUser), 200, { cacheSeconds: 3600 });
       default:
         return htmlResponse(renderNotFoundPage(null, loggedInUser));
     }

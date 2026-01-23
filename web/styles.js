@@ -3,7 +3,18 @@
  * Dark theme optimized for Twitch-style appearance
  */
 
-export const CSS = `
+function minifyCSS(css) {
+  return css
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\s*([{}:;,>~+])\s*/g, '$1')
+    .replace(/\s+/g, ' ')
+    .replace(/;\}/g, '}')
+    .replace(/^\s+|\s+$/gm, '')
+    .replace(/\n+/g, '')
+    .trim();
+}
+
+export const CSS = minifyCSS(`
 :root {
   /* Dark theme (default) - WCAG AA compliant */
   --bg-primary: #0e0e10;
@@ -4277,4 +4288,374 @@ div[id] {
     align-self: flex-start;
   }
 }
-`;
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  pointer-events: auto;
+  transform: translateX(120%);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  max-width: 340px;
+}
+
+.toast.visible {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.toast-error {
+  background: var(--error);
+  color: #fff;
+}
+
+.toast-success {
+  background: var(--success);
+  color: #000;
+}
+
+.toast-info {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Confirm Dialog */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  backdrop-filter: blur(2px);
+}
+
+.confirm-overlay.active {
+  display: flex;
+}
+
+.confirm-dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.confirm-message {
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.confirm-btn-cancel {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.confirm-btn-cancel:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.confirm-btn-ok {
+  background: var(--error);
+  border: none;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.confirm-btn-ok:hover {
+  opacity: 0.9;
+}
+
+/* Improved Achievement Progress Bars */
+.achievement-progress {
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.achievement-progress .progress-bar {
+  height: 8px;
+  margin-bottom: 2px;
+  width: 100%;
+}
+
+.achievement-progress-text {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Modal Progress Bar */
+.modal-progress-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.modal-progress-bar .progress-bar {
+  height: 10px;
+  width: 100%;
+}
+
+.modal-progress-bar span {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Dark Mode Toggle Improvements */
+.theme-toggle-footer {
+  position: relative;
+  padding: 8px 16px;
+}
+
+.theme-toggle-footer .theme-toggle-label {
+  font-weight: 500;
+}
+
+.theme-toggle-footer[data-theme-active="light"] {
+  background: var(--bg-card);
+  border-color: var(--accent);
+}
+
+.theme-toggle-footer[data-theme-active="dark"] {
+  background: var(--bg-tertiary);
+}
+
+/* Loading Skeleton */
+.skeleton-loading {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.skeleton-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+.profile-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.skeleton-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+}
+
+.skeleton-text {
+  height: 16px;
+  border-radius: 4px;
+}
+
+.skeleton-text-lg {
+  height: 24px;
+  width: 200px;
+}
+
+.skeleton-text-sm {
+  height: 14px;
+  width: 150px;
+}
+
+/* Keyboard Shortcuts Modal */
+.shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10002;
+  backdrop-filter: blur(2px);
+}
+
+.shortcuts-overlay.active {
+  display: flex;
+}
+
+.shortcuts-dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  max-width: 380px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.shortcuts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.shortcuts-header h3 {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.shortcuts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.shortcut-item kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.shortcut-item span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Offline Banner */
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--error);
+  color: #fff;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 10003;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+}
+
+.offline-banner.visible {
+  transform: translateY(0);
+}
+
+/* Leaderboard Filter Bar */
+.leaderboard-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.leaderboard-search {
+  flex: 1;
+  max-width: 300px;
+  padding: 8px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.leaderboard-search:focus {
+  border-color: var(--accent);
+}
+
+.leaderboard-search::placeholder {
+  color: var(--text-muted);
+}
+
+.leaderboard-count {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .toast-container {
+    top: auto;
+    bottom: 20px;
+    right: 10px;
+    left: 10px;
+  }
+
+  .toast {
+    max-width: 100%;
+  }
+
+  .achievement-progress {
+    width: 100px;
+  }
+
+  .leaderboard-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .leaderboard-search {
+    max-width: 100%;
+  }
+}
+`);

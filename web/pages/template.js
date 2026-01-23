@@ -108,7 +108,7 @@ export function baseTemplate(title, content, activePage = '', user = null) {
         <form class="search-form" action="" method="get" role="search" aria-label="Spielersuche">
           <input type="hidden" name="page" value="profile">
           <input type="text" name="user" placeholder="Spieler..." class="search-input" required aria-label="Spielername eingeben">
-          <button type="submit" class="btn btn-search" aria-label="Suchen"><img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Suche.png" alt="" class="search-icon" aria-hidden="true"></button>
+          <button type="submit" class="btn btn-search" aria-label="Suchen"><img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Suche.png" alt="" class="search-icon" aria-hidden="true" loading="lazy" width="16" height="16"></button>
         </form>
         ${userSectionHtml}
       </div>
@@ -143,9 +143,47 @@ export function baseTemplate(title, content, activePage = '', user = null) {
     <p class="footer-disclaimer">This website is not affiliated with or endorsed by Twitch.</p>
     <button class="theme-toggle-footer" onclick="toggleTheme()" title="Theme wechseln" aria-label="Theme zwischen Hell und Dunkel wechseln">
       <span class="theme-toggle-icon" aria-hidden="true">🌙</span>
-      <span class="theme-toggle-label">Theme</span>
+      <span class="theme-toggle-label">Dark</span>
     </button>
   </footer>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- Confirm Dialog -->
+  <div class="confirm-overlay" id="confirmOverlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="confirm-dialog">
+      <div class="confirm-message" id="confirmMessage"></div>
+      <div class="confirm-actions">
+        <button class="btn confirm-btn-cancel" id="confirmCancel">Abbrechen</button>
+        <button class="btn confirm-btn-ok" id="confirmOk">Bestätigen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Help Modal -->
+  <div class="shortcuts-overlay" id="shortcutsOverlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="shortcuts-dialog">
+      <div class="shortcuts-header">
+        <h3>⌨️ Keyboard Shortcuts</h3>
+        <button class="modal-close" onclick="closeShortcutsModal()" aria-label="Schließen">&times;</button>
+      </div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-item"><kbd>/</kbd><span>Suche fokussieren</span></div>
+        <div class="shortcut-item"><kbd>h</kbd><span>Startseite</span></div>
+        <div class="shortcut-item"><kbd>l</kbd><span>Leaderboard</span></div>
+        <div class="shortcut-item"><kbd>s</kbd><span>Shop</span></div>
+        <div class="shortcut-item"><kbd>t</kbd><span>Theme wechseln</span></div>
+        <div class="shortcut-item"><kbd>?</kbd><span>Diese Hilfe</span></div>
+        <div class="shortcut-item"><kbd>Esc</kbd><span>Dialoge schließen</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Offline Indicator -->
+  <div class="offline-banner" id="offlineBanner" aria-live="assertive">
+    <span>⚡ Keine Internetverbindung</span>
+  </div>
 
   <!-- Achievement Detail Modal -->
   <div class="modal-overlay" id="achievementModal" onclick="closeAchievementModal(event)" role="dialog" aria-modal="true" aria-labelledby="modalName" aria-hidden="true">
@@ -204,7 +242,8 @@ function getClientScripts() {
       }
 
       if (!unlocked && progressCurrent && progressRequired) {
-        document.getElementById('modalProgress').textContent = progressCurrent + ' / ' + progressRequired;
+        const percent = Math.min(100, Math.round((parseInt(progressCurrent) / parseInt(progressRequired)) * 100));
+        document.getElementById('modalProgress').innerHTML = '<div class="modal-progress-bar"><div class="progress-bar"><div class="progress-fill" style="width: ' + percent + '%"></div></div><span>' + progressCurrent + ' / ' + progressRequired + ' (' + percent + '%)</span></div>';
         document.getElementById('modalProgressRow').style.display = 'block';
       } else {
         document.getElementById('modalProgressRow').style.display = 'none';
@@ -239,32 +278,31 @@ function getClientScripts() {
         case 'Escape':
           closeAchievementModal();
           closeMobileNav();
+          closeShortcutsModal();
+          const confirmOverlay = document.getElementById('confirmOverlay');
+          if (confirmOverlay && confirmOverlay.classList.contains('active')) {
+            document.getElementById('confirmCancel').click();
+          }
           break;
         case '/':
-          // Focus search field
           e.preventDefault();
           const searchInput = document.querySelector('.search-input');
           if (searchInput) searchInput.focus();
           break;
         case '?':
-          // Go to info page
-          if (!e.shiftKey) return; // Require Shift+? on most keyboards
-          window.location.href = '?page=info';
+          e.preventDefault();
+          toggleShortcutsModal();
           break;
         case 'h':
-          // Go to home
           window.location.href = '?page=home';
           break;
         case 'l':
-          // Go to leaderboard
           window.location.href = '?page=leaderboard';
           break;
         case 's':
-          // Go to shop
           window.location.href = '?page=shop';
           break;
         case 't':
-          // Toggle theme
           toggleTheme();
           break;
       }
@@ -310,6 +348,48 @@ function getClientScripts() {
       }
     });
 
+    // Toast notification system
+    function showToast(message, type = 'error', duration = 4000) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.textContent = message;
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add('visible'));
+      setTimeout(() => {
+        toast.classList.remove('visible');
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+    // Styled confirm dialog
+    function showConfirm(message) {
+      return new Promise((resolve) => {
+        const overlay = document.getElementById('confirmOverlay');
+        const msgEl = document.getElementById('confirmMessage');
+        const okBtn = document.getElementById('confirmOk');
+        const cancelBtn = document.getElementById('confirmCancel');
+        msgEl.textContent = message;
+        overlay.classList.add('active');
+        overlay.setAttribute('aria-hidden', 'false');
+
+        function cleanup(result) {
+          overlay.classList.remove('active');
+          overlay.setAttribute('aria-hidden', 'true');
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          overlay.removeEventListener('click', onOverlay);
+          resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        function onOverlay(e) { if (e.target === overlay) cleanup(false); }
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        overlay.addEventListener('click', onOverlay);
+      });
+    }
+
     // Accept disclaimer function
     async function acceptDisclaimer() {
       const btn = document.querySelector('.btn-accept-disclaimer');
@@ -323,14 +403,14 @@ function getClientScripts() {
           window.location.reload();
         } else {
           const data = await response.json();
-          alert(data.error || 'Fehler beim Akzeptieren des Disclaimers');
+          showToast(data.error || 'Fehler beim Akzeptieren des Disclaimers');
           if (btn) {
             btn.disabled = false;
             btn.textContent = 'Disclaimer akzeptieren';
           }
         }
       } catch (error) {
-        alert('Netzwerkfehler. Bitte versuche es erneut.');
+        showToast('Netzwerkfehler. Bitte versuche es erneut.');
         if (btn) {
           btn.disabled = false;
           btn.textContent = 'Disclaimer akzeptieren';
@@ -359,8 +439,10 @@ function getClientScripts() {
       const label = document.querySelector('.theme-toggle-label');
       if (icon && label) {
         icon.textContent = theme === 'light' ? '☀️' : '🌙';
-        label.textContent = theme === 'light' ? 'Light' : 'Dark';
+        label.textContent = theme === 'light' ? 'Light Mode' : 'Dark Mode';
       }
+      const footer = document.querySelector('.theme-toggle-footer');
+      if (footer) footer.setAttribute('data-theme-active', theme);
     }
 
     // Get effective theme (localStorage > system preference > dark)
@@ -388,9 +470,20 @@ function getClientScripts() {
         }
       });
 
-      // Achievement filter functionality
+      // Achievement filter functionality with counts
       const filterBtns = document.querySelectorAll('.filter-btn');
       if (filterBtns.length > 0) {
+        // Update filter button counts
+        const allAchievements = document.querySelectorAll('.achievement');
+        const unlockedCount = document.querySelectorAll('.achievement.unlocked').length;
+        const lockedCount = document.querySelectorAll('.achievement.locked').length;
+        filterBtns.forEach(btn => {
+          const f = btn.dataset.filter;
+          if (f === 'all') btn.textContent = 'Alle (' + allAchievements.length + ')';
+          else if (f === 'unlocked') btn.textContent = 'Freigeschaltet (' + unlockedCount + ')';
+          else if (f === 'locked') btn.textContent = 'Gesperrt (' + lockedCount + ')';
+        });
+
         filterBtns.forEach(btn => {
           btn.addEventListener('click', function() {
             const filter = this.dataset.filter;
@@ -423,6 +516,20 @@ function getClientScripts() {
             });
           });
         });
+      }
+
+      // Restore category collapse state from localStorage
+      const savedCollapseState = localStorage.getItem('categoryCollapseState');
+      if (savedCollapseState) {
+        try {
+          const state = JSON.parse(savedCollapseState);
+          document.querySelectorAll('.category').forEach(cat => {
+            const catName = cat.querySelector('.category-title span')?.textContent;
+            if (catName && state[catName]) {
+              cat.classList.add('collapsed');
+            }
+          });
+        } catch (e) {}
       }
 
       // Achievement sort functionality
@@ -569,6 +676,8 @@ function getClientScripts() {
     });
 
     // Admin Panel Functions
+    const MAX_BALANCE = 1000000;
+
     async function adminApiCall(action, data) {
       const msgEl = document.getElementById('adminMessage');
       if (msgEl) {
@@ -585,19 +694,25 @@ function getClientScripts() {
 
         const result = await response.json();
 
-        if (msgEl) {
-          if (result.success) {
+        if (result.success) {
+          showToast('Erfolgreich aktualisiert!', 'success');
+          if (msgEl) {
             msgEl.className = 'admin-message success';
             msgEl.textContent = '✓ Erfolgreich aktualisiert!';
-            setTimeout(() => location.reload(), 1000);
-          } else {
+          }
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          const errMsg = result.error || 'Unbekannter Fehler';
+          showToast('Fehler: ' + errMsg, 'error');
+          if (msgEl) {
             msgEl.className = 'admin-message error';
-            msgEl.textContent = '✗ Fehler: ' + (result.error || 'Unbekannter Fehler');
+            msgEl.textContent = '✗ Fehler: ' + errMsg;
           }
         }
 
         return result;
       } catch (e) {
+        showToast('Netzwerkfehler', 'error');
         if (msgEl) {
           msgEl.className = 'admin-message error';
           msgEl.textContent = '✗ Netzwerkfehler';
@@ -606,38 +721,53 @@ function getClientScripts() {
       }
     }
 
-    function adminSetBalance(username) {
+    function getAdminUsername() {
+      const panel = document.getElementById('adminPanel');
+      return panel ? panel.dataset.username : null;
+    }
+
+    function adminSetBalance() {
+      const username = getAdminUsername();
       const balance = parseInt(document.getElementById('adminBalance').value, 10);
       if (isNaN(balance) || balance < 0) {
-        alert('Ungültiger Betrag');
+        showToast('Ungültiger Betrag (min: 0)', 'error');
+        return;
+      }
+      if (balance > MAX_BALANCE) {
+        showToast('Maximaler Betrag: ' + MAX_BALANCE.toLocaleString('de-DE') + ' DT', 'error');
         return;
       }
       adminApiCall('setBalance', { username, balance });
     }
 
-    function adminSetDisclaimer(username, accepted) {
-      adminApiCall('setDisclaimer', { username, accepted });
+    function adminSetDisclaimer(accepted) {
+      adminApiCall('setDisclaimer', { username: getAdminUsername(), accepted });
     }
 
-    function adminSetSelfBan(username, banned) {
-      if (banned && !confirm('Diesen Spieler wirklich sperren?')) return;
-      adminApiCall('setSelfBan', { username, banned });
+    async function adminSetSelfBan(banned) {
+      if (banned) {
+        const confirmed = await showConfirm('Diesen Spieler wirklich sperren?');
+        if (!confirmed) return;
+      }
+      adminApiCall('setSelfBan', { username: getAdminUsername(), banned });
     }
 
-    function adminSetDuelOpt(username, optedOut) {
-      adminApiCall('setDuelOpt', { username, optedOut });
+    function adminSetDuelOpt(optedOut) {
+      adminApiCall('setDuelOpt', { username: getAdminUsername(), optedOut });
     }
 
-    function adminSetLeaderboardHidden(username, hidden) {
-      adminApiCall('setLeaderboardHidden', { username, hidden });
+    function adminSetLeaderboardHidden(hidden) {
+      adminApiCall('setLeaderboardHidden', { username: getAdminUsername(), hidden });
     }
 
-    function adminSetAchievement(username, unlocked) {
+    async function adminSetAchievement(unlocked) {
+      const username = getAdminUsername();
       const select = document.getElementById('adminAchievement');
       const achievementId = select.value;
       const achievementName = select.options[select.selectedIndex].text;
       const action = unlocked ? 'freischalten' : 'sperren';
-      if (!confirm(\`Achievement "\${achievementName}" wirklich \${action}?\`)) return;
+      const confirmed = await showConfirm('Achievement "' + achievementName.substring(2) + '" wirklich ' + action + '?');
+      if (!confirmed) return;
       adminApiCall('setAchievement', { username, achievementId, unlocked }).then(() => {
         const option = select.options[select.selectedIndex];
         option.dataset.unlocked = unlocked ? 'true' : 'false';
@@ -646,9 +776,9 @@ function getClientScripts() {
     }
 
     // Refund functions
-    async function loadRefundableItems(username) {
+    async function loadRefundableItems() {
+      const username = getAdminUsername();
       const container = document.getElementById('refundItemsContainer');
-      const msgEl = document.getElementById('adminMessage');
       container.innerHTML = '<div class="admin-loading">Lade Items...</div>';
       container.style.display = 'block';
 
@@ -665,61 +795,69 @@ function getClientScripts() {
           return;
         }
 
-        // Group items by type
         const prestigeItems = result.items.filter(i => i.type === 'prestige');
         const unlockItems = result.items.filter(i => i.type === 'unlock');
 
         let html = '<div class="refund-groups">';
 
-        // Prestige Ranks
         html += '<div class="refund-group"><h4>Prestige Ränge</h4><div class="refund-items">';
         for (const item of prestigeItems) {
           const statusClass = item.owned ? (item.canRefund ? 'refundable' : 'blocked') : 'not-owned';
-          html += \`
-            <div class="refund-item \${statusClass}">
-              <span class="refund-item-name">\${item.symbol} \${item.name}</span>
-              <span class="refund-item-price">+\${item.price.toLocaleString('de-DE')} DT</span>
-              \${item.owned ? (item.canRefund
-                ? \`<button class="btn admin-btn danger btn-sm" onclick="refundItem('\${username}', '\${item.key}', '\${item.name}', \${item.price})">Refund</button>\`
-                : \`<span class="refund-blocked">\${item.blockedReason}</span>\`
-              ) : '<span class="refund-not-owned">Nicht gekauft</span>'}
-            </div>
-          \`;
+          html += '<div class="refund-item ' + statusClass + '">';
+          html += '<span class="refund-item-name">' + item.symbol + ' ' + item.name + '</span>';
+          html += '<span class="refund-item-price">+' + item.price.toLocaleString('de-DE') + ' DT</span>';
+          if (item.owned && item.canRefund) {
+            html += '<button class="btn admin-btn danger btn-sm btn-refund" data-key="' + item.key + '" data-name="' + item.name + '" data-price="' + item.price + '">Refund</button>';
+          } else if (item.owned) {
+            html += '<span class="refund-blocked">' + item.blockedReason + '</span>';
+          } else {
+            html += '<span class="refund-not-owned">Nicht gekauft</span>';
+          }
+          html += '</div>';
         }
         html += '</div></div>';
 
-        // Slot Unlocks
         html += '<div class="refund-group"><h4>Slot Unlocks</h4><div class="refund-items">';
         for (const item of unlockItems) {
           const statusClass = item.owned ? (item.canRefund ? 'refundable' : 'blocked') : 'not-owned';
-          html += \`
-            <div class="refund-item \${statusClass}">
-              <span class="refund-item-name">\${item.symbol} \${item.name}</span>
-              <span class="refund-item-price">+\${item.price.toLocaleString('de-DE')} DT</span>
-              \${item.owned ? (item.canRefund
-                ? \`<button class="btn admin-btn danger btn-sm" onclick="refundItem('\${username}', '\${item.key}', '\${item.name}', \${item.price})">Refund</button>\`
-                : \`<span class="refund-blocked">\${item.blockedReason}</span>\`
-              ) : '<span class="refund-not-owned">Nicht gekauft</span>'}
-            </div>
-          \`;
+          html += '<div class="refund-item ' + statusClass + '">';
+          html += '<span class="refund-item-name">' + item.symbol + ' ' + item.name + '</span>';
+          html += '<span class="refund-item-price">+' + item.price.toLocaleString('de-DE') + ' DT</span>';
+          if (item.owned && item.canRefund) {
+            html += '<button class="btn admin-btn danger btn-sm btn-refund" data-key="' + item.key + '" data-name="' + item.name + '" data-price="' + item.price + '">Refund</button>';
+          } else if (item.owned) {
+            html += '<span class="refund-blocked">' + item.blockedReason + '</span>';
+          } else {
+            html += '<span class="refund-not-owned">Nicht gekauft</span>';
+          }
+          html += '</div>';
         }
-        html += '</div></div>';
-        html += '</div>';
+        html += '</div></div></div>';
 
         container.innerHTML = html;
+
+        // Event delegation for refund buttons
+        container.querySelectorAll('.btn-refund').forEach(btn => {
+          btn.addEventListener('click', async function() {
+            const itemKey = this.dataset.key;
+            const itemName = this.dataset.name;
+            const price = parseInt(this.dataset.price, 10);
+            await refundItem(itemKey, itemName, price);
+          });
+        });
       } catch (e) {
         container.innerHTML = '<div class="admin-error">Netzwerkfehler</div>';
       }
     }
 
-    async function refundItem(username, itemKey, itemName, price) {
-      if (!confirm(\`"\${itemName}" wirklich refunden?\\nDer Spieler erhält \${price.toLocaleString('de-DE')} DT zurück.\`)) return;
+    async function refundItem(itemKey, itemName, price) {
+      const username = getAdminUsername();
+      const confirmed = await showConfirm('"' + itemName + '" wirklich refunden? Der Spieler erhält ' + price.toLocaleString('de-DE') + ' DT zurück.');
+      if (!confirmed) return;
 
       const result = await adminApiCall('refund', { username, itemKey });
       if (result && result.success) {
-        // Reload refundable items to update UI
-        loadRefundableItems(username);
-        // Update balance display if on profile
+        loadRefundableItems();
         const balanceEl = document.querySelector('.stat-value');
         if (balanceEl && result.newBalance !== undefined) {
           balanceEl.textContent = result.newBalance.toLocaleString('de-DE');
@@ -742,20 +880,71 @@ function getClientScripts() {
       }
     }
 
-    // Category collapse toggle (profile achievements)
+    // Category collapse toggle (profile achievements) with localStorage persistence
     function toggleCategory(header) {
       const category = header.closest('.category');
       category.classList.toggle('collapsed');
+      saveCategoryCollapseState();
     }
 
     // Collapse/expand all categories
     function collapseAllCategories() {
       document.querySelectorAll('.category').forEach(cat => cat.classList.add('collapsed'));
+      saveCategoryCollapseState();
     }
 
     function expandAllCategories() {
       document.querySelectorAll('.category').forEach(cat => cat.classList.remove('collapsed'));
+      saveCategoryCollapseState();
     }
+
+    function saveCategoryCollapseState() {
+      const state = {};
+      document.querySelectorAll('.category').forEach(cat => {
+        const catName = cat.querySelector('.category-title span')?.textContent;
+        if (catName) state[catName] = cat.classList.contains('collapsed');
+      });
+      localStorage.setItem('categoryCollapseState', JSON.stringify(state));
+    }
+
+    // Keyboard shortcuts help modal
+    function toggleShortcutsModal() {
+      const overlay = document.getElementById('shortcutsOverlay');
+      if (overlay.classList.contains('active')) {
+        closeShortcutsModal();
+      } else {
+        overlay.classList.add('active');
+        overlay.setAttribute('aria-hidden', 'false');
+      }
+    }
+
+    function closeShortcutsModal() {
+      const overlay = document.getElementById('shortcutsOverlay');
+      overlay.classList.remove('active');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+
+    // Close shortcuts on overlay click
+    document.getElementById('shortcutsOverlay').addEventListener('click', function(e) {
+      if (e.target === this) closeShortcutsModal();
+    });
+
+    // Offline/Online connection status
+    function updateConnectionStatus() {
+      const banner = document.getElementById('offlineBanner');
+      if (!navigator.onLine) {
+        banner.classList.add('visible');
+      } else {
+        banner.classList.remove('visible');
+      }
+    }
+    window.addEventListener('offline', updateConnectionStatus);
+    window.addEventListener('online', function() {
+      const banner = document.getElementById('offlineBanner');
+      banner.classList.remove('visible');
+      showToast('Verbindung wiederhergestellt', 'success', 2000);
+    });
+    updateConnectionStatus();
 
     // Shop purchase function
     async function buyItem(itemId, itemName, price) {
@@ -895,13 +1084,22 @@ function getClientScripts() {
 
 /**
  * Create HTML response with security headers
+ * @param {string} html - HTML content
+ * @param {number} status - HTTP status code
+ * @param {object} options - Additional options
+ * @param {number} options.cacheSeconds - Cache-Control max-age in seconds (0 = no-cache)
  */
-export function htmlResponse(html, status = 200) {
+export function htmlResponse(html, status = 200, options = {}) {
+  const cacheSeconds = options.cacheSeconds || 0;
+  const cacheControl = cacheSeconds > 0
+    ? `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}`
+    : 'no-cache';
+
   return new Response(html, {
     status,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': cacheControl,
       'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://static-cdn.jtvnw.net https://assets.help.twitch.tv https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',

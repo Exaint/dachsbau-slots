@@ -9,15 +9,15 @@ export const R2_BASE = 'https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev';
 
 // Achievement category icons (using R2 images)
 export const CATEGORY_ICONS = {
-  [ACHIEVEMENT_CATEGORIES.SPINNING]: `<img src="${R2_BASE}/Slots.png" alt="Spinning" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.WINNING]: `<img src="${R2_BASE}/Winning.png" alt="Winning" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.LOSING]: `<img src="${R2_BASE}/Loosing.png" alt="Loosing" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.COLLECTING]: `<img src="${R2_BASE}/Sammeln.png" alt="Sammeln" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.SOCIAL]: `<img src="${R2_BASE}/Social.png" alt="Social" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.DEDICATION]: `<img src="${R2_BASE}/Hingabe.png" alt="Hingabe" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.SHOPPING]: `<img src="${R2_BASE}/Shopping.png" alt="Shopping" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.ITEMS]: `<img src="${R2_BASE}/Items.png" alt="Items" class="category-icon-img">`,
-  [ACHIEVEMENT_CATEGORIES.SPECIAL]: `<img src="${R2_BASE}/Spezial.png" alt="Spezial" class="category-icon-img">`
+  [ACHIEVEMENT_CATEGORIES.SPINNING]: `<img src="${R2_BASE}/Slots.png" alt="Spinning" class="category-icon-img" loading="lazy" width="28" height="28">`,
+  [ACHIEVEMENT_CATEGORIES.WINNING]: `<img src="${R2_BASE}/Winning.png" alt="Winning" class="category-icon-img" loading="lazy" width="28" height="28">`,
+  [ACHIEVEMENT_CATEGORIES.LOSING]: `<img src="${R2_BASE}/Loosing.png" alt="Loosing" class="category-icon-img" loading="lazy" width="28" height="28">`,
+  [ACHIEVEMENT_CATEGORIES.COLLECTING]: `<img src="${R2_BASE}/Sammeln.png" alt="Sammeln" class="category-icon-img" loading="lazy" width="28" height="28">`,
+  [ACHIEVEMENT_CATEGORIES.SOCIAL]: `<img src="${R2_BASE}/Social.png" alt="Social" class="category-icon-img" loading="lazy" width="28" height="28">`,
+  [ACHIEVEMENT_CATEGORIES.DEDICATION]: `<img src="${R2_BASE}/Hingabe.png" alt="Hingabe" class="category-icon-img" loading="lazy" width="28" height="28">`,
+  [ACHIEVEMENT_CATEGORIES.SHOPPING]: `<img src="${R2_BASE}/Shopping.png" alt="Shopping" class="category-icon-img" loading="lazy" width="28" height="28">`,
+  [ACHIEVEMENT_CATEGORIES.ITEMS]: `<img src="${R2_BASE}/Items.png" alt="Items" class="category-icon-img" loading="lazy" width="28" height="28">`,
+  [ACHIEVEMENT_CATEGORIES.SPECIAL]: `<img src="${R2_BASE}/Spezial.png" alt="Spezial" class="category-icon-img" loading="lazy" width="28" height="28">`
 };
 
 // Achievement category names (German)

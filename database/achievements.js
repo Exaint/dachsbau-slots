@@ -311,6 +311,12 @@ async function getPlayerAchievements(username, env) {
             }
           }
 
+          // Calculate losses from totalSpins - wins if higher than stored value
+          const calculatedLosses = (data.stats.totalSpins || 0) - (data.stats.wins || 0);
+          if (calculatedLosses > (data.stats.losses || 0)) {
+            data.stats.losses = calculatedLosses;
+          }
+
           // Now check ALL stat-based achievements against synced values
           for (const field of syncFields) {
             const value = data.stats[field] || 0;
@@ -345,6 +351,58 @@ async function getPlayerAchievements(username, env) {
         }
       } else {
         data.statsSynced = true;
+        await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
+      }
+    }
+
+    // One-time fix: Recalculate losses from totalSpins - wins for users who already synced
+    if (!data.lossesCalcFixed) {
+      const fullStats = await env.SLOTS_KV.get(kvKey('stats:', username));
+      if (fullStats) {
+        try {
+          const legacy = JSON.parse(fullStats);
+          const totalSpins = Math.max(legacy.totalSpins || 0, data.stats.totalSpins || 0);
+          const wins = Math.max(legacy.wins || 0, data.stats.wins || 0);
+          const calculatedLosses = totalSpins - wins;
+
+          if (calculatedLosses > (data.stats.losses || 0)) {
+            data.stats.losses = calculatedLosses;
+            data.stats.totalSpins = totalSpins;
+            data.stats.wins = wins;
+
+            // Check loss achievements with corrected value
+            const now = Date.now();
+            let addedRewards = 0;
+            const counterPromises = [];
+            const lossAchievements = getAchievementsForStat('losses');
+            for (const achKey of lossAchievements) {
+              const achievement = ACHIEVEMENTS[achKey];
+              if (!achievement || data.unlockedAt[achievement.id]) continue;
+              if (calculatedLosses >= (achievement.requirement || 1)) {
+                data.unlockedAt[achievement.id] = now;
+                addedRewards += achievement.reward || 0;
+                counterPromises.push(incrementAchievementCounter(achievement.id, env));
+              }
+            }
+            if (addedRewards > 0 && !ACHIEVEMENTS_REWARDS_ENABLED) {
+              data.pendingRewards = (data.pendingRewards || 0) + addedRewards;
+            }
+            data.lossesCalcFixed = true;
+            await Promise.all([
+              env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data)),
+              ...counterPromises
+            ]);
+          } else {
+            data.lossesCalcFixed = true;
+            await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
+          }
+        } catch (e) {
+          logError('lossesCalcFix', e, { username });
+          data.lossesCalcFixed = true;
+          await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
+        }
+      } else {
+        data.lossesCalcFixed = true;
         await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
       }
     }

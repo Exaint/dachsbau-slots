@@ -1070,7 +1070,7 @@ body {
 
 .category-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--primary));
+  background: linear-gradient(90deg, var(--accent), #8b5cf6);
   border-radius: 3px;
   transition: width 0.3s ease;
 }
@@ -1247,16 +1247,16 @@ body {
 .achievement-progress-bar-track {
   flex: 1;
   height: 8px;
-  background: var(--bg-primary);
-  border-radius: 4px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   max-width: 160px;
 }
 
 .achievement-progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--primary));
-  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  border-radius: var(--radius-sm);
   transition: width 0.3s ease;
 }
 

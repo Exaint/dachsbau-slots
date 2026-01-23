@@ -153,7 +153,7 @@ export async function renderShopPage(env, user = null) {
   // Prestige rank hierarchy for checking owned status
   const RANK_HIERARCHY = ['🥉', '🥈', '🥇', '💎', '👑'];
 
-  const renderCategory = (cat) => {
+  const renderCategory = (cat, tip = '') => {
     if (cat.items.length === 0) return '';
 
     // Sort items by price
@@ -223,12 +223,13 @@ export async function renderShopPage(env, user = null) {
             <h3 class="shop-category-title">${cat.icon} ${cat.title}</h3>
             <p class="shop-category-desc">${cat.desc}</p>
           </div>
-          <span class="shop-collapse-icon">▶</span>
+          <span class="shop-collapse-icon">▼</span>
         </div>
         <div class="shop-category-content">
           <div class="shop-items">
             ${itemsHtml}
           </div>
+          ${tip ? `<div class="section-note shop-pro-tip">${tip}</div>` : ''}
         </div>
       </div>
     `;
@@ -250,7 +251,6 @@ export async function renderShopPage(env, user = null) {
           <a href="#timed" class="toc-item" onclick="scrollToShopSection(event, 'timed')">⏰ Timed Buffs</a>
           <a href="#unlocks" class="toc-item" onclick="scrollToShopSection(event, 'unlocks')">🔓 Freischaltungen</a>
           <a href="#prestige" class="toc-item" onclick="scrollToShopSection(event, 'prestige')">👑 Prestige-Ränge</a>
-          <a href="#combos" class="toc-item" onclick="scrollToShopSection(event, 'combos')">💡 Buff-Kombinationen</a>
         </div>
         <div class="shop-collapse-controls">
           <button class="btn-collapse-all" onclick="expandAllShopCategories()">Alle ausklappen</button>
@@ -316,45 +316,15 @@ export async function renderShopPage(env, user = null) {
         </div>
       </section>
 
-      <div id="boosts">${renderCategory(categories.boosts)}</div>
-      <div class="section-note shop-pro-tip">
-        💡 <strong>Pro-Tipp:</strong> Kombiniere Boosts mit hohen Multipliers für massive Gewinne!<br>
-        <strong>Beispiel:</strong> 🦡 Dachs-Boost + <code>!slots 100</code> = bis zu 300.000 DT möglich! (15.000 × 2 × 10)
-      </div>
+      <div id="boosts">${renderCategory(categories.boosts, '💡 <strong>Pro-Tipp:</strong> Kombiniere Boosts mit hohen Multipliers für massive Gewinne!<br><strong>Beispiel:</strong> 🦡 Dachs-Boost + <code>!slots 100</code> = bis zu 300.000 DT möglich! (15.000 × 2 × 10)')}</div>
 
-      <div id="instant">${renderCategory(categories.instant)}</div>
-      <div class="section-note shop-pro-tip">
-        💡 <strong>Pro-Tipp:</strong> Peek Token ist perfekt um zu testen ob Lucky Charm oder andere Buffs wirken!
-      </div>
+      <div id="instant">${renderCategory(categories.instant, '💡 <strong>Pro-Tipp:</strong> Peek Token ist perfekt um zu testen ob Lucky Charm oder andere Buffs wirken!')}</div>
 
       <div id="timed">${renderCategory(categories.timed)}</div>
 
       <div id="unlocks">${renderCategory(categories.unlocks)}</div>
 
       <div id="prestige">${renderCategory(categories.prestige)}</div>
-
-      <!-- Buff-Kombinationen -->
-      <section id="combos" class="content-section">
-        <h2><img src="${R2_BASE}/BuffKombination.png" alt="Buff Kombinationen" class="section-title-img"> Buff-Kombinationen</h2>
-        <p class="section-intro">Diese Kombinationen sind besonders effektiv:</p>
-        <div class="combo-cards">
-          <div class="combo-card">
-            <div class="combo-card-title">🌟 + 🌅 Stern-Combo</div>
-            <div class="combo-card-items">Star Magnet + Golden Hour</div>
-            <div class="combo-card-effect">Massive Stern-Gewinne mit +30% Bonus!</div>
-          </div>
-          <div class="combo-card">
-            <div class="combo-card-title">🦡 + 🍀 Dachs-Hunter</div>
-            <div class="combo-card-items">Dachs Locator + Lucky Charm</div>
-            <div class="combo-card-effect">6× Dachs-Chance! (Insane Combo!)</div>
-          </div>
-          <div class="combo-card">
-            <div class="combo-card-title">💎 + 📈 Free Spin Master</div>
-            <div class="combo-card-items">Diamond Rush + Profit Doubler</div>
-            <div class="combo-card-effect">Mehr Free Spins + doppelte Gewinne!</div>
-          </div>
-        </div>
-      </section>
 
     </div>
   `;

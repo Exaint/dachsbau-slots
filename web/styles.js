@@ -2346,14 +2346,15 @@ body {
 }
 
 .shop-collapse-icon {
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
   transition: transform 0.3s ease;
   margin-left: 12px;
+  transform: rotate(-90deg);
 }
 
 .shop-cat-expanded .shop-collapse-icon {
-  transform: rotate(90deg);
+  transform: rotate(0deg);
 }
 
 .shop-category-content {

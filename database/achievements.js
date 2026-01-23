@@ -1324,6 +1324,118 @@ async function getAchievementStats(env) {
   }
 }
 
+/**
+ * Bulk sync: Recalculate all players' achievement stats from their real stats.
+ * Fixes discrepancies (e.g. losses not tracked from beginning).
+ */
+async function syncAllPlayerAchievementStats(env) {
+  const results = { processed: 0, updated: 0, achievementsUnlocked: 0, errors: 0, details: [] };
+
+  try {
+    // List all users
+    const userList = await env.SLOTS_KV.list({ prefix: 'user:', limit: 1000 });
+    const userKeys = userList.keys || [];
+
+    const syncFields = [
+      'totalSpins', 'wins', 'losses', 'maxLossStreak', 'totalDachsSeen', 'hourlyJackpots',
+      'chaosSpins', 'reverseChaosSpins', 'wheelSpins', 'mysteryBoxes',
+      'insuranceTriggers', 'wildCardsUsed', 'freeSpinsUsed',
+      'duelsWon', 'duelsLost', 'maxDuelStreak', 'totalDuelWinnings',
+      'transfersSentCount', 'totalTransferred', 'playDays',
+      'shopPurchases', 'dailysClaimed'
+    ];
+
+    // Process in batches of 10
+    const batchSize = 10;
+    for (let i = 0; i < userKeys.length; i += batchSize) {
+      const batch = userKeys.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (key) => {
+        const username = key.name.replace('user:', '').toLowerCase();
+        if (username === 'dachsbank' || username === 'spieler') return;
+
+        try {
+          // Read both stats and achievements
+          const [statsRaw, achievementsRaw] = await Promise.all([
+            env.SLOTS_KV.get(kvKey('stats:', username)),
+            env.SLOTS_KV.get(kvKey('achievements:', username))
+          ]);
+
+          if (!statsRaw || !achievementsRaw) return;
+
+          const stats = JSON.parse(statsRaw);
+          const data = JSON.parse(achievementsRaw);
+          if (!data.stats) data.stats = { ...DEFAULT_STATS };
+
+          let changed = false;
+          let playerUnlocked = 0;
+          const counterPromises = [];
+          const now = Date.now();
+
+          // Sync all stat fields
+          for (const field of syncFields) {
+            const realVal = stats[field] || 0;
+            const achVal = data.stats[field] || 0;
+            if (realVal > achVal) {
+              data.stats[field] = realVal;
+              changed = true;
+            }
+          }
+
+          // Calculate losses from totalSpins - wins if higher
+          const calculatedLosses = (data.stats.totalSpins || 0) - (data.stats.wins || 0);
+          if (calculatedLosses > (data.stats.losses || 0)) {
+            data.stats.losses = calculatedLosses;
+            changed = true;
+          }
+
+          // Check all stat-based achievements
+          for (const field of [...syncFields, 'losses']) {
+            const value = data.stats[field] || 0;
+            if (value <= 0) continue;
+
+            const achievementsToCheck = getAchievementsForStat(field);
+            for (const achKey of achievementsToCheck) {
+              const achievement = ACHIEVEMENTS[achKey];
+              if (!achievement || data.unlockedAt[achievement.id]) continue;
+              if (value >= (achievement.requirement || 1)) {
+                data.unlockedAt[achievement.id] = now;
+                playerUnlocked++;
+                changed = true;
+                counterPromises.push(incrementAchievementCounter(achievement.id, env));
+              }
+            }
+          }
+
+          if (changed) {
+            // Mark migrations as done so they don't re-run
+            data.statsSynced = true;
+            data.lossesCalcFixed = true;
+            await Promise.all([
+              env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data)),
+              ...counterPromises
+            ]);
+            results.updated++;
+            results.achievementsUnlocked += playerUnlocked;
+            if (playerUnlocked > 0) {
+              results.details.push({ username, unlocked: playerUnlocked });
+            }
+          }
+
+          results.processed++;
+        } catch (e) {
+          results.errors++;
+          logError('syncAllPlayerAchievementStats.player', e, { username });
+        }
+      }));
+    }
+  } catch (error) {
+    logError('syncAllPlayerAchievementStats', error);
+    results.error = error.message;
+  }
+
+  return results;
+}
+
 export {
   getPlayerAchievements,
   savePlayerAchievements,
@@ -1341,5 +1453,6 @@ export {
   getPendingRewards,
   claimPendingRewards,
   getUnlockedAchievementCount,
-  getAchievementStats
+  getAchievementStats,
+  syncAllPlayerAchievementStats
 };

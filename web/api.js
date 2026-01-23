@@ -21,7 +21,8 @@ import {
   unlockAchievement,
   lockAchievement,
   isLeaderboardHidden,
-  setLeaderboardHidden
+  setLeaderboardHidden,
+  syncAllPlayerAchievementStats
 } from '../database.js';
 import { REFUNDABLE_ITEMS, getPreviousPrestigeRank } from '../constants/refund.js';
 import {
@@ -349,7 +350,7 @@ async function handleAdminApi(url, env, loggedInUser, request) {
     }
 
     // D1 migration actions don't require a target user
-    const d1Actions = ['d1-migrate', 'd1-status', 'd1-verify', 'd1-migrate-achievements', 'd1-migrate-unlocks', 'd1-migrate-monthly', 'd1-migrate-full', 'd1-full-status'];
+    const d1Actions = ['d1-migrate', 'd1-status', 'd1-verify', 'd1-migrate-achievements', 'd1-migrate-unlocks', 'd1-migrate-monthly', 'd1-migrate-full', 'd1-full-status', 'sync-achievement-stats'];
     if (d1Actions.includes(action)) {
       // Handle D1 actions without targetUser requirement
     } else {
@@ -397,6 +398,9 @@ async function handleAdminApi(url, env, loggedInUser, request) {
         return await handleD1MigrateFull(body, env);
       case 'd1-full-status':
         return await handleD1FullStatus(env);
+      case 'sync-achievement-stats':
+        const syncResults = await syncAllPlayerAchievementStats(env);
+        return jsonResponse({ success: true, ...syncResults });
       default:
         return jsonResponse({ error: 'Unknown admin action' }, 400);
     }

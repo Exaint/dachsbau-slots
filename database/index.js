@@ -130,7 +130,8 @@ export {
   getPendingRewards,
   claimPendingRewards,
   getUnlockedAchievementCount,
-  getAchievementStats
+  getAchievementStats,
+  syncAllPlayerAchievementStats
 } from './achievements.js';
 
 // D1 Triple tracking (direct D1 access for admin/display)

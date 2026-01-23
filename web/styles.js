@@ -2075,6 +2075,38 @@ body {
   font-size: 0.95rem;
 }
 
+/* Bet Level Toggle */
+.bet-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.bet-toggle-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bet-toggle-btn:hover {
+  background: var(--bg-card);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.bet-toggle-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* Symbol Grid */
 .symbol-grid {
   display: grid;

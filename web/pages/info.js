@@ -393,15 +393,22 @@ export function renderInfoPage(user = null) {
         <summary class="accordion-header"><h2>💎 Gewinne & Symbole</h2></summary>
         <section id="gewinne" class="content-section accordion-content">
           <p class="section-intro">Je höher das Symbol in der Liste, desto wertvoller! Der Dachs ist das seltenste und wertvollste Symbol.</p>
+          <div class="bet-toggle">
+            <button class="bet-toggle-btn active" data-multiplier="1" data-bet="10">!slots</button>
+            <button class="bet-toggle-btn" data-multiplier="2" data-bet="20">!slots 20</button>
+            <button class="bet-toggle-btn" data-multiplier="3" data-bet="30">!slots 30</button>
+            <button class="bet-toggle-btn" data-multiplier="5" data-bet="50">!slots 50</button>
+            <button class="bet-toggle-btn" data-multiplier="10" data-bet="100">!slots 100</button>
+          </div>
         <div class="symbol-grid">
           <div class="symbol-card jackpot">
             <div class="symbol-icon">🦡</div>
             <div class="symbol-name">Dachs</div>
             <div class="symbol-rarity">JACKPOT</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🦡🦡🦡</span><span class="win-amount gold">15.000 DT</span></div>
-              <div class="win-row"><span class="win-combo">🦡🦡</span><span class="win-amount">2.500 DT</span></div>
-              <div class="win-row"><span class="win-combo">🦡</span><span class="win-amount">100 DT</span></div>
+              <div class="win-row"><span class="win-combo">🦡🦡🦡</span><span class="win-amount gold payout-value" data-base="15000">15.000 DT</span></div>
+              <div class="win-row"><span class="win-combo">🦡🦡</span><span class="win-amount payout-value" data-base="2500">2.500 DT</span></div>
+              <div class="win-row"><span class="win-combo">🦡</span><span class="win-amount payout-value" data-base="100">100 DT</span></div>
             </div>
           </div>
           <div class="symbol-card special">
@@ -419,8 +426,8 @@ export function renderInfoPage(user = null) {
             <div class="symbol-name">Stern</div>
             <div class="symbol-rarity">Sehr selten</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">⭐⭐⭐</span><span class="win-amount">500 DT</span></div>
-              <div class="win-row"><span class="win-combo">⭐⭐</span><span class="win-amount">50 DT</span></div>
+              <div class="win-row"><span class="win-combo">⭐⭐⭐</span><span class="win-amount payout-value" data-base="500">500 DT</span></div>
+              <div class="win-row"><span class="win-combo">⭐⭐</span><span class="win-amount payout-value" data-base="50">50 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -428,8 +435,8 @@ export function renderInfoPage(user = null) {
             <div class="symbol-name">Melone</div>
             <div class="symbol-rarity">Selten</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍉🍉🍉</span><span class="win-amount">250 DT</span></div>
-              <div class="win-row"><span class="win-combo">🍉🍉</span><span class="win-amount">25 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍉🍉🍉</span><span class="win-amount payout-value" data-base="250">250 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍉🍉</span><span class="win-amount payout-value" data-base="25">25 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -437,8 +444,8 @@ export function renderInfoPage(user = null) {
             <div class="symbol-name">Trauben</div>
             <div class="symbol-rarity">Ungewöhnlich</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍇🍇🍇</span><span class="win-amount">150 DT</span></div>
-              <div class="win-row"><span class="win-combo">🍇🍇</span><span class="win-amount">15 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍇🍇🍇</span><span class="win-amount payout-value" data-base="150">150 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍇🍇</span><span class="win-amount payout-value" data-base="15">15 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -446,8 +453,8 @@ export function renderInfoPage(user = null) {
             <div class="symbol-name">Orange</div>
             <div class="symbol-rarity">Gewöhnlich</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍊🍊🍊</span><span class="win-amount">100 DT</span></div>
-              <div class="win-row"><span class="win-combo">🍊🍊</span><span class="win-amount">10 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍊🍊🍊</span><span class="win-amount payout-value" data-base="100">100 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍊🍊</span><span class="win-amount payout-value" data-base="10">10 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -455,8 +462,8 @@ export function renderInfoPage(user = null) {
             <div class="symbol-name">Zitrone</div>
             <div class="symbol-rarity">Gewöhnlich</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍋🍋🍋</span><span class="win-amount">75 DT</span></div>
-              <div class="win-row"><span class="win-combo">🍋🍋</span><span class="win-amount">8 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍋🍋🍋</span><span class="win-amount payout-value" data-base="75">75 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍋🍋</span><span class="win-amount payout-value" data-base="8">8 DT</span></div>
             </div>
           </div>
           <div class="symbol-card">
@@ -464,12 +471,12 @@ export function renderInfoPage(user = null) {
             <div class="symbol-name">Kirsche</div>
             <div class="symbol-rarity">Häufig</div>
             <div class="symbol-wins">
-              <div class="win-row"><span class="win-combo">🍒🍒🍒</span><span class="win-amount">50 DT</span></div>
-              <div class="win-row"><span class="win-combo">🍒🍒</span><span class="win-amount">5 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍒🍒🍒</span><span class="win-amount payout-value" data-base="50">50 DT</span></div>
+              <div class="win-row"><span class="win-combo">🍒🍒</span><span class="win-amount payout-value" data-base="5">5 DT</span></div>
             </div>
           </div>
         </div>
-        <p class="section-note"><strong>Beispiel:</strong> Triple-Dachs mit <code>!slots 100</code> = 15.000 × 10 = <strong>150.000 DachsTaler!</strong></p>
+        <p class="section-note bet-toggle-hint"><strong>Tipp:</strong> Nutze die Buttons oben um die Gewinne für verschiedene Einsätze zu sehen!</p>
 
         <h3>🎲 Gewinnchancen</h3>
         <details class="faq-item">
@@ -483,17 +490,17 @@ export function renderInfoPage(user = null) {
               </div>
               <div class="chances-row jackpot-row">
                 <span>🦡🦡🦡 Triple-Dachs</span>
-                <span class="gold">15.000 DT</span>
+                <span class="gold payout-value" data-base="15000">15.000 DT</span>
                 <span>~1 in 140.000</span>
               </div>
               <div class="chances-row">
                 <span>🦡🦡 Doppel-Dachs</span>
-                <span>2.500 DT</span>
+                <span class="payout-value" data-base="2500">2.500 DT</span>
                 <span>~1 in 5.000</span>
               </div>
               <div class="chances-row">
                 <span>🦡 Einzel-Dachs</span>
-                <span>100 DT</span>
+                <span class="payout-value" data-base="100">100 DT</span>
                 <span>~1 in 50</span>
               </div>
               <div class="chances-row special-row">
@@ -508,62 +515,62 @@ export function renderInfoPage(user = null) {
               </div>
               <div class="chances-row fruit-row">
                 <span>⭐⭐⭐ Triple-Stern</span>
-                <span>500 DT</span>
+                <span class="payout-value" data-base="500">500 DT</span>
                 <span>~1 in 1.728</span>
               </div>
               <div class="chances-row">
                 <span>⭐⭐ Doppel-Stern</span>
-                <span>50 DT</span>
+                <span class="payout-value" data-base="50">50 DT</span>
                 <span>~1 in 144</span>
               </div>
               <div class="chances-row fruit-row">
                 <span>🍉🍉🍉 Triple-Melone</span>
-                <span>250 DT</span>
+                <span class="payout-value" data-base="250">250 DT</span>
                 <span>~1 in 1.331</span>
               </div>
               <div class="chances-row">
                 <span>🍉🍉 Doppel-Melone</span>
-                <span>25 DT</span>
+                <span class="payout-value" data-base="25">25 DT</span>
                 <span>~1 in 100</span>
               </div>
               <div class="chances-row fruit-row">
                 <span>🍇🍇🍇 Triple-Trauben</span>
-                <span>150 DT</span>
+                <span class="payout-value" data-base="150">150 DT</span>
                 <span>~1 in 512</span>
               </div>
               <div class="chances-row">
                 <span>🍇🍇 Doppel-Trauben</span>
-                <span>15 DT</span>
+                <span class="payout-value" data-base="15">15 DT</span>
                 <span>~1 in 53</span>
               </div>
               <div class="chances-row fruit-row">
                 <span>🍊🍊🍊 Triple-Orange</span>
-                <span>100 DT</span>
+                <span class="payout-value" data-base="100">100 DT</span>
                 <span>~1 in 248</span>
               </div>
               <div class="chances-row">
                 <span>🍊🍊 Doppel-Orange</span>
-                <span>10 DT</span>
+                <span class="payout-value" data-base="10">10 DT</span>
                 <span>~1 in 40</span>
               </div>
               <div class="chances-row fruit-row">
                 <span>🍋🍋🍋 Triple-Zitrone</span>
-                <span>75 DT</span>
+                <span class="payout-value" data-base="75">75 DT</span>
                 <span>~1 in 216</span>
               </div>
               <div class="chances-row">
                 <span>🍋🍋 Doppel-Zitrone</span>
-                <span>8 DT</span>
+                <span class="payout-value" data-base="8">8 DT</span>
                 <span>~1 in 36</span>
               </div>
               <div class="chances-row fruit-row">
                 <span>🍒🍒🍒 Triple-Kirsche</span>
-                <span>50 DT</span>
+                <span class="payout-value" data-base="50">50 DT</span>
                 <span>~1 in 125</span>
               </div>
               <div class="chances-row">
                 <span>🍒🍒 Doppel-Kirsche</span>
-                <span>5 DT</span>
+                <span class="payout-value" data-base="5">5 DT</span>
                 <span>~1 in 25</span>
               </div>
             </div>

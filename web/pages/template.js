@@ -876,6 +876,20 @@ function getClientScripts() {
         }
       });
     }
+
+    // Bet level toggle for payout display
+    document.querySelectorAll('.bet-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.bet-toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const multiplier = parseInt(btn.dataset.multiplier, 10);
+        document.querySelectorAll('.payout-value').forEach(el => {
+          const base = parseInt(el.dataset.base, 10);
+          const value = base * multiplier;
+          el.textContent = value.toLocaleString('de-DE') + ' DT';
+        });
+      });
+    });
   </script>`;
 }
 

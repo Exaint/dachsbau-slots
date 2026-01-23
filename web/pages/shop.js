@@ -217,13 +217,18 @@ export async function renderShopPage(env, user = null) {
     }).join('');
 
     return `
-      <div class="shop-category">
-        <div class="shop-category-header">
-          <h3 class="shop-category-title">${cat.icon} ${cat.title}</h3>
-          <p class="shop-category-desc">${cat.desc}</p>
+      <div class="shop-category" data-category="${cat.title}">
+        <div class="shop-category-header" onclick="toggleShopCategory(this)">
+          <div class="shop-category-header-left">
+            <h3 class="shop-category-title">${cat.icon} ${cat.title}</h3>
+            <p class="shop-category-desc">${cat.desc}</p>
+          </div>
+          <span class="shop-collapse-icon">▶</span>
         </div>
-        <div class="shop-items">
-          ${itemsHtml}
+        <div class="shop-category-content">
+          <div class="shop-items">
+            ${itemsHtml}
+          </div>
         </div>
       </div>
     `;
@@ -239,13 +244,17 @@ export async function renderShopPage(env, user = null) {
       <!-- Inhaltsverzeichnis -->
       <nav class="info-toc shop-toc" aria-label="Shop-Navigation">
         <div class="toc-grid">
-          <a href="#kaufanleitung" class="toc-item">📋 Kaufanleitung</a>
-          <a href="#boosts" class="toc-item">🎰 Symbol-Boosts</a>
-          <a href="#instant" class="toc-item">⚡ Sofort-Items</a>
-          <a href="#timed" class="toc-item">⏰ Timed Buffs</a>
-          <a href="#unlocks" class="toc-item">🔓 Freischaltungen</a>
-          <a href="#prestige" class="toc-item">👑 Prestige-Ränge</a>
-          <a href="#combos" class="toc-item">💡 Buff-Kombinationen</a>
+          <a href="#kaufanleitung" class="toc-item" onclick="scrollToShopSection(event, 'kaufanleitung')">📋 Kaufanleitung</a>
+          <a href="#boosts" class="toc-item" onclick="scrollToShopSection(event, 'boosts')">🎰 Symbol-Boosts</a>
+          <a href="#instant" class="toc-item" onclick="scrollToShopSection(event, 'instant')">⚡ Sofort-Items</a>
+          <a href="#timed" class="toc-item" onclick="scrollToShopSection(event, 'timed')">⏰ Timed Buffs</a>
+          <a href="#unlocks" class="toc-item" onclick="scrollToShopSection(event, 'unlocks')">🔓 Freischaltungen</a>
+          <a href="#prestige" class="toc-item" onclick="scrollToShopSection(event, 'prestige')">👑 Prestige-Ränge</a>
+          <a href="#combos" class="toc-item" onclick="scrollToShopSection(event, 'combos')">💡 Buff-Kombinationen</a>
+        </div>
+        <div class="shop-collapse-controls">
+          <button class="btn-collapse-all" onclick="expandAllShopCategories()">Alle ausklappen</button>
+          <button class="btn-collapse-all" onclick="collapseAllShopCategories()">Alle einklappen</button>
         </div>
       </nav>
 

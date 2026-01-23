@@ -880,6 +880,50 @@ function getClientScripts() {
       }
     }
 
+    // Shop category collapse toggle
+    function toggleShopCategory(header) {
+      const category = header.closest('.shop-category');
+      category.classList.toggle('shop-cat-expanded');
+    }
+
+    function expandAllShopCategories() {
+      document.querySelectorAll('.shop-category').forEach(cat => cat.classList.add('shop-cat-expanded'));
+    }
+
+    function collapseAllShopCategories() {
+      document.querySelectorAll('.shop-category').forEach(cat => cat.classList.remove('shop-cat-expanded'));
+    }
+
+    function scrollToShopSection(event, sectionId) {
+      event.preventDefault();
+      const target = document.getElementById(sectionId);
+      if (!target) return;
+
+      // If it's a shop category wrapper, expand the category inside
+      const category = target.querySelector('.shop-category');
+      if (category) {
+        category.classList.add('shop-cat-expanded');
+      }
+
+      // For the collapsible Kaufanleitung section
+      if (sectionId === 'kaufanleitung') {
+        const section = target.closest('.collapsible-section') || target;
+        if (!section.classList.contains('expanded')) {
+          section.classList.add('expanded');
+          const content = section.querySelector('.collapsible-content');
+          if (content) content.style.display = 'block';
+        }
+      }
+
+      // Scroll to element
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      // Flash animation
+      const flashTarget = category || target;
+      flashTarget.classList.add('shop-flash');
+      setTimeout(() => flashTarget.classList.remove('shop-flash'), 1500);
+    }
+
     // Category collapse toggle (profile achievements) with localStorage persistence
     function toggleCategory(header) {
       const category = header.closest('.category');

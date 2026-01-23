@@ -2307,19 +2307,30 @@ body {
 
 /* Shop */
 .shop-category {
-  margin-top: 56px;
-  padding-top: 40px;
-  border-top: 1px solid var(--border);
-}
-
-.shop-category:first-child {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
+  margin-top: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.3s ease;
 }
 
 .shop-category-header {
-  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+  background: var(--bg-tertiary);
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.shop-category-header:hover {
+  background: var(--bg-hover, rgba(255,255,255,0.05));
+}
+
+.shop-category-header-left {
+  flex: 1;
 }
 
 .shop-category-title {
@@ -2329,9 +2340,66 @@ body {
 }
 
 .shop-category-desc {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+.shop-collapse-icon {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  transition: transform 0.3s ease;
+  margin-left: 12px;
+}
+
+.shop-cat-expanded .shop-collapse-icon {
+  transform: rotate(90deg);
+}
+
+.shop-category-content {
+  display: none;
+  padding: 16px 20px 20px;
+}
+
+.shop-cat-expanded .shop-category-content {
+  display: block;
+}
+
+.shop-collapse-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.btn-collapse-all {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-collapse-all:hover {
+  background: var(--bg-hover, rgba(255,255,255,0.08));
+  color: var(--text-primary);
+}
+
+/* Shop category flash animation */
+@keyframes shopFlash {
+  0%, 100% { border-color: var(--border); }
+  25% { border-color: var(--accent); box-shadow: 0 0 12px rgba(168, 85, 247, 0.3); }
+  50% { border-color: var(--accent); box-shadow: 0 0 20px rgba(168, 85, 247, 0.4); }
+  75% { border-color: var(--accent); box-shadow: 0 0 12px rgba(168, 85, 247, 0.3); }
+}
+
+.shop-flash {
+  animation: shopFlash 1.5s ease;
 }
 
 .shop-tip {

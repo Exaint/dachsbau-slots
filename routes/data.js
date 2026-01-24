@@ -86,12 +86,12 @@ async function handleAchievementsApi(username, env) {
     return jsonResponse({ error: 'Username required or invalid' }, 400);
   }
 
-  // Check if user exists (check both disclaimer AND balance for legacy players)
-  const [hasDisclaimer, balance] = await Promise.all([
+  // Check if user exists without auto-creating (getBalance creates ghost users)
+  const [hasDisclaimer, rawBalance] = await Promise.all([
     hasAcceptedDisclaimer(cleanUsername, env),
-    getBalance(cleanUsername, env)
+    env.SLOTS_KV.get(`user:${cleanUsername}`)
   ]);
-  if (!hasDisclaimer && balance <= 0) {
+  if (!hasDisclaimer && rawBalance === null) {
     return jsonResponse({ error: 'Player not found', username: cleanUsername }, 404);
   }
 
@@ -161,19 +161,19 @@ async function handleProfileApi(username, env) {
     return jsonResponse({ error: 'Username required or invalid' }, 400);
   }
 
-  // Check if user exists and fetch data in parallel
-  const [hasDisclaimer, balance, rank, stats, achievementData] = await Promise.all([
+  // Check if user exists without auto-creating (getBalance creates ghost users)
+  const [hasDisclaimer, rawBalance, rank, stats, achievementData] = await Promise.all([
     hasAcceptedDisclaimer(cleanUsername, env),
-    getBalance(cleanUsername, env),
+    env.SLOTS_KV.get(`user:${cleanUsername}`),
     getPrestigeRank(cleanUsername, env),
     getStats(cleanUsername, env),
     getPlayerAchievements(cleanUsername, env)
   ]);
 
-  // User exists if they accepted disclaimer OR have a balance (legacy players)
-  if (!hasDisclaimer && balance <= 0) {
+  if (!hasDisclaimer && rawBalance === null) {
     return jsonResponse({ error: 'Player not found', username: cleanUsername }, 404);
   }
+  const balance = rawBalance !== null ? parseInt(rawBalance, 10) || 0 : 0;
 
   const allAchievements = getAllAchievements();
   const unlockedCount = Object.keys(achievementData.unlockedAt).length;

@@ -8,7 +8,7 @@ import { sanitizeUsername, logError } from './utils.js';
 
 // Web pages and API
 import { handleWebPage } from './web/pages.js';
-import { handleApi } from './web/api.js';
+import { handleApi } from './routes/data.js';
 import { getUserFromRequest } from './web/twitch.js';
 
 // Route handlers

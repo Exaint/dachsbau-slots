@@ -9,7 +9,7 @@ import { getUserRole, getTwitchUser } from '../twitch.js';
 import { LEADERBOARD_LIMIT, LEADERBOARD_DISPLAY_LIMIT } from '../../constants.js';
 import { isAdmin, logError } from '../../utils.js';
 import { escapeHtml, formatNumber } from './utils.js';
-import { ROLE_BADGES, R2_BASE } from './constants.js';
+import { ROLE_BADGES, R2_BASE } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
 
 /**

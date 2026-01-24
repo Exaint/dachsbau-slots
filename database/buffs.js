@@ -212,18 +212,20 @@ async function addBoost(username, symbol, env) {
 async function consumeBoost(username, symbol, env) {
   try {
     const key = kvKey('boost:', username, symbol);
+    const claimKey = `${key}:claim`;
+
+    // Check if another request is already claiming this boost
+    const alreadyClaimed = await env.SLOTS_KV.get(claimKey);
+    if (alreadyClaimed) return false;
+
     const value = await env.SLOTS_KV.get(key);
-    if (value === KV_ACTIVE) {
-      await env.SLOTS_KV.delete(key);
-      // Verify deletion succeeded (prevents race condition double-consume)
-      const verify = await env.SLOTS_KV.get(key);
-      if (verify === null) {
-        return true; // Successfully consumed
-      }
-      // Another request consumed it first
-      return false;
-    }
-    return false;
+    if (value !== KV_ACTIVE) return false;
+
+    // Set claim-lock with short TTL (prevents parallel double-consume)
+    await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 10 });
+    await env.SLOTS_KV.delete(key);
+    await env.SLOTS_KV.delete(claimKey);
+    return true;
   } catch (error) {
     logError('consumeBoost', error, { username, symbol });
     return false;

@@ -5,7 +5,7 @@
 import { getAchievementStats } from '../../database.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES } from '../../constants.js';
 import { escapeHtml, formatNumber } from './utils.js';
-import { CATEGORY_ICONS, CATEGORY_NAMES } from './constants.js';
+import { CATEGORY_ICONS, CATEGORY_NAMES } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
 
 /**

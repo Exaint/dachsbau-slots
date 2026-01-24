@@ -4,7 +4,7 @@
 
 import { getBalance, getPrestigeRank, hasUnlock } from '../../database.js';
 import { SHOP_ITEMS } from '../../constants.js';
-import { isWebPurchasable } from '../shop-api.js';
+import { isWebPurchasable } from '../../routes/shop.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { baseTemplate } from './template.js';
 

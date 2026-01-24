@@ -3,7 +3,7 @@
  */
 
 import { getUserFromRequest } from '../web/twitch.js';
-import { handleShopBuyAPI } from '../web/shop-api.js';
+import { handleShopBuyAPI } from './shop.js';
 import { setDisclaimerAccepted } from '../database.js';
 import { checkRateLimit } from '../utils.js';
 import { RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';

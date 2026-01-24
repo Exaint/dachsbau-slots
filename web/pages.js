@@ -6,7 +6,7 @@
  *
  * ARCHITECTURE:
  * - ./pages/utils.js - escapeHtml, formatNumber
- * - ./pages/constants.js - CATEGORY_ICONS, ROLE_BADGES, PRESTIGE_RANK_NAMES
+ * - ./pages/ui-config.js - CATEGORY_ICONS, ROLE_BADGES, PRESTIGE_RANK_NAMES
  * - ./pages/template.js - baseTemplate, htmlResponse (with all client-side JS)
  * - ./pages/home.js - Home page
  * - ./pages/profile.js - Profile page

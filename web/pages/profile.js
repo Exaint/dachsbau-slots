@@ -2,14 +2,14 @@
  * Profile Page Handler and Renderer
  */
 
-import { getPlayerAchievements, getStats, getBalance, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned } from '../../database.js';
+import { getPlayerAchievements, getStats, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned } from '../../database.js';
 import { isDuelOptedOut } from '../../database/duels.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getTwitchProfileData } from '../twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement } from '../../constants.js';
 import { isAdmin } from '../../utils.js';
 import { escapeHtml, formatNumber } from './utils.js';
-import { CATEGORY_ICONS, CATEGORY_NAMES, PRESTIGE_RANK_NAMES, ROLE_BADGES, ADMIN_ROLE_OVERRIDES } from './constants.js';
+import { CATEGORY_ICONS, CATEGORY_NAMES, PRESTIGE_RANK_NAMES, ROLE_BADGES, ADMIN_ROLE_OVERRIDES } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
 import { renderHomePage } from './home.js';
 import { renderNotFoundPage } from './errors.js';
@@ -24,17 +24,16 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
     return htmlResponse(renderHomePage('Bitte gib einen Spielernamen ein.', loggedInUser));
   }
 
-  // Check if user exists (check both disclaimer AND balance for legacy players)
-  const [hasDisclaimer, balance] = await Promise.all([
+  // Check if user exists without auto-creating (getBalance creates ghost users)
+  const [hasDisclaimer, rawBalance] = await Promise.all([
     hasAcceptedDisclaimer(username, env),
-    getBalance(username, env)
+    env.SLOTS_KV.get(`user:${username}`)
   ]);
 
-  // User exists if they accepted disclaimer OR have a balance (legacy players)
-  const userExists = hasDisclaimer || balance > 0;
-  if (!userExists) {
+  if (!hasDisclaimer && rawBalance === null) {
     return htmlResponse(renderNotFoundPage(username, loggedInUser));
   }
+  const balance = rawBalance !== null ? parseInt(rawBalance, 10) || 0 : 0;
 
   // Fetch remaining data in parallel with error fallback
   let rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData;

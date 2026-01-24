@@ -676,6 +676,7 @@ function getClientScripts() {
     });
 
     // Admin Panel Functions
+    function escAdm(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
     const MAX_BALANCE = 1000000;
 
     async function adminApiCall(action, data) {
@@ -791,7 +792,7 @@ function getClientScripts() {
         const result = await response.json();
 
         if (!result.success) {
-          container.innerHTML = '<div class="admin-error">Fehler: ' + (result.error || 'Unbekannt') + '</div>';
+          container.innerHTML = '<div class="admin-error">Fehler: ' + escAdm(result.error || 'Unbekannt') + '</div>';
           return;
         }
 
@@ -804,12 +805,12 @@ function getClientScripts() {
         for (const item of prestigeItems) {
           const statusClass = item.owned ? (item.canRefund ? 'refundable' : 'blocked') : 'not-owned';
           html += '<div class="refund-item ' + statusClass + '">';
-          html += '<span class="refund-item-name">' + item.symbol + ' ' + item.name + '</span>';
+          html += '<span class="refund-item-name">' + escAdm(item.symbol) + ' ' + escAdm(item.name) + '</span>';
           html += '<span class="refund-item-price">+' + item.price.toLocaleString('de-DE') + ' DT</span>';
           if (item.owned && item.canRefund) {
-            html += '<button class="btn admin-btn danger btn-sm btn-refund" data-key="' + item.key + '" data-name="' + item.name + '" data-price="' + item.price + '">Refund</button>';
+            html += '<button class="btn admin-btn danger btn-sm btn-refund" data-key="' + escAdm(item.key) + '" data-name="' + escAdm(item.name) + '" data-price="' + item.price + '">Refund</button>';
           } else if (item.owned) {
-            html += '<span class="refund-blocked">' + item.blockedReason + '</span>';
+            html += '<span class="refund-blocked">' + escAdm(item.blockedReason) + '</span>';
           } else {
             html += '<span class="refund-not-owned">Nicht gekauft</span>';
           }
@@ -821,12 +822,12 @@ function getClientScripts() {
         for (const item of unlockItems) {
           const statusClass = item.owned ? (item.canRefund ? 'refundable' : 'blocked') : 'not-owned';
           html += '<div class="refund-item ' + statusClass + '">';
-          html += '<span class="refund-item-name">' + item.symbol + ' ' + item.name + '</span>';
+          html += '<span class="refund-item-name">' + escAdm(item.symbol) + ' ' + escAdm(item.name) + '</span>';
           html += '<span class="refund-item-price">+' + item.price.toLocaleString('de-DE') + ' DT</span>';
           if (item.owned && item.canRefund) {
-            html += '<button class="btn admin-btn danger btn-sm btn-refund" data-key="' + item.key + '" data-name="' + item.name + '" data-price="' + item.price + '">Refund</button>';
+            html += '<button class="btn admin-btn danger btn-sm btn-refund" data-key="' + escAdm(item.key) + '" data-name="' + escAdm(item.name) + '" data-price="' + item.price + '">Refund</button>';
           } else if (item.owned) {
-            html += '<span class="refund-blocked">' + item.blockedReason + '</span>';
+            html += '<span class="refund-blocked">' + escAdm(item.blockedReason) + '</span>';
           } else {
             html += '<span class="refund-not-owned">Nicht gekauft</span>';
           }

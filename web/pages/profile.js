@@ -9,7 +9,7 @@ import { getTwitchProfileData } from '../twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement } from '../../constants.js';
 import { isAdmin } from '../../utils.js';
 import { escapeHtml, formatNumber } from './utils.js';
-import { CATEGORY_ICONS, CATEGORY_NAMES, PRESTIGE_RANK_NAMES, ROLE_BADGES } from './constants.js';
+import { CATEGORY_ICONS, CATEGORY_NAMES, PRESTIGE_RANK_NAMES, ROLE_BADGES, ADMIN_ROLE_OVERRIDES } from './constants.js';
 import { baseTemplate, htmlResponse } from './template.js';
 import { renderHomePage } from './home.js';
 import { renderNotFoundPage } from './errors.js';
@@ -291,13 +291,11 @@ export function renderProfilePage(data) {
   const lowerUsername = username.toLowerCase();
   const roleBadges = [];
 
-  // Special admin overrides - multiple badges
-  if (lowerUsername === 'exaint_') {
-    roleBadges.push({ ...ROLE_BADGES.leadmod });
-    roleBadges.push({ ...ROLE_BADGES.admin });
-  } else if (lowerUsername === 'frechhdachs') {
-    roleBadges.push({ ...ROLE_BADGES.broadcaster });
-    roleBadges.push({ ...ROLE_BADGES.admin });
+  // Admin/special user badge overrides
+  if (ADMIN_ROLE_OVERRIDES[lowerUsername]) {
+    for (const role of ADMIN_ROLE_OVERRIDES[lowerUsername]) {
+      if (ROLE_BADGES[role]) roleBadges.push({ ...ROLE_BADGES[role] });
+    }
   } else if (twitchData?.role && ROLE_BADGES[twitchData.role]) {
     roleBadges.push({ ...ROLE_BADGES[twitchData.role] });
   }

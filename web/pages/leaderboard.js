@@ -261,7 +261,8 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
       ${currentUserHtml}
     </div>
     <script>
-      const allUsers = ${JSON.stringify(allUsers.map(u => ({ u: u.username, b: u.balance, r: u.rank })))};
+      function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+      const allUsers = ${JSON.stringify(allUsers.map(u => ({ u: u.username, b: u.balance, r: u.rank }))).replace(/</g, '\\u003c')};
       const topN = ${players.length};
 
       document.getElementById('leaderboardSearch').addEventListener('input', function() {
@@ -288,7 +289,7 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
               '<div class="leaderboard-item search-result-item">' +
                 '<div class="leaderboard-rank">#' + p.r + '</div>' +
                 '<div class="leaderboard-avatar-placeholder">👤</div>' +
-                '<div class="leaderboard-user"><a href="?page=profile&user=' + encodeURIComponent(p.u) + '" class="leaderboard-username-link">' + p.u.replace(/</g, '&lt;') + '</a></div>' +
+                '<div class="leaderboard-user"><a href="?page=profile&user=' + encodeURIComponent(p.u) + '" class="leaderboard-username-link">' + escHtml(p.u) + '</a></div>' +
                 '<div class="leaderboard-balance">' + p.b.toLocaleString('de-DE') + ' DT</div>' +
               '</div>'
             ).join('');

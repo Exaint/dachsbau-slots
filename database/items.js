@@ -114,16 +114,14 @@ async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
 
     const freeSpins = await getFreeSpins(username, env);
 
-    const existing = freeSpins.find(fs => fs.multiplier === multiplier);
-    if (existing) {
-      existing.count += count;
-    } else {
-      freeSpins.push({ multiplier, count });
-    }
+    const hasExisting = freeSpins.some(fs => fs.multiplier === multiplier);
+    const updated = hasExisting
+      ? freeSpins.map(fs => fs.multiplier === multiplier ? { ...fs, count: fs.count + count } : fs)
+      : [...freeSpins, { multiplier, count }];
 
-    freeSpins.sort((a, b) => a.multiplier - b.multiplier);
+    updated.sort((a, b) => a.multiplier - b.multiplier);
 
-    const jsonValue = JSON.stringify(freeSpins);
+    const jsonValue = JSON.stringify(updated);
     await env.SLOTS_KV.put(kvKey('freespins:', username), jsonValue);
 
     if (D1_ENABLED && DUAL_WRITE && env.DB) {

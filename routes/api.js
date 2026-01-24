@@ -70,7 +70,20 @@ export function validateCsrf(request, url) {
  * @param {object} env - Environment bindings
  * @returns {Promise<Response|null>} API response or null if not an API route
  */
+const MAX_BODY_SIZE = 4096; // 4KB max for API requests
+
 export async function handleApiRoutes(pathname, request, url, env) {
+  // Reject oversized request bodies
+  if (request.method === 'POST') {
+    const contentLength = parseInt(request.headers.get('Content-Length') || '0', 10);
+    if (contentLength > MAX_BODY_SIZE) {
+      return new Response(JSON.stringify({ error: 'Request body too large' }), {
+        status: 413,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
   // Shop buy API endpoint (requires logged-in user)
   if (pathname === '/api/shop/buy' && request.method === 'POST') {
     const loggedInUser = await getUserFromRequest(request, env);

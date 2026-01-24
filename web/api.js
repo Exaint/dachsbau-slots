@@ -40,8 +40,7 @@ import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, L
 import { logError, isAdmin, sanitizeUsername } from '../utils.js';
 
 const JSON_HEADERS = {
-  'Content-Type': 'application/json; charset=utf-8',
-  'Access-Control-Allow-Origin': 'https://dachsbau-slots.exaint.workers.dev'
+  'Content-Type': 'application/json; charset=utf-8'
 };
 
 /**
@@ -305,7 +304,7 @@ async function handleSearchApi(query, env) {
 function jsonResponse(data, status = 200, cacheSeconds = 0) {
   const headers = { ...JSON_HEADERS };
   if (cacheSeconds > 0) {
-    headers['Cache-Control'] = `public, max-age=${cacheSeconds}`;
+    headers['Cache-Control'] = `private, max-age=${cacheSeconds}`;
   }
   return new Response(JSON.stringify(data), {
     status,

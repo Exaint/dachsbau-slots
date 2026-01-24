@@ -70,3 +70,9 @@ export const ROLE_BADGES = {
     color: '#9147ff'
   }
 };
+
+// Admin/special user badge overrides (role badges shown on profile)
+export const ADMIN_ROLE_OVERRIDES = {
+  'exaint_': ['leadmod', 'admin'],
+  'frechhdachs': ['broadcaster', 'admin']
+};

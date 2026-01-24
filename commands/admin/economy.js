@@ -161,7 +161,7 @@ async function handleGiveBuff(username, target, shopNumber, env) {
       return new Response(`@${username} ❌ Dieser Item-Typ kann nicht direkt gegeben werden.`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {
-    logError('handleGiveBuff', error, { username, target, buffArg });
+    logError('handleGiveBuff', error, { username, target, shopNumber });
     return new Response(`@${username} ❌ Fehler beim Geben des Buffs.`, { headers: RESPONSE_HEADERS });
   }
 }
@@ -196,7 +196,7 @@ async function handleRemoveBuff(username, target, shopNumber, env) {
       return new Response(`@${username} ❌ Dieser Item-Typ kann nicht entfernt werden.`, { headers: RESPONSE_HEADERS });
     }
   } catch (error) {
-    logError('handleRemoveBuff', error, { username, target, buffArg });
+    logError('handleRemoveBuff', error, { username, target, shopNumber });
     return new Response(`@${username} ❌ Fehler beim Entfernen des Buffs.`, { headers: RESPONSE_HEADERS });
   }
 }

@@ -1,0 +1,14 @@
+{
+  "name": "dachsbau-slots",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Twitch Slot Machine Game - Cloudflare Worker",
+  "main": "_worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

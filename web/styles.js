@@ -363,6 +363,26 @@ body {
   background: linear-gradient(90deg, var(--gradient-start), rgba(5, 150, 105, 0.12));
 }
 
+[data-theme="light"] .achievement-rarity.rarity-rare {
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .admin-btn.success:hover {
+  background: #047857;
+}
+
+[data-theme="light"] .admin-btn.danger:hover {
+  background: #b91c1c;
+}
+
+[data-theme="light"] .btn-accept-disclaimer {
+  color: #ffffff;
+}
+
+[data-theme="light"] .btn-accept-disclaimer:hover {
+  background: #047857;
+}
+
 .header-content {
   max-width: var(--container-max);
   margin: 0 auto;
@@ -766,14 +786,14 @@ body {
 
 .profile-duel-status.opted-in {
   background: var(--bg-tertiary);
-  border: 1px solid #00ad03;
-  color: #00ad03;
+  border: 1px solid var(--success);
+  color: var(--success);
 }
 
 .profile-duel-status.opted-out {
   background: var(--bg-tertiary);
-  border: 1px solid #ef4444;
-  color: #ef4444;
+  border: 1px solid var(--error);
+  color: var(--error);
 }
 
 .profile-selfban-status {
@@ -784,7 +804,7 @@ body {
 
 .profile-selfban-status.banned {
   background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  color: var(--error);
 }
 
 .profile-duel-hint {
@@ -1197,7 +1217,7 @@ body {
 
 /* Rarity color coding */
 .achievement-rarity.rarity-legendary {
-  color: #ff8c00;
+  color: var(--warning);
   font-weight: 600;
 }
 .achievement-rarity.rarity-legendary::before {
@@ -1205,7 +1225,7 @@ body {
 }
 
 .achievement-rarity.rarity-epic {
-  color: #a855f7;
+  color: var(--accent);
   font-weight: 600;
 }
 .achievement-rarity.rarity-epic::before {
@@ -2651,8 +2671,8 @@ body {
 
 .purchase-feedback.error {
   background: rgba(244, 67, 54, 0.15);
-  color: #f44336;
-  border: 1px solid #f44336;
+  color: var(--error);
+  border: 1px solid var(--error);
 }
 
 /* Item-level error message (shown directly at the shop item) */
@@ -3492,7 +3512,7 @@ body {
 
 .refund-blocked {
   font-size: 0.75rem;
-  color: #ffc107;
+  color: var(--warning);
   max-width: 120px;
   text-align: right;
 }

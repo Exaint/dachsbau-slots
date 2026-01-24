@@ -2,7 +2,7 @@
 
 Ein vollwertiges Slot-Machine-Spiel für den Twitch-Chat von [twitch.tv/frechhdachs](https://twitch.tv/frechhdachs), betrieben als Cloudflare Worker mit KV-Storage und D1-Datenbank.
 
-**Website:** [slots.dachsbau.live](https://slots.dachsbau.live)
+**Website:** [Link](https://dachsbau-slots.exaint.workers.dev)
 
 ---
 
@@ -230,6 +230,6 @@ npx wrangler dev
 
 ## Links
 
-- **Website:** [slots.dachsbau.live](https://slots.dachsbau.live)
-- **Twitch:** [twitch.tv/frechhdachs](https://twitch.tv/frechhdachs)
-- **Info-Seite:** [slots.dachsbau.live/info](https://slots.dachsbau.live/?page=info)
+- **Website:** [Link](https://dachsbau-slots.exaint.workers.dev)
+- **Twitch:** [Link](https://twitch.tv/frechhdachs)
+- **Info-Seite:** [Link](https://dachsbau-slots.exaint.workers.dev/?page=info)

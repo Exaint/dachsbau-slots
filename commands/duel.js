@@ -25,7 +25,7 @@
  */
 
 import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
-import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStat, setMaxAchievementStat, checkBalanceAchievements, incrementStat, updateMaxStat } from '../database.js';
+import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStatBatch, setMaxAchievementStat, checkBalanceAchievements, incrementStat, updateMaxStat } from '../database.js';
 import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
 
@@ -38,30 +38,30 @@ import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
  */
 async function trackDuelAchievements(player, isWinner, winnings, env) {
   try {
-    const promises = [];
-
-    // Both players get FIRST_DUEL and duelsPlayed tracked
-    promises.push(checkAndUnlockAchievement(player, ACHIEVEMENTS.FIRST_DUEL.id, env));
-    promises.push(incrementStat(player, 'duelsPlayed', 1, env));
-
+    // Step 1: Batch all achievement stat updates in a single atomic read-modify-write
+    // This prevents race conditions on the achievements:{username} KV key
+    const statUpdates = [['duelsPlayed', 1]];
     if (isWinner) {
-      // Winner stats
-      promises.push(updateAchievementStat(player, 'duelsWon', 1, env));
-      promises.push(updateAchievementStat(player, 'totalDuelWinnings', winnings, env));
-      promises.push(incrementStat(player, 'totalDuelWinnings', winnings, env));
-
-      // Track duel win streak
-      promises.push(trackDuelStreak(player, true, env));
+      statUpdates.push(['duelsWon', 1]);
+      statUpdates.push(['totalDuelWinnings', winnings]);
     } else {
-      // Loser stats
-      promises.push(updateAchievementStat(player, 'duelsLost', 1, env));
-      promises.push(incrementStat(player, 'duelsLost', 1, env));
-
-      // Reset duel win streak on loss
-      promises.push(trackDuelStreak(player, false, env));
+      statUpdates.push(['duelsLost', 1]);
     }
+    await updateAchievementStatBatch(player, statUpdates, env);
 
-    await Promise.all(promises);
+    // Step 2: One-time achievement (reads fresh data after batch save)
+    await checkAndUnlockAchievement(player, ACHIEVEMENTS.FIRST_DUEL.id, env);
+
+    // Step 3: KV stats + streak (separate keys, safe to run in parallel)
+    const kvPromises = [incrementStat(player, 'duelsPlayed', 1, env)];
+    if (isWinner) {
+      kvPromises.push(incrementStat(player, 'totalDuelWinnings', winnings, env));
+      kvPromises.push(trackDuelStreak(player, true, env));
+    } else {
+      kvPromises.push(incrementStat(player, 'duelsLost', 1, env));
+      kvPromises.push(trackDuelStreak(player, false, env));
+    }
+    await Promise.all(kvPromises);
   } catch (error) {
     logError('trackDuelAchievements', error, { player, isWinner });
   }

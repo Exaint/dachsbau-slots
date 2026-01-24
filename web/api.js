@@ -37,7 +37,8 @@ import {
 } from '../database/migration.js';
 import { getLeaderboard as getD1Leaderboard, D1_ENABLED } from '../database/d1.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
-import { logError, isAdmin, sanitizeUsername } from '../utils.js';
+import { logError, isAdmin, sanitizeUsername, checkRateLimit } from '../utils.js';
+import { RATE_LIMIT_SEARCH, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8'
@@ -63,7 +64,7 @@ export async function handleApi(api, url, env, loggedInUser = null, request = nu
       case 'leaderboard':
         return await handleLeaderboardApi(env);
       case 'search':
-        return await handleSearchApi(url.searchParams.get('q'), env);
+        return await handleSearchApi(url.searchParams.get('q'), env, request);
       // Admin endpoints
       case 'admin':
         return await handleAdminApi(url, env, loggedInUser, request);
@@ -265,9 +266,16 @@ async function handleLeaderboardApi(env) {
 /**
  * Search for players by username prefix
  */
-async function handleSearchApi(query, env) {
+async function handleSearchApi(query, env, request) {
   if (!query || query.length < 2) {
     return jsonResponse({ players: [] });
+  }
+
+  // Rate-Limit per IP
+  const ip = request?.headers.get('CF-Connecting-IP') || 'unknown';
+  const allowed = await checkRateLimit(`search:${ip}`, RATE_LIMIT_SEARCH, RATE_LIMIT_WINDOW_SECONDS, env);
+  if (!allowed) {
+    return jsonResponse({ error: 'Rate limit exceeded' }, 429);
   }
 
   // Sanitize search query - only allow valid username characters

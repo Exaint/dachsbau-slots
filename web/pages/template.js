@@ -1140,12 +1140,16 @@ export function htmlResponse(html, status = 200, options = {}) {
     ? `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}`
     : 'no-cache';
 
-  return new Response(html, {
+  // Generate CSP nonce and inject into all script tags
+  const nonce = crypto.randomUUID();
+  const nonceHtml = html.replace(/<script>/g, `<script nonce="${nonce}">`);
+
+  return new Response(nonceHtml, {
     status,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': cacheControl,
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://static-cdn.jtvnw.net https://assets.help.twitch.tv https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      'Content-Security-Policy': `default-src 'self'; script-src 'unsafe-inline'; script-src-elem 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' https://static-cdn.jtvnw.net https://assets.help.twitch.tv https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'X-XSS-Protection': '1; mode=block',

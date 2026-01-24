@@ -143,7 +143,15 @@ export const MAX_RETRIES = 3;
 export const EXPONENTIAL_BACKOFF_BASE_MS = 10;
 
 // ===========================================
-// 11. HTTP & URLs
+// 11. Rate Limiting
+// ===========================================
+
+export const RATE_LIMIT_SEARCH = 30;        // Max Requests pro Fenster
+export const RATE_LIMIT_SHOP = 10;          // Max Shop-Käufe pro Fenster
+export const RATE_LIMIT_WINDOW_SECONDS = 60; // Zeitfenster in Sekunden
+
+// ===========================================
+// 12. HTTP & URLs
 // ===========================================
 
 export const RESPONSE_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8' };

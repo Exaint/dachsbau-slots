@@ -320,6 +320,15 @@ function createInfoResponse(username, message) {
   return new Response(`@${username} ℹ️ ${message}`, { headers: RESPONSE_HEADERS });
 }
 
+// Rate-Limit Check via KV Counter mit TTL
+async function checkRateLimit(identifier, limit, windowSeconds, env) {
+  const key = `rl:${identifier}`;
+  const count = parseInt(await env.SLOTS_KV.get(key) || '0', 10);
+  if (count >= limit) return false;
+  await env.SLOTS_KV.put(key, String(count + 1), { expirationTtl: windowSeconds });
+  return true;
+}
+
 export {
   secureRandom,
   secureRandomInt,
@@ -350,5 +359,6 @@ export {
   createErrorResponse,
   createSuccessResponse,
   createInfoResponse,
-  atomicKvUpdate
+  atomicKvUpdate,
+  checkRateLimit
 };

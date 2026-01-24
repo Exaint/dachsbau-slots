@@ -5,6 +5,8 @@
 import { getUserFromRequest } from '../web/twitch.js';
 import { handleShopBuyAPI } from '../web/shop-api.js';
 import { setDisclaimerAccepted } from '../database.js';
+import { checkRateLimit } from '../utils.js';
+import { RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';
 
 /**
  * Validate CSRF protection for POST requests
@@ -87,6 +89,20 @@ export async function handleApiRoutes(pathname, request, url, env) {
   // Shop buy API endpoint (requires logged-in user)
   if (pathname === '/api/shop/buy' && request.method === 'POST') {
     const loggedInUser = await getUserFromRequest(request, env);
+    if (!loggedInUser) {
+      return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    // Rate-Limit per User
+    const allowed = await checkRateLimit(`shop:${loggedInUser.username}`, RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS, env);
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Zu viele Käufe, bitte warte kurz' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     return await handleShopBuyAPI(request, env, loggedInUser);
   }
 

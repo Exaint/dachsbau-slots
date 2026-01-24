@@ -132,9 +132,9 @@ export async function handleApiRoutes(pathname, request, url, env) {
       });
     }
 
-    // Check unlock or admin
+    // Check unlock
     const hasCustomMessageUnlock = await hasUnlock(loggedInUser.username, 'custom_message', env);
-    if (!hasCustomMessageUnlock && !isAdmin(loggedInUser.username)) {
+    if (!hasCustomMessageUnlock) {
       return new Response(JSON.stringify({ error: 'Custom Messages nicht freigeschaltet' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' }

@@ -188,7 +188,7 @@ export function renderProfilePage(data) {
 
   // Custom Messages Editor (visible to profile owner with unlock, or admin)
   const isOwnProfile = loggedInUser && loggedInUser.username.toLowerCase() === username.toLowerCase();
-  const showCustomMsgEditor = (isOwnProfile && hasCustomMsgUnlock) || showAdminPanel;
+  const showCustomMsgEditor = isOwnProfile && hasCustomMsgUnlock;
   const winMsgs = customMessages?.win || [];
   const lossMsgs = customMessages?.loss || [];
 

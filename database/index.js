@@ -32,7 +32,9 @@ export {
   getLastActive,
   setLastActive,
   isLeaderboardHidden,
-  setLeaderboardHidden
+  setLeaderboardHidden,
+  getCustomMessages,
+  setCustomMessages
 } from './core.js';
 
 // Buff system

@@ -2,7 +2,7 @@
  * Profile Page Handler and Renderer
  */
 
-import { getPlayerAchievements, getStats, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned } from '../../database.js';
+import { getPlayerAchievements, getStats, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned, hasUnlock, getCustomMessages } from '../../database.js';
 import { isDuelOptedOut } from '../../database/duels.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getTwitchProfileData } from '../twitch.js';
@@ -36,9 +36,9 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
   const balance = rawBalance !== null ? parseInt(rawBalance, 10) || 0 : 0;
 
   // Fetch remaining data in parallel with error fallback
-  let rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData;
+  let rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages;
   try {
-    [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData] = await Promise.all([
+    [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages] = await Promise.all([
       getPrestigeRank(username, env).catch(() => null),
       getStats(username, env).catch(() => ({})),
       getPlayerAchievements(username, env).catch(() => ({ unlockedAt: {}, stats: {}, pendingRewards: 0 })),
@@ -47,12 +47,15 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
       isDuelOptedOut(username, env).catch(() => false),
       isSelfBanned(username, env).catch(() => false),
       isLeaderboardHidden(username, env).catch(() => false),
-      getTwitchProfileData(username, env).catch(() => null)
+      getTwitchProfileData(username, env).catch(() => null),
+      hasUnlock(username, 'custom_message', env).catch(() => false),
+      getCustomMessages(username, env).catch(() => null)
     ]);
   } catch (e) {
     rank = null; stats = {}; achievementData = { unlockedAt: {}, stats: {}, pendingRewards: 0 };
     lastActive = null; achievementStats = { totalPlayers: 0, counts: {} };
     duelOptOut = false; selfBanned = false; leaderboardHidden = false; twitchData = null;
+    hasCustomMsgUnlock = false; customMessages = null;
   }
 
   const allAchievements = getAllAchievements();
@@ -113,7 +116,9 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
     leaderboardHidden,
     hasDisclaimer,
     twitchData,
-    loggedInUser
+    loggedInUser,
+    hasCustomMsgUnlock,
+    customMessages
   }));
 }
 
@@ -121,7 +126,7 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
  * Profile page renderer
  */
 export function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, leaderboardHidden, hasDisclaimer, twitchData, loggedInUser } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, leaderboardHidden, hasDisclaimer, twitchData, loggedInUser, hasCustomMsgUnlock, customMessages } = data;
 
   // Check if logged-in user is admin
   const showAdminPanel = loggedInUser && isAdmin(loggedInUser.username);
@@ -180,6 +185,58 @@ export function renderProfilePage(data) {
       </div>
     </div>
   `;
+
+  // Custom Messages Editor (visible to profile owner with unlock, or admin)
+  const isOwnProfile = loggedInUser && loggedInUser.username.toLowerCase() === username.toLowerCase();
+  const showCustomMsgEditor = (isOwnProfile && hasCustomMsgUnlock) || showAdminPanel;
+  const winMsgs = customMessages?.win || [];
+  const lossMsgs = customMessages?.loss || [];
+
+  const customMessagesHtml = showCustomMsgEditor ? `
+    <div class="custom-messages-editor">
+      <div class="custom-messages-header">
+        <h3>💬 Custom Messages</h3>
+        <span class="custom-messages-hint">Wird zufällig an dein Spin-Ergebnis angehängt</span>
+      </div>
+      <div class="custom-messages-section">
+        <div class="custom-messages-type">
+          <label class="custom-messages-label">Win-Nachrichten (bei Gewinn):</label>
+          <div class="custom-messages-list" id="winMessages">
+            ${winMsgs.map((msg, i) => `
+              <div class="custom-message-row">
+                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht...">
+                <button class="custom-message-remove" onclick="removeMessageRow(this)" title="Entfernen">&times;</button>
+              </div>
+            `).join('')}
+          </div>
+          <div class="custom-messages-actions">
+            <button class="custom-message-add" onclick="addMessageRow('win')" ${winMsgs.length >= 5 ? 'disabled' : ''}>+ Nachricht hinzufügen</button>
+            <span class="custom-messages-counter" id="winCounter">${winMsgs.length}/5</span>
+          </div>
+        </div>
+        <div class="custom-messages-type">
+          <label class="custom-messages-label">Lose-Nachrichten (bei Verlust):</label>
+          <div class="custom-messages-list" id="lossMessages">
+            ${lossMsgs.map((msg, i) => `
+              <div class="custom-message-row">
+                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht...">
+                <button class="custom-message-remove" onclick="removeMessageRow(this)" title="Entfernen">&times;</button>
+              </div>
+            `).join('')}
+          </div>
+          <div class="custom-messages-actions">
+            <button class="custom-message-add" onclick="addMessageRow('loss')" ${lossMsgs.length >= 5 ? 'disabled' : ''}>+ Nachricht hinzufügen</button>
+            <span class="custom-messages-counter" id="lossCounter">${lossMsgs.length}/5</span>
+          </div>
+        </div>
+      </div>
+      <div class="custom-messages-footer">
+        <span class="custom-messages-charlimit">Max. 50 Zeichen pro Nachricht</span>
+        <button class="custom-messages-save" onclick="saveCustomMessages()">💾 Speichern</button>
+      </div>
+      <div class="custom-messages-status" id="customMsgStatus"></div>
+    </div>
+  ` : '';
 
   // Categories HTML
   const categoriesHtml = Object.entries(byCategory).map(([category, achs]) => {
@@ -407,6 +464,7 @@ export function renderProfilePage(data) {
         </div>
       </div>
       ${statsHtml}
+      ${customMessagesHtml}
       <div class="achievement-summary">
         <div class="achievement-count">
           <span class="achievement-count-label">🏆 Achievements</span>

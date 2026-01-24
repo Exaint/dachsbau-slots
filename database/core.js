@@ -236,6 +236,28 @@ async function setLeaderboardHidden(username, hidden, env) {
   }
 }
 
+// Custom Messages
+async function getCustomMessages(username, env) {
+  try {
+    const value = await env.SLOTS_KV.get(kvKey('custom_messages:', username));
+    if (!value) return null;
+    return JSON.parse(value);
+  } catch (error) {
+    logError('getCustomMessages', error, { username });
+    return null;
+  }
+}
+
+async function setCustomMessages(username, messages, env) {
+  try {
+    await env.SLOTS_KV.put(kvKey('custom_messages:', username), JSON.stringify(messages));
+    return true;
+  } catch (error) {
+    logError('setCustomMessages', error, { username });
+    return false;
+  }
+}
+
 export {
   getBalance,
   setBalance,
@@ -252,5 +274,7 @@ export {
   getLastActive,
   setLastActive,
   isLeaderboardHidden,
-  setLeaderboardHidden
+  setLeaderboardHidden,
+  getCustomMessages,
+  setCustomMessages
 };

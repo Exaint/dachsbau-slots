@@ -221,6 +221,11 @@ async function handleUnlockItem(username, item, itemId, balance, hasPrerequisite
   // Fire-and-forget achievement tracking
   trackShopAchievements(username, itemId, item, null, env);
 
+  // Custom Messages unlock: include profile link
+  if (item.unlockKey === 'custom_message') {
+    return new Response(`@${username} ✅ Custom Messages freigeschaltet! Richte sie ein: https://dachsbau-slots.exaint.workers.dev/?page=profile&user=${encodeURIComponent(username)} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+  }
+
   return new Response(`@${username} ✅ ${item.name} freigeschaltet! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
 

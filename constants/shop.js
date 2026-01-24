@@ -29,7 +29,7 @@ export const SHOP_ITEMS = {
   25: { name: '!slots all Unlock', price: 4444, type: 'unlock', unlockKey: 'slots_all', requires: 'slots_100', symbol: '🔓' },
   26: { name: 'Gold Dachs Rang', price: 8000, type: 'prestige', rank: '🥇', requiresRank: '🥈', symbol: '🥇' },
   27: { name: 'Daily Interest Boost', price: 10000, type: 'unlock', unlockKey: 'daily_boost', symbol: '💰' },
-  28: { name: 'Custom Win Message', price: 10000, type: 'unlock', unlockKey: 'custom_message', symbol: '💬' },
+  28: { name: 'Custom Messages', price: 10000, type: 'unlock', unlockKey: 'custom_message', symbol: '💬' },
   29: { name: 'Platin Dachs Rang', price: 25000, type: 'prestige', rank: '💎', requiresRank: '🥇', symbol: '💎' },
   30: { name: 'Legendary Dachs Rang', price: 44444, type: 'prestige', rank: '👑', requiresRank: '💎', symbol: '👑' },
   31: { name: 'Reverse Chaos', price: 150, type: 'instant', symbol: '🔄' },

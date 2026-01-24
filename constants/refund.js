@@ -142,7 +142,7 @@ export const REFUNDABLE_ITEMS = {
     unlockKey: 'custom_message',
     symbol: '💬',
     shopId: 28,
-    name: 'Custom Win Message',
+    name: 'Custom Messages',
     price: SHOP_ITEMS[28].price,
     blockedBy: []
   }

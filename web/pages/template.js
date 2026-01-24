@@ -1053,6 +1053,11 @@ function getClientScripts() {
             }
           }
 
+          // Custom Messages: redirect to profile
+          if (result.redirectToProfile) {
+            showCustomMsgPurchaseModal();
+          }
+
           // Update all buy buttons based on new balance
           updateBuyButtons(result.newBalance);
         } else {
@@ -1124,6 +1129,94 @@ function getClientScripts() {
         });
       });
     });
+
+    // Custom Messages: Purchase Modal
+    function showCustomMsgPurchaseModal() {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = '<div class="modal-content custom-msg-modal">' +
+        '<h3>💬 Custom Messages freigeschaltet!</h3>' +
+        '<p>Du kannst jetzt in deinem Profil eigene Win- und Lose-Nachrichten hinterlegen, die zuf\\u00e4llig an deine Spin-Ergebnisse angeh\\u00e4ngt werden.</p>' +
+        '<div class="modal-actions">' +
+          '<button class="btn-modal-primary" onclick="window.location.href=\\'?page=profile&user=' + encodeURIComponent(document.querySelector('.user-display-name')?.textContent || '') + '\\'">Zum Profil</button>' +
+          '<button class="btn-modal-secondary" onclick="this.closest(\\'.modal-overlay\\').remove()">Sp\\u00e4ter</button>' +
+        '</div></div>';
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+      document.body.appendChild(overlay);
+    }
+
+    // Custom Messages: Add/Remove/Save
+    function addMessageRow(type) {
+      const container = document.getElementById(type === 'win' ? 'winMessages' : 'lossMessages');
+      const counter = document.getElementById(type === 'win' ? 'winCounter' : 'lossCounter');
+      const addBtn = container.parentElement.querySelector('.custom-message-add');
+      const count = container.querySelectorAll('.custom-message-row').length;
+      if (count >= 5) return;
+
+      const row = document.createElement('div');
+      row.className = 'custom-message-row';
+      row.innerHTML = '<input type="text" class="custom-message-input" maxlength="50" placeholder="Nachricht...">' +
+        '<button class="custom-message-remove" onclick="removeMessageRow(this)" title="Entfernen">&times;</button>';
+      container.appendChild(row);
+
+      const newCount = count + 1;
+      counter.textContent = newCount + '/5';
+      if (newCount >= 5) addBtn.disabled = true;
+    }
+
+    function removeMessageRow(btn) {
+      const row = btn.closest('.custom-message-row');
+      const container = row.parentElement;
+      const type = container.id === 'winMessages' ? 'win' : 'loss';
+      const counter = document.getElementById(type === 'win' ? 'winCounter' : 'lossCounter');
+      const addBtn = container.parentElement.querySelector('.custom-message-add');
+      row.remove();
+
+      const count = container.querySelectorAll('.custom-message-row').length;
+      counter.textContent = count + '/5';
+      addBtn.disabled = false;
+    }
+
+    async function saveCustomMessages() {
+      const statusEl = document.getElementById('customMsgStatus');
+      const winInputs = document.querySelectorAll('#winMessages .custom-message-input');
+      const lossInputs = document.querySelectorAll('#lossMessages .custom-message-input');
+
+      const win = Array.from(winInputs).map(i => i.value.trim()).filter(v => v);
+      const loss = Array.from(lossInputs).map(i => i.value.trim()).filter(v => v);
+
+      // Client-side length check
+      const tooLong = [...win, ...loss].find(m => m.length > 50);
+      if (tooLong) {
+        statusEl.className = 'custom-messages-status error';
+        statusEl.textContent = 'Nachricht zu lang (max. 50 Zeichen)';
+        return;
+      }
+
+      statusEl.className = 'custom-messages-status saving';
+      statusEl.textContent = 'Speichern...';
+
+      try {
+        const response = await fetch('/api/custom-messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ win, loss })
+        });
+        const result = await response.json();
+        if (result.success) {
+          statusEl.className = 'custom-messages-status success';
+          statusEl.textContent = 'Gespeichert!';
+          setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'custom-messages-status'; }, 3000);
+        } else {
+          statusEl.className = 'custom-messages-status error';
+          statusEl.textContent = result.error || 'Fehler beim Speichern';
+        }
+      } catch (e) {
+        statusEl.className = 'custom-messages-status error';
+        statusEl.textContent = 'Netzwerkfehler';
+      }
+    }
   </script>`;
 }
 

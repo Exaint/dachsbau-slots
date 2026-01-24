@@ -64,7 +64,8 @@ import {
   updateBankBalance,
   checkAndClaimHourlyJackpot,
   getLastDaily,
-  hasUnlock
+  hasUnlock,
+  getCustomMessages
 } from '../database.js';
 
 // Engine functions
@@ -73,7 +74,6 @@ import { generateGrid, applySpecialItems, calculateWin, buildResponseMessage } f
 // Helper functions
 import {
   trackSlotAchievements,
-  getCustomMessage,
   parseSpinAmount,
   applyMultipliersAndBuffs,
   calculateStreakBonuses
@@ -147,7 +147,8 @@ async function handleSlot(username, amountParam, url, env) {
       getStreakMultiplier(username, env),
       getPrestigeRank(username, env),
       getLastDaily(username, env),
-      hasUnlock(username, 'daily_boost', env)
+      hasUnlock(username, 'daily_boost', env),
+      getCustomMessages(username, env)
     ]);
 
     // Selfban Check
@@ -217,7 +218,8 @@ async function handleSlot(username, amountParam, url, env) {
       currentStreakMulti,
       prestigeRank,
       lastDaily,
-      hasDailyBoost
+      hasDailyBoost,
+      kvMessages
     ] = await stage2Promise;
 
     // Decrement Dachs Locator uses (using atomic function with retry mechanism)
@@ -348,14 +350,14 @@ async function handleSlot(username, amountParam, url, env) {
       }
     }
 
-    // Custom Message Check
-    const isCustomWin = result.points > 0 || totalBonuses > 0;
-    const totalWinAmount = (result.points || 0) + totalBonuses;
-    const customMsg = getCustomMessage(lowerUsername, username, isCustomWin, {
-      amount: isCustomWin ? totalWinAmount : spinCost,
-      balance: newBalance,
-      grid: grid.join(' ')
-    });
+    // Custom Message (KV-based)
+    let customMsgAppend = null;
+    if (kvMessages) {
+      const msgArray = isWin ? kvMessages.win : kvMessages.loss;
+      if (msgArray && msgArray.length > 0) {
+        customMsgAppend = msgArray[Math.floor(Math.random() * msgArray.length)];
+      }
+    }
 
     // Fire-and-forget achievement tracking - with error handling
     // Pass extended data for tracking loss streaks and spin costs
@@ -366,13 +368,15 @@ async function handleSlot(username, amountParam, url, env) {
     trackSlotAchievements(username, originalGrid, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, extendedData)
       .catch(err => logError('trackSlotAchievements', err, { username }));
 
-    if (customMsg) {
-      return new Response(`@${username} [ ${grid.join(' ')} ] ${customMsg} ║ Kontostand: ${newBalance} DachsTaler`, { headers: RESPONSE_HEADERS });
-    }
-
     // Build response
     const totalWin = result.points + totalBonuses;
-    const message = buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage, spinCost);
+    let message = buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage, spinCost);
+
+    // Append custom message if available
+    if (customMsgAppend) {
+      message += ` | 💬 "${customMsgAppend}"`;
+    }
+
     return new Response(message, { headers: RESPONSE_HEADERS });
   } catch (error) {
     logError('handleSlot', error, { username, amountParam });

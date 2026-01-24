@@ -4,8 +4,8 @@
 
 import { getUserFromRequest } from '../web/twitch.js';
 import { handleShopBuyAPI } from './shop.js';
-import { setDisclaimerAccepted } from '../database.js';
-import { checkRateLimit } from '../utils.js';
+import { setDisclaimerAccepted, hasUnlock, getCustomMessages, setCustomMessages } from '../database.js';
+import { checkRateLimit, containsProfanity, isAdmin } from '../utils.js';
 import { RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';
 
 /**
@@ -117,6 +117,139 @@ export async function handleApiRoutes(pathname, request, url, env) {
     }
     await setDisclaimerAccepted(loggedInUser.username, env);
     return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Custom Messages save endpoint
+  if (pathname === '/api/custom-messages' && request.method === 'POST') {
+    const loggedInUser = await getUserFromRequest(request, env);
+    if (!loggedInUser) {
+      return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Check unlock or admin
+    const hasCustomMessageUnlock = await hasUnlock(loggedInUser.username, 'custom_message', env);
+    if (!hasCustomMessageUnlock && !isAdmin(loggedInUser.username)) {
+      return new Response(JSON.stringify({ error: 'Custom Messages nicht freigeschaltet' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Ungültiges JSON' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { win = [], loss = [] } = body;
+
+    // Validate arrays
+    if (!Array.isArray(win) || !Array.isArray(loss)) {
+      return new Response(JSON.stringify({ error: 'win und loss müssen Arrays sein' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Max 5 per type
+    if (win.length > 5 || loss.length > 5) {
+      return new Response(JSON.stringify({ error: 'Maximal 5 Nachrichten pro Typ' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Validate each message
+    const cleanWin = [];
+    const cleanLoss = [];
+
+    for (const msg of win) {
+      if (typeof msg !== 'string') continue;
+      const trimmed = msg.trim();
+      if (!trimmed) continue;
+      if (trimmed.length > 50) {
+        return new Response(JSON.stringify({ error: `Nachricht zu lang (max. 50 Zeichen): "${trimmed.slice(0, 20)}..."` }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      if (containsProfanity(trimmed)) {
+        return new Response(JSON.stringify({ error: 'Nachricht enthält unerlaubte Wörter' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      cleanWin.push(trimmed);
+    }
+
+    for (const msg of loss) {
+      if (typeof msg !== 'string') continue;
+      const trimmed = msg.trim();
+      if (!trimmed) continue;
+      if (trimmed.length > 50) {
+        return new Response(JSON.stringify({ error: `Nachricht zu lang (max. 50 Zeichen): "${trimmed.slice(0, 20)}..."` }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      if (containsProfanity(trimmed)) {
+        return new Response(JSON.stringify({ error: 'Nachricht enthält unerlaubte Wörter' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      cleanLoss.push(trimmed);
+    }
+
+    const messages = { win: cleanWin, loss: cleanLoss };
+    const success = await setCustomMessages(loggedInUser.username, messages, env);
+
+    if (!success) {
+      return new Response(JSON.stringify({ error: 'Speichern fehlgeschlagen' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Get custom messages endpoint
+  if (pathname === '/api/custom-messages' && request.method === 'GET') {
+    const loggedInUser = await getUserFromRequest(request, env);
+    if (!loggedInUser) {
+      return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const targetUser = url.searchParams.get('user') || loggedInUser.username;
+    const isOwn = targetUser.toLowerCase() === loggedInUser.username.toLowerCase();
+
+    // Only own messages or admin can view
+    if (!isOwn && !isAdmin(loggedInUser.username)) {
+      return new Response(JSON.stringify({ error: 'Keine Berechtigung' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const messages = await getCustomMessages(targetUser, env);
+    return new Response(JSON.stringify({ messages: messages || { win: [], loss: [] } }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

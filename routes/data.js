@@ -751,6 +751,11 @@ async function handleAdminRefund(username, itemKey, env) {
 
     // Perform refund: Remove the unlock
     await removeUnlock(username, item.unlockKey, env);
+
+    // Also delete custom messages data when custom_message unlock is refunded
+    if (item.unlockKey === 'custom_message') {
+      env.SLOTS_KV.delete(`custom_messages:${username.toLowerCase()}`).catch(() => {});
+    }
   }
 
   // Add refund amount to balance

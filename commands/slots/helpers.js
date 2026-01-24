@@ -20,7 +20,6 @@ import {
 } from '../../constants.js';
 import { logError, kvKey } from '../../utils.js';
 import { D1_ENABLED, DUAL_WRITE, updateStreakCounts } from '../../database/d1.js';
-import { CUSTOM_MESSAGES } from '../../config.js';
 import {
   hasUnlock,
   consumeWinMultiplier,
@@ -198,28 +197,6 @@ async function trackPlayDay(username, env) {
   } catch (error) {
     logError('trackPlayDay', error, { username });
   }
-}
-
-/**
- * Get custom message for special users
- * @param {string} lowerUsername - Lowercased username
- * @param {string} username - Original username
- * @param {boolean} isWin - Whether the spin was a win
- * @param {object} data - Data for template replacement
- * @returns {string|null} Custom message or null
- */
-export function getCustomMessage(lowerUsername, username, isWin, data) {
-  const userMessages = CUSTOM_MESSAGES[lowerUsername];
-  if (!userMessages) return null;
-
-  const template = isWin ? userMessages.win : userMessages.loss;
-  if (!template) return null;
-
-  return template
-    .replace(/{username}/g, username)
-    .replace(/{amount}/g, data.amount)
-    .replace(/{balance}/g, data.balance)
-    .replace(/{grid}/g, data.grid);
 }
 
 /**

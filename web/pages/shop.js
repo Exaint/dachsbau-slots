@@ -37,7 +37,7 @@ const ITEM_DESCRIPTIONS = {
   25: 'Schaltet freie Einsätze frei - !slots 1 bis !slots all (jeder Betrag)',
   26: 'Gold Prestige-Rang mit 🥇 Badge',
   27: 'Permanenter Bonus auf tägliche Belohnungen',
-  28: 'Eigene Gewinn-Nachricht bei großen Wins',
+  28: '5 Win + 5 Lose Nachrichten für deine Spins',
   29: 'Diamant Prestige-Rang mit 💎 Badge',
   30: 'Legendärer Prestige-Rang mit 👑 Badge',
   31: 'Kehrt den letzten Chaos Spin um',

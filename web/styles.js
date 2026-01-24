@@ -897,6 +897,226 @@ body {
   margin-top: 4px;
 }
 
+/* Custom Messages Editor */
+.custom-messages-editor {
+  margin-top: 24px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+.custom-messages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.custom-messages-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.custom-messages-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.custom-messages-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.custom-messages-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.custom-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.custom-message-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.custom-message-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.custom-message-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.custom-message-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: color 0.2s, background 0.2s;
+}
+
+.custom-message-remove:hover {
+  color: var(--error);
+  background: rgba(255, 0, 0, 0.1);
+}
+
+.custom-messages-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.custom-message-add {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.custom-message-add:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.custom-message-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.custom-messages-counter {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.custom-messages-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.custom-messages-charlimit {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.custom-messages-save {
+  padding: 8px 20px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: opacity 0.2s;
+}
+
+.custom-messages-save:hover {
+  opacity: 0.9;
+}
+
+.custom-messages-status {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  min-height: 20px;
+}
+
+.custom-messages-status.success { color: var(--success); }
+.custom-messages-status.error { color: var(--error); }
+.custom-messages-status.saving { color: var(--text-muted); }
+
+/* Custom Messages Purchase Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 32px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.modal-content h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.2rem;
+  color: var(--text-primary);
+}
+
+.modal-content p {
+  color: var(--text-secondary);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btn-modal-primary {
+  padding: 10px 24px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-modal-secondary {
+  padding: 10px 24px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
 /* Achievement Progress */
 .achievement-summary {
   display: flex;

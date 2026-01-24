@@ -291,11 +291,17 @@ async function purchaseUnlock(username, item, itemId, hasPrerequisite, hasExisti
     updateBankBalance(item.price, env)
   ]);
 
-  return {
+  const result = {
     success: true,
     message: `${item.name} freigeschaltet!`,
     newBalance: deduction.newBalance
   };
+
+  if (item.unlockKey === 'custom_message') {
+    result.redirectToProfile = true;
+  }
+
+  return result;
 }
 
 async function purchaseTimed(username, item, env) {

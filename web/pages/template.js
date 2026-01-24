@@ -1143,6 +1143,7 @@ function getClientScripts() {
         '</div></div>';
       overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
       document.body.appendChild(overlay);
+      overlay.classList.add('active');
     }
 
     // Custom Messages: Add/Remove/Save

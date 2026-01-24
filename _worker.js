@@ -54,7 +54,7 @@ export default {
       // Web pages (HTML)
       const page = url.searchParams.get('page');
       if (page) {
-        return await handleWebPage(page, url, env, loggedInUser, request);
+        return await handleWebPage(page, url, env, loggedInUser);
       }
 
       // API endpoints (JSON)

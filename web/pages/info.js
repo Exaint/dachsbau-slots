@@ -25,7 +25,6 @@ export function renderInfoPage(user = null) {
           <a href="#multiplier" class="toc-item">📈 Multiplier-System</a>
           <a href="#bonus" class="toc-item">🎁 Bonus-Systeme</a>
           <a href="#duell" class="toc-item">⚔️ Duell-System</a>
-          <a href="#bank" class="toc-item">🏦 DachsBank</a>
           <a href="#faq" class="toc-item">❓ FAQ</a>
           <a href="#hilfe" class="toc-item">📞 Hilfe</a>
           <a href="#shortcuts" class="toc-item desktop-only">⌨️ Tastaturkürzel</a>
@@ -198,10 +197,6 @@ export function renderInfoPage(user = null) {
             <code>!transfer @user [Betrag]</code>
             <span>DachsTaler senden (1-100.000)</span>
           </div>
-          <div class="command-item">
-            <code>!transfer @dachsbank [Betrag]</code>
-            <span>An Bank spenden</span>
-          </div>
         </div>
 
         <h3>Website & Erfolge</h3>
@@ -225,10 +220,6 @@ export function renderInfoPage(user = null) {
           <div class="command-item">
             <code>!slots stats</code>
             <span>Persönliche Statistiken anzeigen</span>
-          </div>
-          <div class="command-item">
-            <code>!slots bank</code>
-            <span>DachsBank Kontostand anzeigen</span>
           </div>
           <div class="command-item">
             <code>!slots info / help / commands</code>
@@ -318,14 +309,6 @@ export function renderInfoPage(user = null) {
             <div class="command-item">
               <code>!slots wipe @user</code>
               <span>Alle Daten eines Spielers löschen</span>
-            </div>
-            <div class="command-item">
-              <code>!slots bankset [Betrag]</code>
-              <span>DachsBank Kontostand setzen</span>
-            </div>
-            <div class="command-item">
-              <code>!slots bankreset</code>
-              <span>DachsBank auf Startwert zurücksetzen</span>
             </div>
           </div>
 
@@ -819,45 +802,6 @@ export function renderInfoPage(user = null) {
             <p><strong>Cooldown:</strong> Nach einem Duell musst du 60 Sekunden warten bevor du ein neues starten kannst</p>
           </div>
           </div>
-        </section>
-      </details>
-
-      <!-- DachsBank -->
-      <details class="info-accordion">
-        <summary class="accordion-header"><h2>🏦 DachsBank</h2></summary>
-        <section id="bank" class="content-section accordion-content">
-          <p class="section-intro">Die DachsBank trackt die gesamte Casino-Ökonomie.</p>
-
-          <div class="bank-grid">
-          <div class="bank-card income">
-            <h4>Bank erhält</h4>
-            <ul>
-              <li>✅ Jeden Spin-Einsatz</li>
-              <li>✅ Jeden Shop-Kauf</li>
-              <li>✅ Spenden von Spielern</li>
-            </ul>
-          </div>
-          <div class="bank-card expense">
-            <h4>Bank zahlt</h4>
-            <ul>
-              <li>✅ Jeden Gewinn</li>
-              <li>✅ Alle Boni</li>
-            </ul>
-          </div>
-        </div>
-
-        <h3>Commands</h3>
-        <div class="command-list compact">
-          <div class="command-item">
-            <code>!slots bank</code>
-            <span>Kontostand anzeigen</span>
-          </div>
-          <div class="command-item">
-            <code>!transfer @dachsbank [Betrag]</code>
-            <span>Spenden</span>
-          </div>
-        </div>
-          <p class="section-note"><strong>Startguthaben:</strong> 444.444 DachsTaler • Kann ins Minus gehen!</p>
         </section>
       </details>
 

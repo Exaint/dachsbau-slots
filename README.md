@@ -14,7 +14,6 @@ Das Slot-Machine-Spiel für den Twitch-Chat von [twitch.tv/frechhdachs](https://
 - 🛍️ **39 Shop-Items** (Buffs, Boosts, Unlocks, Prestige-Ränge)
 - ⚔️ **Duel-System** für 1v1 Herausforderungen
 - 🏅 **Prestige-Ränge** (Bronze → Silber → Gold → Diamant → Legende)
-- 💰 **DachsBank** Community-Konto
 - 🎡 **Glücksrad**, **Chaos Spin**, **Mystery Box** und mehr
 - 📊 Interaktive Profilseiten mit Achievement-Tracking
 - 📈 Leaderboard und globale Statistiken
@@ -41,7 +40,6 @@ Das Slot-Machine-Spiel für den Twitch-Chat von [twitch.tv/frechhdachs](https://
 | `!slots balance` | Zeige Kontostand und Free Spins |
 | `!slots stats` | Zeige persönliche Statistiken |
 | `!slots buffs` | Zeige aktive Buffs und Items |
-| `!slots bank` | Zeige DachsBank-Kontostand |
 | `!slots daily` | Hole täglichen Bonus |
 | `!leaderboard` | Top 5 Spieler |
 
@@ -66,7 +64,6 @@ Das Slot-Machine-Spiel für den Twitch-Chat von [twitch.tv/frechhdachs](https://
 | Command | Beschreibung |
 |---------|-------------|
 | `!transfer @user [Betrag]` | Sende DachsTaler an Spieler |
-| `!transfer dachsbank [Betrag]` | Spende an DachsBank |
 
 ---
 

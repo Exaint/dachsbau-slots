@@ -681,16 +681,12 @@ async function lockAchievement(username, achievementId, env) {
 /**
  * Decrement the global counter for an achievement
  */
+/**
+ * Legacy: Decrement counter. Now just invalidates cache since
+ * getAchievementStats() does a full scan.
+ */
 async function decrementAchievementCounter(achievementId, env) {
-  try {
-    const key = `achievement_count:${achievementId}`;
-    const current = parseInt(await env.SLOTS_KV.get(key) || '0', 10);
-    if (current > 0) {
-      await env.SLOTS_KV.put(key, String(current - 1));
-    }
-  } catch (error) {
-    logError('decrementAchievementCounter', error, { achievementId });
-  }
+  await invalidateAchievementStatsCache(env);
 }
 
 /**
@@ -727,10 +723,10 @@ async function unlockAchievement(username, achievementId, env, existingData = nu
       data.pendingRewards = (data.pendingRewards || 0) + reward;
     }
 
-    // Save player achievements and increment global counter in parallel
+    // Save player achievements and invalidate stats cache
     await Promise.all([
       savePlayerAchievements(username, data, env),
-      incrementAchievementCounter(achievementId, env)
+      env.SLOTS_KV.delete(STATS_CACHE_KEY)
     ]);
 
     // DUAL_WRITE: Fire-and-forget D1 write
@@ -1191,34 +1187,25 @@ function getTripleKey(symbol) {
  * Increment global counter when an achievement is unlocked
  * Uses retry mechanism to handle race conditions
  */
-async function incrementAchievementCounter(achievementId, env, maxRetries = 3) {
-  const key = `achievement_count:${achievementId}`;
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const current = await env.SLOTS_KV.get(key);
-      const currentCount = parseInt(current, 10) || 0;
-      const newCount = currentCount + 1;
-      await env.SLOTS_KV.put(key, newCount.toString());
-
-      // Verify the write succeeded
-      const verifyValue = await env.SLOTS_KV.get(key);
-      const verifyCount = parseInt(verifyValue, 10) || 0;
-
-      // Check if the count increased (might be higher due to concurrent increments, that's OK)
-      if (verifyCount >= newCount) {
-        return; // Success
-      }
-
-      // Verification failed, retry with backoff
-      if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 50 * Math.pow(2, attempt)));
-      }
-    } catch (error) {
-      logError('incrementAchievementCounter', error, { achievementId, attempt: attempt + 1 });
-      if (attempt === maxRetries - 1) return;
-    }
+/**
+ * Invalidate the achievement stats cache so next read does a fresh scan.
+ * Called whenever an achievement is unlocked.
+ */
+async function invalidateAchievementStatsCache(env) {
+  try {
+    await env.SLOTS_KV.delete(STATS_CACHE_KEY);
+  } catch (error) {
+    // Non-critical, cache will expire naturally
   }
+}
+
+/**
+ * Legacy: Increment counter and invalidate cache.
+ * The counter keys (achievement_count:*) are no longer the source of truth -
+ * getAchievementStats() now does a full scan. This just invalidates the cache.
+ */
+async function incrementAchievementCounter(achievementId, env) {
+  await invalidateAchievementStatsCache(env);
 }
 
 /**
@@ -1249,8 +1236,8 @@ async function migrateAllPlayersToAchievements(env) {
     const missingUsers = [];
     for (const key of userKeys) {
       const username = key.name.replace('user:', '').toLowerCase();
-      // Skip DachsBank and placeholder users
-      if (username === 'dachsbank' || username === 'spieler') continue;
+      // Skip placeholder users
+      if (username === 'spieler') continue;
       if (!existingAchievements.has(username)) {
         missingUsers.push(username);
       }
@@ -1277,47 +1264,62 @@ async function migrateAllPlayersToAchievements(env) {
  */
 async function getAchievementStats(env) {
   try {
-    // Run migration to ensure all players have achievement entries
-    await migrateAllPlayersToAchievements(env);
-
-    // Get all achievement IDs
-    const achievementIds = Object.values(ACHIEVEMENTS).map(a => a.id);
-
-    // Fetch all achievement counts in parallel (these are always up-to-date)
-    const countPromises = achievementIds.map(id =>
-      env.SLOTS_KV.get(`achievement_count:${id}`)
-    );
-
-    // Check cached total players count
-    let totalPlayers = 0;
-    const cachedTotal = await env.SLOTS_KV.get(STATS_CACHE_KEY);
-    if (cachedTotal) {
+    // Check cache first (valid for 5 minutes)
+    const cached = await env.SLOTS_KV.get(STATS_CACHE_KEY);
+    if (cached) {
       try {
-        const parsed = JSON.parse(cachedTotal);
-        totalPlayers = parsed.totalPlayers || 0;
+        const parsed = JSON.parse(cached);
+        if (parsed.totalPlayers > 0 && parsed.counts) {
+          return parsed;
+        }
       } catch {
         // Invalid cache, recalculate
       }
     }
 
-    // If no cached total, count achievement records
-    if (totalPlayers === 0) {
-      const achievementList = await env.SLOTS_KV.list({ prefix: 'achievements:', limit: 1000 });
-      totalPlayers = achievementList.keys?.length || 0;
-      // Cache just the total players count
-      await env.SLOTS_KV.put(STATS_CACHE_KEY, JSON.stringify({ totalPlayers }), { expirationTtl: STATS_CACHE_TTL });
-    }
+    // Run migration to ensure all players have achievement entries
+    await migrateAllPlayersToAchievements(env);
 
-    // Wait for all count fetches
-    const countResults = await Promise.all(countPromises);
+    // Full scan: List all achievement entries
+    const achievementList = await env.SLOTS_KV.list({ prefix: 'achievements:', limit: 1000 });
+    const keys = achievementList.keys || [];
+    const totalPlayers = keys.length;
 
-    // Build counts object
+    // Initialize counts for all achievements
+    const achievementIds = Object.values(ACHIEVEMENTS).map(a => a.id);
     const counts = {};
-    for (let i = 0; i < achievementIds.length; i++) {
-      counts[achievementIds[i]] = parseInt(countResults[i] || '0', 10);
+    for (const id of achievementIds) {
+      counts[id] = 0;
     }
 
-    return { totalPlayers, counts };
+    // Fetch all player achievement data in batches and count unlocks
+    const batchSize = 20;
+    for (let i = 0; i < keys.length; i += batchSize) {
+      const batch = keys.slice(i, i + batchSize);
+      const results = await Promise.all(batch.map(k => env.SLOTS_KV.get(k.name)));
+      for (const raw of results) {
+        if (!raw) continue;
+        try {
+          const data = JSON.parse(raw);
+          if (data.unlockedAt) {
+            for (const achievementId of Object.keys(data.unlockedAt)) {
+              if (counts[achievementId] !== undefined) {
+                counts[achievementId]++;
+              }
+            }
+          }
+        } catch {
+          // Skip invalid entries
+        }
+      }
+    }
+
+    const result = { totalPlayers, counts };
+
+    // Cache for 5 minutes
+    await env.SLOTS_KV.put(STATS_CACHE_KEY, JSON.stringify(result), { expirationTtl: STATS_CACHE_TTL });
+
+    return result;
   } catch (error) {
     logError('getAchievementStats', error);
     return { totalPlayers: 0, counts: {} };
@@ -1351,7 +1353,7 @@ async function syncAllPlayerAchievementStats(env) {
       const batch = userKeys.slice(i, i + batchSize);
       await Promise.all(batch.map(async (key) => {
         const username = key.name.replace('user:', '').toLowerCase();
-        if (username === 'dachsbank' || username === 'spieler') return;
+        if (username === 'spieler') return;
 
         try {
           // Read both stats and achievements
@@ -1432,6 +1434,9 @@ async function syncAllPlayerAchievementStats(env) {
     logError('syncAllPlayerAchievementStats', error);
     results.error = error.message;
   }
+
+  // Always invalidate stats cache after sync
+  await invalidateAchievementStatsCache(env);
 
   return results;
 }

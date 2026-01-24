@@ -2,7 +2,7 @@
  * Admin Economy Commands - Give, balance, buffs, stats
  */
 
-import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, SHOP_ITEM_MAX, BANK_KEY } from '../../constants.js';
+import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, SHOP_ITEM_MAX } from '../../constants.js';
 import { requireAdmin, requireAdminWithTarget, validateAmount, sanitizeUsername, logError, logAudit, createErrorResponse } from '../../utils.js';
 import {
   getBalance,
@@ -64,43 +64,6 @@ async function handleSetBalance(username, target, amount, env) {
   } catch (error) {
     logError('handleSetBalance', error, { username, target, amount });
     return createErrorResponse(username, 'Fehler beim Setzen der Balance.');
-  }
-}
-
-async function handleBankSet(username, amount, env) {
-  try {
-    const adminCheck = requireAdmin(username);
-    if (adminCheck) return adminCheck;
-
-    if (!amount) {
-      return new Response(`@${username} ❌ Nutze: !slots bankset [Betrag]`, { headers: RESPONSE_HEADERS });
-    }
-
-    const parsedAmount = parseInt(amount, 10);
-    if (isNaN(parsedAmount)) {
-      return new Response(`@${username} ❌ Ungültiger Betrag!`, { headers: RESPONSE_HEADERS });
-    }
-
-    await env.SLOTS_KV.put(BANK_KEY, parsedAmount.toString());
-
-    return new Response(`@${username} ✅ DachsBank auf ${parsedAmount.toLocaleString('de-DE')} DachsTaler gesetzt! 🏦`, { headers: RESPONSE_HEADERS });
-  } catch (error) {
-    logError('handleBankSet', error, { username, amount });
-    return new Response(`@${username} ❌ Fehler beim Setzen der Bank.`, { headers: RESPONSE_HEADERS });
-  }
-}
-
-async function handleBankReset(username, env) {
-  try {
-    const adminCheck = requireAdmin(username);
-    if (adminCheck) return adminCheck;
-
-    await env.SLOTS_KV.put(BANK_KEY, '0');
-
-    return new Response(`@${username} ✅ DachsBank wurde auf 0 DachsTaler zurückgesetzt! 🏦`, { headers: RESPONSE_HEADERS });
-  } catch (error) {
-    logError('handleBankReset', error, { username });
-    return new Response(`@${username} ❌ Fehler beim Zurücksetzen der Bank.`, { headers: RESPONSE_HEADERS });
   }
 }
 
@@ -474,8 +437,6 @@ async function handleGiveWinMulti(username, target, env) {
 export {
   handleGive,
   handleSetBalance,
-  handleBankSet,
-  handleBankReset,
   handleGiveBuff,
   handleRemoveBuff,
   handleClearAllBuffs,

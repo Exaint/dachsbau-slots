@@ -24,7 +24,6 @@ import {
   MAX_BALANCE,
   COOLDOWN_SECONDS,
   BASE_SPIN_COST,
-  HOURLY_JACKPOT_AMOUNT,
   DACHS_BASE_CHANCE,
   DAILY_BOOST_AMOUNT,
   DAILY_AMOUNT,
@@ -34,7 +33,8 @@ import {
   URLS,
   RAGE_MODE_LOSS_STACK,
   RAGE_MODE_MAX_STACK,
-  FREE_SPIN_COST_THRESHOLD
+  FREE_SPIN_COST_THRESHOLD,
+  HOURLY_JACKPOT_AMOUNT
 } from '../constants.js';
 import { logError, logWarn, getCurrentDate, getGermanDateFromTimestamp, kvKey, calculateBuffTTL } from '../utils.js';
 import {
@@ -61,11 +61,10 @@ import {
   getStreak,
   updateStats,
   getPrestigeRank,
-  updateBankBalance,
-  checkAndClaimHourlyJackpot,
   getLastDaily,
   hasUnlock,
-  getCustomMessages
+  getCustomMessages,
+  checkAndClaimHourlyJackpot
 } from '../database.js';
 
 // Engine functions
@@ -313,10 +312,6 @@ async function handleSlot(username, amountParam, url, env) {
       setLastActive(username, env),
       getFreeSpins(username, env)
     ];
-
-    if (!isFreeSpinUsed) {
-      finalUpdates.push(updateBankBalance(spinCost - (result.points + totalBonuses), env));
-    }
 
     const results = await Promise.all(finalUpdates);
     const rank = prestigeRank; // Pre-loaded

@@ -12,7 +12,7 @@
  * - items.js: Guaranteed Pair, Wild Card, Free Spins
  * - progression.js: Streaks, Stats, Monthly Login, Prestige, Unlocks
  * - shop.js: Weekly purchase limits (Spin Bundle, Dachs Boost)
- * - bank.js: DachsBank balance, Hourly Jackpot
+ * - jackpot.js: Hourly Jackpot (lucky second mechanism)
  */
 
 // Core functions
@@ -101,13 +101,6 @@ export {
   incrementDachsBoostPurchases
 } from './shop.js';
 
-// Bank
-export {
-  updateBankBalance,
-  getBankBalance,
-  checkAndClaimHourlyJackpot
-} from './bank.js';
-
 // Duels
 export {
   setDuelOptOut,
@@ -135,6 +128,11 @@ export {
   getAchievementStats,
   syncAllPlayerAchievementStats
 } from './achievements.js';
+
+// Jackpot
+export {
+  checkAndClaimHourlyJackpot
+} from './jackpot.js';
 
 // D1 Triple tracking (direct D1 access for admin/display)
 export {

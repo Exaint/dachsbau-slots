@@ -25,7 +25,6 @@ import {
   incrementSpinBundlePurchases,
   getDachsBoostPurchases,
   incrementDachsBoostPurchases,
-  updateBankBalance,
   activateGuaranteedPair,
   activateWildCard
 } from '../database.js';
@@ -259,10 +258,7 @@ async function purchasePrestige(username, item, itemId, currentRank, env) {
     return { success: false, error: deduction.error };
   }
 
-  await Promise.all([
-    setPrestigeRank(username, item.rank, env),
-    updateBankBalance(item.price, env)
-  ]);
+  await setPrestigeRank(username, item.rank, env);
 
   return {
     success: true,
@@ -286,10 +282,7 @@ async function purchaseUnlock(username, item, itemId, hasPrerequisite, hasExisti
     return { success: false, error: deduction.error };
   }
 
-  await Promise.all([
-    setUnlock(username, item.unlockKey, env),
-    updateBankBalance(item.price, env)
-  ]);
+  await setUnlock(username, item.unlockKey, env);
 
   const result = {
     success: true,
@@ -310,8 +303,6 @@ async function purchaseTimed(username, item, env) {
   if (!deduction.success) {
     return { success: false, error: deduction.error };
   }
-
-  await updateBankBalance(item.price, env);
 
   if (item.uses) {
     await activateBuffWithUses(username, item.buffKey, item.duration, item.uses, env);
@@ -371,8 +362,7 @@ async function purchaseBoost(username, item, env) {
 
     await Promise.all([
       addBoost(username, item.symbol, env),
-      incrementDachsBoostPurchases(username, env),
-      updateBankBalance(item.price, env)
+      incrementDachsBoostPurchases(username, env)
     ]);
 
     return {
@@ -388,10 +378,7 @@ async function purchaseBoost(username, item, env) {
     return { success: false, error: deduction.error };
   }
 
-  await Promise.all([
-    addBoost(username, item.symbol, env),
-    updateBankBalance(item.price, env)
-  ]);
+  await addBoost(username, item.symbol, env);
 
   return {
     success: true,
@@ -407,10 +394,7 @@ async function purchaseInsurance(username, item, env) {
     return { success: false, error: deduction.error };
   }
 
-  await Promise.all([
-    addInsurance(username, 5, env),
-    updateBankBalance(item.price, env)
-  ]);
+  await addInsurance(username, 5, env);
 
   return {
     success: true,
@@ -426,10 +410,7 @@ async function purchaseWinMulti(username, item, env) {
     return { success: false, error: deduction.error };
   }
 
-  await Promise.all([
-    addWinMultiplier(username, env),
-    updateBankBalance(item.price, env)
-  ]);
+  await addWinMultiplier(username, env);
 
   return {
     success: true,
@@ -452,8 +433,7 @@ async function purchaseBundle(username, item, env) {
 
   await Promise.all([
     addFreeSpinsWithMultiplier(username, SPIN_BUNDLE_COUNT, SPIN_BUNDLE_MULTIPLIER, env),
-    incrementSpinBundlePurchases(username, env),
-    updateBankBalance(item.price, env)
+    incrementSpinBundlePurchases(username, env)
   ]);
 
   const remainingPurchases = WEEKLY_SPIN_BUNDLE_LIMIT - (purchases.count + 1);
@@ -473,10 +453,7 @@ async function purchaseSpinToken(username, item, itemId, env) {
 
   // Guaranteed Pair (ID 37)
   if (itemId === 37) {
-    await Promise.all([
-      activateGuaranteedPair(username, env),
-      updateBankBalance(item.price, env)
-    ]);
+    await activateGuaranteedPair(username, env);
 
     return {
       success: true,
@@ -487,10 +464,7 @@ async function purchaseSpinToken(username, item, itemId, env) {
 
   // Wild Card (ID 38)
   if (itemId === 38) {
-    await Promise.all([
-      activateWildCard(username, env),
-      updateBankBalance(item.price, env)
-    ]);
+    await activateWildCard(username, env);
 
     return {
       success: true,

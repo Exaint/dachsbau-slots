@@ -1146,6 +1146,64 @@ function getClientScripts() {
       overlay.classList.add('active');
     }
 
+    // Custom Messages: Profanity check (client-side)
+    const PROFANITY_RE = [
+      /h[u0ü]r[e3]ns[o0]hn/i, /w[i1]chs[e3]r/i, /f[o0]tz[e3]/i, /schl[a4]mp[e3]/i,
+      /[a4]rschl[o0]ch/i, /m[i1]sstück/i, /m[i1]stst[uü]ck/i, /d[r]?ecks[a4]u/i,
+      /sp[a4]st/i, /b[e3]h[i1]nd[e3]rt/i, /m[o0]ng[o0]/i, /v[o0]ll[i1]d[i1][o0]t/i,
+      /schwuchtel/i, /n[u0]tt[e3]/i, /w[i1]x+[e3]r/i, /missgeburt/i, /bastard/i,
+      /h[u0]nds[o0]hn/i, /spacko/i, /abschaum/i, /krepier/i, /verrecke?/i,
+      /verpiss/i, /schei[sß]+/i, /schwanzlutscher/i, /hackfresse/i,
+      /dreckschwein/i, /hurenbock/i, /flittchen/i,
+      /n[i1]gg[e3a4]r?/i, /n[e3]g[e3]r/i, /k[a4]n[a4]k/i,
+      /h[e3][i1]l\\s*h[i1]tl[e3]r/i, /s[i1][e3]g\\s*h[e3][i1]l/i, /n[a4]z[i1]/i,
+      /zigeuner/i, /judens[a4]u/i, /judenschwein/i, /untermensch/i,
+      /ausländer\\s*raus/i, /88(?:\\s|$)/,
+      /f+[u0ü]+c+k+/i, /sh[i1]+t+/i, /b[i1]tch/i, /c[u0]nt/i,
+      /[a4]ssh[o0]l[e3]/i, /wh[o0]r[e3]/i, /r[e3]t[a4]rd/i, /f[a4]gg?[o0]t/i,
+      /motherf/i, /cock(?:suck)?/i, /slut/i, /kys/i,
+      /p[o0]rn[o0]?/i, /t[i1]tt[e3]n/i, /schw[a4]nz/i, /fick/i,
+      /vergew[a4]lt/i, /ermorden/i, /abstechen/i, /totschlag/i,
+      /k[i1]ll\\s*y[o0]urself/i, /unalive/i, /r[a4]pe/i,
+      /pedo/i, /p[ä]do/i, /tr[a4]nny/i, /shemale/i,
+      /amina\\s*koyim/i, /orospu/i, /siktir/i, /göt/i
+    ];
+
+    function checkProfanity(text) {
+      if (!text) return false;
+      const n = text.toLowerCase()
+        .replace(/[0]/g, 'o').replace(/[1!|]/g, 'i').replace(/[3]/g, 'e')
+        .replace(/[4@]/g, 'a').replace(/[$5]/g, 's').replace(/[7]/g, 't');
+      return PROFANITY_RE.some(function(p) { return p.test(n) || p.test(text); });
+    }
+
+    // Custom Messages: Char counter + profanity check
+    function updateCharCount(input) {
+      const row = input.parentElement;
+      const charSpan = row.querySelector('.custom-message-chars');
+      if (charSpan) {
+        const remaining = 50 - input.value.length;
+        charSpan.textContent = remaining;
+        charSpan.classList.toggle('chars-low', remaining <= 10);
+        charSpan.classList.toggle('chars-zero', remaining <= 0);
+      }
+
+      // Profanity check
+      const existingErr = row.nextElementSibling;
+      if (existingErr && existingErr.classList.contains('custom-message-error')) {
+        existingErr.remove();
+      }
+      if (input.value.trim() && checkProfanity(input.value.trim())) {
+        const err = document.createElement('div');
+        err.className = 'custom-message-error';
+        err.textContent = 'Nachricht enth\\u00e4lt unerlaubte W\\u00f6rter';
+        row.parentElement.insertBefore(err, row.nextSibling);
+        input.classList.add('input-error');
+      } else {
+        input.classList.remove('input-error');
+      }
+    }
+
     // Custom Messages: Add/Remove/Save
     function addMessageRow(type) {
       const container = document.getElementById(type === 'win' ? 'winMessages' : 'lossMessages');
@@ -1156,7 +1214,8 @@ function getClientScripts() {
 
       const row = document.createElement('div');
       row.className = 'custom-message-row';
-      row.innerHTML = '<input type="text" class="custom-message-input" maxlength="50" placeholder="Nachricht...">' +
+      row.innerHTML = '<input type="text" class="custom-message-input" maxlength="50" placeholder="Nachricht..." oninput="updateCharCount(this)">' +
+        '<span class="custom-message-chars">50</span>' +
         '<button class="custom-message-remove" onclick="removeMessageRow(this)" title="Entfernen">&times;</button>';
       container.appendChild(row);
 
@@ -1180,19 +1239,36 @@ function getClientScripts() {
 
     async function saveCustomMessages() {
       const statusEl = document.getElementById('customMsgStatus');
-      const winInputs = document.querySelectorAll('#winMessages .custom-message-input');
-      const lossInputs = document.querySelectorAll('#lossMessages .custom-message-input');
+      const allInputs = document.querySelectorAll('.custom-message-input');
 
-      const win = Array.from(winInputs).map(i => i.value.trim()).filter(v => v);
-      const loss = Array.from(lossInputs).map(i => i.value.trim()).filter(v => v);
+      // Clear existing errors
+      document.querySelectorAll('.custom-message-error').forEach(function(e) { e.remove(); });
+      allInputs.forEach(function(i) { i.classList.remove('input-error'); });
 
-      // Client-side length check
-      const tooLong = [...win, ...loss].find(m => m.length > 50);
-      if (tooLong) {
+      // Client-side validation
+      let hasError = false;
+      allInputs.forEach(function(input) {
+        const val = input.value.trim();
+        if (!val) return;
+        if (val.length > 50 || checkProfanity(val)) {
+          input.classList.add('input-error');
+          const err = document.createElement('div');
+          err.className = 'custom-message-error';
+          err.textContent = val.length > 50 ? 'Nachricht zu lang (max. 50 Zeichen)' : 'Nachricht enth\\u00e4lt unerlaubte W\\u00f6rter';
+          input.closest('.custom-message-row').parentElement.insertBefore(err, input.closest('.custom-message-row').nextSibling);
+          hasError = true;
+        }
+      });
+      if (hasError) {
         statusEl.className = 'custom-messages-status error';
-        statusEl.textContent = 'Nachricht zu lang (max. 50 Zeichen)';
+        statusEl.textContent = 'Bitte korrigiere die markierten Nachrichten';
         return;
       }
+
+      const winInputs = document.querySelectorAll('#winMessages .custom-message-input');
+      const lossInputs = document.querySelectorAll('#lossMessages .custom-message-input');
+      const win = Array.from(winInputs).map(function(i) { return i.value.trim(); }).filter(function(v) { return v; });
+      const loss = Array.from(lossInputs).map(function(i) { return i.value.trim(); }).filter(function(v) { return v; });
 
       statusEl.className = 'custom-messages-status saving';
       statusEl.textContent = 'Speichern...';

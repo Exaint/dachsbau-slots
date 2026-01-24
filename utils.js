@@ -193,7 +193,7 @@ function getWeekStart() {
 }
 
 // OPTIMIZED: Static Set for O(1) lookup instead of Array.includes()
-const LEADERBOARD_BLOCKLIST = new Set(['dachsbank']);
+const LEADERBOARD_BLOCKLIST = new Set([]);
 
 function isLeaderboardBlocked(username) {
   return LEADERBOARD_BLOCKLIST.has(username.toLowerCase());

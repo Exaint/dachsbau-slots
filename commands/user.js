@@ -3,7 +3,6 @@ import {
   MAX_BALANCE,
   MIN_TRANSFER,
   MAX_TRANSFER,
-  BANK_USERNAME,
   LEADERBOARD_CACHE_TTL,
   LEADERBOARD_LIMIT,
   LEADERBOARD_BATCH_SIZE,
@@ -29,8 +28,6 @@ import {
   updateMonthlyLogin,
   markMilestoneClaimed,
   setLastDaily,
-  getBankBalance,
-  updateBankBalance,
   getBuffWithUses,
   getBuffWithStack,
   getInsuranceCount,
@@ -80,10 +77,9 @@ async function trackDailyAchievements(username, monthlyDays, env) {
  * Track transfer achievements (fire-and-forget)
  * @param {string} username - Sender username
  * @param {number} amount - Transfer amount
- * @param {boolean} isBankDonation - Whether this is a donation to DachsBank
  * @param {object} env - Environment with KV binding
  */
-async function trackTransferAchievements(username, amount, isBankDonation, env) {
+async function trackTransferAchievements(username, amount, env) {
   try {
     const promises = [];
 
@@ -96,10 +92,6 @@ async function trackTransferAchievements(username, amount, isBankDonation, env) 
     // Track transfer count for TRANSFER_COUNT_10/50/100 achievements
     promises.push(updateAchievementStat(username, 'transfersSentCount', 1, env));
     promises.push(incrementStat(username, 'transfersSentCount', 1, env));
-
-    if (isBankDonation) {
-      promises.push(incrementStat(username, 'bankDonations', amount, env));
-    }
 
     await Promise.all(promises);
   } catch (error) {
@@ -354,22 +346,6 @@ async function handleBuffs(username, env) {
   }
 }
 
-async function handleBank(username, env) {
-  try {
-    const balance = await getBankBalance(env);
-
-    if (balance >= 0) {
-      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DachsTaler | Die Bank ist im Plus! 💰`, { headers: RESPONSE_HEADERS });
-    } else {
-      const deficit = Math.abs(balance);
-      return new Response(`@${username} 🏦 DachsBank Kontostand: ${balance.toLocaleString('de-DE')} DachsTaler | Die Community hat die Bank um ${deficit.toLocaleString('de-DE')} DachsTaler geplündert! 🦡💸`, { headers: RESPONSE_HEADERS });
-    }
-  } catch (error) {
-    logError('handleBank', error);
-    return new Response(`@${username} ❌ Fehler beim Abrufen der DachsBank.`, { headers: RESPONSE_HEADERS });
-  }
-}
-
 async function handleTransfer(username, target, amount, env) {
   try {
     const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once
@@ -390,28 +366,6 @@ async function handleTransfer(username, target, amount, env) {
 
     if (lowerUsername === cleanTarget) {
       return new Response(`@${username} ❌ Du kannst dir nicht selbst DachsTaler senden!`, { headers: RESPONSE_HEADERS });
-    }
-
-    // Allow transfer to DachsBank (no disclaimer check needed)
-    if (cleanTarget === BANK_USERNAME) {
-      const senderBalance = await getBalance(username, env);
-
-      if (senderBalance < parsedAmount) {
-        return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderBalance}.`, { headers: RESPONSE_HEADERS });
-      }
-
-      const newSenderBalance = senderBalance - parsedAmount;
-
-      // OPTIMIZED: Update balance and bank atomically, use returned value instead of re-fetching
-      const [, newBankBalance] = await Promise.all([
-        setBalance(username, newSenderBalance, env),
-        updateBankBalance(parsedAmount, env)
-      ]);
-
-      // Track achievements (await to ensure they complete before response)
-      await trackTransferAchievements(username, parsedAmount, true, env);
-
-      return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an die DachsBank gespendet! 💰 | Dein Kontostand: ${newSenderBalance} | Bank: ${newBankBalance.toLocaleString('de-DE')} DachsTaler 🏦`, { headers: RESPONSE_HEADERS });
     }
 
     // Check if receiver has accepted disclaimer (has played before)
@@ -493,7 +447,7 @@ async function handleTransfer(username, target, amount, env) {
 
         // Track achievements
         await Promise.all([
-          trackTransferAchievements(username, parsedAmount, false, env),
+          trackTransferAchievements(username, parsedAmount, env),
           trackTransferReceived(cleanTarget, actualReceived, env),
           checkBalanceAchievements(cleanTarget, newReceiverBalance, env)
         ]);
@@ -605,7 +559,6 @@ export {
   handleStats,
   handleDaily,
   handleBuffs,
-  handleBank,
   handleTransfer,
   handleLeaderboard
 };

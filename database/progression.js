@@ -252,7 +252,7 @@ const DEFAULT_STATS = {
   // Duel extended
   duelsPlayed: 0, duelsWon: 0, duelsLost: 0, maxDuelStreak: 0, totalDuelWinnings: 0,
   // Transfer extended
-  totalTransferred: 0, transfersReceived: 0, transfersSentCount: 0, bankDonations: 0,
+  totalTransferred: 0, transfersReceived: 0, transfersSentCount: 0,
   // Time/Activity
   playDays: 0, firstSpinAt: 0, maxDailyStreak: 0,
   // Spin types

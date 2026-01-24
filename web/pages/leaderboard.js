@@ -49,7 +49,7 @@ async function computeLeaderboardData(env) {
         const isSelfBannedUser = selfBanStatuses[j];
         const isHidden = hiddenStatuses[j];
 
-        if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler' && !isHidden) {
+        if (!isNaN(balance) && balance > 0 && lowerUsername !== 'spieler' && !isHidden) {
           if (hasDisclaimer && !isSelfBannedUser) {
             users.push({ username, balance, hasDisclaimer: true });
           }
@@ -180,7 +180,7 @@ async function handleLeaderboardUncached(env, loggedInUser, showAll, isAdminUser
         const username = usernames[j];
         const lowerUsername = username.toLowerCase();
 
-        if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler' && !hiddenStatuses[j]) {
+        if (!isNaN(balance) && balance > 0 && lowerUsername !== 'spieler' && !hiddenStatuses[j]) {
           if (!selfBanStatuses[j]) {
             users.push({ username, balance, hasDisclaimer: disclaimerStatuses[j] });
           }

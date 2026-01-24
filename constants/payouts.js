@@ -6,7 +6,6 @@
 export const DAILY_AMOUNT = 50;
 export const DAILY_BOOST_AMOUNT = 250;
 export const LOW_BALANCE_WARNING = 100;
-export const HOURLY_JACKPOT_AMOUNT = 100;
 
 // Dachs Payouts
 export const DACHS_TRIPLE_PAYOUT = 15000;
@@ -46,6 +45,9 @@ export const REVERSE_CHAOS_MAX = 200;
 // Diamond Mine
 export const DIAMOND_MINE_MIN_SPINS = 3;
 export const DIAMOND_MINE_MAX_SPINS = 5;
+
+// Hourly Jackpot
+export const HOURLY_JACKPOT_AMOUNT = 100;
 
 // Rage Mode
 export const RAGE_MODE_LOSS_STACK = 5;

@@ -19,8 +19,7 @@
 | [⚠️ Disclaimer](#-disclaimer) | [🚀 Schnellstart](#-schnellstart) |
 | [⚠️ Wichtig zu wissen](#️-wichtig-zu-wissen) | [📋 Commands](#-commands) |
 | [💎 Gewinne & Chancen](#-gewinne--chancen) | [⚔️ Duell-System](#️-duell-system) |
-| [🛒 Shop-Übersicht](#-shop-übersicht) | [🏦 DachsBank](#-dachsbank) |
-| [❓ FAQ](#-faq) | |
+| [🛒 Shop-Übersicht](#-shop-übersicht) | [❓ FAQ](#-faq) |
 
 ---
 
@@ -124,7 +123,6 @@ Kaufe die Unlocks im Shop in dieser Reihenfolge:
 | `!shop` | Shop-Link anzeigen |
 | `!shop buy [Nr]` | Item kaufen (z.B. `!shop buy 38`) |
 | `!transfer @user [Betrag]` | DachsTaler senden (1–100.000) |
-| `!transfer @dachsbank [Betrag]` | An Bank spenden |
 
 ### Website & Erfolge
 
@@ -139,7 +137,6 @@ Kaufe die Unlocks im Shop in dieser Reihenfolge:
 | Command | Beschreibung | Voraussetzung |
 |:--------|:-------------|:--------------|
 | `!slots stats` | Persönliche Statistiken | Stats Tracker (#18) |
-| `!slots bank` | DachsBank Kontostand | – |
 | `!slots info / help / commands` | Link zu diesem Dokument | – |
 | `!slots disclaimer` | Glücksspiel-Warnung | – |
 | `!slots selfban` | Selbstausschluss | – |
@@ -441,24 +438,6 @@ Um wieder Duelle zu aktivieren:
 
 ---
 
-## 🏦 DachsBank
-
-Die DachsBank trackt die gesamte Casino-Ökonomie.
-
-| Bank erhält | Bank zahlt |
-|:------------|:-----------|
-| ✅ Jeden Spin-Einsatz | ✅ Jeden Gewinn |
-| ✅ Jeden Shop-Kauf | ✅ Alle Boni |
-| ✅ Spenden von Spielern | |
-
-**Commands:**
-- `!slots bank` – Kontostand anzeigen
-- `!transfer @dachsbank [Betrag]` – Spenden
-
-> **Startguthaben:** 444.444 DachsTaler • Kann ins Minus gehen!
-
----
-
 ## ❓ FAQ
 
 <details>
@@ -598,8 +577,6 @@ Das Wild ersetzt **jedes Symbol** für den besten Outcome:
 | Command | Beschreibung |
 |:--------|:-------------|
 | `!slots maintenance [on/off]` | Wartungsmodus |
-| `!slots bankset [Betrag]` | DachsBank Balance setzen |
-| `!slots bankreset` | DachsBank auf 0 zurücksetzen |
 
 </details>
 

@@ -237,8 +237,8 @@ async function handleLeaderboardApi(env) {
           const lowerUsername = username.toLowerCase();
           const isHidden = hiddenStatuses[j];
 
-          // Filter out DachsBank, "Spieler", and hidden users
-          if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler' && !isHidden) {
+          // Filter out "Spieler" and hidden users
+          if (!isNaN(balance) && balance > 0 && lowerUsername !== 'spieler' && !isHidden) {
             users.push({
               username,
               balance
@@ -293,7 +293,7 @@ async function handleSearchApi(query, env, request) {
     const matches = [];
     for (const key of listResult.keys) {
       const username = key.name.replace('user:', '');
-      if (username.toLowerCase().includes(searchQuery) && username.toLowerCase() !== 'dachsbank') {
+      if (username.toLowerCase().includes(searchQuery)) {
         matches.push(username);
         if (matches.length >= 10) break; // Limit to 10 suggestions
       }

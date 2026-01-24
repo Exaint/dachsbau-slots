@@ -86,15 +86,7 @@ export const FREE_SPIN_COST_THRESHOLD = 1000;
 export const JACKPOT_LUCKY_SECOND_DIVISOR = 60;
 
 // ===========================================
-// 5. Bank Settings
-// ===========================================
-
-export const BANK_USERNAME = 'dachsbank';
-export const BANK_START_BALANCE = 444444;
-export const BANK_KEY = `user:${BANK_USERNAME}`;
-
-// ===========================================
-// 5b. Twitch Channel Settings
+// 5. Twitch Channel Settings
 // ===========================================
 
 export const BROADCASTER_LOGIN = 'frechhdachs';

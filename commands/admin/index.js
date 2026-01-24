@@ -18,8 +18,6 @@ export {
 export {
   handleGive,
   handleSetBalance,
-  handleBankSet,
-  handleBankReset,
   handleGiveBuff,
   handleRemoveBuff,
   handleClearAllBuffs,

@@ -43,9 +43,6 @@ export async function migrateAllUsersToD1(env, options = {}) {
       const result = await env.SLOTS_KV.list(listOptions);
 
       for (const key of result.keys) {
-        // Skip special accounts like dachsbank
-        if (key.name === 'user:dachsbank') continue;
-
         const username = key.name.replace('user:', '');
         const balance = await env.SLOTS_KV.get(key.name);
 
@@ -272,7 +269,7 @@ export async function getMigrationStatus(env) {
       if (cursor) listOptions.cursor = cursor;
 
       const result = await env.SLOTS_KV.list(listOptions);
-      kvCount += result.keys.filter(k => k.name !== 'user:dachsbank').length;
+      kvCount += result.keys.length;
       cursor = result.cursor;
     } while (cursor);
 
@@ -706,7 +703,7 @@ export async function getFullMigrationStatus(env) {
         if (cursor) listOptions.cursor = cursor;
         const result = await env.SLOTS_KV.list(listOptions);
         kvCounts[key] += result.keys.filter(k =>
-          !k.name.includes('dachsbank') && !k.name.includes('spieler')
+          !k.name.includes('spieler')
         ).length;
         cursor = result.cursor;
       } while (cursor);

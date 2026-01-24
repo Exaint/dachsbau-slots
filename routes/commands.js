@@ -12,7 +12,6 @@ import {
   handleStats,
   handleDaily,
   handleBuffs,
-  handleBank,
   handleTransfer,
   handleLeaderboard
 } from '../commands/user.js';
@@ -26,8 +25,6 @@ import {
   handleFreeze,
   handleUnfreeze,
   handleSetBalance,
-  handleBankSet,
-  handleBankReset,
   handleGiveBuff,
   handleRemoveBuff,
   handleClearAllBuffs,
@@ -62,7 +59,7 @@ export const ACHIEVEMENTS_ALIASES = new Set(['erfolge', 'achievements']);
 
 // Commands that don't need security checks (read-only info commands)
 export const SAFE_COMMANDS = new Set([
-  'stats', 'buffs', 'bank', 'ping',
+  'stats', 'buffs', 'ping',
   ...LEADERBOARD_ALIASES, ...BALANCE_ALIASES, ...INFO_ALIASES,
   ...WEBSITE_ALIASES, ...ACHIEVEMENTS_ALIASES
 ]);
@@ -188,7 +185,6 @@ export async function handleSlotSubcommands(cleanUsername, lower, url, env) {
   if (lower === 'daily') return await handleDaily(cleanUsername, env);
   if (lower === 'stats') return await handleStats(cleanUsername, env);
   if (lower === 'buffs') return await handleBuffs(cleanUsername, env);
-  if (lower === 'bank') return await handleBank(cleanUsername, env);
   if (lower === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
 
   // Admin commands with target only
@@ -207,8 +203,6 @@ export async function handleSlotSubcommands(cleanUsername, lower, url, env) {
   }
 
   // Special admin commands with unique signatures
-  if (lower === 'bankset') return await handleBankSet(cleanUsername, url.searchParams.get('target'), env);
-  if (lower === 'bankreset') return await handleBankReset(cleanUsername, env);
   if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target'), env);
   if (lower === 'givefreespins') return await handleGiveFreespins(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), url.searchParams.get('multiplier'), env);
 

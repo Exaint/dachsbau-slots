@@ -73,7 +73,6 @@ import {
   incrementDachsBoostPurchases,
   activateGuaranteedPair,
   activateWildCard,
-  updateBankBalance,
   isBuffActive,
   updateAchievementStat,
   checkAndUnlockAchievement,
@@ -195,7 +194,6 @@ async function handlePrestigeItem(username, item, itemId, balance, currentRank, 
     setPrestigeRank(username, item.rank, env),
     setBalance(username, balance - item.price, env)
   ]);
-  await updateBankBalance(item.price, env);
 
   // Fire-and-forget achievement tracking
   trackShopAchievements(username, itemId, item, null, env);
@@ -214,8 +212,7 @@ async function handleUnlockItem(username, item, itemId, balance, hasPrerequisite
 
   await Promise.all([
     setUnlock(username, item.unlockKey, env),
-    setBalance(username, balance - item.price, env),
-    updateBankBalance(item.price, env)
+    setBalance(username, balance - item.price, env)
   ]);
 
   // Fire-and-forget achievement tracking
@@ -230,10 +227,7 @@ async function handleUnlockItem(username, item, itemId, balance, hasPrerequisite
 }
 
 async function handleTimedItem(username, item, itemId, balance, env) {
-  await Promise.all([
-    setBalance(username, balance - item.price, env),
-    updateBankBalance(item.price, env)
-  ]);
+  await setBalance(username, balance - item.price, env);
 
   if (item.uses) {
     await activateBuffWithUses(username, item.buffKey, item.duration, item.uses, env);
@@ -274,8 +268,7 @@ async function handleBoostItem(username, item, itemId, balance, env) {
     await Promise.all([
       setBalance(username, balance - item.price, env),
       addBoost(username, item.symbol, env),
-      incrementDachsBoostPurchases(username, env),
-      updateBankBalance(item.price, env)
+      incrementDachsBoostPurchases(username, env)
     ]);
 
     return new Response(`@${username} ✅ ${item.name} aktiviert! Dein nächster Gewinn mit ${item.symbol} wird verdoppelt! | Kontostand: ${balance - item.price} 🦡 | Du kannst diese Woche keinen weiteren Dachs-Boost kaufen`, { headers: RESPONSE_HEADERS });
@@ -283,8 +276,7 @@ async function handleBoostItem(username, item, itemId, balance, env) {
 
   await Promise.all([
     setBalance(username, balance - item.price, env),
-    addBoost(username, item.symbol, env),
-    updateBankBalance(item.price, env)
+    addBoost(username, item.symbol, env)
   ]);
   return new Response(`@${username} ✅ ${item.name} aktiviert! Dein nächster Gewinn mit ${item.symbol} wird verdoppelt! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
@@ -292,8 +284,7 @@ async function handleBoostItem(username, item, itemId, balance, env) {
 async function handleInsuranceItem(username, item, itemId, balance, env) {
   await Promise.all([
     setBalance(username, balance - item.price, env),
-    addInsurance(username, 5, env),
-    updateBankBalance(item.price, env)
+    addInsurance(username, 5, env)
   ]);
   return new Response(`@${username} ✅ Insurance Pack erhalten! Die nächsten 5 Verluste geben 50% des Einsatzes zurück! 🛡️ | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
@@ -301,8 +292,7 @@ async function handleInsuranceItem(username, item, itemId, balance, env) {
 async function handleWinMultiItem(username, item, itemId, balance, env) {
   await Promise.all([
     setBalance(username, balance - item.price, env),
-    addWinMultiplier(username, env),
-    updateBankBalance(item.price, env)
+    addWinMultiplier(username, env)
   ]);
   return new Response(`@${username} ✅ Win Multiplier aktiviert! Dein nächster Gewinn wird x2! ⚡ | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
@@ -316,8 +306,7 @@ async function handleBundleItem(username, item, itemId, balance, env) {
   await Promise.all([
     setBalance(username, balance - item.price, env),
     addFreeSpinsWithMultiplier(username, SPIN_BUNDLE_COUNT, SPIN_BUNDLE_MULTIPLIER, env),
-    incrementSpinBundlePurchases(username, env),
-    updateBankBalance(item.price, env)
+    incrementSpinBundlePurchases(username, env)
   ]);
 
   const remainingPurchases = WEEKLY_SPIN_BUNDLE_LIMIT - (purchases.count + 1);
@@ -336,10 +325,7 @@ async function handlePeekItem(username, item, itemId, balance, env) {
     env.SLOTS_KV.get(`buff:${lowerUsername}:rage_mode`)
   ]);
 
-  await Promise.all([
-    setBalance(username, balance - item.price, env),
-    updateBankBalance(item.price, env)
-  ]);
+  await setBalance(username, balance - item.price, env);
 
   // Calculate Dachs chance with all buffs
   let peekDachsChance = DACHS_BASE_CHANCE;
@@ -403,11 +389,7 @@ async function handleInstantItem(username, item, itemId, balance, env) {
   if (itemId === 11) {
     const result = secureRandomInt(CHAOS_SPIN_MIN, CHAOS_SPIN_MAX);
     const newBalance = Math.min(balance - item.price + result, MAX_BALANCE);
-    const netBankChange = item.price - result;
-    await Promise.all([
-      setBalance(username, Math.max(0, newBalance), env),
-      updateBankBalance(netBankChange, env)
-    ]);
+    await setBalance(username, Math.max(0, newBalance), env);
     // Fire-and-forget achievement tracking
     trackShopAchievements(username, itemId, item, { chaosResult: result }, env);
     return new Response(`@${username} 🎲 Chaos Spin! ${result >= 0 ? '+' : ''}${result} DachsTaler! | Kontostand: ${Math.max(0, newBalance)}`, { headers: RESPONSE_HEADERS });
@@ -417,11 +399,7 @@ async function handleInstantItem(username, item, itemId, balance, env) {
   if (itemId === 12) {
     const wheel = spinWheel();
     const newBalance = Math.max(0, Math.min(balance - item.price + wheel.prize, MAX_BALANCE));
-    const netBankChange = item.price - wheel.prize;
-    await Promise.all([
-      setBalance(username, newBalance, env),
-      updateBankBalance(netBankChange, env)
-    ]);
+    await setBalance(username, newBalance, env);
     // Fire-and-forget achievement tracking (wheelJackpot = 5x Dachs)
     const isWheelJackpot = wheel.prize === WHEEL_JACKPOT_PRIZE;
     trackShopAchievements(username, itemId, item, { wheelJackpot: isWheelJackpot }, env);
@@ -430,10 +408,7 @@ async function handleInstantItem(username, item, itemId, balance, env) {
   }
 
   // All other instant items: deduct price first
-  await Promise.all([
-    setBalance(username, balance - item.price, env),
-    updateBankBalance(item.price, env)
-  ]);
+  await setBalance(username, balance - item.price, env);
 
   // Mystery Box (ID 16)
   if (itemId === 16) {
@@ -447,10 +422,7 @@ async function handleInstantItem(username, item, itemId, balance, env) {
   if (itemId === 31) {
     const result = secureRandomInt(REVERSE_CHAOS_MIN, REVERSE_CHAOS_MAX);
     const newBalance = Math.max(0, Math.min(balance - item.price + result, MAX_BALANCE));
-    await Promise.all([
-      setBalance(username, newBalance, env),
-      updateBankBalance(-result, env)
-    ]);
+    await setBalance(username, newBalance, env);
     // Fire-and-forget achievement tracking
     trackShopAchievements(username, itemId, item, null, env);
     return new Response(`@${username} 🎲 Reverse Chaos! +${result} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
@@ -521,10 +493,7 @@ async function handleMysteryBox(username, item, balance, env) {
     // Rollback: Refund balance and reverse bank update if activation failed
     logError('MysteryBox.activation', activationError, { username, mysteryItemId, mysteryItemName: mysteryResult.name });
     try {
-      await Promise.all([
-        setBalance(username, balance, env),
-        updateBankBalance(-item.price, env)
-      ]);
+      await setBalance(username, balance, env);
       // Verify rollback succeeded
       const verifyBalance = await getBalance(username, env);
       if (verifyBalance !== balance) {

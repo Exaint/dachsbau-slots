@@ -204,7 +204,8 @@ export function renderProfilePage(data) {
           <div class="custom-messages-list" id="winMessages">
             ${winMsgs.map((msg, i) => `
               <div class="custom-message-row">
-                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht...">
+                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht..." oninput="updateCharCount(this)">
+                <span class="custom-message-chars">${50 - msg.length}</span>
                 <button class="custom-message-remove" onclick="removeMessageRow(this)" title="Entfernen">&times;</button>
               </div>
             `).join('')}
@@ -219,7 +220,8 @@ export function renderProfilePage(data) {
           <div class="custom-messages-list" id="lossMessages">
             ${lossMsgs.map((msg, i) => `
               <div class="custom-message-row">
-                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht...">
+                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht..." oninput="updateCharCount(this)">
+                <span class="custom-message-chars">${50 - msg.length}</span>
                 <button class="custom-message-remove" onclick="removeMessageRow(this)" title="Entfernen">&times;</button>
               </div>
             `).join('')}

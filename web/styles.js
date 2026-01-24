@@ -337,14 +337,6 @@ body {
   background: linear-gradient(135deg, var(--gradient-start) 0%, rgba(124, 58, 237, 0.12) 100%);
 }
 
-[data-theme="light"] .bank-card.income {
-  background: linear-gradient(135deg, var(--gradient-start), rgba(5, 150, 105, 0.1));
-}
-
-[data-theme="light"] .bank-card.expense {
-  background: linear-gradient(135deg, var(--gradient-start), rgba(220, 38, 38, 0.1));
-}
-
 [data-theme="light"] .streak-row.hot,
 [data-theme="light"] .bonus-row.highlight,
 [data-theme="light"] .combo-item.hot {
@@ -981,6 +973,31 @@ body {
 .custom-message-remove:hover {
   color: var(--error);
   background: rgba(255, 0, 0, 0.1);
+}
+
+.custom-message-chars {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  min-width: 20px;
+  text-align: right;
+}
+
+.custom-message-chars.chars-low {
+  color: var(--warning, #f59e0b);
+}
+
+.custom-message-chars.chars-zero {
+  color: var(--error);
+}
+
+.custom-message-error {
+  font-size: 0.8rem;
+  color: var(--error);
+  padding: 2px 0 4px 0;
+}
+
+.custom-message-input.input-error {
+  border-color: var(--error);
 }
 
 .custom-messages-actions {
@@ -4189,46 +4206,6 @@ body {
   font-size: 1.2rem;
 }
 
-/* Bank Grid */
-.bank-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin: 16px 0;
-}
-
-.bank-card {
-  padding: 16px;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-}
-
-.bank-card h4 {
-  margin: 0 0 12px;
-  color: var(--text-primary);
-}
-
-.bank-card ul {
-  margin: 0;
-  padding-left: 20px;
-  color: var(--text-secondary);
-}
-
-.bank-card li {
-  margin-bottom: 6px;
-}
-
-.bank-card.income {
-  border-color: var(--success);
-  background: linear-gradient(135deg, var(--bg-tertiary), rgba(0, 245, 147, 0.05));
-}
-
-.bank-card.expense {
-  border-color: var(--error);
-  background: linear-gradient(135deg, var(--bg-tertiary), rgba(248, 113, 113, 0.05));
-}
-
 /* Info Accordion */
 .info-accordion {
   background: var(--bg-secondary);
@@ -4597,10 +4574,6 @@ div[id] {
 
   .step-number {
     align-self: flex-start;
-  }
-
-  .bank-grid {
-    grid-template-columns: 1fr;
   }
 
   .bonus-cards {

@@ -26,7 +26,7 @@
 
 import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
 import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStatBatch, setMaxAchievementStat, checkBalanceAchievements, incrementStat, updateMaxStat } from '../database.js';
-import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown } from '../database/duels.js';
+import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
 
 /**
@@ -293,6 +293,22 @@ async function handleDuelAccept(username, env) {
       trackDuelAchievements(duel.challenger, false, 0, env);
       trackDuelAchievements(username, false, 0, env);
     }
+
+    // Fire-and-forget D1 duel log
+    const winner = challengerScore.score > targetScore.score ? duel.challenger
+      : targetScore.score > challengerScore.score ? username
+      : null;
+    logDuel({
+      challenger: duel.challenger,
+      target: username,
+      amount: duel.amount,
+      challengerGrid,
+      targetGrid,
+      challengerScore: challengerScore.score,
+      targetScore: targetScore.score,
+      winner,
+      pot
+    }, env);
 
     // Build response
     const challengerGridStr = challengerGrid.join(' ');

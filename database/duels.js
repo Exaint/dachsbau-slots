@@ -22,6 +22,7 @@
 
 import { DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, KV_TRUE } from '../constants.js';
 import { logError, kvKey } from '../utils.js';
+import { D1_ENABLED } from './d1.js';
 
 /**
  * Create a new duel challenge
@@ -224,6 +225,43 @@ async function setDuelCooldown(username, env) {
   }
 }
 
+/**
+ * Log a completed duel to D1 (fire-and-forget)
+ * @param {object} data - Duel result data
+ * @param {string} data.challenger - Challenger username
+ * @param {string} data.target - Target username
+ * @param {number} data.amount - Bet amount per player
+ * @param {string[]} data.challengerGrid - Challenger's 3 symbols
+ * @param {string[]} data.targetGrid - Target's 3 symbols
+ * @param {number} data.challengerScore - Challenger's calculated score
+ * @param {number} data.targetScore - Target's calculated score
+ * @param {string|null} data.winner - Winner username or null for tie
+ * @param {number} data.pot - Total pot (amount * 2)
+ * @param {object} env - Environment with DB binding
+ */
+async function logDuel(data, env) {
+  if (!D1_ENABLED || !env.DB) return;
+
+  try {
+    await env.DB.prepare(`
+      INSERT INTO duel_log (challenger, target, amount, challenger_grid, target_grid, challenger_score, target_score, winner, pot)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.challenger.toLowerCase(),
+      data.target.toLowerCase(),
+      data.amount,
+      JSON.stringify(data.challengerGrid),
+      JSON.stringify(data.targetGrid),
+      data.challengerScore,
+      data.targetScore,
+      data.winner ? data.winner.toLowerCase() : null,
+      data.pot
+    ).run();
+  } catch (error) {
+    logError('logDuel', error, { challenger: data.challenger, target: data.target });
+  }
+}
+
 export {
   createDuel,
   getDuel,
@@ -234,5 +272,6 @@ export {
   setDuelOptOut,
   isDuelOptedOut,
   getDuelCooldown,
-  setDuelCooldown
+  setDuelCooldown,
+  logDuel
 };

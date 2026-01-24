@@ -104,7 +104,8 @@ export {
 // Duels
 export {
   setDuelOptOut,
-  isDuelOptedOut
+  isDuelOptedOut,
+  logDuel
 } from './duels.js';
 
 // Achievements

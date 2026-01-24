@@ -6,7 +6,7 @@
 import { CSS_V2 } from '../../styles-v2.js';
 import { escapeHtml } from '../utils.js';
 import { htmlResponse } from '../template.js';
-import { isAdmin } from '../../utils.js';
+import { isAdmin } from '../../../utils.js';
 
 // Re-export htmlResponse for V2 pages
 export { htmlResponse };

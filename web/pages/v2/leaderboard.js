@@ -2,12 +2,12 @@
  * V2 Leaderboard Page Handler and Renderer
  */
 
-import { hasAcceptedDisclaimer } from '../../database.js';
-import { isSelfBanned } from '../../database.js';
-import { isLeaderboardHidden } from '../../database/core.js';
-import { getUserRole, getTwitchUser } from '../twitch.js';
-import { LEADERBOARD_LIMIT, LEADERBOARD_DISPLAY_LIMIT } from '../../constants.js';
-import { isAdmin, logError } from '../../utils.js';
+import { hasAcceptedDisclaimer } from '../../../database.js';
+import { isSelfBanned } from '../../../database.js';
+import { isLeaderboardHidden } from '../../../database/core.js';
+import { getUserRole, getTwitchUser } from '../../twitch.js';
+import { LEADERBOARD_LIMIT, LEADERBOARD_DISPLAY_LIMIT } from '../../../constants.js';
+import { isAdmin, logError } from '../../../utils.js';
 import { escapeHtml, formatNumber } from '../utils.js';
 import { ROLE_BADGES, R2_BASE } from '../ui-config.js';
 import { baseTemplateV2, htmlResponse } from './template.js';

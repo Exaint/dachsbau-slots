@@ -2,7 +2,7 @@
  * V2 Info Page Renderer
  */
 
-import { isAdmin } from '../../utils.js';
+import { isAdmin } from '../../../utils.js';
 import { baseTemplateV2 } from './template.js';
 
 export function renderInfoPageV2(user = null) {

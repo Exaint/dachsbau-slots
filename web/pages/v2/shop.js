@@ -3,9 +3,9 @@
  * "Luxury Woodland Lodge" aesthetic redesign
  */
 
-import { getBalance, getPrestigeRank, hasUnlock } from '../../database.js';
-import { SHOP_ITEMS } from '../../constants.js';
-import { isWebPurchasable } from '../../routes/shop.js';
+import { getBalance, getPrestigeRank, hasUnlock } from '../../../database.js';
+import { SHOP_ITEMS } from '../../../constants.js';
+import { isWebPurchasable } from '../../../routes/shop.js';
 import { escapeHtml, formatNumber } from '../utils.js';
 import { baseTemplateV2 } from './template.js';
 

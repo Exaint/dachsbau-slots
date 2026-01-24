@@ -2,12 +2,12 @@
  * V2 Profile Page Handler and Renderer
  */
 
-import { getPlayerAchievements, getStats, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned } from '../../database.js';
-import { isDuelOptedOut } from '../../database/duels.js';
-import { isLeaderboardHidden } from '../../database/core.js';
-import { getTwitchProfileData } from '../twitch.js';
-import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement } from '../../constants.js';
-import { isAdmin } from '../../utils.js';
+import { getPlayerAchievements, getStats, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned } from '../../../database.js';
+import { isDuelOptedOut } from '../../../database/duels.js';
+import { isLeaderboardHidden } from '../../../database/core.js';
+import { getTwitchProfileData } from '../../twitch.js';
+import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement } from '../../../constants.js';
+import { isAdmin } from '../../../utils.js';
 import { escapeHtml, formatNumber } from '../utils.js';
 import { CATEGORY_ICONS, CATEGORY_NAMES, PRESTIGE_RANK_NAMES, ROLE_BADGES, ADMIN_ROLE_OVERRIDES } from '../ui-config.js';
 import { baseTemplateV2, htmlResponse } from './template.js';

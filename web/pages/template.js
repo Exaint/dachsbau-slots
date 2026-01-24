@@ -5,6 +5,7 @@
 
 import { CSS } from '../styles.js';
 import { escapeHtml } from './utils.js';
+import { isAdmin } from '../../utils.js';
 
 // Disclaimer HTML shown on all pages
 const DISCLAIMER_HTML = `
@@ -145,6 +146,7 @@ export function baseTemplate(title, content, activePage = '', user = null) {
       <span class="theme-toggle-icon" aria-hidden="true">🌙</span>
       <span class="theme-toggle-label">Dark</span>
     </button>
+    ${user && isAdmin(user.username) ? '<button style="margin-top:8px;padding:4px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:var(--text-muted);font-size:0.7rem;cursor:pointer" onclick="toggleDesignVersion(\'v2\')">Design V2 testen &#8594;</button>' : ''}
   </footer>
 
   <!-- Toast Notification Container -->
@@ -1124,6 +1126,15 @@ function getClientScripts() {
         });
       });
     });
+
+    // Design version toggle (admin only)
+    async function toggleDesignVersion(version) {
+      try {
+        const response = await fetch('?api=design-toggle&version=' + version, { method: 'POST', credentials: 'same-origin' });
+        if (response.ok) { window.location.reload(); }
+        else { showToast('Fehler beim Wechseln', 'error'); }
+      } catch (e) { showToast('Netzwerkfehler', 'error'); }
+    }
   </script>`;
 }
 

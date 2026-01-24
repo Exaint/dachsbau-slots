@@ -65,6 +65,9 @@ export async function handleApi(api, url, env, loggedInUser = null, request = nu
         return await handleLeaderboardApi(env);
       case 'search':
         return await handleSearchApi(url.searchParams.get('q'), env, request);
+      // Design version toggle (admin-only)
+      case 'design-toggle':
+        return handleDesignToggle(url, loggedInUser);
       // Admin endpoints
       case 'admin':
         return await handleAdminApi(url, env, loggedInUser, request);
@@ -317,6 +320,32 @@ function jsonResponse(data, status = 200, cacheSeconds = 0) {
   return new Response(JSON.stringify(data), {
     status,
     headers
+  });
+}
+
+// ==================== DESIGN TOGGLE ====================
+
+/**
+ * Handle design version toggle (admin-only)
+ * Sets a cookie to switch between V1 and V2 design
+ */
+function handleDesignToggle(url, loggedInUser) {
+  if (!loggedInUser) {
+    return jsonResponse({ error: 'Not authenticated' }, 401);
+  }
+  if (!isAdmin(loggedInUser.username)) {
+    return jsonResponse({ error: 'Admin only' }, 403);
+  }
+
+  const version = url.searchParams.get('version') === 'v1' ? 'v1' : 'v2';
+  const maxAge = 365 * 24 * 60 * 60; // 1 year
+
+  return new Response(JSON.stringify({ success: true, version }), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Set-Cookie': `dachsbau_design=${version}; Path=/; SameSite=Lax; Max-Age=${maxAge}`
+    }
   });
 }
 

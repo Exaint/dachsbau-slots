@@ -18,7 +18,7 @@ import { validateCsrf, handleApiRoutes } from './routes/api.js';
 import { handleSlotAction, handleLegacyActions } from './routes/commands.js';
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     try {
       const url = new URL(request.url);
 
@@ -54,7 +54,7 @@ export default {
       // Web pages (HTML)
       const page = url.searchParams.get('page');
       if (page) {
-        return await handleWebPage(page, url, env, loggedInUser);
+        return await handleWebPage(page, url, env, loggedInUser, ctx);
       }
 
       // API endpoints (JSON)

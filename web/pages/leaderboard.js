@@ -6,132 +6,206 @@ import { hasAcceptedDisclaimer } from '../../database.js';
 import { isSelfBanned } from '../../database.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getUserRole, getTwitchUser } from '../twitch.js';
-import { LEADERBOARD_LIMIT, LEADERBOARD_DISPLAY_LIMIT } from '../../constants.js';
+import { LEADERBOARD_LIMIT, LEADERBOARD_DISPLAY_LIMIT, WEB_LEADERBOARD_CACHE_TTL } from '../../constants.js';
 import { isAdmin, logError } from '../../utils.js';
+
+const CACHE_KEY = 'cache:web_leaderboard';
 import { escapeHtml, formatNumber } from './utils.js';
 import { ROLE_BADGES, R2_BASE } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
 
 /**
- * Leaderboard page handler
+ * Compute leaderboard data (expensive: ~2000 KV operations)
+ * Returns { topPlayers, allUsers, timestamp }
  */
-export async function handleLeaderboardPage(env, loggedInUser = null, showAll = false) {
+async function computeLeaderboardData(env) {
   const BATCH_SIZE = 100;
 
-  // Only admins can use showAll filter
-  const isAdminUser = loggedInUser && isAdmin(loggedInUser.username);
-  const actualShowAll = isAdminUser && showAll;
+  const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
 
-  try {
-    const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
+  if (!listResult.keys || listResult.keys.length === 0) {
+    return { topPlayers: [], allUsers: [], timestamp: Date.now() };
+  }
 
-    if (!listResult.keys || listResult.keys.length === 0) {
-      return htmlResponse(renderLeaderboardPage([], loggedInUser, actualShowAll, isAdminUser));
-    }
+  const users = [];
 
-    const users = [];
+  for (let i = 0; i < listResult.keys.length; i += BATCH_SIZE) {
+    const batch = listResult.keys.slice(i, i + BATCH_SIZE);
+    const usernames = batch.map(key => key.name.replace('user:', ''));
 
-    // Batch fetch balances, disclaimer status, self-ban status, and leaderboard hidden status
-    for (let i = 0; i < listResult.keys.length; i += BATCH_SIZE) {
-      const batch = listResult.keys.slice(i, i + BATCH_SIZE);
-      const usernames = batch.map(key => key.name.replace('user:', ''));
+    const [balances, disclaimerStatuses, selfBanStatuses, hiddenStatuses] = await Promise.all([
+      Promise.all(batch.map(key => env.SLOTS_KV.get(key.name))),
+      Promise.all(usernames.map(username => hasAcceptedDisclaimer(username, env))),
+      Promise.all(usernames.map(username => isSelfBanned(username, env))),
+      Promise.all(usernames.map(username => isLeaderboardHidden(username, env)))
+    ]);
 
-      // Fetch balances, disclaimer status, self-ban status, and hidden status in parallel
-      const [balances, disclaimerStatuses, selfBanStatuses, hiddenStatuses] = await Promise.all([
-        Promise.all(batch.map(key => env.SLOTS_KV.get(key.name))),
-        Promise.all(usernames.map(username => hasAcceptedDisclaimer(username, env))),
-        Promise.all(usernames.map(username => isSelfBanned(username, env))),
-        Promise.all(usernames.map(username => isLeaderboardHidden(username, env)))
-      ]);
+    for (let j = 0; j < batch.length; j++) {
+      if (balances[j]) {
+        const balance = parseInt(balances[j], 10);
+        const username = usernames[j];
+        const lowerUsername = username.toLowerCase();
+        const hasDisclaimer = disclaimerStatuses[j];
+        const isSelfBannedUser = selfBanStatuses[j];
+        const isHidden = hiddenStatuses[j];
 
-      for (let j = 0; j < batch.length; j++) {
-        if (balances[j]) {
-          const balance = parseInt(balances[j], 10);
-          const username = usernames[j];
-          const lowerUsername = username.toLowerCase();
-          const hasDisclaimer = disclaimerStatuses[j];
-          const isSelfBannedUser = selfBanStatuses[j];
-          const isHidden = hiddenStatuses[j];
-
-          // Base filter: valid balance, not system accounts, not hidden from leaderboard
-          if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler' && !isHidden) {
-            // Admin showAll: show all users (even without disclaimer), but still hide self-banned
-            // Normal: show only users with disclaimer and not self-banned
-            if (actualShowAll) {
-              // Admin view: show all, mark those without disclaimer
-              if (!isSelfBannedUser) {
-                users.push({
-                  username,
-                  balance,
-                  hasDisclaimer
-                });
-              }
-            } else {
-              // Normal view: only show users with disclaimer and not self-banned
-              if (hasDisclaimer && !isSelfBannedUser) {
-                users.push({
-                  username,
-                  balance,
-                  hasDisclaimer: true
-                });
-              }
-            }
+        if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler' && !isHidden) {
+          if (hasDisclaimer && !isSelfBannedUser) {
+            users.push({ username, balance, hasDisclaimer: true });
           }
         }
       }
     }
+  }
 
-    // Sort by balance descending
-    users.sort((a, b) => b.balance - a.balance);
+  users.sort((a, b) => b.balance - a.balance);
 
-    // Get top N for display (LEADERBOARD_DISPLAY_LIMIT = 25)
-    const topN = users.slice(0, LEADERBOARD_DISPLAY_LIMIT);
+  const topN = users.slice(0, LEADERBOARD_DISPLAY_LIMIT);
 
-    // Find logged-in user's rank if they exist and are not in top N
+  // Fetch Twitch roles and avatars for top N
+  const [roles, twitchUsers] = await Promise.all([
+    Promise.all(topN.map(user => getUserRole(user.username, env))),
+    Promise.all(topN.map(user => getTwitchUser(user.username, env)))
+  ]);
+
+  const topPlayers = topN.map((user, index) => ({
+    ...user,
+    role: roles[index],
+    avatar: twitchUsers[index]?.avatar || null
+  }));
+
+  const allUsers = users.map((u, i) => ({ u: u.username, b: u.balance, r: i + 1 }));
+
+  return { topPlayers, allUsers, timestamp: Date.now() };
+}
+
+/**
+ * Compute and store leaderboard data in KV cache
+ */
+async function computeAndCache(env) {
+  const data = await computeLeaderboardData(env);
+  await env.SLOTS_KV.put(CACHE_KEY, JSON.stringify(data), {
+    expirationTtl: WEB_LEADERBOARD_CACHE_TTL * 5
+  });
+  return data;
+}
+
+/**
+ * Leaderboard page handler with stale-while-revalidate caching
+ */
+export async function handleLeaderboardPage(env, loggedInUser = null, showAll = false, ctx = null) {
+  const isAdminUser = loggedInUser && isAdmin(loggedInUser.username);
+  const actualShowAll = isAdminUser && showAll;
+
+  try {
+    // Admin showAll bypasses cache (rare, needs different data)
+    if (actualShowAll) {
+      return await handleLeaderboardUncached(env, loggedInUser, true, isAdminUser);
+    }
+
+    // Try cache
+    const cached = await env.SLOTS_KV.get(CACHE_KEY);
+    let data;
+
+    if (cached) {
+      try {
+        data = JSON.parse(cached);
+        const age = Date.now() - data.timestamp;
+
+        if (age > WEB_LEADERBOARD_CACHE_TTL * 1000 && ctx) {
+          // Stale: serve immediately, revalidate in background
+          ctx.waitUntil(computeAndCache(env).catch(err => logError('leaderboard.revalidate', err)));
+        }
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!data) {
+      // No cache or corrupt: compute synchronously
+      data = await computeAndCache(env);
+    }
+
+    // Derive current user's rank from cached allUsers (cheap)
     let currentUserRank = null;
-    if (loggedInUser) {
-      const userIndex = users.findIndex(u => u.username.toLowerCase() === loggedInUser.username.toLowerCase());
-      if (userIndex >= LEADERBOARD_DISPLAY_LIMIT) {
-        // User is not in top N, get their data
+    if (loggedInUser && data.allUsers) {
+      const userEntry = data.allUsers.find(u => u.u.toLowerCase() === loggedInUser.username.toLowerCase());
+      if (userEntry && userEntry.r > LEADERBOARD_DISPLAY_LIMIT) {
         currentUserRank = {
-          ...users[userIndex],
-          rank: userIndex + 1
+          username: userEntry.u,
+          balance: userEntry.b,
+          rank: userEntry.r,
+          hasDisclaimer: true,
+          role: null,
+          avatar: null
         };
       }
     }
 
-    // Fetch Twitch roles and avatars for top N players
-    // Also fetch for current user if they're not in top N
-    const usersToFetch = currentUserRank ? [...topN, currentUserRank] : topN;
-
-    const [roles, twitchUsers] = await Promise.all([
-      Promise.all(usersToFetch.map(user => getUserRole(user.username, env))),
-      Promise.all(usersToFetch.map(user => getTwitchUser(user.username, env)))
-    ]);
-
-    // Add roles and avatars to top N
-    const playersWithRoles = topN.map((user, index) => ({
-      ...user,
-      role: roles[index],
-      avatar: twitchUsers[index]?.avatar || null
-    }));
-
-    // Add roles and avatar to current user if exists
-    if (currentUserRank) {
-      const userFetchIndex = topN.length; // Last item in usersToFetch
-      currentUserRank.role = roles[userFetchIndex];
-      currentUserRank.avatar = twitchUsers[userFetchIndex]?.avatar || null;
-    }
-
-    // Pass all users (username + balance + rank) for search functionality
-    const allUsers = users.map((u, i) => ({ username: u.username, balance: u.balance, rank: i + 1 }));
-
-    return htmlResponse(renderLeaderboardPage(playersWithRoles, loggedInUser, actualShowAll, isAdminUser, currentUserRank, allUsers));
+    return htmlResponse(renderLeaderboardPage(data.topPlayers, loggedInUser, false, isAdminUser, currentUserRank, data.allUsers));
   } catch (error) {
     logError('handleLeaderboardPage', error);
     const { renderErrorPage } = await import('./errors.js');
     return htmlResponse(renderErrorPage(loggedInUser));
   }
+}
+
+/**
+ * Uncached leaderboard handler (for admin showAll)
+ */
+async function handleLeaderboardUncached(env, loggedInUser, showAll, isAdminUser) {
+  const BATCH_SIZE = 100;
+  const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
+
+  if (!listResult.keys || listResult.keys.length === 0) {
+    return htmlResponse(renderLeaderboardPage([], loggedInUser, showAll, isAdminUser));
+  }
+
+  const users = [];
+
+  for (let i = 0; i < listResult.keys.length; i += BATCH_SIZE) {
+    const batch = listResult.keys.slice(i, i + BATCH_SIZE);
+    const usernames = batch.map(key => key.name.replace('user:', ''));
+
+    const [balances, disclaimerStatuses, selfBanStatuses, hiddenStatuses] = await Promise.all([
+      Promise.all(batch.map(key => env.SLOTS_KV.get(key.name))),
+      Promise.all(usernames.map(username => hasAcceptedDisclaimer(username, env))),
+      Promise.all(usernames.map(username => isSelfBanned(username, env))),
+      Promise.all(usernames.map(username => isLeaderboardHidden(username, env)))
+    ]);
+
+    for (let j = 0; j < batch.length; j++) {
+      if (balances[j]) {
+        const balance = parseInt(balances[j], 10);
+        const username = usernames[j];
+        const lowerUsername = username.toLowerCase();
+
+        if (!isNaN(balance) && balance > 0 && lowerUsername !== 'dachsbank' && lowerUsername !== 'spieler' && !hiddenStatuses[j]) {
+          if (!selfBanStatuses[j]) {
+            users.push({ username, balance, hasDisclaimer: disclaimerStatuses[j] });
+          }
+        }
+      }
+    }
+  }
+
+  users.sort((a, b) => b.balance - a.balance);
+  const topN = users.slice(0, LEADERBOARD_DISPLAY_LIMIT);
+
+  const [roles, twitchUsers] = await Promise.all([
+    Promise.all(topN.map(user => getUserRole(user.username, env))),
+    Promise.all(topN.map(user => getTwitchUser(user.username, env)))
+  ]);
+
+  const topPlayers = topN.map((user, index) => ({
+    ...user,
+    role: roles[index],
+    avatar: twitchUsers[index]?.avatar || null
+  }));
+
+  const allUsers = users.map((u, i) => ({ u: u.username, b: u.balance, r: i + 1 }));
+
+  return htmlResponse(renderLeaderboardPage(topPlayers, loggedInUser, showAll, isAdminUser, null, allUsers));
 }
 
 /**
@@ -262,7 +336,7 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
     </div>
     <script>
       function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-      const allUsers = ${JSON.stringify(allUsers.map(u => ({ u: u.username, b: u.balance, r: u.rank }))).replace(/</g, '\\u003c')};
+      const allUsers = ${JSON.stringify(allUsers).replace(/</g, '\\u003c')};
       const topN = ${players.length};
 
       document.getElementById('leaderboardSearch').addEventListener('input', function() {

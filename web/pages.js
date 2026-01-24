@@ -40,8 +40,9 @@ import { renderNotFoundPage, renderErrorPage } from './pages/errors.js';
  * @param {URL} url - Request URL
  * @param {object} env - Environment bindings
  * @param {object|null} loggedInUser - Logged in user from JWT cookie
+ * @param {object|null} ctx - Cloudflare Worker execution context
  */
-export async function handleWebPage(page, url, env, loggedInUser = null) {
+export async function handleWebPage(page, url, env, loggedInUser = null, ctx = null) {
   try {
     // Check if logged-in user has accepted disclaimer
     if (loggedInUser) {
@@ -56,7 +57,7 @@ export async function handleWebPage(page, url, env, loggedInUser = null) {
         return await handleProfilePage(url, env, loggedInUser);
       case 'leaderboard':
         const showAll = url.searchParams.get('showAll') === 'true';
-        return await handleLeaderboardPage(env, loggedInUser, showAll);
+        return await handleLeaderboardPage(env, loggedInUser, showAll, ctx);
       case 'info':
         return htmlResponse(renderInfoPage(loggedInUser), 200, { cacheSeconds: 300 });
       case 'shop':

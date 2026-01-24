@@ -110,6 +110,7 @@ export const JACKPOT_CLAIM_TTL = SECONDS_PER_HOUR;
 export const DAILY_TTL_SECONDS = SECONDS_PER_DAY + SECONDS_PER_HOUR;
 export const STREAK_TTL_SECONDS = SECONDS_PER_DAY * 7;
 export const LEADERBOARD_CACHE_TTL = 300;
+export const WEB_LEADERBOARD_CACHE_TTL = 120; // Web leaderboard stale-while-revalidate TTL
 
 // ===========================================
 // 7. Leaderboard Settings

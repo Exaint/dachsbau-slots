@@ -94,6 +94,9 @@ async function setDisclaimerAccepted(username, env) {
   try {
     await env.SLOTS_KV.put(kvKey('disclaimer:', username), KV_ACCEPTED);
 
+    // Invalidate web leaderboard cache
+    env.SLOTS_KV.delete('cache:web_leaderboard').catch(() => {});
+
     // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
       upsertUser(username, { disclaimer_accepted: true }, env).catch(err => logError('setDisclaimerAccepted.d1', err, { username }));
@@ -134,6 +137,9 @@ async function setSelfBan(username, env) {
 
     await env.SLOTS_KV.put(kvKey('selfban:', username), JSON.stringify(banData));
 
+    // Invalidate web leaderboard cache
+    env.SLOTS_KV.delete('cache:web_leaderboard').catch(() => {});
+
     // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
       upsertUser(username, { selfban_timestamp: now }, env).catch(err => logError('setSelfBan.d1', err, { username }));
@@ -146,6 +152,9 @@ async function setSelfBan(username, env) {
 async function removeSelfBan(username, env) {
   try {
     await env.SLOTS_KV.delete(kvKey('selfban:', username));
+
+    // Invalidate web leaderboard cache
+    env.SLOTS_KV.delete('cache:web_leaderboard').catch(() => {});
 
     // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
@@ -211,6 +220,9 @@ async function setLeaderboardHidden(username, hidden, env) {
     } else {
       await env.SLOTS_KV.delete(key);
     }
+
+    // Invalidate web leaderboard cache
+    env.SLOTS_KV.delete('cache:web_leaderboard').catch(() => {});
 
     // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {

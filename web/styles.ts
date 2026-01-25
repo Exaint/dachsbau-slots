@@ -1209,7 +1209,6 @@ a.duel-player.opponent {
 
 a.duel-player.opponent:hover {
   color: var(--accent);
-  text-decoration: underline;
 }
 
 .duel-vs {

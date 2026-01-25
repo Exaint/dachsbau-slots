@@ -260,8 +260,8 @@ export async function consumeBoost(username: string, symbol: string, env: Env): 
     const value = await env.SLOTS_KV.get(key);
     if (value !== KV_ACTIVE) return false;
 
-    // Set claim-lock with short TTL (prevents parallel double-consume)
-    await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 10 });
+    // Set claim-lock with short TTL (KV minimum is 60s)
+    await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 60 });
     await env.SLOTS_KV.delete(key);
     await env.SLOTS_KV.delete(claimKey);
     return true;

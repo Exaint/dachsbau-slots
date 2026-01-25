@@ -437,8 +437,8 @@ async function handleTransfer(username: string, target: string, amount: string, 
         return new Response(`@${username} ❌ Transfer wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
       }
 
-      // Acquire lock (5 second TTL)
-      await env.SLOTS_KV.put(lockKey, lockValue, { expirationTtl: 5 });
+      // Acquire lock (KV minimum TTL is 60 seconds)
+      await env.SLOTS_KV.put(lockKey, lockValue, { expirationTtl: 60 });
 
       try {
         // Verify we got the lock

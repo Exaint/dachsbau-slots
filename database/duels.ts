@@ -214,7 +214,8 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
     if (alreadyClaimed) return { success: false, reason: 'already_claimed' };
 
     // Set claim-lock with short TTL (prevents parallel double-accept)
-    await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 10 });
+    // Note: KV minimum TTL is 60 seconds
+    await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 60 });
 
     // Delete the duel
     await env.SLOTS_KV.delete(key);

@@ -35,6 +35,7 @@ export const SHOP_ITEMS: Record<number, ShopItem> = {
   15: { name: 'Spin Bundle', price: 90, type: 'bundle', symbol: '🎰' },
   16: { name: 'Mystery Box', price: 1000, type: 'instant', symbol: '📦' },
   17: { name: 'Bronze Dachs Rang', price: 1200, type: 'prestige', rank: '🥉', symbol: '🥉' },
+  18: { name: 'Jackpot Booster', price: 1500, type: 'timed', buffKey: 'jackpot_booster', duration: 3600, symbol: '🎰' },
   19: { name: '!slots 30 Unlock', price: 2000, type: 'unlock', unlockKey: 'slots_30', requires: 'slots_20', symbol: '🔓' },
   20: { name: 'Lucky Charm', price: 2000, type: 'timed', buffKey: 'lucky_charm', duration: 3600, symbol: '🍀' },
   21: { name: '!slots 50 Unlock', price: 2500, type: 'unlock', unlockKey: 'slots_50', requires: 'slots_30', symbol: '🔓' },

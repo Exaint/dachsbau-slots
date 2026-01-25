@@ -170,6 +170,7 @@ async function handleSlot(username: string, amountParam: string | undefined, url
       getStreak(username, env),
       isBuffActive(username, 'golden_hour', env),
       isBuffActive(username, 'profit_doubler', env),
+      isBuffActive(username, 'jackpot_booster', env),
       getStreakMultiplier(username, env),
       getPrestigeRank(username, env),
       getLastDaily(username, env),
@@ -241,6 +242,7 @@ async function handleSlot(username: string, amountParam: string | undefined, url
       previousStreak,
       hasGoldenHour,
       hasProfitDoubler,
+      hasJackpotBooster,
       currentStreakMulti,
       prestigeRank,
       lastDaily,
@@ -249,6 +251,7 @@ async function handleSlot(username: string, amountParam: string | undefined, url
     ] = await stage2Promise as [
       number,
       StreakData,
+      boolean,
       boolean,
       boolean,
       number,
@@ -277,7 +280,7 @@ async function handleSlot(username: string, amountParam: string | undefined, url
     }
 
     // OPTIMIZED: Apply buffs with pre-loaded values
-    const preloadedBuffs = { hasGoldenHour, hasProfitDoubler, currentStreakMulti };
+    const preloadedBuffs = { hasGoldenHour, hasProfitDoubler, hasJackpotBooster, currentStreakMulti };
     const { shopBuffs, streakMulti } = await applyMultipliersAndBuffs(username, result, multiplier, grid, env, preloadedBuffs);
 
     // OPTIMIZED: Calculate streak bonuses with pre-loaded streak

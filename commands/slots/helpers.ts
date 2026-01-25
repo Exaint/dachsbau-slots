@@ -311,7 +311,7 @@ export async function applyMultipliersAndBuffs(
   env: Env,
   preloadedBuffs: PreloadedBuffs
 ): Promise<MultiplierResult> {
-  const { hasGoldenHour, hasProfitDoubler, currentStreakMulti } = preloadedBuffs;
+  const { hasGoldenHour, hasProfitDoubler, hasJackpotBooster, currentStreakMulti } = preloadedBuffs;
   const shopBuffs: string[] = [];
 
   // Award Free Spins
@@ -349,9 +349,15 @@ export async function applyMultipliersAndBuffs(
     }
   }
 
-  // Golden Hour, Profit Doubler & Streak Multiplier (pre-loaded)
+  // Golden Hour, Jackpot Booster, Profit Doubler & Streak Multiplier (pre-loaded)
   let streakMulti = 1.0;
   if (result.points > 0) {
+    // Jackpot Booster: +25% on triples
+    const isTriple = grid[0] === grid[1] && grid[1] === grid[2];
+    if (hasJackpotBooster && isTriple) {
+      result.points = Math.floor(result.points * 1.25);
+      shopBuffs.push('+25% Triple');
+    }
     if (hasGoldenHour) {
       result.points = Math.floor(result.points * 1.3);
       shopBuffs.push('+30%');

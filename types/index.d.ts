@@ -59,6 +59,8 @@ export interface PreloadedBuffs {
   hasGoldenHour: boolean;
   /** Profit doubler buff active */
   hasProfitDoubler: boolean;
+  /** Jackpot booster buff active (+25% on triples) */
+  hasJackpotBooster: boolean;
   /** Current streak multiplier (1.0+) */
   currentStreakMulti: number;
 }

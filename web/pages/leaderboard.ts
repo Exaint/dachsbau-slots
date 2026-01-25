@@ -12,7 +12,7 @@ import { isAdmin, logError } from '../../utils.js';
 
 const CACHE_KEY = 'cache:web_leaderboard';
 import { escapeHtml, formatNumber } from './utils.js';
-import { ROLE_BADGES, R2_BASE } from './ui-config.js';
+import { ROLE_BADGES, R2_BASE, PRESTIGE_RANK_NAMES } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
 
 interface LeaderboardPlayer {
@@ -299,8 +299,8 @@ export function renderLeaderboardPage(
       ? '<span class="no-disclaimer-badge" title="Kein Disclaimer akzeptiert">⚠️</span>'
       : '';
     const noDisclaimerClass = showAll && !player.hasDisclaimer ? ' no-disclaimer' : '';
-    const prestigeRankHtml = player.prestigeRank
-      ? `<span class="leaderboard-prestige" title="Prestige-Rang">${player.prestigeRank}</span>`
+    const prestigeRankHtml = player.prestigeRank && PRESTIGE_RANK_NAMES[player.prestigeRank]
+      ? `<span class="leaderboard-prestige" style="--prestige-color: ${PRESTIGE_RANK_NAMES[player.prestigeRank].color}">Prestige: ${player.prestigeRank} ${PRESTIGE_RANK_NAMES[player.prestigeRank].name}</span>`
       : '';
     return `
       <div class="leaderboard-item${noDisclaimerClass}${extraClass}">

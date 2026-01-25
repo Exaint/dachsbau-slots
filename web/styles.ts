@@ -1796,8 +1796,16 @@ body {
 }
 
 .leaderboard-prestige {
-  font-size: 1.1rem;
-  margin-left: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--prestige-color, var(--dachs-gold));
+  color: var(--prestige-color, var(--dachs-gold));
+  white-space: nowrap;
 }
 
 .leaderboard-balance {

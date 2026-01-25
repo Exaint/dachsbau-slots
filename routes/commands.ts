@@ -198,7 +198,8 @@ export async function handleSlotSubcommands(cleanUsername: string, lower: string
 
   // Special admin commands with unique signatures
   if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target') || '', env);
-  if (lower === 'givefreespins') return await handleGiveFreespins(cleanUsername, url.searchParams.get('target') || '', url.searchParams.get('giveamount') || '', url.searchParams.get('multiplier') || '', env);
+  // Fossabot mapping: amount=$(1)=target, target=$(2)=count, giveamount=$(3)=multiplier
+  if (lower === 'givefreespins') return await handleGiveFreespins(cleanUsername, url.searchParams.get('amount') || '', url.searchParams.get('target') || '', url.searchParams.get('giveamount') || '', env);
 
   // Disclaimer command
   if (lower === 'disclaimer') {

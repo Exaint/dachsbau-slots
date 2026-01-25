@@ -251,29 +251,41 @@ function calculateWin(grid: string[]): WinResult {
     }
   }
 
+  // Check Diamonds FIRST (using ORIGINAL grid - wilds don't count for free spins)
+  // This must be checked before Dachs to allow combined wins (e.g., 🦡 💎 💎 = 100 DT + 1 Free Spin)
+  let diamondFreeSpins = 0;
+  let diamondMessage = '';
+  if (grid[0] === '💎' && grid[1] === '💎' && grid[2] === '💎') {
+    diamondFreeSpins = 5;
+    diamondMessage = '💎💎💎 DIAMANTEN JACKPOT! +5 FREE SPINS!';
+  } else {
+    const realDiamondCount = grid.filter(s => s === '💎').length;
+    if (realDiamondCount === 2) {
+      diamondFreeSpins = 1;
+      diamondMessage = '💎💎 +1 FREE SPIN!';
+    }
+  }
+
   // Check Dachs (using processed grid)
   const dachsCount = processedGrid.filter(s => s === '🦡').length;
   if (dachsCount === 3) {
-    return { points: DACHS_TRIPLE_PAYOUT, message: '🔥🦡🔥 MEGAAA DACHS JACKPOT!!! 🔥🦡🔥 HOLY MOLY!!!' + wildSuffix };
+    // Triple Dachs + possible diamonds
+    const msg = '🔥🦡🔥 MEGAAA DACHS JACKPOT!!! 🔥🦡🔥 HOLY MOLY!!!' + wildSuffix + (diamondMessage ? ` ${diamondMessage}` : '');
+    return { points: DACHS_TRIPLE_PAYOUT, message: msg, freeSpins: diamondFreeSpins || undefined };
   }
   if (dachsCount === 2) {
+    // Double Dachs + possible diamond (🦡 🦡 💎 = only 1 diamond, no free spin)
     return { points: DACHS_PAIR_PAYOUT, message: '💥🦡💥 KRASSER DOPPEL-DACHS!!! 💥🦡💥' + wildSuffix };
   }
   if (dachsCount === 1) {
-    return { points: DACHS_SINGLE_PAYOUT, message: '🦡 Dachs gesichtet! Nice!' + wildSuffix };
+    // Single Dachs + possible 2 diamonds (🦡 💎 💎 = 100 DT + 1 Free Spin!)
+    const msg = '🦡 Dachs gesichtet! Nice!' + wildSuffix + (diamondMessage ? ` ${diamondMessage}` : '');
+    return { points: DACHS_SINGLE_PAYOUT, message: msg, freeSpins: diamondFreeSpins || undefined };
   }
 
-  // Check Diamonds (using ORIGINAL grid - wilds don't count for free spins)
-  if (grid[0] === '💎' && grid[1] === '💎' && grid[2] === '💎') {
-    return { points: 0, message: '💎💎💎 DIAMANTEN JACKPOT! +5 FREE SPINS!', freeSpins: 5 };
-  }
-
-  // Diamond pairs: Check ALL three pair positions (0-1, 1-2, 0-2)
-  // Count real diamonds (not wilds)
-  const realDiamondCount = grid.filter(s => s === '💎').length;
-  if (realDiamondCount === 2) {
-    // Exactly 2 diamonds gives 1 free spin (regardless of position)
-    return { points: 0, message: '💎💎 Diamanten! +1 FREE SPIN!', freeSpins: 1 };
+  // Pure diamond wins (no Dachs)
+  if (diamondFreeSpins > 0) {
+    return { points: 0, message: diamondMessage, freeSpins: diamondFreeSpins };
   }
 
   // Check Triples (using processed grid)

@@ -316,8 +316,11 @@ export function renderProfilePage(data: ProfileData): string {
   };
 
   const duelHistoryHtml = duelHistory.length > 0 ? `
-    <div class="duel-history">
-      <h3>⚔️ Duell-Historie</h3>
+    <div class="duel-history collapsed">
+      <div class="duel-history-header" onclick="toggleDuelHistory()">
+        <h3>⚔️ Duell-Historie <span class="duel-count">(${duelHistory.length})</span></h3>
+        <span class="duel-collapse-icon">▼</span>
+      </div>
       <div class="duel-history-list">
         ${duelHistory.map(duel => {
           const isChallenger = duel.challenger === username.toLowerCase();

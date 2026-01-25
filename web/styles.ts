@@ -1120,10 +1120,46 @@ body {
   border: 1px solid var(--border);
 }
 
+.duel-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.duel-history-header:hover {
+  opacity: 0.8;
+}
+
 .duel-history h3 {
-  margin: 0 0 16px 0;
+  margin: 0;
   font-size: 1.1rem;
   color: var(--text-primary);
+}
+
+.duel-count {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.duel-collapse-icon {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.duel-history.collapsed .duel-collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.duel-history.collapsed .duel-history-list {
+  display: none;
+}
+
+.duel-history:not(.collapsed) .duel-history-list {
+  margin-top: 16px;
 }
 
 .duel-history-list {

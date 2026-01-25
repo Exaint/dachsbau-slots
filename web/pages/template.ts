@@ -939,6 +939,14 @@ function getClientScripts(): string {
       saveCategoryCollapseState();
     }
 
+    // Duel history toggle
+    function toggleDuelHistory() {
+      const duelHistory = document.querySelector('.duel-history');
+      if (duelHistory) {
+        duelHistory.classList.toggle('collapsed');
+      }
+    }
+
     // Collapse/expand all categories
     function collapseAllCategories() {
       document.querySelectorAll('.category').forEach(cat => cat.classList.add('collapsed'));

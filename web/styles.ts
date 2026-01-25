@@ -454,16 +454,15 @@ body {
 }
 
 .btn.btn-search {
-  padding: 10px 16px;
+  padding: 0 14px;
   min-width: 44px;
-  min-height: 44px;
+  height: 44px;
   font-size: 1rem;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
-  height: 38px;
   box-sizing: border-box;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);

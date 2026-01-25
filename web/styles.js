@@ -888,6 +888,24 @@ body {
   margin-top: 4px;
 }
 
+/* Colored stat boxes */
+.stat-box.stat-win .stat-value {
+  color: #22c55e;
+}
+
+.stat-box.stat-loss .stat-value {
+  color: #ef4444;
+}
+
+/* Light mode adjustments for better contrast */
+[data-theme="light"] .stat-box.stat-win .stat-value {
+  color: #16a34a;
+}
+
+[data-theme="light"] .stat-box.stat-loss .stat-value {
+  color: #dc2626;
+}
+
 /* Custom Messages Editor */
 .custom-messages-editor {
   margin-top: 24px;

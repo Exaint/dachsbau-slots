@@ -169,7 +169,7 @@ export function renderProfilePage(data) {
         <div class="stat-value">${formatNumber(stats.totalSpins || 0)}</div>
         <div class="stat-label">Spins</div>
       </div>
-      <div class="stat-box">
+      <div class="stat-box stat-win">
         <div class="stat-value">${formatNumber(stats.wins || 0)}</div>
         <div class="stat-label">Gewinne</div>
       </div>
@@ -177,19 +177,19 @@ export function renderProfilePage(data) {
         <div class="stat-value">${formatNumber(stats.biggestWin || 0)}</div>
         <div class="stat-label">Höchster Gewinn</div>
       </div>
-      <div class="stat-box">
+      <div class="stat-box stat-win">
         <div class="stat-value">${formatNumber(stats.totalWon || 0)}</div>
         <div class="stat-label">Gesamt gewonnen</div>
       </div>
-      <div class="stat-box">
+      <div class="stat-box stat-loss">
         <div class="stat-value">${formatNumber(stats.totalLost || 0)}</div>
         <div class="stat-label">Gesamt verloren</div>
       </div>
-      <div class="stat-box">
+      <div class="stat-box stat-win">
         <div class="stat-value">${formatNumber(stats.duelsWon || 0)}</div>
         <div class="stat-label">Duelle gewonnen</div>
       </div>
-      <div class="stat-box">
+      <div class="stat-box stat-loss">
         <div class="stat-value">${formatNumber(stats.duelsLost || 0)}</div>
         <div class="stat-label">Duelle verloren</div>
       </div>

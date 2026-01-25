@@ -5,17 +5,128 @@
  * Can be run incrementally and safely re-run.
  */
 
-import { logError, logWarn, kvKey } from '../utils.js';
+import type { Env } from '../types/index.d.ts';
+import { logError } from '../utils.js';
 import { batchMigrateAchievements, rebuildAchievementStats } from './d1-achievements.js';
+
+// === Type Definitions ===
+
+interface MigrationOptions {
+  batchSize?: number;
+  maxUsers?: number | null;
+  dryRun?: boolean;
+}
+
+interface MigrationStats {
+  total: number;
+  migrated: number;
+  skipped: number;
+  errors: number;
+  startTime: number;
+  duration?: number;
+}
+
+interface AchievementMigrationStats extends MigrationStats {
+  achievements: number;
+}
+
+interface MigrationResult<T = MigrationStats> {
+  success: boolean;
+  error?: string;
+  dryRun?: boolean;
+  stats?: T;
+  message?: string;
+}
+
+interface VerificationResults {
+  checked: number;
+  matched: number;
+  mismatched: Array<{
+    username: string;
+    d1: { balance: number; disclaimer: number; hidden: number };
+    kv: { balance: number; disclaimer: number; hidden: number };
+  }>;
+  missing: string[];
+}
+
+interface MigrationStatusResult {
+  success: boolean;
+  error?: string;
+  d1Count?: number;
+  kvCount?: number;
+  migrationComplete?: boolean;
+  percentage?: number;
+}
+
+interface FullMigrationResults {
+  users: MigrationResult | null;
+  achievements: MigrationResult<AchievementMigrationStats> | null;
+  unlocks: MigrationResult | null;
+  monthlyLogin: MigrationResult | null;
+  totalDuration: number;
+  startTime: number;
+}
+
+interface FullMigrationStatusResult {
+  success: boolean;
+  error?: string;
+  d1?: {
+    users: number;
+    achievements: number;
+    stats: number;
+    unlocks: number;
+    monthlyLogin: number;
+  };
+  kv?: {
+    users: number;
+    achievements: number;
+    unlocks: number;
+    monthlyLogin: number;
+  };
+  percentages?: {
+    users: number;
+    achievements: number;
+    unlocks: number;
+    monthlyLogin: number;
+  };
+}
+
+interface EnrichedUser {
+  username: string;
+  balance: number;
+  disclaimer_accepted: number;
+  leaderboard_hidden: number;
+  duel_opt_out: number;
+  is_blacklisted: number;
+  selfban_timestamp: number | null;
+  prestige_rank: string | null;
+  last_active_at: number | null;
+}
+
+interface AchievementData {
+  username: string;
+  unlockedAt: Record<string, number>;
+  stats: Record<string, number>;
+  pendingRewards: number;
+}
+
+interface MonthlyLoginData {
+  username: string;
+  month: string;
+  days: number[];
+  claimedMilestones: number[];
+}
+
+// === Migration Functions ===
 
 /**
  * Migrate all users from KV to D1
  * Processes in batches to avoid timeouts
  */
-export async function migrateAllUsersToD1(env, options = {}) {
+export async function migrateAllUsersToD1(env: Env, options: MigrationOptions = {}): Promise<MigrationResult> {
   const {
     batchSize = 100,
-    maxUsers = null, // null = all users
+    maxUsers = null,
     dryRun = false
   } = options;
 
@@ -23,7 +134,7 @@ export async function migrateAllUsersToD1(env, options = {}) {
     return { success: false, error: 'D1 database not configured' };
   }
 
-  const stats = {
+  const stats: MigrationStats = {
     total: 0,
     migrated: 0,
     skipped: 0,
@@ -33,11 +144,11 @@ export async function migrateAllUsersToD1(env, options = {}) {
 
   try {
     // Get all users from KV
-    let cursor = null;
-    let allUsers = [];
+    let cursor: string | null = null;
+    let allUsers: Array<{ username: string; balance: number }> = [];
 
     do {
-      const listOptions = { prefix: 'user:', limit: 1000 };
+      const listOptions: { prefix: string; limit: number; cursor?: string } = { prefix: 'user:', limit: 1000 };
       if (cursor) listOptions.cursor = cursor;
 
       const result = await env.SLOTS_KV.list(listOptions);
@@ -54,7 +165,7 @@ export async function migrateAllUsersToD1(env, options = {}) {
         }
       }
 
-      cursor = result.cursor;
+      cursor = result.cursor || null;
 
       if (maxUsers && allUsers.length >= maxUsers) {
         allUsers = allUsers.slice(0, maxUsers);
@@ -79,7 +190,7 @@ export async function migrateAllUsersToD1(env, options = {}) {
 
       try {
         // Fetch additional data for each user in batch
-        const enrichedBatch = await Promise.all(batch.map(async (user) => {
+        const enrichedBatch: EnrichedUser[] = await Promise.all(batch.map(async (user) => {
           const [
             disclaimer,
             leaderboardHidden,
@@ -98,12 +209,12 @@ export async function migrateAllUsersToD1(env, options = {}) {
             env.SLOTS_KV.get(`lastActive:${user.username}`)
           ]);
 
-          let selfbanTimestamp = null;
+          let selfbanTimestamp: number | null = null;
           if (selfban) {
             try {
-              const parsed = JSON.parse(selfban);
+              const parsed = JSON.parse(selfban) as { timestamp?: number };
               selfbanTimestamp = parsed.timestamp || null;
-            } catch (e) {
+            } catch {
               // Ignore parse errors
             }
           }
@@ -123,7 +234,7 @@ export async function migrateAllUsersToD1(env, options = {}) {
         // Batch insert into D1
         const now = Date.now();
         const statements = enrichedBatch.map(user =>
-          env.DB.prepare(`
+          env.DB!.prepare(`
             INSERT INTO users (
               username, balance, prestige_rank, disclaimer_accepted,
               leaderboard_hidden, duel_opt_out, is_blacklisted,
@@ -154,10 +265,10 @@ export async function migrateAllUsersToD1(env, options = {}) {
           )
         );
 
-        await env.DB.batch(statements);
+        await env.DB!.batch(statements);
         stats.migrated += batch.length;
       } catch (batchError) {
-        logError('migration.batch', batchError, { batchStart: i, batchSize: batch.length });
+        logError('migration.batch', batchError as Error, { batchStart: i, batchSize: batch.length });
         stats.errors += batch.length;
       }
     }
@@ -170,10 +281,10 @@ export async function migrateAllUsersToD1(env, options = {}) {
       message: `Migrated ${stats.migrated}/${stats.total} users in ${stats.duration}ms`
     };
   } catch (error) {
-    logError('migration.migrateAllUsersToD1', error);
+    logError('migration.migrateAllUsersToD1', error as Error);
     return {
       success: false,
-      error: error.message,
+      error: (error as Error).message,
       stats
     };
   }
@@ -182,12 +293,12 @@ export async function migrateAllUsersToD1(env, options = {}) {
 /**
  * Verify migration by comparing KV and D1 data
  */
-export async function verifyMigration(env, sampleSize = 50) {
+export async function verifyMigration(env: Env, sampleSize: number = 50): Promise<{ success: boolean; error?: string; results?: VerificationResults; message?: string }> {
   if (!env.DB) {
     return { success: false, error: 'D1 database not configured' };
   }
 
-  const results = {
+  const results: VerificationResults = {
     checked: 0,
     matched: 0,
     mismatched: [],
@@ -203,7 +314,7 @@ export async function verifyMigration(env, sampleSize = 50) {
       LIMIT ?
     `).bind(sampleSize).all();
 
-    for (const d1User of d1Users.results) {
+    for (const d1User of d1Users.results as Array<{ username: string; balance: number; disclaimer_accepted: number; leaderboard_hidden: number }>) {
       results.checked++;
 
       // Get corresponding KV data
@@ -244,52 +355,54 @@ export async function verifyMigration(env, sampleSize = 50) {
       message: `Verified ${results.matched}/${results.checked} users match`
     };
   } catch (error) {
-    logError('migration.verifyMigration', error);
-    return { success: false, error: error.message, results };
+    logError('migration.verifyMigration', error as Error);
+    return { success: false, error: (error as Error).message, results };
   }
 }
 
 /**
  * Get migration status (count of users in D1 vs KV)
  */
-export async function getMigrationStatus(env) {
+export async function getMigrationStatus(env: Env): Promise<MigrationStatusResult> {
   if (!env.DB) {
     return { success: false, error: 'D1 database not configured' };
   }
 
   try {
     // Count in D1
-    const d1Count = await env.DB.prepare('SELECT COUNT(*) as count FROM users').first();
+    const d1Count = await env.DB.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>();
 
     // Count in KV (approximate)
     let kvCount = 0;
-    let cursor = null;
+    let cursor: string | null = null;
     do {
-      const listOptions = { prefix: 'user:', limit: 1000 };
+      const listOptions: { prefix: string; limit: number; cursor?: string } = { prefix: 'user:', limit: 1000 };
       if (cursor) listOptions.cursor = cursor;
 
       const result = await env.SLOTS_KV.list(listOptions);
       kvCount += result.keys.length;
-      cursor = result.cursor;
+      cursor = result.cursor || null;
     } while (cursor);
+
+    const d1CountValue = d1Count?.count || 0;
 
     return {
       success: true,
-      d1Count: d1Count.count,
+      d1Count: d1CountValue,
       kvCount,
-      migrationComplete: d1Count.count >= kvCount,
-      percentage: kvCount > 0 ? Math.round((d1Count.count / kvCount) * 100) : 0
+      migrationComplete: d1CountValue >= kvCount,
+      percentage: kvCount > 0 ? Math.round((d1CountValue / kvCount) * 100) : 0
     };
   } catch (error) {
-    logError('migration.getMigrationStatus', error);
-    return { success: false, error: error.message };
+    logError('migration.getMigrationStatus', error as Error);
+    return { success: false, error: (error as Error).message };
   }
 }
 
 /**
  * Migrate achievements and stats from KV to D1
  */
-export async function migrateAchievementsToD1(env, options = {}) {
+export async function migrateAchievementsToD1(env: Env, options: MigrationOptions = {}): Promise<MigrationResult<AchievementMigrationStats>> {
   const {
     batchSize = 50,
     maxUsers = null,
@@ -300,7 +413,7 @@ export async function migrateAchievementsToD1(env, options = {}) {
     return { success: false, error: 'D1 database not configured' };
   }
 
-  const stats = {
+  const stats: AchievementMigrationStats = {
     total: 0,
     migrated: 0,
     skipped: 0,
@@ -311,11 +424,11 @@ export async function migrateAchievementsToD1(env, options = {}) {
 
   try {
     // Get all achievement entries from KV
-    let cursor = null;
-    let allAchievementData = [];
+    let cursor: string | null = null;
+    let allAchievementData: Array<{ username: string; key: string }> = [];
 
     do {
-      const listOptions = { prefix: 'achievements:', limit: 1000 };
+      const listOptions: { prefix: string; limit: number; cursor?: string } = { prefix: 'achievements:', limit: 1000 };
       if (cursor) listOptions.cursor = cursor;
 
       const result = await env.SLOTS_KV.list(listOptions);
@@ -325,7 +438,7 @@ export async function migrateAchievementsToD1(env, options = {}) {
         allAchievementData.push({ username, key: key.name });
       }
 
-      cursor = result.cursor;
+      cursor = result.cursor || null;
 
       if (maxUsers && allAchievementData.length >= maxUsers) {
         allAchievementData = allAchievementData.slice(0, maxUsers);
@@ -350,25 +463,29 @@ export async function migrateAchievementsToD1(env, options = {}) {
 
       try {
         // Fetch achievement data for each user
-        const enrichedBatch = await Promise.all(batch.map(async (item) => {
+        const enrichedBatch = await Promise.all(batch.map(async (item): Promise<AchievementData | null> => {
           const data = await env.SLOTS_KV.get(item.key);
           if (!data) return null;
 
           try {
-            const parsed = JSON.parse(data);
+            const parsed = JSON.parse(data) as {
+              unlockedAt?: Record<string, number>;
+              stats?: Record<string, number>;
+              pendingRewards?: number;
+            };
             return {
               username: item.username,
               unlockedAt: parsed.unlockedAt || {},
               stats: parsed.stats || {},
               pendingRewards: parsed.pendingRewards || 0
             };
-          } catch (e) {
+          } catch {
             return null;
           }
         }));
 
         // Filter out null entries
-        const validBatch = enrichedBatch.filter(u => u !== null);
+        const validBatch = enrichedBatch.filter((u): u is AchievementData => u !== null);
 
         if (validBatch.length > 0) {
           const result = await batchMigrateAchievements(validBatch, env);
@@ -383,7 +500,7 @@ export async function migrateAchievementsToD1(env, options = {}) {
 
         stats.skipped += batch.length - validBatch.length;
       } catch (batchError) {
-        logError('migration.achievementsBatch', batchError, { batchStart: i });
+        logError('migration.achievementsBatch', batchError as Error, { batchStart: i });
         stats.errors += batch.length;
       }
     }
@@ -399,10 +516,10 @@ export async function migrateAchievementsToD1(env, options = {}) {
       message: `Migrated ${stats.migrated}/${stats.total} users (${stats.achievements} achievements) in ${stats.duration}ms`
     };
   } catch (error) {
-    logError('migration.migrateAchievementsToD1', error);
+    logError('migration.migrateAchievementsToD1', error as Error);
     return {
       success: false,
-      error: error.message,
+      error: (error as Error).message,
       stats
     };
   }
@@ -411,27 +528,28 @@ export async function migrateAchievementsToD1(env, options = {}) {
 /**
  * Migrate unlocks from KV to D1
  */
-export async function migrateUnlocksToD1(env, options = {}) {
+export async function migrateUnlocksToD1(env: Env, options: { dryRun?: boolean } = {}): Promise<MigrationResult> {
   const { dryRun = false } = options;
 
   if (!env.DB) {
     return { success: false, error: 'D1 database not configured' };
   }
 
-  const stats = {
+  const stats: MigrationStats = {
     total: 0,
     migrated: 0,
+    skipped: 0,
     errors: 0,
     startTime: Date.now()
   };
 
   try {
     // Get all unlock entries from KV
-    let cursor = null;
-    const unlocks = [];
+    let cursor: string | null = null;
+    const unlocks: Array<{ username: string; unlockKey: string; kvKey: string }> = [];
 
     do {
-      const listOptions = { prefix: 'unlock:', limit: 1000 };
+      const listOptions: { prefix: string; limit: number; cursor?: string } = { prefix: 'unlock:', limit: 1000 };
       if (cursor) listOptions.cursor = cursor;
 
       const result = await env.SLOTS_KV.list(listOptions);
@@ -446,7 +564,7 @@ export async function migrateUnlocksToD1(env, options = {}) {
         }
       }
 
-      cursor = result.cursor;
+      cursor = result.cursor || null;
     } while (cursor);
 
     stats.total = unlocks.length;
@@ -468,17 +586,17 @@ export async function migrateUnlocksToD1(env, options = {}) {
       try {
         const now = Date.now();
         const statements = batch.map(item =>
-          env.DB.prepare(`
+          env.DB!.prepare(`
             INSERT INTO player_unlocks (username, unlock_key, unlocked_at)
             VALUES (?, ?, ?)
             ON CONFLICT(username, unlock_key) DO NOTHING
           `).bind(item.username.toLowerCase(), item.unlockKey, now)
         );
 
-        await env.DB.batch(statements);
+        await env.DB!.batch(statements);
         stats.migrated += batch.length;
       } catch (batchError) {
-        logError('migration.unlocksBatch', batchError, { batchStart: i });
+        logError('migration.unlocksBatch', batchError as Error, { batchStart: i });
         stats.errors += batch.length;
       }
     }
@@ -491,10 +609,10 @@ export async function migrateUnlocksToD1(env, options = {}) {
       message: `Migrated ${stats.migrated}/${stats.total} unlocks in ${stats.duration}ms`
     };
   } catch (error) {
-    logError('migration.migrateUnlocksToD1', error);
+    logError('migration.migrateUnlocksToD1', error as Error);
     return {
       success: false,
-      error: error.message,
+      error: (error as Error).message,
       stats
     };
   }
@@ -503,27 +621,28 @@ export async function migrateUnlocksToD1(env, options = {}) {
 /**
  * Migrate monthly login data from KV to D1
  */
-export async function migrateMonthlyLoginToD1(env, options = {}) {
+export async function migrateMonthlyLoginToD1(env: Env, options: { dryRun?: boolean } = {}): Promise<MigrationResult> {
   const { dryRun = false } = options;
 
   if (!env.DB) {
     return { success: false, error: 'D1 database not configured' };
   }
 
-  const stats = {
+  const stats: MigrationStats = {
     total: 0,
     migrated: 0,
+    skipped: 0,
     errors: 0,
     startTime: Date.now()
   };
 
   try {
     // Get all monthly login entries from KV
-    let cursor = null;
-    const logins = [];
+    let cursor: string | null = null;
+    const logins: Array<{ username: string; kvKey: string }> = [];
 
     do {
-      const listOptions = { prefix: 'monthlylogin:', limit: 1000 };
+      const listOptions: { prefix: string; limit: number; cursor?: string } = { prefix: 'monthlylogin:', limit: 1000 };
       if (cursor) listOptions.cursor = cursor;
 
       const result = await env.SLOTS_KV.list(listOptions);
@@ -533,7 +652,7 @@ export async function migrateMonthlyLoginToD1(env, options = {}) {
         logins.push({ username, kvKey: key.name });
       }
 
-      cursor = result.cursor;
+      cursor = result.cursor || null;
     } while (cursor);
 
     stats.total = logins.length;
@@ -554,29 +673,33 @@ export async function migrateMonthlyLoginToD1(env, options = {}) {
 
       try {
         // Fetch data for batch
-        const enrichedBatch = await Promise.all(batch.map(async (item) => {
+        const enrichedBatch = await Promise.all(batch.map(async (item): Promise<MonthlyLoginData | null> => {
           const data = await env.SLOTS_KV.get(item.kvKey);
           if (!data) return null;
 
           try {
-            const parsed = JSON.parse(data);
+            const parsed = JSON.parse(data) as {
+              month?: string;
+              days?: number[];
+              claimedMilestones?: number[];
+            };
             return {
               username: item.username,
               month: parsed.month || '',
               days: parsed.days || [],
               claimedMilestones: parsed.claimedMilestones || []
             };
-          } catch (e) {
+          } catch {
             return null;
           }
         }));
 
-        const validBatch = enrichedBatch.filter(u => u !== null && u.month);
+        const validBatch = enrichedBatch.filter((u): u is MonthlyLoginData => u !== null && u.month !== '');
 
         if (validBatch.length > 0) {
           const now = Date.now();
           const statements = validBatch.map(item =>
-            env.DB.prepare(`
+            env.DB!.prepare(`
               INSERT INTO monthly_login (username, month, login_days, claimed_milestones, created_at, updated_at)
               VALUES (?, ?, ?, ?, ?, ?)
               ON CONFLICT(username) DO UPDATE SET
@@ -594,13 +717,13 @@ export async function migrateMonthlyLoginToD1(env, options = {}) {
             )
           );
 
-          await env.DB.batch(statements);
+          await env.DB!.batch(statements);
           stats.migrated += validBatch.length;
         }
 
         stats.errors += batch.length - validBatch.length;
       } catch (batchError) {
-        logError('migration.monthlyLoginBatch', batchError, { batchStart: i });
+        logError('migration.monthlyLoginBatch', batchError as Error, { batchStart: i });
         stats.errors += batch.length;
       }
     }
@@ -613,10 +736,10 @@ export async function migrateMonthlyLoginToD1(env, options = {}) {
       message: `Migrated ${stats.migrated}/${stats.total} monthly logins in ${stats.duration}ms`
     };
   } catch (error) {
-    logError('migration.migrateMonthlyLoginToD1', error);
+    logError('migration.migrateMonthlyLoginToD1', error as Error);
     return {
       success: false,
-      error: error.message,
+      error: (error as Error).message,
       stats
     };
   }
@@ -625,10 +748,10 @@ export async function migrateMonthlyLoginToD1(env, options = {}) {
 /**
  * Run full migration (users + achievements + unlocks + monthly login)
  */
-export async function runFullMigration(env, options = {}) {
+export async function runFullMigration(env: Env, options: MigrationOptions = {}): Promise<{ success: boolean; dryRun: boolean; results: FullMigrationResults; message: string }> {
   const { dryRun = false } = options;
 
-  const results = {
+  const results: FullMigrationResults = {
     users: null,
     achievements: null,
     unlocks: null,
@@ -652,8 +775,8 @@ export async function runFullMigration(env, options = {}) {
   results.totalDuration = Date.now() - results.startTime;
 
   return {
-    success: results.users?.success && results.achievements?.success &&
-             results.unlocks?.success && results.monthlyLogin?.success,
+    success: !!(results.users?.success && results.achievements?.success &&
+             results.unlocks?.success && results.monthlyLogin?.success),
     dryRun,
     results,
     message: dryRun
@@ -665,7 +788,7 @@ export async function runFullMigration(env, options = {}) {
 /**
  * Get comprehensive migration status
  */
-export async function getFullMigrationStatus(env) {
+export async function getFullMigrationStatus(env: Env): Promise<FullMigrationStatusResult> {
   if (!env.DB) {
     return { success: false, error: 'D1 database not configured' };
   }
@@ -673,15 +796,15 @@ export async function getFullMigrationStatus(env) {
   try {
     // Get counts from D1
     const [usersD1, achievementsD1, statsD1, unlocksD1, monthlyD1] = await Promise.all([
-      env.DB.prepare('SELECT COUNT(*) as count FROM users').first(),
-      env.DB.prepare('SELECT COUNT(*) as count FROM player_achievements').first(),
-      env.DB.prepare('SELECT COUNT(*) as count FROM player_stats').first(),
-      env.DB.prepare('SELECT COUNT(*) as count FROM player_unlocks').first(),
-      env.DB.prepare('SELECT COUNT(*) as count FROM monthly_login').first()
+      env.DB.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>(),
+      env.DB.prepare('SELECT COUNT(*) as count FROM player_achievements').first<{ count: number }>(),
+      env.DB.prepare('SELECT COUNT(*) as count FROM player_stats').first<{ count: number }>(),
+      env.DB.prepare('SELECT COUNT(*) as count FROM player_unlocks').first<{ count: number }>(),
+      env.DB.prepare('SELECT COUNT(*) as count FROM monthly_login').first<{ count: number }>()
     ]);
 
     // Get counts from KV
-    const kvCounts = {
+    const kvCounts: Record<string, number> = {
       users: 0,
       achievements: 0,
       unlocks: 0,
@@ -689,7 +812,7 @@ export async function getFullMigrationStatus(env) {
     };
 
     // Count KV entries
-    const prefixes = [
+    const prefixes: Array<{ prefix: string; key: string }> = [
       { prefix: 'user:', key: 'users' },
       { prefix: 'achievements:', key: 'achievements' },
       { prefix: 'unlock:', key: 'unlocks' },
@@ -697,15 +820,15 @@ export async function getFullMigrationStatus(env) {
     ];
 
     for (const { prefix, key } of prefixes) {
-      let cursor = null;
+      let cursor: string | null = null;
       do {
-        const listOptions = { prefix, limit: 1000 };
+        const listOptions: { prefix: string; limit: number; cursor?: string } = { prefix, limit: 1000 };
         if (cursor) listOptions.cursor = cursor;
         const result = await env.SLOTS_KV.list(listOptions);
         kvCounts[key] += result.keys.filter(k =>
           !k.name.includes('spieler')
         ).length;
-        cursor = result.cursor;
+        cursor = result.cursor || null;
       } while (cursor);
     }
 
@@ -718,7 +841,12 @@ export async function getFullMigrationStatus(env) {
         unlocks: unlocksD1?.count || 0,
         monthlyLogin: monthlyD1?.count || 0
       },
-      kv: kvCounts,
+      kv: {
+        users: kvCounts.users,
+        achievements: kvCounts.achievements,
+        unlocks: kvCounts.unlocks,
+        monthlyLogin: kvCounts.monthlyLogin
+      },
       percentages: {
         users: kvCounts.users > 0 ? Math.round((usersD1?.count || 0) / kvCounts.users * 100) : 0,
         achievements: kvCounts.achievements > 0 ? Math.round((statsD1?.count || 0) / kvCounts.achievements * 100) : 0,
@@ -727,7 +855,7 @@ export async function getFullMigrationStatus(env) {
       }
     };
   } catch (error) {
-    logError('migration.getFullMigrationStatus', error);
-    return { success: false, error: error.message };
+    logError('migration.getFullMigrationStatus', error as Error);
+    return { success: false, error: (error as Error).message };
   }
 }

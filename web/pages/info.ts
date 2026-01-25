@@ -2,13 +2,14 @@
  * Info Page Renderer
  */
 
+import type { LoggedInUser } from '../../types/index.d.ts';
 import { isAdmin } from '../../utils.js';
 import { baseTemplate } from './template.js';
 
 /**
  * Info page
  */
-export function renderInfoPage(user = null) {
+export function renderInfoPage(user: LoggedInUser | null = null): string {
   const content = `
     <div class="content-page">
       <h1 class="page-title">ℹ️ Info & Commands</h1>

@@ -3,7 +3,7 @@
  * Dark theme optimized for Twitch-style appearance
  */
 
-function minifyCSS(css) {
+function minifyCSS(css: string): string {
   return css
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\s*([{}:;,>~+])\s*/g, '$1')

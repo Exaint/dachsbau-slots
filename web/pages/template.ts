@@ -3,6 +3,7 @@
  * This is the main layout wrapper for all pages
  */
 
+import type { LoggedInUser } from '../../types/index.d.ts';
 import { CSS } from '../styles.js';
 import { escapeHtml } from './utils.js';
 
@@ -19,15 +20,21 @@ const DISCLAIMER_HTML = `
 </div>
 `;
 
+interface NavItem {
+  page: string;
+  label: string;
+  icon: string;
+}
+
+interface HtmlResponseOptions {
+  cacheSeconds?: number;
+}
+
 /**
  * Base HTML template with navigation
- * @param {string} title - Page title
- * @param {string} content - Page content HTML
- * @param {string} activePage - Current active page for nav highlighting
- * @param {object|null} user - Logged in user object or null
  */
-export function baseTemplate(title, content, activePage = '', user = null) {
-  const navItems = [
+export function baseTemplate(title: string, content: string, activePage: string = '', user: LoggedInUser | null = null): string {
+  const navItems: NavItem[] = [
     { page: 'home', label: 'Start', icon: '🏠' },
     { page: 'info', label: 'Info', icon: 'ℹ️' },
     { page: 'shop', label: 'Shop', icon: '🛒' },
@@ -212,7 +219,7 @@ export function baseTemplate(title, content, activePage = '', user = null) {
  * Client-side JavaScript for interactivity
  * Separated for readability
  */
-function getClientScripts() {
+function getClientScripts(): string {
   return `<script>
     // Achievement detail modal
     function showAchievementDetail(el) {
@@ -1299,12 +1306,8 @@ function getClientScripts() {
 
 /**
  * Create HTML response with security headers
- * @param {string} html - HTML content
- * @param {number} status - HTTP status code
- * @param {object} options - Additional options
- * @param {number} options.cacheSeconds - Cache-Control max-age in seconds (0 = no-cache)
  */
-export function htmlResponse(html, status = 200, options = {}) {
+export function htmlResponse(html: string, status: number = 200, options: HtmlResponseOptions = {}): Response {
   const cacheSeconds = options.cacheSeconds || 0;
   const cacheControl = cacheSeconds > 0
     ? `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}`

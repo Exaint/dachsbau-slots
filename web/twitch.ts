@@ -4,6 +4,7 @@
  * Also handles user authentication via OAuth
  */
 
+import type { Env, LoggedInUser } from '../types/index.d.ts';
 import { logError } from '../utils.js';
 import { BROADCASTER_LOGIN } from '../constants.js';
 
@@ -20,11 +21,53 @@ const SESSION_TTL_SECONDS = 604800; // 7 days
 const TWITCH_API = 'https://api.twitch.tv/helix';
 const TWITCH_OAUTH = 'https://id.twitch.tv/oauth2/token';
 
+interface TwitchUser {
+  id: string;
+  login: string;
+  displayName: string;
+  avatar: string;
+}
+
+interface TwitchTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+}
+
+interface TwitchUserResponse {
+  data: Array<{
+    id: string;
+    login: string;
+    display_name: string;
+    profile_image_url: string;
+  }>;
+}
+
+interface ChannelRoles {
+  moderators: Set<string>;
+  vips: Set<string>;
+}
+
+interface TwitchProfileData {
+  avatar: string | null;
+  displayName: string;
+  role: string | null;
+}
+
+interface SessionPayload {
+  twitchId: string;
+  username: string;
+  displayName: string;
+  avatar: string;
+  iat?: number;
+  exp?: number;
+}
+
 /**
  * Get app access token (Client Credentials flow)
  * This token is used for public API calls (avatars, user info)
  */
-async function getAppAccessToken(env) {
+async function getAppAccessToken(env: Env): Promise<string | null> {
   try {
     // Check cache first
     const cached = await env.SLOTS_KV.get('twitch:app_token');
@@ -39,8 +82,8 @@ async function getAppAccessToken(env) {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
-        client_id: env.TWITCH_CLIENT_ID,
-        client_secret: env.TWITCH_CLIENT_SECRET,
+        client_id: env.TWITCH_CLIENT_ID!,
+        client_secret: env.TWITCH_CLIENT_SECRET!,
         grant_type: 'client_credentials'
       })
     });
@@ -49,7 +92,7 @@ async function getAppAccessToken(env) {
       throw new Error(`Token request failed: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as TwitchTokenResponse;
     const token = data.access_token;
 
     // Cache token (slightly shorter than actual expiry)
@@ -68,9 +111,9 @@ async function getAppAccessToken(env) {
  * Get broadcaster access token (for mod/VIP lists)
  * This requires the broadcaster to have authorized the app
  */
-async function getBroadcasterToken(env) {
+async function getBroadcasterToken(env: Env): Promise<string | null> {
   try {
-    const tokenData = await env.SLOTS_KV.get('twitch:broadcaster_token', { type: 'json' });
+    const tokenData = await env.SLOTS_KV.get('twitch:broadcaster_token', { type: 'json' }) as { accessToken: string; refreshToken: string; expiresAt: number } | null;
     if (!tokenData) {
       return null;
     }
@@ -91,7 +134,7 @@ async function getBroadcasterToken(env) {
 /**
  * Refresh broadcaster token
  */
-async function refreshBroadcasterToken(refreshToken, env) {
+async function refreshBroadcasterToken(refreshToken: string, env: Env): Promise<string | null> {
   try {
     const response = await fetch(TWITCH_OAUTH, {
       method: 'POST',
@@ -99,8 +142,8 @@ async function refreshBroadcasterToken(refreshToken, env) {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
-        client_id: env.TWITCH_CLIENT_ID,
-        client_secret: env.TWITCH_CLIENT_SECRET,
+        client_id: env.TWITCH_CLIENT_ID!,
+        client_secret: env.TWITCH_CLIENT_SECRET!,
         grant_type: 'refresh_token',
         refresh_token: refreshToken
       })
@@ -110,7 +153,7 @@ async function refreshBroadcasterToken(refreshToken, env) {
       throw new Error(`Token refresh failed: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as TwitchTokenResponse;
 
     // Store new tokens
     await env.SLOTS_KV.put('twitch:broadcaster_token', JSON.stringify({
@@ -129,11 +172,11 @@ async function refreshBroadcasterToken(refreshToken, env) {
 /**
  * Get user info (including avatar) from Twitch
  */
-async function getTwitchUser(username, env) {
+async function getTwitchUser(username: string, env: Env): Promise<TwitchUser | null> {
   try {
     // Check cache first
     const cacheKey = `twitch:user:${username.toLowerCase()}`;
-    const cached = await env.SLOTS_KV.get(cacheKey, { type: 'json' });
+    const cached = await env.SLOTS_KV.get(cacheKey, { type: 'json' }) as TwitchUser | null;
     if (cached) {
       return cached;
     }
@@ -146,7 +189,7 @@ async function getTwitchUser(username, env) {
     const response = await fetch(`${TWITCH_API}/users?login=${encodeURIComponent(username)}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Client-Id': env.TWITCH_CLIENT_ID
+        'Client-Id': env.TWITCH_CLIENT_ID!
       }
     });
 
@@ -154,12 +197,12 @@ async function getTwitchUser(username, env) {
       throw new Error(`User fetch failed: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as TwitchUserResponse;
     if (!data.data || data.data.length === 0) {
       return null;
     }
 
-    const user = {
+    const user: TwitchUser = {
       id: data.data[0].id,
       login: data.data[0].login,
       displayName: data.data[0].display_name,
@@ -181,7 +224,7 @@ async function getTwitchUser(username, env) {
 /**
  * Get broadcaster ID (cached)
  */
-async function getBroadcasterId(env) {
+async function getBroadcasterId(env: Env): Promise<string | null> {
   try {
     const cached = await env.SLOTS_KV.get('twitch:broadcaster_id');
     if (cached) {
@@ -207,10 +250,10 @@ async function getBroadcasterId(env) {
  * Get channel roles (moderators and VIPs)
  * Returns object with 'moderators' and 'vips' Sets
  */
-async function getChannelRoles(env) {
+async function getChannelRoles(env: Env): Promise<ChannelRoles> {
   try {
     // Check cache first
-    const cached = await env.SLOTS_KV.get('twitch:channel_roles', { type: 'json' });
+    const cached = await env.SLOTS_KV.get('twitch:channel_roles', { type: 'json' }) as { moderators: string[]; vips: string[] } | null;
     if (cached) {
       return {
         moderators: new Set(cached.moderators || []),
@@ -234,27 +277,27 @@ async function getChannelRoles(env) {
       fetch(`${TWITCH_API}/moderation/moderators?broadcaster_id=${broadcasterId}&first=100`, {
         headers: {
           'Authorization': `Bearer ${broadcasterToken}`,
-          'Client-Id': env.TWITCH_CLIENT_ID
+          'Client-Id': env.TWITCH_CLIENT_ID!
         }
       }),
       fetch(`${TWITCH_API}/channels/vips?broadcaster_id=${broadcasterId}&first=100`, {
         headers: {
           'Authorization': `Bearer ${broadcasterToken}`,
-          'Client-Id': env.TWITCH_CLIENT_ID
+          'Client-Id': env.TWITCH_CLIENT_ID!
         }
       })
     ]);
 
-    const moderators = [];
-    const vips = [];
+    const moderators: string[] = [];
+    const vips: string[] = [];
 
     if (modsResponse.ok) {
-      const modsData = await modsResponse.json();
+      const modsData = await modsResponse.json() as { data: Array<{ user_login: string }> };
       moderators.push(...(modsData.data || []).map(m => m.user_login.toLowerCase()));
     }
 
     if (vipsResponse.ok) {
-      const vipsData = await vipsResponse.json();
+      const vipsData = await vipsResponse.json() as { data: Array<{ user_login: string }> };
       vips.push(...(vipsData.data || []).map(v => v.user_login.toLowerCase()));
     }
 
@@ -280,7 +323,7 @@ async function getChannelRoles(env) {
  * Get user's role in channel
  * Returns: 'broadcaster', 'moderator', 'vip', or null
  */
-async function getUserRole(username, env) {
+async function getUserRole(username: string, env: Env): Promise<string | null> {
   const lowerUsername = username.toLowerCase();
 
   // Check if broadcaster
@@ -305,7 +348,7 @@ async function getUserRole(username, env) {
  * Get full Twitch profile data (avatar + role)
  * This is the main function to call from profile pages
  */
-async function getTwitchProfileData(username, env) {
+async function getTwitchProfileData(username: string, env: Env): Promise<TwitchProfileData> {
   try {
     // Fetch user data and role in parallel
     const [user, role] = await Promise.all([
@@ -332,7 +375,7 @@ async function getTwitchProfileData(username, env) {
  * Handle OAuth callback from Twitch
  * This is called when the broadcaster authorizes the app
  */
-async function handleOAuthCallback(url, env) {
+async function handleOAuthCallback(url: URL, env: Env): Promise<Response> {
   const code = url.searchParams.get('code');
   const error = url.searchParams.get('error');
   const state = url.searchParams.get('state');
@@ -367,8 +410,8 @@ async function handleOAuthCallback(url, env) {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
-        client_id: env.TWITCH_CLIENT_ID,
-        client_secret: env.TWITCH_CLIENT_SECRET,
+        client_id: env.TWITCH_CLIENT_ID!,
+        client_secret: env.TWITCH_CLIENT_SECRET!,
         code: code,
         grant_type: 'authorization_code',
         redirect_uri: `${url.origin}/auth/callback`
@@ -380,7 +423,7 @@ async function handleOAuthCallback(url, env) {
       throw new Error(`Token exchange failed: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as TwitchTokenResponse;
 
     // Store broadcaster tokens
     await env.SLOTS_KV.put('twitch:broadcaster_token', JSON.stringify({
@@ -417,14 +460,14 @@ async function handleOAuthCallback(url, env) {
     });
   } catch (error) {
     logError('handleOAuthCallback', error);
-    return new Response(`Authorization failed: ${error.message}`, { status: 500 });
+    return new Response(`Authorization failed: ${(error as Error).message}`, { status: 500 });
   }
 }
 
 /**
  * Generate a cryptographically secure state parameter for OAuth
  */
-function generateOAuthState() {
+function generateOAuthState(): string {
   const buffer = new Uint8Array(32);
   crypto.getRandomValues(buffer);
   return Array.from(buffer, b => b.toString(16).padStart(2, '0')).join('');
@@ -433,14 +476,14 @@ function generateOAuthState() {
 /**
  * Generate OAuth authorization URL with CSRF protection
  */
-async function getAuthorizationUrl(env, origin) {
+async function getAuthorizationUrl(env: Env, origin: string): Promise<string> {
   const state = generateOAuthState();
 
   // Store state in KV with short TTL (10 minutes)
   await env.SLOTS_KV.put(`oauth_state:broadcaster:${state}`, 'valid', { expirationTtl: 600 });
 
   const params = new URLSearchParams({
-    client_id: env.TWITCH_CLIENT_ID,
+    client_id: env.TWITCH_CLIENT_ID!,
     redirect_uri: `${origin}/auth/callback`,
     response_type: 'code',
     scope: 'moderation:read channel:read:vips',
@@ -455,7 +498,7 @@ async function getAuthorizationUrl(env, origin) {
 /**
  * Base64URL encode (JWT-safe)
  */
-function base64UrlEncode(str) {
+function base64UrlEncode(str: string): string {
   return btoa(str)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -465,7 +508,7 @@ function base64UrlEncode(str) {
 /**
  * Base64URL decode
  */
-function base64UrlDecode(str) {
+function base64UrlDecode(str: string): string {
   // Add padding if needed
   str = str.replace(/-/g, '+').replace(/_/g, '/');
   while (str.length % 4) str += '=';
@@ -475,11 +518,11 @@ function base64UrlDecode(str) {
 /**
  * Create JWT session token
  */
-async function createSessionToken(payload, env) {
+async function createSessionToken(payload: Omit<SessionPayload, 'iat' | 'exp'>, env: Env): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
 
-  const claims = {
+  const claims: SessionPayload = {
     ...payload,
     iat: now,
     exp: now + SESSION_TTL_SECONDS
@@ -492,7 +535,7 @@ async function createSessionToken(payload, env) {
   // Sign with HMAC-SHA256
   const key = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(env.JWT_SECRET),
+    new TextEncoder().encode(env.JWT_SECRET!),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign']
@@ -511,7 +554,7 @@ async function createSessionToken(payload, env) {
 /**
  * Verify and decode session token
  */
-async function verifySessionToken(token, env) {
+async function verifySessionToken(token: string, env: Env): Promise<LoggedInUser | null> {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -522,7 +565,7 @@ async function verifySessionToken(token, env) {
     const unsigned = `${headerB64}.${payloadB64}`;
     const key = await crypto.subtle.importKey(
       'raw',
-      new TextEncoder().encode(env.JWT_SECRET),
+      new TextEncoder().encode(env.JWT_SECRET!),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['verify']
@@ -539,10 +582,15 @@ async function verifySessionToken(token, env) {
     if (!valid) return null;
 
     // Decode and check expiration
-    const payload = JSON.parse(base64UrlDecode(payloadB64));
-    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+    const payload = JSON.parse(base64UrlDecode(payloadB64)) as SessionPayload;
+    if (payload.exp! < Math.floor(Date.now() / 1000)) return null;
 
-    return payload;
+    return {
+      twitchId: payload.twitchId,
+      username: payload.username,
+      displayName: payload.displayName,
+      avatar: payload.avatar
+    };
   } catch (error) {
     logError('verifySessionToken', error);
     return null;
@@ -552,7 +600,7 @@ async function verifySessionToken(token, env) {
 /**
  * Get user from request cookie
  */
-async function getUserFromRequest(request, env) {
+async function getUserFromRequest(request: Request, env: Env): Promise<LoggedInUser | null> {
   try {
     const cookieHeader = request.headers.get('Cookie') || '';
     const cookies = Object.fromEntries(
@@ -575,14 +623,14 @@ async function getUserFromRequest(request, env) {
 /**
  * Generate user login URL with CSRF protection
  */
-async function getUserLoginUrl(env, origin) {
+async function getUserLoginUrl(env: Env, origin: string): Promise<string> {
   const state = generateOAuthState();
 
   // Store state in KV with short TTL (10 minutes)
   await env.SLOTS_KV.put(`oauth_state:user:${state}`, 'valid', { expirationTtl: 600 });
 
   const params = new URLSearchParams({
-    client_id: env.TWITCH_CLIENT_ID,
+    client_id: env.TWITCH_CLIENT_ID!,
     redirect_uri: `${origin}/auth/user/callback`,
     response_type: 'code',
     scope: '', // No special scopes needed for basic user info
@@ -595,7 +643,7 @@ async function getUserLoginUrl(env, origin) {
 /**
  * Handle user OAuth callback
  */
-async function handleUserOAuthCallback(url, env) {
+async function handleUserOAuthCallback(url: URL, env: Env): Promise<Response> {
   const code = url.searchParams.get('code');
   const error = url.searchParams.get('error');
   const state = url.searchParams.get('state');
@@ -634,8 +682,8 @@ async function handleUserOAuthCallback(url, env) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: env.TWITCH_CLIENT_ID,
-        client_secret: env.TWITCH_CLIENT_SECRET,
+        client_id: env.TWITCH_CLIENT_ID!,
+        client_secret: env.TWITCH_CLIENT_SECRET!,
         code: code,
         grant_type: 'authorization_code',
         redirect_uri: `${url.origin}/auth/user/callback`
@@ -646,13 +694,13 @@ async function handleUserOAuthCallback(url, env) {
       throw new Error(`Token exchange failed: ${tokenResponse.status}`);
     }
 
-    const tokens = await tokenResponse.json();
+    const tokens = await tokenResponse.json() as TwitchTokenResponse;
 
     // Get user info from Twitch
     const userResponse = await fetch(`${TWITCH_API}/users`, {
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
-        'Client-Id': env.TWITCH_CLIENT_ID
+        'Client-Id': env.TWITCH_CLIENT_ID!
       }
     });
 
@@ -660,7 +708,7 @@ async function handleUserOAuthCallback(url, env) {
       throw new Error(`User fetch failed: ${userResponse.status}`);
     }
 
-    const userData = await userResponse.json();
+    const userData = await userResponse.json() as TwitchUserResponse;
     if (!userData.data || userData.data.length === 0) {
       throw new Error('No user data returned');
     }
@@ -697,7 +745,7 @@ async function handleUserOAuthCallback(url, env) {
 /**
  * Create logout response (clears cookie)
  */
-function createLogoutResponse(origin) {
+function createLogoutResponse(origin: string): Response {
   return new Response(null, {
     status: 302,
     headers: {

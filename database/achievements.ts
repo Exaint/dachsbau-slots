@@ -14,17 +14,104 @@
  * - Use getPlayerAchievements() to read all achievements for a player
  */
 
+import type { Env, Achievement } from '../types/index.d.ts';
 import { ACHIEVEMENTS, ACHIEVEMENTS_REWARDS_ENABLED, getAchievementById } from '../constants/achievements.js';
 import { logError, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE } from './d1.js';
 import { unlockAchievementD1, lockAchievementD1, incrementStatD1, updatePlayerStatsD1, recordTripleHitD1 } from './d1-achievements.js';
+
+// === Type Definitions ===
+
+interface TriplesCollected {
+  dachs: boolean;
+  diamond: boolean;
+  star: boolean;
+  watermelon: boolean;
+  grapes: boolean;
+  orange: boolean;
+  lemon: boolean;
+  cherry: boolean;
+}
+
+interface PlayerStats {
+  totalSpins: number;
+  wins: number;
+  losses: number;
+  maxLossStreak: number;
+  biggestWin: number;
+  totalWon: number;
+  totalLost: number;
+  totalTransferred: number;
+  transfersSentCount: number;
+  shopPurchases: number;
+  duelsPlayed: number;
+  duelsWon: number;
+  duelsLost: number;
+  maxDuelStreak: number;
+  totalDuelWinnings: number;
+  dailysClaimed: number;
+  playDays: number;
+  chaosSpins: number;
+  reverseChaosSpins: number;
+  wheelSpins: number;
+  mysteryBoxes: number;
+  insuranceTriggers: number;
+  wildCardsUsed: number;
+  freeSpinsUsed: number;
+  totalDachsSeen: number;
+  hourlyJackpots: number;
+  triplesCollected: TriplesCollected;
+}
+
+interface PlayerAchievementData {
+  unlockedAt: Record<string, number>;
+  stats: PlayerStats;
+  pendingRewards: number;
+  statsSynced?: boolean;
+  migratedAt?: number;
+  shopMigrated?: boolean;
+  transferMigrated?: boolean;
+  duelMigrated?: boolean;
+  balanceMigrated?: boolean;
+  lossesCalcFixed?: boolean;
+}
+
+interface UnlockResult {
+  unlocked: boolean;
+  reward: number;
+  achievement: Achievement | null;
+}
+
+interface LockResult {
+  locked: boolean;
+  wasUnlocked: boolean;
+}
+
+interface UnlockedAchievement {
+  achievement: Achievement;
+  reward: number;
+}
+
+interface AchievementStatsResult {
+  totalPlayers: number;
+  counts: Record<string, number>;
+}
+
+interface SyncResults {
+  processed: number;
+  updated: number;
+  achievementsUnlocked: number;
+  errors: number;
+  details: Array<{ username: string; unlocked: number }>;
+  error?: string;
+}
 
 // Cache keys (defined early so they can be used in migrations)
 const STATS_CACHE_KEY = 'cache:achievement_stats_v3';
 const STATS_CACHE_TTL = 300; // 5 minutes in seconds
 
 // Default stats structure for new players
-const DEFAULT_STATS = {
+const DEFAULT_STATS: PlayerStats = {
   totalSpins: 0,
   wins: 0,
   losses: 0,
@@ -42,7 +129,6 @@ const DEFAULT_STATS = {
   totalDuelWinnings: 0,
   dailysClaimed: 0,
   playDays: 0,
-  // Item usage
   chaosSpins: 0,
   reverseChaosSpins: 0,
   wheelSpins: 0,
@@ -50,10 +136,8 @@ const DEFAULT_STATS = {
   insuranceTriggers: 0,
   wildCardsUsed: 0,
   freeSpinsUsed: 0,
-  // Dachs & Jackpot
   totalDachsSeen: 0,
   hourlyJackpots: 0,
-  // Triple tracking for FRUIT_COLLECTOR and ALL_TRIPLES
   triplesCollected: {
     dachs: false,
     diamond: false,
@@ -66,12 +150,14 @@ const DEFAULT_STATS = {
   }
 };
 
+// Type for ACHIEVEMENTS object keys
+type AchievementKey = keyof typeof ACHIEVEMENTS;
+
 /**
  * Get all achievement data for a player
  * Includes automatic migration of legacy stats from stats:{username}
- * @returns {{ unlockedAt: Object, stats: Object, pendingRewards: number }}
  */
-async function getPlayerAchievements(username, env) {
+async function getPlayerAchievements(username: string, env: Env): Promise<PlayerAchievementData> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('achievements:', username));
 
@@ -81,8 +167,8 @@ async function getPlayerAchievements(username, env) {
 
       if (legacyStats) {
         // Migrate existing player stats (pull ALL available fields)
-        const legacy = JSON.parse(legacyStats);
-        const migratedData = {
+        const legacy = JSON.parse(legacyStats) as Partial<PlayerStats>;
+        const migratedData: PlayerAchievementData = {
           unlockedAt: {},
           stats: {
             ...DEFAULT_STATS,
@@ -140,7 +226,7 @@ async function getPlayerAchievements(username, env) {
       };
     }
 
-    const data = JSON.parse(value);
+    const data = JSON.parse(value) as PlayerAchievementData;
     // Ensure stats has all fields (migration safety)
     if (!data.stats) {
       data.stats = { ...DEFAULT_STATS, triplesCollected: { ...DEFAULT_STATS.triplesCollected } };
@@ -164,7 +250,7 @@ async function getPlayerAchievements(username, env) {
 
       // Count how many unlocks the user has (each unlock = 1 shop purchase)
       const unlockCount = unlockChecks.filter(v => v === 'true').length;
-      const counterPromises = [];
+      const counterPromises: Promise<void>[] = [];
 
       if (unlockCount > 0 && (data.stats.shopPurchases || 0) < unlockCount) {
         data.stats.shopPurchases = unlockCount;
@@ -212,13 +298,13 @@ async function getPlayerAchievements(username, env) {
     const monthlyLoginData = await env.SLOTS_KV.get(kvKey('monthlylogin:', username));
     if (monthlyLoginData) {
       try {
-        const monthlyLogin = JSON.parse(monthlyLoginData);
+        const monthlyLogin = JSON.parse(monthlyLoginData) as { days?: number[] };
         const monthlyDays = monthlyLogin.days ? monthlyLogin.days.length : 0;
 
         if (monthlyDays > 0) {
           const now = Date.now();
           let addedRewards = 0;
-          const counterPromises = [];
+          const counterPromises: Promise<void>[] = [];
 
           // FIRST_DAILY if they have any daily claims
           if (!data.unlockedAt[ACHIEVEMENTS.FIRST_DAILY.id]) {
@@ -259,7 +345,7 @@ async function getPlayerAchievements(username, env) {
         }
       } catch (e) {
         // Invalid monthly login data, skip
-        logError('dailyAchievementCatchup', e, { username });
+        logError('dailyAchievementCatchup', e as Error, { username });
       }
     }
 
@@ -288,13 +374,13 @@ async function getPlayerAchievements(username, env) {
       const fullStats = await env.SLOTS_KV.get(kvKey('stats:', username));
       if (fullStats) {
         try {
-          const legacy = JSON.parse(fullStats);
+          const legacy = JSON.parse(fullStats) as Partial<PlayerStats>;
           const now = Date.now();
           let addedRewards = 0;
-          const counterPromises = [];
+          const counterPromises: Promise<void>[] = [];
 
           // Sync all stat fields from stats:{username} that might be ahead of achievement stats
-          const syncFields = [
+          const syncFields: Array<keyof PlayerStats> = [
             'losses', 'maxLossStreak', 'totalDachsSeen', 'hourlyJackpots',
             'chaosSpins', 'reverseChaosSpins', 'wheelSpins', 'mysteryBoxes',
             'insuranceTriggers', 'wildCardsUsed', 'freeSpinsUsed',
@@ -304,10 +390,10 @@ async function getPlayerAchievements(username, env) {
           ];
 
           for (const field of syncFields) {
-            const legacyVal = legacy[field] || 0;
-            const currentVal = data.stats[field] || 0;
+            const legacyVal = (legacy[field] as number) || 0;
+            const currentVal = (data.stats[field] as number) || 0;
             if (legacyVal > currentVal) {
-              data.stats[field] = legacyVal;
+              (data.stats[field] as number) = legacyVal;
             }
           }
 
@@ -319,12 +405,12 @@ async function getPlayerAchievements(username, env) {
 
           // Now check ALL stat-based achievements against synced values
           for (const field of syncFields) {
-            const value = data.stats[field] || 0;
+            const value = (data.stats[field] as number) || 0;
             if (value <= 0) continue;
 
-            const achievementsToCheck = getAchievementsForStat(field);
+            const achievementsToCheck = getAchievementsForStat(field as string);
             for (const achKey of achievementsToCheck) {
-              const achievement = ACHIEVEMENTS[achKey];
+              const achievement = ACHIEVEMENTS[achKey as AchievementKey];
               if (!achievement || data.unlockedAt[achievement.id]) continue;
               const requirement = achievement.requirement || 1;
               if (value >= requirement) {
@@ -345,7 +431,7 @@ async function getPlayerAchievements(username, env) {
             ...counterPromises
           ]);
         } catch (e) {
-          logError('statsSyncMigration', e, { username });
+          logError('statsSyncMigration', e as Error, { username });
           data.statsSynced = true;
           await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
         }
@@ -360,7 +446,7 @@ async function getPlayerAchievements(username, env) {
       const fullStats = await env.SLOTS_KV.get(kvKey('stats:', username));
       if (fullStats) {
         try {
-          const legacy = JSON.parse(fullStats);
+          const legacy = JSON.parse(fullStats) as Partial<PlayerStats>;
           const totalSpins = Math.max(legacy.totalSpins || 0, data.stats.totalSpins || 0);
           const wins = Math.max(legacy.wins || 0, data.stats.wins || 0);
           const calculatedLosses = totalSpins - wins;
@@ -373,10 +459,10 @@ async function getPlayerAchievements(username, env) {
             // Check loss achievements with corrected value
             const now = Date.now();
             let addedRewards = 0;
-            const counterPromises = [];
+            const counterPromises: Promise<void>[] = [];
             const lossAchievements = getAchievementsForStat('losses');
             for (const achKey of lossAchievements) {
-              const achievement = ACHIEVEMENTS[achKey];
+              const achievement = ACHIEVEMENTS[achKey as AchievementKey];
               if (!achievement || data.unlockedAt[achievement.id]) continue;
               if (calculatedLosses >= (achievement.requirement || 1)) {
                 data.unlockedAt[achievement.id] = now;
@@ -397,7 +483,7 @@ async function getPlayerAchievements(username, env) {
             await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
           }
         } catch (e) {
-          logError('lossesCalcFix', e, { username });
+          logError('lossesCalcFix', e as Error, { username });
           data.lossesCalcFixed = true;
           await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
         }
@@ -434,7 +520,7 @@ async function getPlayerAchievements(username, env) {
         if (!isNaN(balance) && balance > 0) {
           const now = Date.now();
           let addedRewards = 0;
-          const counterPromises = [];
+          const counterPromises: Promise<void>[] = [];
 
           const balanceAchievements = [
             { id: 'balance_1000', threshold: 1000, achievement: ACHIEVEMENTS.BALANCE_1000 },
@@ -484,7 +570,7 @@ async function getPlayerAchievements(username, env) {
 
     return data;
   } catch (error) {
-    logError('getPlayerAchievements', error, { username });
+    logError('getPlayerAchievements', error as Error, { username });
     return {
       unlockedAt: {},
       stats: { ...DEFAULT_STATS, triplesCollected: { ...DEFAULT_STATS.triplesCollected } },
@@ -498,11 +584,11 @@ async function getPlayerAchievements(username, env) {
  * Called once during migration from legacy stats system
  * Returns array of unlocked achievement IDs for counter updates
  */
-function migrateAchievementsFromStats(data) {
+function migrateAchievementsFromStats(data: PlayerAchievementData): string[] {
   const { stats, unlockedAt } = data;
   const now = Date.now();
   let pendingRewards = 0;
-  const unlockedIds = [];
+  const unlockedIds: string[] = [];
 
   // Spin milestones
   if (stats.totalSpins >= 1) {
@@ -581,7 +667,7 @@ function migrateAchievementsFromStats(data) {
   }
 
   // Check ALL stat-based achievements using the general mapping
-  const statFields = [
+  const statFields: Array<keyof PlayerStats> = [
     'losses', 'maxLossStreak', 'totalDachsSeen', 'hourlyJackpots',
     'chaosSpins', 'reverseChaosSpins', 'wheelSpins', 'mysteryBoxes',
     'insuranceTriggers', 'wildCardsUsed', 'freeSpinsUsed',
@@ -591,12 +677,12 @@ function migrateAchievementsFromStats(data) {
   ];
 
   for (const field of statFields) {
-    const value = stats[field] || 0;
+    const value = (stats[field] as number) || 0;
     if (value <= 0) continue;
 
     const achievementsToCheck = getAchievementsForStat(field);
     for (const achKey of achievementsToCheck) {
-      const achievement = ACHIEVEMENTS[achKey];
+      const achievement = ACHIEVEMENTS[achKey as AchievementKey];
       if (!achievement || unlockedAt[achievement.id]) continue;
       if (value >= (achievement.requirement || 1)) {
         unlockedAt[achievement.id] = now;
@@ -615,7 +701,7 @@ function migrateAchievementsFromStats(data) {
 /**
  * Save achievement data for a player
  */
-async function savePlayerAchievements(username, data, env) {
+async function savePlayerAchievements(username: string, data: PlayerAchievementData, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('achievements:', username), JSON.stringify(data));
 
@@ -624,22 +710,22 @@ async function savePlayerAchievements(username, data, env) {
       updatePlayerStatsD1(username, {
         ...data.stats,
         pendingRewards: data.pendingRewards || 0
-      }, env).catch(err => logError('savePlayerAchievements.d1', err, { username }));
+      }, env).catch(err => logError('savePlayerAchievements.d1', err as Error, { username }));
     }
   } catch (error) {
-    logError('savePlayerAchievements', error, { username });
+    logError('savePlayerAchievements', error as Error, { username });
   }
 }
 
 /**
  * Check if player has unlocked an achievement
  */
-async function hasAchievement(username, achievementId, env) {
+async function hasAchievement(username: string, achievementId: string, env: Env): Promise<boolean> {
   try {
     const data = await getPlayerAchievements(username, env);
     return !!data.unlockedAt[achievementId];
   } catch (error) {
-    logError('hasAchievement', error, { username, achievementId });
+    logError('hasAchievement', error as Error, { username, achievementId });
     return false;
   }
 }
@@ -648,7 +734,7 @@ async function hasAchievement(username, achievementId, env) {
  * Lock (remove) an achievement from a player
  * Used by admins to revoke achievements
  */
-async function lockAchievement(username, achievementId, env) {
+async function lockAchievement(username: string, achievementId: string, env: Env): Promise<LockResult> {
   try {
     const data = await getPlayerAchievements(username, env);
 
@@ -668,38 +754,29 @@ async function lockAchievement(username, achievementId, env) {
 
     // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      lockAchievementD1(username, achievementId, env).catch(err => logError('lockAchievement.d1', err, { username, achievementId }));
+      lockAchievementD1(username, achievementId, env).catch(err => logError('lockAchievement.d1', err as Error, { username, achievementId }));
     }
 
     return { locked: true, wasUnlocked: true };
   } catch (error) {
-    logError('lockAchievement', error, { username, achievementId });
+    logError('lockAchievement', error as Error, { username, achievementId });
     return { locked: false, wasUnlocked: false };
   }
 }
 
 /**
- * Decrement the global counter for an achievement
- */
-/**
  * Legacy: Decrement counter. Now just invalidates cache since
  * getAchievementStats() does a full scan.
  */
-async function decrementAchievementCounter(achievementId, env) {
+async function decrementAchievementCounter(_achievementId: string, env: Env): Promise<void> {
   await invalidateAchievementStatsCache(env);
 }
 
 /**
  * Unlock an achievement for a player (if not already unlocked)
  * Returns the reward amount if newly unlocked and REWARDS_ENABLED, otherwise 0
- *
- * @param {string} username
- * @param {string} achievementId
- * @param {object} env
- * @param {object|null} existingData - Optional pre-loaded achievement data to avoid extra KV read
- * @returns {Promise<{ unlocked: boolean, reward: number, achievement: object|null }>}
  */
-async function unlockAchievement(username, achievementId, env, existingData = null) {
+async function unlockAchievement(username: string, achievementId: string, env: Env, existingData: PlayerAchievementData | null = null): Promise<UnlockResult> {
   try {
     const achievement = getAchievementById(achievementId);
     if (!achievement) {
@@ -731,7 +808,7 @@ async function unlockAchievement(username, achievementId, env, existingData = nu
 
     // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      unlockAchievementD1(username, achievementId, env).catch(err => logError('unlockAchievement.d1', err, { username, achievementId }));
+      unlockAchievementD1(username, achievementId, env).catch(err => logError('unlockAchievement.d1', err as Error, { username, achievementId }));
     }
 
     return {
@@ -740,7 +817,7 @@ async function unlockAchievement(username, achievementId, env, existingData = nu
       achievement
     };
   } catch (error) {
-    logError('unlockAchievement', error, { username, achievementId });
+    logError('unlockAchievement', error as Error, { username, achievementId });
     return { unlocked: false, reward: 0, achievement: null };
   }
 }
@@ -748,26 +825,20 @@ async function unlockAchievement(username, achievementId, env, existingData = nu
 /**
  * Update a stat and check for related achievements
  * Returns array of newly unlocked achievements
- *
- * @param {string} username
- * @param {string} statKey - Key in stats object (e.g., 'totalSpins', 'wins')
- * @param {number} increment - Amount to add (default 1)
- * @param {object} env
- * @returns {Promise<Array<{ achievement: object, reward: number }>>}
  */
-async function updateAchievementStat(username, statKey, increment, env) {
+async function updateAchievementStat(username: string, statKey: string, increment: number, env: Env): Promise<UnlockedAchievement[]> {
   try {
     const data = await getPlayerAchievements(username, env);
-    const oldValue = data.stats[statKey] || 0;
+    const oldValue = (data.stats[statKey as keyof PlayerStats] as number) || 0;
     const newValue = oldValue + increment;
-    data.stats[statKey] = newValue;
+    (data.stats[statKey as keyof PlayerStats] as number) = newValue;
 
-    const unlockedAchievements = [];
+    const unlockedAchievements: UnlockedAchievement[] = [];
 
     // Check stat-based achievements
     const achievementsToCheck = getAchievementsForStat(statKey);
     for (const achKey of achievementsToCheck) {
-      const achievement = ACHIEVEMENTS[achKey];
+      const achievement = ACHIEVEMENTS[achKey as AchievementKey];
       if (!achievement) continue;
 
       // Skip if already unlocked
@@ -778,7 +849,7 @@ async function updateAchievementStat(username, statKey, increment, env) {
       const requirement = achievement.requirement || 1;
       if (newValue >= requirement) {
         const result = await unlockAchievement(username, achievement.id, env, data);
-        if (result.unlocked) {
+        if (result.unlocked && result.achievement) {
           unlockedAchievements.push({ achievement: result.achievement, reward: result.reward });
         }
       }
@@ -788,34 +859,31 @@ async function updateAchievementStat(username, statKey, increment, env) {
 
     // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      incrementStatD1(username, statKey, increment, env).catch(err => logError('updateAchievementStat.d1', err, { username, statKey }));
+      incrementStatD1(username, statKey, increment, env).catch(err => logError('updateAchievementStat.d1', err as Error, { username, statKey }));
     }
 
     return unlockedAchievements;
   } catch (error) {
-    logError('updateAchievementStat', error, { username, statKey, increment });
+    logError('updateAchievementStat', error as Error, { username, statKey, increment });
     return [];
   }
 }
 
 /**
  * Batch update multiple achievement stats in a single read-modify-write cycle
- * @param {string} username - Player username
- * @param {Array<[string, number]>} updates - Array of [statKey, increment] pairs
- * @param {object} env
  */
-async function updateAchievementStatBatch(username, updates, env) {
+async function updateAchievementStatBatch(username: string, updates: Array<[string, number]>, env: Env): Promise<void> {
   try {
     const data = await getPlayerAchievements(username, env);
 
     for (const [statKey, increment] of updates) {
-      const newValue = (data.stats[statKey] || 0) + increment;
-      data.stats[statKey] = newValue;
+      const newValue = ((data.stats[statKey as keyof PlayerStats] as number) || 0) + increment;
+      (data.stats[statKey as keyof PlayerStats] as number) = newValue;
 
       // Check stat-based achievements for each updated stat
       const achievementsToCheck = getAchievementsForStat(statKey);
       for (const achKey of achievementsToCheck) {
-        const achievement = ACHIEVEMENTS[achKey];
+        const achievement = ACHIEVEMENTS[achKey as AchievementKey];
         if (!achievement || data.unlockedAt[achievement.id]) continue;
         if (newValue >= (achievement.requirement || 1)) {
           await unlockAchievement(username, achievement.id, env, data);
@@ -828,10 +896,10 @@ async function updateAchievementStatBatch(username, updates, env) {
     // DUAL_WRITE: Fire-and-forget D1 writes
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
       Promise.all(updates.map(([key, amt]) => incrementStatD1(username, key, amt, env)))
-        .catch(err => logError('updateAchievementStatBatch.d1', err, { username }));
+        .catch(err => logError('updateAchievementStatBatch.d1', err as Error, { username }));
     }
   } catch (error) {
-    logError('updateAchievementStatBatch', error, { username, updates: updates.map(u => u[0]) });
+    logError('updateAchievementStatBatch', error as Error, { username, updates: updates.map(u => u[0]) });
   }
 }
 
@@ -839,23 +907,23 @@ async function updateAchievementStatBatch(username, updates, env) {
  * Set a max-value achievement stat (only updates if new value is higher)
  * Used for stats like maxLossStreak, maxDuelStreak where we track the maximum
  */
-async function setMaxAchievementStat(username, statKey, newValue, env) {
+async function setMaxAchievementStat(username: string, statKey: string, newValue: number, env: Env): Promise<UnlockedAchievement[]> {
   try {
     const data = await getPlayerAchievements(username, env);
-    const currentValue = data.stats[statKey] || 0;
+    const currentValue = (data.stats[statKey as keyof PlayerStats] as number) || 0;
 
     if (newValue <= currentValue) return [];
 
-    data.stats[statKey] = newValue;
-    const unlockedAchievements = [];
+    (data.stats[statKey as keyof PlayerStats] as number) = newValue;
+    const unlockedAchievements: UnlockedAchievement[] = [];
 
     const achievementsToCheck = getAchievementsForStat(statKey);
     for (const achKey of achievementsToCheck) {
-      const achievement = ACHIEVEMENTS[achKey];
+      const achievement = ACHIEVEMENTS[achKey as AchievementKey];
       if (!achievement || data.unlockedAt[achievement.id]) continue;
       if (newValue >= (achievement.requirement || 1)) {
         const result = await unlockAchievement(username, achievement.id, env, data);
-        if (result.unlocked) {
+        if (result.unlocked && result.achievement) {
           unlockedAchievements.push({ achievement: result.achievement, reward: result.reward });
         }
       }
@@ -864,7 +932,7 @@ async function setMaxAchievementStat(username, statKey, newValue, env) {
     await savePlayerAchievements(username, data, env);
     return unlockedAchievements;
   } catch (error) {
-    logError('setMaxAchievementStat', error, { username, statKey, newValue });
+    logError('setMaxAchievementStat', error as Error, { username, statKey, newValue });
     return [];
   }
 }
@@ -873,7 +941,7 @@ async function setMaxAchievementStat(username, statKey, newValue, env) {
  * Mark a triple as collected and check for collection achievements
  * Also records to D1 for detailed tracking with timestamps and counters
  */
-async function markTripleCollected(username, symbol, env) {
+async function markTripleCollected(username: string, symbol: string, env: Env): Promise<UnlockedAchievement[]> {
   try {
     const data = await getPlayerAchievements(username, env);
     const symbolKey = getTripleKey(symbol);
@@ -885,11 +953,11 @@ async function markTripleCollected(username, symbol, env) {
     // DUAL_WRITE: Fire-and-forget D1 write (increments counter even if already collected)
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
       const d1Key = symbolKey === 'dachs' ? 'dachs_triple' : symbolKey;
-      recordTripleHitD1(username, d1Key, env).catch(err => logError('markTripleCollected.d1', err, { username, symbolKey }));
+      recordTripleHitD1(username, d1Key, env).catch(err => logError('markTripleCollected.d1', err as Error, { username, symbolKey }));
     }
 
     // Check if already collected in KV (for achievement tracking)
-    if (data.stats.triplesCollected?.[symbolKey]) {
+    if (data.stats.triplesCollected?.[symbolKey as keyof TriplesCollected]) {
       return []; // Already collected, but D1 counter was incremented above
     }
 
@@ -897,12 +965,12 @@ async function markTripleCollected(username, symbol, env) {
     if (!data.stats.triplesCollected) {
       data.stats.triplesCollected = { ...DEFAULT_STATS.triplesCollected };
     }
-    data.stats.triplesCollected[symbolKey] = true;
+    data.stats.triplesCollected[symbolKey as keyof TriplesCollected] = true;
 
-    const unlockedAchievements = [];
+    const unlockedAchievements: UnlockedAchievement[] = [];
 
     // Check individual triple achievements
-    const tripleAchievementMap = {
+    const tripleAchievementMap: Record<string, AchievementKey> = {
       dachs: 'DACHS_TRIPLE',
       diamond: 'DIAMOND_TRIPLE',
       star: 'STAR_TRIPLE'
@@ -922,8 +990,8 @@ async function markTripleCollected(username, symbol, env) {
     }
 
     // Check FRUIT_COLLECTOR (all fruit triples)
-    const fruitKeys = ['watermelon', 'grapes', 'orange', 'lemon', 'cherry'];
-    const allFruitsCollected = fruitKeys.every(k => data.stats.triplesCollected?.[k])
+    const fruitKeys: Array<keyof TriplesCollected> = ['watermelon', 'grapes', 'orange', 'lemon', 'cherry'];
+    const allFruitsCollected = fruitKeys.every(k => data.stats.triplesCollected?.[k]);
     if (allFruitsCollected && !data.unlockedAt[ACHIEVEMENTS.FRUIT_COLLECTOR.id]) {
       data.unlockedAt[ACHIEVEMENTS.FRUIT_COLLECTOR.id] = Date.now();
       const reward = ACHIEVEMENTS_REWARDS_ENABLED ? (ACHIEVEMENTS.FRUIT_COLLECTOR.reward || 0) : 0;
@@ -934,7 +1002,7 @@ async function markTripleCollected(username, symbol, env) {
     }
 
     // Check ALL_TRIPLES (every triple)
-    const allKeys = Object.keys(DEFAULT_STATS.triplesCollected);
+    const allKeys = Object.keys(DEFAULT_STATS.triplesCollected) as Array<keyof TriplesCollected>;
     const allTriplesCollected = allKeys.every(k => data.stats.triplesCollected?.[k]);
     if (allTriplesCollected && !data.unlockedAt[ACHIEVEMENTS.ALL_TRIPLES.id]) {
       data.unlockedAt[ACHIEVEMENTS.ALL_TRIPLES.id] = Date.now();
@@ -948,7 +1016,7 @@ async function markTripleCollected(username, symbol, env) {
     await savePlayerAchievements(username, data, env);
     return unlockedAchievements;
   } catch (error) {
-    logError('markTripleCollected', error, { username, symbol });
+    logError('markTripleCollected', error as Error, { username, symbol });
     return [];
   }
 }
@@ -957,13 +1025,13 @@ async function markTripleCollected(username, symbol, env) {
  * Record a dachs hit (single or double) to D1
  * Called from slots helpers for non-triple dachs appearances
  */
-function recordDachsHit(username, count, env) {
+function recordDachsHit(username: string, count: number, env: Env): void {
   if (!D1_ENABLED || !DUAL_WRITE || !env.DB) return;
 
   // Fire-and-forget D1 write
   const key = count === 1 ? 'dachs_single' : count === 2 ? 'dachs_double' : null;
   if (key) {
-    recordTripleHitD1(username, key, env).catch(err => logError('recordDachsHit.d1', err, { username, count }));
+    recordTripleHitD1(username, key, env).catch(err => logError('recordDachsHit.d1', err as Error, { username, count }));
   }
 }
 
@@ -971,17 +1039,17 @@ function recordDachsHit(username, count, env) {
  * Check and unlock a one-time achievement (e.g., FIRST_SPIN, FIRST_WIN)
  * Returns unlock result
  */
-async function checkAndUnlockAchievement(username, achievementId, env) {
+async function checkAndUnlockAchievement(username: string, achievementId: string, env: Env): Promise<UnlockResult> {
   return unlockAchievement(username, achievementId, env);
 }
 
 /**
  * Check balance milestones and unlock if reached
  */
-async function checkBalanceAchievements(username, newBalance, env) {
+async function checkBalanceAchievements(username: string, newBalance: number, env: Env): Promise<UnlockedAchievement[]> {
   try {
     const data = await getPlayerAchievements(username, env);
-    const unlockedAchievements = [];
+    const unlockedAchievements: UnlockedAchievement[] = [];
 
     const balanceAchievements = [
       { id: 'balance_1000', threshold: 1000 },
@@ -992,7 +1060,7 @@ async function checkBalanceAchievements(username, newBalance, env) {
     ];
 
     // Special: Lucky 777
-    const counterPromises = [];
+    const counterPromises: Promise<void>[] = [];
     if (newBalance === 777 && !data.unlockedAt[ACHIEVEMENTS.LUCKY_777.id]) {
       data.unlockedAt[ACHIEVEMENTS.LUCKY_777.id] = Date.now();
       const reward = ACHIEVEMENTS_REWARDS_ENABLED ? (ACHIEVEMENTS.LUCKY_777.reward || 0) : 0;
@@ -1027,7 +1095,7 @@ async function checkBalanceAchievements(username, newBalance, env) {
 
     return unlockedAchievements;
   } catch (error) {
-    logError('checkBalanceAchievements', error, { username, newBalance });
+    logError('checkBalanceAchievements', error as Error, { username, newBalance });
     return [];
   }
 }
@@ -1035,10 +1103,10 @@ async function checkBalanceAchievements(username, newBalance, env) {
 /**
  * Check big win achievements
  */
-async function checkBigWinAchievements(username, winAmount, env) {
+async function checkBigWinAchievements(username: string, winAmount: number, env: Env): Promise<UnlockedAchievement[]> {
   try {
     const data = await getPlayerAchievements(username, env);
-    const unlockedAchievements = [];
+    const unlockedAchievements: UnlockedAchievement[] = [];
 
     // Update biggest win stat
     if (winAmount > (data.stats.biggestWin || 0)) {
@@ -1052,7 +1120,7 @@ async function checkBigWinAchievements(username, winAmount, env) {
       { id: 'big_win_10000', threshold: 10000 }
     ];
 
-    const counterPromises = [];
+    const counterPromises: Promise<void>[] = [];
     for (const { id, threshold } of bigWinAchievements) {
       if (winAmount >= threshold && !data.unlockedAt[id]) {
         const achievement = getAchievementById(id);
@@ -1077,7 +1145,7 @@ async function checkBigWinAchievements(username, winAmount, env) {
 
     return unlockedAchievements;
   } catch (error) {
-    logError('checkBigWinAchievements', error, { username, winAmount });
+    logError('checkBigWinAchievements', error as Error, { username, winAmount });
     return [];
   }
 }
@@ -1085,12 +1153,12 @@ async function checkBigWinAchievements(username, winAmount, env) {
 /**
  * Get total pending rewards for a player (rewards earned while REWARDS_ENABLED was false)
  */
-async function getPendingRewards(username, env) {
+async function getPendingRewards(username: string, env: Env): Promise<number> {
   try {
     const data = await getPlayerAchievements(username, env);
     return data.pendingRewards || 0;
   } catch (error) {
-    logError('getPendingRewards', error, { username });
+    logError('getPendingRewards', error as Error, { username });
     return 0;
   }
 }
@@ -1099,7 +1167,7 @@ async function getPendingRewards(username, env) {
  * Claim all pending rewards (when REWARDS_ENABLED is turned on)
  * Returns the amount claimed and resets pendingRewards to 0
  */
-async function claimPendingRewards(username, env) {
+async function claimPendingRewards(username: string, env: Env): Promise<number> {
   try {
     const data = await getPlayerAchievements(username, env);
     const amount = data.pendingRewards || 0;
@@ -1109,7 +1177,7 @@ async function claimPendingRewards(username, env) {
     }
     return amount;
   } catch (error) {
-    logError('claimPendingRewards', error, { username });
+    logError('claimPendingRewards', error as Error, { username });
     return 0;
   }
 }
@@ -1117,12 +1185,12 @@ async function claimPendingRewards(username, env) {
 /**
  * Get count of unlocked achievements for a player
  */
-async function getUnlockedAchievementCount(username, env) {
+async function getUnlockedAchievementCount(username: string, env: Env): Promise<number> {
   try {
     const data = await getPlayerAchievements(username, env);
     return Object.keys(data.unlockedAt).length;
   } catch (error) {
-    logError('getUnlockedAchievementCount', error, { username });
+    logError('getUnlockedAchievementCount', error as Error, { username });
     return 0;
   }
 }
@@ -1134,8 +1202,8 @@ async function getUnlockedAchievementCount(username, env) {
 /**
  * Map stat keys to achievement keys
  */
-function getAchievementsForStat(statKey) {
-  const mapping = {
+function getAchievementsForStat(statKey: string): string[] {
+  const mapping: Record<string, string[]> = {
     totalSpins: ['SPIN_100', 'SPIN_500', 'SPIN_1000', 'SPIN_5000', 'SPIN_10000'],
     wins: ['WIN_100', 'WIN_500', 'WIN_1000'],
     losses: ['LOSS_100', 'LOSS_500', 'LOSS_1000'],
@@ -1165,8 +1233,8 @@ function getAchievementsForStat(statKey) {
 /**
  * Map symbol emoji to triple key
  */
-function getTripleKey(symbol) {
-  const mapping = {
+function getTripleKey(symbol: string): string | null {
+  const mapping: Record<string, string> = {
     '🦡': 'dachs',
     '💎': 'diamond',
     '⭐': 'star',
@@ -1184,17 +1252,13 @@ function getTripleKey(symbol) {
 // ============================================
 
 /**
- * Increment global counter when an achievement is unlocked
- * Uses retry mechanism to handle race conditions
- */
-/**
  * Invalidate the achievement stats cache so next read does a fresh scan.
  * Called whenever an achievement is unlocked.
  */
-async function invalidateAchievementStatsCache(env) {
+async function invalidateAchievementStatsCache(env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.delete(STATS_CACHE_KEY);
-  } catch (error) {
+  } catch {
     // Non-critical, cache will expire naturally
   }
 }
@@ -1204,7 +1268,7 @@ async function invalidateAchievementStatsCache(env) {
  * The counter keys (achievement_count:*) are no longer the source of truth -
  * getAchievementStats() now does a full scan. This just invalidates the cache.
  */
-async function incrementAchievementCounter(achievementId, env) {
+async function incrementAchievementCounter(_achievementId: string, env: Env): Promise<void> {
   await invalidateAchievementStatsCache(env);
 }
 
@@ -1216,7 +1280,7 @@ async function incrementAchievementCounter(achievementId, env) {
 const MIGRATION_KEY = 'cache:all_players_migrated_v3';
 const MIGRATION_TTL = 300; // Check every 5 minutes for new players
 
-async function migrateAllPlayersToAchievements(env) {
+async function migrateAllPlayersToAchievements(env: Env): Promise<void> {
   try {
     // Check if we already ran migration recently
     const migrated = await env.SLOTS_KV.get(MIGRATION_KEY);
@@ -1233,7 +1297,7 @@ async function migrateAllPlayersToAchievements(env) {
     const existingAchievements = new Set(achievementList.keys.map(k => k.name.replace('achievements:', '')));
 
     // Find users without achievement entries
-    const missingUsers = [];
+    const missingUsers: string[] = [];
     for (const key of userKeys) {
       const username = key.name.replace('user:', '').toLowerCase();
       // Skip placeholder users
@@ -1253,7 +1317,7 @@ async function migrateAllPlayersToAchievements(env) {
     // Mark migration as done
     await env.SLOTS_KV.put(MIGRATION_KEY, 'true', { expirationTtl: MIGRATION_TTL });
   } catch (error) {
-    logError('migrateAllPlayersToAchievements', error);
+    logError('migrateAllPlayersToAchievements', error as Error);
   }
 }
 
@@ -1262,13 +1326,13 @@ async function migrateAllPlayersToAchievements(env) {
  * Uses the achievement_count:{id} counters for real-time accuracy
  * Total players is cached for 5 minutes to reduce load
  */
-async function getAchievementStats(env) {
+async function getAchievementStats(env: Env): Promise<AchievementStatsResult> {
   try {
     // Check cache first (valid for 5 minutes)
     const cached = await env.SLOTS_KV.get(STATS_CACHE_KEY);
     if (cached) {
       try {
-        const parsed = JSON.parse(cached);
+        const parsed = JSON.parse(cached) as AchievementStatsResult;
         if (parsed.totalPlayers > 0 && parsed.counts) {
           return parsed;
         }
@@ -1287,7 +1351,7 @@ async function getAchievementStats(env) {
 
     // Initialize counts for all achievements
     const achievementIds = Object.values(ACHIEVEMENTS).map(a => a.id);
-    const counts = {};
+    const counts: Record<string, number> = {};
     for (const id of achievementIds) {
       counts[id] = 0;
     }
@@ -1300,7 +1364,7 @@ async function getAchievementStats(env) {
       for (const raw of results) {
         if (!raw) continue;
         try {
-          const data = JSON.parse(raw);
+          const data = JSON.parse(raw) as PlayerAchievementData;
           if (data.unlockedAt) {
             for (const achievementId of Object.keys(data.unlockedAt)) {
               if (counts[achievementId] !== undefined) {
@@ -1314,14 +1378,14 @@ async function getAchievementStats(env) {
       }
     }
 
-    const result = { totalPlayers, counts };
+    const result: AchievementStatsResult = { totalPlayers, counts };
 
     // Cache for 5 minutes
     await env.SLOTS_KV.put(STATS_CACHE_KEY, JSON.stringify(result), { expirationTtl: STATS_CACHE_TTL });
 
     return result;
   } catch (error) {
-    logError('getAchievementStats', error);
+    logError('getAchievementStats', error as Error);
     return { totalPlayers: 0, counts: {} };
   }
 }
@@ -1330,15 +1394,15 @@ async function getAchievementStats(env) {
  * Bulk sync: Recalculate all players' achievement stats from their real stats.
  * Fixes discrepancies (e.g. losses not tracked from beginning).
  */
-async function syncAllPlayerAchievementStats(env) {
-  const results = { processed: 0, updated: 0, achievementsUnlocked: 0, errors: 0, details: [] };
+async function syncAllPlayerAchievementStats(env: Env): Promise<SyncResults> {
+  const results: SyncResults = { processed: 0, updated: 0, achievementsUnlocked: 0, errors: 0, details: [] };
 
   try {
     // List all users
     const userList = await env.SLOTS_KV.list({ prefix: 'user:', limit: 1000 });
     const userKeys = userList.keys || [];
 
-    const syncFields = [
+    const syncFields: Array<keyof PlayerStats> = [
       'totalSpins', 'wins', 'losses', 'maxLossStreak', 'totalDachsSeen', 'hourlyJackpots',
       'chaosSpins', 'reverseChaosSpins', 'wheelSpins', 'mysteryBoxes',
       'insuranceTriggers', 'wildCardsUsed', 'freeSpinsUsed',
@@ -1364,21 +1428,21 @@ async function syncAllPlayerAchievementStats(env) {
 
           if (!statsRaw || !achievementsRaw) return;
 
-          const stats = JSON.parse(statsRaw);
-          const data = JSON.parse(achievementsRaw);
+          const stats = JSON.parse(statsRaw) as Partial<PlayerStats>;
+          const data = JSON.parse(achievementsRaw) as PlayerAchievementData;
           if (!data.stats) data.stats = { ...DEFAULT_STATS };
 
           let changed = false;
           let playerUnlocked = 0;
-          const counterPromises = [];
+          const counterPromises: Promise<void>[] = [];
           const now = Date.now();
 
           // Sync all stat fields
           for (const field of syncFields) {
-            const realVal = stats[field] || 0;
-            const achVal = data.stats[field] || 0;
+            const realVal = (stats[field] as number) || 0;
+            const achVal = (data.stats[field] as number) || 0;
             if (realVal > achVal) {
-              data.stats[field] = realVal;
+              (data.stats[field] as number) = realVal;
               changed = true;
             }
           }
@@ -1391,13 +1455,13 @@ async function syncAllPlayerAchievementStats(env) {
           }
 
           // Check all stat-based achievements
-          for (const field of [...syncFields, 'losses']) {
-            const value = data.stats[field] || 0;
+          for (const field of [...syncFields, 'losses' as keyof PlayerStats]) {
+            const value = (data.stats[field] as number) || 0;
             if (value <= 0) continue;
 
             const achievementsToCheck = getAchievementsForStat(field);
             for (const achKey of achievementsToCheck) {
-              const achievement = ACHIEVEMENTS[achKey];
+              const achievement = ACHIEVEMENTS[achKey as AchievementKey];
               if (!achievement || data.unlockedAt[achievement.id]) continue;
               if (value >= (achievement.requirement || 1)) {
                 data.unlockedAt[achievement.id] = now;
@@ -1426,13 +1490,13 @@ async function syncAllPlayerAchievementStats(env) {
           results.processed++;
         } catch (e) {
           results.errors++;
-          logError('syncAllPlayerAchievementStats.player', e, { username });
+          logError('syncAllPlayerAchievementStats.player', e as Error, { username });
         }
       }));
     }
   } catch (error) {
-    logError('syncAllPlayerAchievementStats', error);
-    results.error = error.message;
+    logError('syncAllPlayerAchievementStats', error as Error);
+    results.error = (error as Error).message;
   }
 
   // Always invalidate stats cache after sync

@@ -8,9 +8,109 @@ import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, KV_TRUE, MAX_RETRIE
 import { getCurrentMonth, getCurrentDate, logError, kvKey, exponentialBackoff } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, upsertUser, updateStreakMultiplier as updateStreakMultiplierD1 } from './d1.js';
 import { addUnlockD1, removeUnlockD1, updateMonthlyLoginD1, incrementStatD1, updateBiggestWinD1 } from './d1-achievements.js';
+import type { Env, MonthlyLoginData, StreakData } from '../types/index.js';
 
+// ============================================
+// Types
+// ============================================
+
+export interface PlayerStats {
+  // Core stats
+  totalSpins: number;
+  wins: number;
+  biggestWin: number;
+  totalWon: number;
+  totalLost: number;
+  // Loss tracking
+  losses: number;
+  biggestLoss: number;
+  maxLossStreak: number;
+  // Item/Buff usage
+  chaosSpins: number;
+  reverseChaosSpins: number;
+  wheelSpins: number;
+  mysteryBoxes: number;
+  peekTokens: number;
+  insuranceTriggers: number;
+  wildCardsUsed: number;
+  guaranteedPairsUsed: number;
+  freeSpinsUsed: number;
+  diamondMines: number;
+  // Duel extended
+  duelsPlayed: number;
+  duelsWon: number;
+  duelsLost: number;
+  maxDuelStreak: number;
+  totalDuelWinnings: number;
+  // Transfer extended
+  totalTransferred: number;
+  transfersReceived: number;
+  transfersSentCount: number;
+  // Time/Activity
+  playDays: number;
+  firstSpinAt: number;
+  maxDailyStreak: number;
+  // Spin types
+  allInSpins: number;
+  highBetSpins: number;
+  // Dachs tracking
+  totalDachsSeen: number;
+  // Hourly jackpot
+  hourlyJackpots: number;
+  // Shop
+  shopPurchases: number;
+  // Daily
+  dailysClaimed: number;
+}
+
+// ============================================
+// Constants
+// ============================================
+
+// Stats - with structure validation
+const DEFAULT_STATS: PlayerStats = {
+  // Core stats
+  totalSpins: 0, wins: 0, biggestWin: 0, totalWon: 0, totalLost: 0,
+  // Loss tracking
+  losses: 0, biggestLoss: 0, maxLossStreak: 0,
+  // Item/Buff usage
+  chaosSpins: 0, reverseChaosSpins: 0, wheelSpins: 0, mysteryBoxes: 0,
+  peekTokens: 0, insuranceTriggers: 0, wildCardsUsed: 0, guaranteedPairsUsed: 0,
+  freeSpinsUsed: 0, diamondMines: 0,
+  // Duel extended
+  duelsPlayed: 0, duelsWon: 0, duelsLost: 0, maxDuelStreak: 0, totalDuelWinnings: 0,
+  // Transfer extended
+  totalTransferred: 0, transfersReceived: 0, transfersSentCount: 0,
+  // Time/Activity
+  playDays: 0, firstSpinAt: 0, maxDailyStreak: 0,
+  // Spin types
+  allInSpins: 0, highBetSpins: 0,
+  // Dachs tracking
+  totalDachsSeen: 0,
+  // Hourly jackpot
+  hourlyJackpots: 0,
+  // Shop
+  shopPurchases: 0,
+  // Daily
+  dailysClaimed: 0
+};
+
+// Whitelist of valid stat keys for SQL safety (prevents SQL injection via statKey)
+const VALID_STAT_KEYS = new Set<string>(Object.keys(DEFAULT_STATS));
+
+// Convert camelCase to snake_case for D1 column names
+function statKeyToColumn(statKey: string): string {
+  if (!VALID_STAT_KEYS.has(statKey)) {
+    throw new Error(`Invalid stat key: ${statKey}`);
+  }
+  return statKey.replace(/([A-Z])/g, '_$1').toLowerCase();
+}
+
+// ============================================
 // Streak Multiplier
-async function getStreakMultiplier(username, env) {
+// ============================================
+
+export async function getStreakMultiplier(username: string, env: Env): Promise<number> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('streakmultiplier:', username));
     return value ? parseFloat(value) : 1.0;
@@ -19,7 +119,7 @@ async function getStreakMultiplier(username, env) {
   }
 }
 
-async function incrementStreakMultiplier(username, env, maxRetries = MAX_RETRIES) {
+export async function incrementStreakMultiplier(username: string, env: Env, maxRetries: number = MAX_RETRIES): Promise<number> {
   const key = kvKey('streakmultiplier:', username);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -50,7 +150,7 @@ async function incrementStreakMultiplier(username, env, maxRetries = MAX_RETRIES
   return 1.0;
 }
 
-async function resetStreakMultiplier(username, env) {
+export async function resetStreakMultiplier(username: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.delete(kvKey('streakmultiplier:', username));
 
@@ -62,8 +162,11 @@ async function resetStreakMultiplier(username, env) {
   }
 }
 
+// ============================================
 // Prestige Rank
-async function getPrestigeRank(username, env) {
+// ============================================
+
+export async function getPrestigeRank(username: string, env: Env): Promise<string | null> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('rank:', username));
     // Return null for empty string or null (handles KV edge cases)
@@ -74,7 +177,7 @@ async function getPrestigeRank(username, env) {
   }
 }
 
-async function setPrestigeRank(username, rank, env) {
+export async function setPrestigeRank(username: string, rank: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('rank:', username), rank);
 
@@ -87,7 +190,7 @@ async function setPrestigeRank(username, rank, env) {
   }
 }
 
-async function removePrestigeRank(username, env) {
+export async function removePrestigeRank(username: string, env: Env): Promise<boolean> {
   try {
     await env.SLOTS_KV.delete(kvKey('rank:', username));
 
@@ -102,8 +205,11 @@ async function removePrestigeRank(username, env) {
   }
 }
 
+// ============================================
 // Unlocks
-async function hasUnlock(username, unlockKey, env) {
+// ============================================
+
+export async function hasUnlock(username: string, unlockKey: string, env: Env): Promise<boolean> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('unlock:', username, unlockKey));
     return value === KV_TRUE;
@@ -113,7 +219,7 @@ async function hasUnlock(username, unlockKey, env) {
   }
 }
 
-async function setUnlock(username, unlockKey, env) {
+export async function setUnlock(username: string, unlockKey: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('unlock:', username, unlockKey), 'true');
 
@@ -126,7 +232,7 @@ async function setUnlock(username, unlockKey, env) {
   }
 }
 
-async function removeUnlock(username, unlockKey, env) {
+export async function removeUnlock(username: string, unlockKey: string, env: Env): Promise<boolean> {
   try {
     await env.SLOTS_KV.delete(kvKey('unlock:', username, unlockKey));
 
@@ -141,8 +247,11 @@ async function removeUnlock(username, unlockKey, env) {
   }
 }
 
+// ============================================
 // Monthly Login System
-async function getMonthlyLogin(username, env) {
+// ============================================
+
+export async function getMonthlyLogin(username: string, env: Env): Promise<MonthlyLoginData> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('monthlylogin:', username));
     const currentMonth = getCurrentMonth();
@@ -151,7 +260,7 @@ async function getMonthlyLogin(username, env) {
       return { month: currentMonth, days: [], claimedMilestones: [] };
     }
 
-    let data;
+    let data: MonthlyLoginData;
     try {
       data = JSON.parse(value);
     } catch (parseError) {
@@ -182,7 +291,7 @@ async function getMonthlyLogin(username, env) {
   }
 }
 
-async function updateMonthlyLogin(username, env) {
+export async function updateMonthlyLogin(username: string, env: Env): Promise<MonthlyLoginData> {
   try {
     const monthlyLogin = await getMonthlyLogin(username, env);
     const today = getCurrentDate();
@@ -209,7 +318,7 @@ async function updateMonthlyLogin(username, env) {
 }
 
 // OPTIMIZED: Accept monthlyLogin as parameter to avoid redundant KV read
-async function markMilestoneClaimed(username, milestone, env, monthlyLogin = null) {
+export async function markMilestoneClaimed(username: string, milestone: number, env: Env, monthlyLogin: MonthlyLoginData | null = null): Promise<void> {
   try {
     const data = monthlyLogin || await getMonthlyLogin(username, env);
 
@@ -227,58 +336,26 @@ async function markMilestoneClaimed(username, milestone, env, monthlyLogin = nul
   }
 }
 
+// ============================================
 // Streaks
-async function getStreak(username, env) {
+// ============================================
+
+export async function getStreak(username: string, env: Env): Promise<StreakData> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('streak:', username));
     if (!value) return { wins: 0, losses: 0 };
-    return JSON.parse(value);
+    return JSON.parse(value) as StreakData;
   } catch (error) {
     logError('getStreak', error, { username });
     return { wins: 0, losses: 0 };
   }
 }
 
-// Stats - with structure validation
-const DEFAULT_STATS = {
-  // Core stats
-  totalSpins: 0, wins: 0, biggestWin: 0, totalWon: 0, totalLost: 0,
-  // Loss tracking
-  losses: 0, biggestLoss: 0, maxLossStreak: 0,
-  // Item/Buff usage
-  chaosSpins: 0, reverseChaosSpins: 0, wheelSpins: 0, mysteryBoxes: 0,
-  peekTokens: 0, insuranceTriggers: 0, wildCardsUsed: 0, guaranteedPairsUsed: 0,
-  freeSpinsUsed: 0, diamondMines: 0,
-  // Duel extended
-  duelsPlayed: 0, duelsWon: 0, duelsLost: 0, maxDuelStreak: 0, totalDuelWinnings: 0,
-  // Transfer extended
-  totalTransferred: 0, transfersReceived: 0, transfersSentCount: 0,
-  // Time/Activity
-  playDays: 0, firstSpinAt: 0, maxDailyStreak: 0,
-  // Spin types
-  allInSpins: 0, highBetSpins: 0,
-  // Dachs tracking
-  totalDachsSeen: 0,
-  // Hourly jackpot
-  hourlyJackpots: 0,
-  // Shop
-  shopPurchases: 0,
-  // Daily
-  dailysClaimed: 0
-};
+// ============================================
+// Stats
+// ============================================
 
-// Whitelist of valid stat keys for SQL safety (prevents SQL injection via statKey)
-const VALID_STAT_KEYS = new Set(Object.keys(DEFAULT_STATS));
-
-// Convert camelCase to snake_case for D1 column names
-function statKeyToColumn(statKey) {
-  if (!VALID_STAT_KEYS.has(statKey)) {
-    throw new Error(`Invalid stat key: ${statKey}`);
-  }
-  return statKey.replace(/([A-Z])/g, '_$1').toLowerCase();
-}
-
-async function getStats(username, env) {
+export async function getStats(username: string, env: Env): Promise<PlayerStats> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('stats:', username));
     if (!value) return { ...DEFAULT_STATS };
@@ -286,8 +363,8 @@ async function getStats(username, env) {
     const parsed = JSON.parse(value);
 
     // Validate and sanitize each field - merge with defaults for backwards compatibility
-    const stats = { ...DEFAULT_STATS };
-    for (const key of Object.keys(DEFAULT_STATS)) {
+    const stats: PlayerStats = { ...DEFAULT_STATS };
+    for (const key of Object.keys(DEFAULT_STATS) as (keyof PlayerStats)[]) {
       if (typeof parsed[key] === 'number') {
         stats[key] = parsed[key];
       }
@@ -299,7 +376,7 @@ async function getStats(username, env) {
   }
 }
 
-async function updateStats(username, isWin, winAmount, lostAmount, env) {
+export async function updateStats(username: string, isWin: boolean, winAmount: number, lostAmount: number, env: Env): Promise<void> {
   try {
     const stats = await getStats(username, env);
     const wasNewBiggestWin = isWin && winAmount > stats.biggestWin;
@@ -319,7 +396,7 @@ async function updateStats(username, isWin, winAmount, lostAmount, env) {
 
     // DUAL_WRITE: Fire-and-forget D1 writes (batch all D1 updates)
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
-      const d1Ops = [incrementStatD1(username, 'totalSpins', 1, env)];
+      const d1Ops: Promise<boolean>[] = [incrementStatD1(username, 'totalSpins', 1, env)];
       if (isWin) {
         d1Ops.push(incrementStatD1(username, 'wins', 1, env));
         d1Ops.push(incrementStatD1(username, 'totalWon', winAmount, env));
@@ -339,7 +416,7 @@ async function updateStats(username, isWin, winAmount, lostAmount, env) {
  * Increment a specific stat by a given amount
  * Used for tracking item usage, special events, etc.
  */
-async function incrementStat(username, statKey, amount, env) {
+export async function incrementStat(username: string, statKey: keyof PlayerStats, amount: number, env: Env): Promise<void> {
   try {
     const stats = await getStats(username, env);
     if (statKey in stats) {
@@ -359,7 +436,7 @@ async function incrementStat(username, statKey, amount, env) {
 /**
  * Set a specific stat to a value (for max values, timestamps, etc.)
  */
-async function setStat(username, statKey, value, env) {
+export async function setStat(username: string, statKey: keyof PlayerStats, value: number, env: Env): Promise<void> {
   try {
     const stats = await getStats(username, env);
     if (statKey in stats) {
@@ -380,15 +457,12 @@ async function setStat(username, statKey, value, env) {
 /**
  * Batch increment multiple stats in a single read-modify-write cycle
  * Prevents race conditions from parallel incrementStat calls on the same key
- * @param {string} username - Player username
- * @param {Array<[string, number]>} updates - Array of [statKey, amount] pairs
- * @param {object} env - Environment bindings
  */
-async function incrementStats(username, updates, env) {
+export async function incrementStats(username: string, updates: [keyof PlayerStats, number][], env: Env): Promise<void> {
   try {
     if (!updates || updates.length === 0) return;
     const stats = await getStats(username, env);
-    const d1Updates = [];
+    const d1Updates: [string, number][] = [];
 
     for (const [statKey, amount] of updates) {
       if (statKey in stats) {
@@ -411,21 +485,22 @@ async function incrementStats(username, updates, env) {
 
 /**
  * Batch increment stats + update max stat in a single read-modify-write
- * @param {string} username - Player username
- * @param {Array<[string, number]>} increments - Array of [statKey, amount] pairs
- * @param {Array<[string, number]>} maxUpdates - Array of [statKey, newValue] pairs for max updates
- * @param {object} env - Environment bindings
  */
-async function batchUpdateStats(username, increments, maxUpdates, env) {
+export async function batchUpdateStats(
+  username: string,
+  increments: [keyof PlayerStats, number][] | null,
+  maxUpdates: [keyof PlayerStats, number][] | null,
+  env: Env
+): Promise<void> {
   try {
     if ((!increments || increments.length === 0) && (!maxUpdates || maxUpdates.length === 0)) return;
     const stats = await getStats(username, env);
-    const d1Promises = [];
+    const d1Promises: (() => Promise<D1Result<unknown>>)[] = [];
 
     for (const [statKey, amount] of (increments || [])) {
       if (statKey in stats) {
         stats[statKey] += amount;
-        d1Promises.push(() => incrementStatD1(username, statKey, amount, env));
+        d1Promises.push(() => incrementStatD1(username, statKey, amount, env) as unknown as Promise<D1Result<unknown>>);
       }
     }
 
@@ -458,7 +533,7 @@ async function batchUpdateStats(username, increments, maxUpdates, env) {
 /**
  * Update max stat if new value is higher
  */
-async function updateMaxStat(username, statKey, newValue, env) {
+export async function updateMaxStat(username: string, statKey: keyof PlayerStats, newValue: number, env: Env): Promise<void> {
   try {
     const stats = await getStats(username, env);
     if (statKey in stats && newValue > stats[statKey]) {
@@ -480,26 +555,3 @@ async function updateMaxStat(username, statKey, newValue, env) {
     logError('updateMaxStat', error, { username, statKey, newValue });
   }
 }
-
-export {
-  getStreakMultiplier,
-  incrementStreakMultiplier,
-  resetStreakMultiplier,
-  getPrestigeRank,
-  setPrestigeRank,
-  removePrestigeRank,
-  hasUnlock,
-  setUnlock,
-  removeUnlock,
-  getMonthlyLogin,
-  updateMonthlyLogin,
-  markMilestoneClaimed,
-  getStreak,
-  getStats,
-  updateStats,
-  incrementStat,
-  incrementStats,
-  batchUpdateStats,
-  setStat,
-  updateMaxStat
-};

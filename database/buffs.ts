@@ -23,9 +23,39 @@
 import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES, KV_ACTIVE } from '../constants.js';
 import { exponentialBackoff, logError, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, upsertItem, deleteItem } from './d1.js';
+import type { Env } from '../types/index.js';
 
+// ============================================
+// Types
+// ============================================
+
+export interface BuffUsesData {
+  expireAt: number;
+  uses: number;
+}
+
+export interface BuffStackData {
+  expireAt: number;
+  stack: number;
+}
+
+export interface BuffWithUsesResult {
+  active: boolean;
+  uses: number;
+  data: BuffUsesData | null;
+}
+
+export interface BuffWithStackResult {
+  active: boolean;
+  stack: number;
+  data: BuffStackData | null;
+}
+
+// ============================================
 // Buffs (timed)
-async function activateBuff(username, buffKey, duration, env) {
+// ============================================
+
+export async function activateBuff(username: string, buffKey: string, duration: number, env: Env): Promise<void> {
   try {
     const expireAt = Date.now() + (duration * 1000);
     await env.SLOTS_KV.put(kvKey('buff:', username, buffKey), expireAt.toString(), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
@@ -34,7 +64,7 @@ async function activateBuff(username, buffKey, duration, env) {
   }
 }
 
-async function isBuffActive(username, buffKey, env) {
+export async function isBuffActive(username: string, buffKey: string, env: Env): Promise<boolean> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('buff:', username, buffKey));
     if (!value) return false;
@@ -45,11 +75,14 @@ async function isBuffActive(username, buffKey, env) {
   }
 }
 
+// ============================================
 // Buff with uses (Dachs Locator)
-async function activateBuffWithUses(username, buffKey, duration, uses, env) {
+// ============================================
+
+export async function activateBuffWithUses(username: string, buffKey: string, duration: number, uses: number, env: Env): Promise<void> {
   try {
     const expireAt = Date.now() + (duration * 1000);
-    const data = { expireAt, uses };
+    const data: BuffUsesData = { expireAt, uses };
     await env.SLOTS_KV.put(kvKey('buff:', username, buffKey), JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
     logError('activateBuffWithUses', error, { username, buffKey, duration, uses });
@@ -57,13 +90,13 @@ async function activateBuffWithUses(username, buffKey, duration, uses, env) {
 }
 
 // OPTIMIZED: Return full data object to avoid redundant reads
-async function getBuffWithUses(username, buffKey, env) {
+export async function getBuffWithUses(username: string, buffKey: string, env: Env): Promise<BuffWithUsesResult> {
   try {
     const key = kvKey('buff:', username, buffKey);
     const value = await env.SLOTS_KV.get(key);
     if (!value) return { active: false, uses: 0, data: null };
 
-    let data;
+    let data: BuffUsesData;
     try {
       data = JSON.parse(value);
     } catch (parseError) {
@@ -99,7 +132,7 @@ async function getBuffWithUses(username, buffKey, env) {
 }
 
 // Atomic buff uses decrement with retry mechanism (prevents race conditions)
-async function decrementBuffUses(username, buffKey, env, maxRetries = MAX_RETRIES) {
+export async function decrementBuffUses(username: string, buffKey: string, env: Env, maxRetries: number = MAX_RETRIES): Promise<void> {
   const key = kvKey('buff:', username, buffKey);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -108,14 +141,14 @@ async function decrementBuffUses(username, buffKey, env, maxRetries = MAX_RETRIE
       const value = await env.SLOTS_KV.get(key);
       if (!value) return;
 
-      const data = JSON.parse(value);
+      const data: BuffUsesData = JSON.parse(value);
       if (Date.now() >= data.expireAt || data.uses <= 0) {
         await env.SLOTS_KV.delete(key);
         return;
       }
 
       // Prepare update
-      const updatedData = { ...data, uses: data.uses - 1 };
+      const updatedData: BuffUsesData = { ...data, uses: data.uses - 1 };
 
       if (updatedData.uses <= 0) {
         await env.SLOTS_KV.delete(key);
@@ -132,7 +165,7 @@ async function decrementBuffUses(username, buffKey, env, maxRetries = MAX_RETRIE
       } else {
         // Should have updated uses
         if (verifyValue) {
-          const verifyData = JSON.parse(verifyValue);
+          const verifyData: BuffUsesData = JSON.parse(verifyValue);
           if (verifyData.uses === updatedData.uses) return; // Success
         }
       }
@@ -148,11 +181,14 @@ async function decrementBuffUses(username, buffKey, env, maxRetries = MAX_RETRIE
   }
 }
 
+// ============================================
 // Buff with stack (Rage Mode)
-async function activateBuffWithStack(username, buffKey, duration, env) {
+// ============================================
+
+export async function activateBuffWithStack(username: string, buffKey: string, duration: number, env: Env): Promise<void> {
   try {
     const expireAt = Date.now() + (duration * 1000);
-    const data = { expireAt, stack: 0 };
+    const data: BuffStackData = { expireAt, stack: 0 };
     await env.SLOTS_KV.put(kvKey('buff:', username, buffKey), JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
   } catch (error) {
     logError('activateBuffWithStack', error, { username, buffKey, duration });
@@ -160,13 +196,13 @@ async function activateBuffWithStack(username, buffKey, duration, env) {
 }
 
 // OPTIMIZED: Return full data object to avoid redundant reads
-async function getBuffWithStack(username, buffKey, env) {
+export async function getBuffWithStack(username: string, buffKey: string, env: Env): Promise<BuffWithStackResult> {
   try {
     const key = kvKey('buff:', username, buffKey);
     const value = await env.SLOTS_KV.get(key);
     if (!value) return { active: false, stack: 0, data: null };
 
-    let data;
+    let data: BuffStackData;
     try {
       data = JSON.parse(value);
     } catch (parseError) {
@@ -200,8 +236,11 @@ async function getBuffWithStack(username, buffKey, env) {
   }
 }
 
+// ============================================
 // Boosts (symbol-specific)
-async function addBoost(username, symbol, env) {
+// ============================================
+
+export async function addBoost(username: string, symbol: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('boost:', username, symbol), KV_ACTIVE);
   } catch (error) {
@@ -209,7 +248,7 @@ async function addBoost(username, symbol, env) {
   }
 }
 
-async function consumeBoost(username, symbol, env) {
+export async function consumeBoost(username: string, symbol: string, env: Env): Promise<boolean> {
   try {
     const key = kvKey('boost:', username, symbol);
     const claimKey = `${key}:claim`;
@@ -232,8 +271,11 @@ async function consumeBoost(username, symbol, env) {
   }
 }
 
+// ============================================
 // Insurance - Atomic add with retry mechanism
-async function addInsurance(username, count, env, maxRetries = MAX_RETRIES) {
+// ============================================
+
+export async function addInsurance(username: string, count: number, env: Env, maxRetries: number = MAX_RETRIES): Promise<void> {
   const key = kvKey('insurance:', username);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -262,7 +304,7 @@ async function addInsurance(username, count, env, maxRetries = MAX_RETRIES) {
   }
 }
 
-async function getInsuranceCount(username, env) {
+export async function getInsuranceCount(username: string, env: Env): Promise<number> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('insurance:', username));
     return value ? parseInt(value, 10) : 0;
@@ -273,7 +315,7 @@ async function getInsuranceCount(username, env) {
 }
 
 // Atomic insurance decrement with retry mechanism (prevents race conditions)
-async function decrementInsuranceCount(username, env, maxRetries = MAX_RETRIES) {
+export async function decrementInsuranceCount(username: string, env: Env, maxRetries: number = MAX_RETRIES): Promise<void> {
   const key = kvKey('insurance:', username);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -317,7 +359,7 @@ async function decrementInsuranceCount(username, env, maxRetries = MAX_RETRIES) 
 }
 
 // OPTIMIZED: Set insurance directly when count is already known (avoids redundant KV read)
-async function setInsuranceCount(username, count, env) {
+export async function setInsuranceCount(username: string, count: number, env: Env): Promise<void> {
   try {
     const key = kvKey('insurance:', username);
     if (count <= 0) {
@@ -336,8 +378,11 @@ async function setInsuranceCount(username, count, env) {
   }
 }
 
+// ============================================
 // Win Multiplier
-async function addWinMultiplier(username, env) {
+// ============================================
+
+export async function addWinMultiplier(username: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('winmulti:', username), KV_ACTIVE);
 
@@ -349,7 +394,7 @@ async function addWinMultiplier(username, env) {
   }
 }
 
-async function consumeWinMultiplier(username, env) {
+export async function consumeWinMultiplier(username: string, env: Env): Promise<boolean> {
   try {
     const key = kvKey('winmulti:', username);
     const value = await env.SLOTS_KV.get(key);
@@ -372,21 +417,3 @@ async function consumeWinMultiplier(username, env) {
     return false;
   }
 }
-
-export {
-  activateBuff,
-  isBuffActive,
-  activateBuffWithUses,
-  getBuffWithUses,
-  decrementBuffUses,
-  activateBuffWithStack,
-  getBuffWithStack,
-  addBoost,
-  consumeBoost,
-  addInsurance,
-  getInsuranceCount,
-  setInsuranceCount,
-  decrementInsuranceCount,
-  addWinMultiplier,
-  consumeWinMultiplier
-};

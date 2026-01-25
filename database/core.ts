@@ -7,9 +7,15 @@
 import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE, COOLDOWN_TTL_SECONDS, KV_TRUE, KV_ACCEPTED } from '../constants.js';
 import { logError, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, updateBalance as updateBalanceD1, upsertUser } from './d1.js';
+import type { Env, CustomMessages } from '../types/index.js';
+
+export interface SelfBanData {
+  timestamp: number;
+  date: string;
+}
 
 // Balance Functions
-async function getBalance(username, env) {
+export async function getBalance(username: string, env: Env): Promise<number> {
   try {
     const key = kvKey('user:', username);
     const value = await env.SLOTS_KV.get(key);
@@ -33,7 +39,7 @@ async function getBalance(username, env) {
   }
 }
 
-async function setBalance(username, balance, env) {
+export async function setBalance(username: string, balance: number, env: Env): Promise<void> {
   try {
     const safeBalance = Math.max(0, Math.min(balance, MAX_BALANCE));
 
@@ -50,7 +56,7 @@ async function setBalance(username, balance, env) {
 }
 
 // Daily Functions
-async function getLastDaily(username, env) {
+export async function getLastDaily(username: string, env: Env): Promise<number | null> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('daily:', username));
     return value ? parseInt(value, 10) : null;
@@ -60,7 +66,7 @@ async function getLastDaily(username, env) {
   }
 }
 
-async function setLastDaily(username, timestamp, env) {
+export async function setLastDaily(username: string, timestamp: number, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('daily:', username), timestamp.toString(), { expirationTtl: DAILY_TTL_SECONDS });
   } catch (error) {
@@ -69,7 +75,7 @@ async function setLastDaily(username, timestamp, env) {
 }
 
 // Cooldown System
-async function getLastSpin(username, env) {
+export async function getLastSpin(username: string, env: Env): Promise<number | null> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('cooldown:', username));
     return value ? parseInt(value, 10) : null;
@@ -79,7 +85,7 @@ async function getLastSpin(username, env) {
   }
 }
 
-async function setLastSpin(username, timestamp, env) {
+export async function setLastSpin(username: string, timestamp: number, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('cooldown:', username), timestamp.toString(), { expirationTtl: COOLDOWN_TTL_SECONDS });
   } catch (error) {
@@ -88,7 +94,7 @@ async function setLastSpin(username, timestamp, env) {
 }
 
 // First-Time User System
-async function hasAcceptedDisclaimer(username, env) {
+export async function hasAcceptedDisclaimer(username: string, env: Env): Promise<boolean> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('disclaimer:', username));
     return value === KV_ACCEPTED;
@@ -98,7 +104,7 @@ async function hasAcceptedDisclaimer(username, env) {
   }
 }
 
-async function setDisclaimerAccepted(username, env) {
+export async function setDisclaimerAccepted(username: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('disclaimer:', username), KV_ACCEPTED);
 
@@ -121,18 +127,18 @@ async function setDisclaimerAccepted(username, env) {
 }
 
 // Selfban System
-async function isSelfBanned(username, env) {
+export async function isSelfBanned(username: string, env: Env): Promise<SelfBanData | null> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('selfban:', username));
     if (!value) return null;
-    return JSON.parse(value); // Returns { timestamp, date }
+    return JSON.parse(value) as SelfBanData; // Returns { timestamp, date }
   } catch (error) {
     logError('isSelfBanned', error, { username });
     return null;
   }
 }
 
-async function setSelfBan(username, env) {
+export async function setSelfBan(username: string, env: Env): Promise<void> {
   try {
     const now = Date.now();
     const date = new Date(now).toLocaleString('de-DE', {
@@ -144,7 +150,7 @@ async function setSelfBan(username, env) {
       minute: '2-digit'
     });
 
-    const banData = {
+    const banData: SelfBanData = {
       timestamp: now,
       date: date
     };
@@ -163,7 +169,7 @@ async function setSelfBan(username, env) {
   }
 }
 
-async function removeSelfBan(username, env) {
+export async function removeSelfBan(username: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.delete(kvKey('selfban:', username));
 
@@ -180,7 +186,7 @@ async function removeSelfBan(username, env) {
 }
 
 // Blacklist
-async function isBlacklisted(username, env) {
+export async function isBlacklisted(username: string, env: Env): Promise<boolean> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('blacklist:', username));
     return value === KV_TRUE;
@@ -191,7 +197,7 @@ async function isBlacklisted(username, env) {
 }
 
 // Last Active tracking
-async function getLastActive(username, env) {
+export async function getLastActive(username: string, env: Env): Promise<number | null> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('lastActive:', username));
     return value ? parseInt(value, 10) : null;
@@ -201,7 +207,7 @@ async function getLastActive(username, env) {
   }
 }
 
-async function setLastActive(username, env) {
+export async function setLastActive(username: string, env: Env): Promise<void> {
   try {
     const now = Date.now();
     await env.SLOTS_KV.put(kvKey('lastActive:', username), now.toString());
@@ -216,7 +222,7 @@ async function setLastActive(username, env) {
 }
 
 // Leaderboard Visibility
-async function isLeaderboardHidden(username, env) {
+export async function isLeaderboardHidden(username: string, env: Env): Promise<boolean> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('leaderboard_hidden:', username));
     return value === KV_TRUE;
@@ -226,7 +232,7 @@ async function isLeaderboardHidden(username, env) {
   }
 }
 
-async function setLeaderboardHidden(username, hidden, env) {
+export async function setLeaderboardHidden(username: string, hidden: boolean, env: Env): Promise<boolean> {
   try {
     const key = kvKey('leaderboard_hidden:', username);
     if (hidden) {
@@ -251,18 +257,18 @@ async function setLeaderboardHidden(username, hidden, env) {
 }
 
 // Custom Messages
-async function getCustomMessages(username, env) {
+export async function getCustomMessages(username: string, env: Env): Promise<CustomMessages | null> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('custom_messages:', username));
     if (!value) return null;
-    return JSON.parse(value);
+    return JSON.parse(value) as CustomMessages;
   } catch (error) {
     logError('getCustomMessages', error, { username });
     return null;
   }
 }
 
-async function setCustomMessages(username, messages, env) {
+export async function setCustomMessages(username: string, messages: CustomMessages, env: Env): Promise<boolean> {
   try {
     await env.SLOTS_KV.put(kvKey('custom_messages:', username), JSON.stringify(messages));
     return true;
@@ -271,24 +277,3 @@ async function setCustomMessages(username, messages, env) {
     return false;
   }
 }
-
-export {
-  getBalance,
-  setBalance,
-  getLastDaily,
-  setLastDaily,
-  getLastSpin,
-  setLastSpin,
-  hasAcceptedDisclaimer,
-  setDisclaimerAccepted,
-  isSelfBanned,
-  setSelfBan,
-  removeSelfBan,
-  isBlacklisted,
-  getLastActive,
-  setLastActive,
-  isLeaderboardHidden,
-  setLeaderboardHidden,
-  getCustomMessages,
-  setCustomMessages
-};

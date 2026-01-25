@@ -7,6 +7,67 @@
 
 import { logError } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE } from './d1.js';
+import type { Env, MonthlyLoginData } from '../types/index.js';
+
+// ============================================
+// Types
+// ============================================
+
+export interface D1PlayerStats {
+  totalSpins: number;
+  wins: number;
+  biggestWin: number;
+  totalWon: number;
+  totalLost: number;
+  totalTransferred: number;
+  shopPurchases: number;
+  duelsPlayed: number;
+  duelsWon: number;
+  dailysClaimed: number;
+  streakMultiplier: number;
+  pendingRewards: number;
+  triplesCollected: {
+    dachs: boolean;
+    diamond: boolean;
+    star: boolean;
+    watermelon: boolean;
+    grapes: boolean;
+    orange: boolean;
+    lemon: boolean;
+    cherry: boolean;
+  };
+}
+
+export interface AchievementStats {
+  counts: Record<string, number>;
+  totalPlayers: number;
+}
+
+export interface TripleStats {
+  triple_key: string;
+  player_count: number;
+  total_hits: number;
+  first_global_hit: number;
+}
+
+export interface PlayerTriple {
+  triple_key: string;
+  first_hit_at: number;
+  hit_count: number;
+  last_hit_at: number;
+}
+
+export interface BatchMigrateResult {
+  success: number;
+  failed: number;
+}
+
+export interface BatchMigrateUser {
+  username: string;
+  unlockedAt: Record<string, number>;
+  stats?: Record<string, unknown>;
+  pendingRewards?: number;
+}
 
 // ============================================
 // Player Achievements
@@ -16,7 +77,7 @@ import { D1_ENABLED, DUAL_WRITE } from './d1.js';
  * Get all achievement IDs unlocked by a player from D1
  * Returns Map<achievementId, unlockedAt>
  */
-async function getPlayerAchievementsD1(username, env) {
+export async function getPlayerAchievementsD1(username: string, env: Env): Promise<Record<string, number> | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
@@ -24,9 +85,9 @@ async function getPlayerAchievementsD1(username, env) {
       SELECT achievement_id, unlocked_at
       FROM player_achievements
       WHERE username = ?
-    `).bind(username.toLowerCase()).all();
+    `).bind(username.toLowerCase()).all<{ achievement_id: string; unlocked_at: number }>();
 
-    const unlockedAt = {};
+    const unlockedAt: Record<string, number> = {};
     for (const row of result.results || []) {
       unlockedAt[row.achievement_id] = row.unlocked_at;
     }
@@ -40,7 +101,7 @@ async function getPlayerAchievementsD1(username, env) {
 /**
  * Unlock an achievement in D1
  */
-async function unlockAchievementD1(username, achievementId, env) {
+export async function unlockAchievementD1(username: string, achievementId: string, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -70,7 +131,7 @@ async function unlockAchievementD1(username, achievementId, env) {
 /**
  * Lock (remove) an achievement in D1
  */
-async function lockAchievementD1(username, achievementId, env) {
+export async function lockAchievementD1(username: string, achievementId: string, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -79,7 +140,7 @@ async function lockAchievementD1(username, achievementId, env) {
       WHERE username = ? AND achievement_id = ?
     `).bind(username.toLowerCase(), achievementId).run();
 
-    if (result.meta?.changes > 0) {
+    if (result.meta?.changes && result.meta.changes > 0) {
       // Decrement global counter
       await env.DB.prepare(`
         UPDATE achievement_stats
@@ -100,7 +161,7 @@ async function lockAchievementD1(username, achievementId, env) {
  * Get global achievement statistics from D1
  * Returns { counts: { achievementId: count }, totalPlayers: number }
  */
-async function getAchievementStatsD1(env) {
+export async function getAchievementStatsD1(env: Env): Promise<AchievementStats | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
@@ -108,14 +169,14 @@ async function getAchievementStatsD1(env) {
       env.DB.prepare(`
         SELECT achievement_id, unlock_count
         FROM achievement_stats
-      `).all(),
+      `).all<{ achievement_id: string; unlock_count: number }>(),
       env.DB.prepare(`
         SELECT COUNT(DISTINCT username) as total
         FROM player_achievements
-      `).first()
+      `).first<{ total: number }>()
     ]);
 
-    const counts = {};
+    const counts: Record<string, number> = {};
     for (const row of statsResult.results || []) {
       counts[row.achievement_id] = row.unlock_count;
     }
@@ -137,39 +198,39 @@ async function getAchievementStatsD1(env) {
 /**
  * Get player stats from D1
  */
-async function getPlayerStatsD1(username, env) {
+export async function getPlayerStatsD1(username: string, env: Env): Promise<D1PlayerStats | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
     const result = await env.DB.prepare(`
       SELECT * FROM player_stats WHERE username = ?
-    `).bind(username.toLowerCase()).first();
+    `).bind(username.toLowerCase()).first<Record<string, unknown>>();
 
     if (!result) return null;
 
     // Convert D1 columns to stats object format
     return {
-      totalSpins: result.total_spins || 0,
-      wins: result.wins || 0,
-      biggestWin: result.biggest_win || 0,
-      totalWon: result.total_won || 0,
-      totalLost: result.total_lost || 0,
-      totalTransferred: result.total_transferred || 0,
-      shopPurchases: result.shop_purchases || 0,
-      duelsPlayed: result.duels_played || 0,
-      duelsWon: result.duels_won || 0,
-      dailysClaimed: result.dailys_claimed || 0,
-      streakMultiplier: result.streak_multiplier || 1.0,
-      pendingRewards: result.pending_rewards || 0,
+      totalSpins: (result.total_spins as number) || 0,
+      wins: (result.wins as number) || 0,
+      biggestWin: (result.biggest_win as number) || 0,
+      totalWon: (result.total_won as number) || 0,
+      totalLost: (result.total_lost as number) || 0,
+      totalTransferred: (result.total_transferred as number) || 0,
+      shopPurchases: (result.shop_purchases as number) || 0,
+      duelsPlayed: (result.duels_played as number) || 0,
+      duelsWon: (result.duels_won as number) || 0,
+      dailysClaimed: (result.dailys_claimed as number) || 0,
+      streakMultiplier: (result.streak_multiplier as number) || 1.0,
+      pendingRewards: (result.pending_rewards as number) || 0,
       triplesCollected: {
-        dachs: result.triple_dachs > 0,
-        diamond: result.triple_diamond > 0,
-        star: result.triple_star > 0,
-        watermelon: result.triple_watermelon > 0,
-        grapes: result.triple_grapes > 0,
-        orange: result.triple_orange > 0,
-        lemon: result.triple_lemon > 0,
-        cherry: result.triple_cherry > 0
+        dachs: (result.triple_dachs as number) > 0,
+        diamond: (result.triple_diamond as number) > 0,
+        star: (result.triple_star as number) > 0,
+        watermelon: (result.triple_watermelon as number) > 0,
+        grapes: (result.triple_grapes as number) > 0,
+        orange: (result.triple_orange as number) > 0,
+        lemon: (result.triple_lemon as number) > 0,
+        cherry: (result.triple_cherry as number) > 0
       }
     };
   } catch (error) {
@@ -178,10 +239,35 @@ async function getPlayerStatsD1(username, env) {
   }
 }
 
+export interface StatsUpdate {
+  totalSpins?: number;
+  wins?: number;
+  biggestWin?: number;
+  totalWon?: number;
+  totalLost?: number;
+  totalTransferred?: number;
+  shopPurchases?: number;
+  duelsPlayed?: number;
+  duelsWon?: number;
+  dailysClaimed?: number;
+  streakMultiplier?: number;
+  pendingRewards?: number;
+  triplesCollected?: {
+    dachs?: boolean;
+    diamond?: boolean;
+    star?: boolean;
+    watermelon?: boolean;
+    grapes?: boolean;
+    orange?: boolean;
+    lemon?: boolean;
+    cherry?: boolean;
+  };
+}
+
 /**
  * Update player stats in D1 (upsert)
  */
-async function updatePlayerStatsD1(username, stats, env) {
+export async function updatePlayerStatsD1(username: string, stats: StatsUpdate, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -276,11 +362,11 @@ async function updatePlayerStatsD1(username, stats, env) {
 /**
  * Increment a single stat in D1
  */
-async function incrementStatD1(username, statKey, increment, env) {
+export async function incrementStatD1(username: string, statKey: string, increment: number, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   // Map stat keys to D1 column names
-  const columnMap = {
+  const columnMap: Record<string, string> = {
     totalSpins: 'total_spins',
     wins: 'wins',
     biggestWin: 'biggest_win',
@@ -319,7 +405,7 @@ async function incrementStatD1(username, statKey, increment, env) {
 /**
  * Update biggest win if new value is higher
  */
-async function updateBiggestWinD1(username, winAmount, env) {
+export async function updateBiggestWinD1(username: string, winAmount: number, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -346,7 +432,7 @@ async function updateBiggestWinD1(username, winAmount, env) {
 /**
  * Check if player has an unlock
  */
-async function hasUnlockD1(username, unlockKey, env) {
+export async function hasUnlockD1(username: string, unlockKey: string, env: Env): Promise<boolean | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
@@ -365,7 +451,7 @@ async function hasUnlockD1(username, unlockKey, env) {
 /**
  * Add an unlock for a player
  */
-async function addUnlockD1(username, unlockKey, env) {
+export async function addUnlockD1(username: string, unlockKey: string, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -385,7 +471,7 @@ async function addUnlockD1(username, unlockKey, env) {
 /**
  * Remove an unlock from a player
  */
-async function removeUnlockD1(username, unlockKey, env) {
+export async function removeUnlockD1(username: string, unlockKey: string, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -404,13 +490,13 @@ async function removeUnlockD1(username, unlockKey, env) {
 /**
  * Get all unlocks for a player
  */
-async function getUnlocksD1(username, env) {
+export async function getUnlocksD1(username: string, env: Env): Promise<string[] | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
     const result = await env.DB.prepare(`
       SELECT unlock_key FROM player_unlocks WHERE username = ?
-    `).bind(username.toLowerCase()).all();
+    `).bind(username.toLowerCase()).all<{ unlock_key: string }>();
 
     return (result.results || []).map(r => r.unlock_key);
   } catch (error) {
@@ -426,7 +512,7 @@ async function getUnlocksD1(username, env) {
 /**
  * Get monthly login data from D1
  */
-async function getMonthlyLoginD1(username, env) {
+export async function getMonthlyLoginD1(username: string, env: Env): Promise<MonthlyLoginData | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
@@ -434,14 +520,18 @@ async function getMonthlyLoginD1(username, env) {
       SELECT month, login_days, claimed_milestones
       FROM monthly_login
       WHERE username = ?
-    `).bind(username.toLowerCase()).first();
+    `).bind(username.toLowerCase()).first<{
+      month: string;
+      login_days: string;
+      claimed_milestones: string;
+    }>();
 
     if (!result) return null;
 
     return {
       month: result.month,
-      days: JSON.parse(result.login_days || '[]'),
-      claimedMilestones: JSON.parse(result.claimed_milestones || '[]')
+      days: JSON.parse(result.login_days || '[]') as string[],
+      claimedMilestones: JSON.parse(result.claimed_milestones || '[]') as number[]
     };
   } catch (error) {
     logError('d1.getMonthlyLogin', error, { username });
@@ -452,7 +542,7 @@ async function getMonthlyLoginD1(username, env) {
 /**
  * Update monthly login data in D1
  */
-async function updateMonthlyLoginD1(username, data, env) {
+export async function updateMonthlyLoginD1(username: string, data: MonthlyLoginData, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -491,7 +581,7 @@ async function updateMonthlyLoginD1(username, data, env) {
 /**
  * Batch migrate achievements from KV to D1
  */
-async function batchMigrateAchievements(users, env) {
+export async function batchMigrateAchievements(users: BatchMigrateUser[], env: Env): Promise<BatchMigrateResult> {
   if (!D1_ENABLED || !env.DB) return { success: 0, failed: 0 };
 
   let success = 0;
@@ -502,7 +592,7 @@ async function batchMigrateAchievements(users, env) {
     const batch = users.slice(i, i + batchSize);
 
     try {
-      const statements = [];
+      const statements: D1PreparedStatement[] = [];
       const now = Date.now();
 
       for (const user of batch) {
@@ -519,6 +609,7 @@ async function batchMigrateAchievements(users, env) {
 
         // Insert stats
         if (user.stats) {
+          const stats = user.stats;
           statements.push(
             env.DB.prepare(`
               INSERT INTO player_stats (
@@ -538,46 +629,46 @@ async function batchMigrateAchievements(users, env) {
                 updated_at = ?
             `).bind(
               user.username.toLowerCase(),
-              user.stats.totalSpins || 0,
-              user.stats.wins || 0,
-              user.stats.biggestWin || 0,
-              user.stats.totalWon || 0,
-              user.stats.totalLost || 0,
-              user.stats.totalTransferred || 0,
-              user.stats.shopPurchases || 0,
-              user.stats.duelsPlayed || 0,
-              user.stats.duelsWon || 0,
-              user.stats.dailysClaimed || 0,
+              (stats.totalSpins as number) || 0,
+              (stats.wins as number) || 0,
+              (stats.biggestWin as number) || 0,
+              (stats.totalWon as number) || 0,
+              (stats.totalLost as number) || 0,
+              (stats.totalTransferred as number) || 0,
+              (stats.shopPurchases as number) || 0,
+              (stats.duelsPlayed as number) || 0,
+              (stats.duelsWon as number) || 0,
+              (stats.dailysClaimed as number) || 0,
               user.pendingRewards || 0,
-              user.stats.triplesCollected?.dachs ? 1 : 0,
-              user.stats.triplesCollected?.diamond ? 1 : 0,
-              user.stats.triplesCollected?.star ? 1 : 0,
-              user.stats.triplesCollected?.watermelon ? 1 : 0,
-              user.stats.triplesCollected?.grapes ? 1 : 0,
-              user.stats.triplesCollected?.orange ? 1 : 0,
-              user.stats.triplesCollected?.lemon ? 1 : 0,
-              user.stats.triplesCollected?.cherry ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.dachs ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.diamond ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.star ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.watermelon ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.grapes ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.orange ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.lemon ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.cherry ? 1 : 0,
               now, now,
               // ON CONFLICT values
-              user.stats.totalSpins || 0,
-              user.stats.wins || 0,
-              user.stats.biggestWin || 0,
-              user.stats.totalWon || 0,
-              user.stats.totalLost || 0,
-              user.stats.totalTransferred || 0,
-              user.stats.shopPurchases || 0,
-              user.stats.duelsPlayed || 0,
-              user.stats.duelsWon || 0,
-              user.stats.dailysClaimed || 0,
+              (stats.totalSpins as number) || 0,
+              (stats.wins as number) || 0,
+              (stats.biggestWin as number) || 0,
+              (stats.totalWon as number) || 0,
+              (stats.totalLost as number) || 0,
+              (stats.totalTransferred as number) || 0,
+              (stats.shopPurchases as number) || 0,
+              (stats.duelsPlayed as number) || 0,
+              (stats.duelsWon as number) || 0,
+              (stats.dailysClaimed as number) || 0,
               user.pendingRewards || 0,
-              user.stats.triplesCollected?.dachs ? 1 : 0,
-              user.stats.triplesCollected?.diamond ? 1 : 0,
-              user.stats.triplesCollected?.star ? 1 : 0,
-              user.stats.triplesCollected?.watermelon ? 1 : 0,
-              user.stats.triplesCollected?.grapes ? 1 : 0,
-              user.stats.triplesCollected?.orange ? 1 : 0,
-              user.stats.triplesCollected?.lemon ? 1 : 0,
-              user.stats.triplesCollected?.cherry ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.dachs ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.diamond ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.star ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.watermelon ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.grapes ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.orange ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.lemon ? 1 : 0,
+              (stats.triplesCollected as Record<string, boolean> | undefined)?.cherry ? 1 : 0,
               now
             )
           );
@@ -600,7 +691,7 @@ async function batchMigrateAchievements(users, env) {
 /**
  * Rebuild achievement_stats table from player_achievements
  */
-async function rebuildAchievementStats(env) {
+export async function rebuildAchievementStats(env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -631,7 +722,7 @@ async function rebuildAchievementStats(env) {
  * Record a triple hit for a player
  * Creates entry if first hit, otherwise increments counter
  */
-async function recordTripleHitD1(username, tripleKey, env) {
+export async function recordTripleHitD1(username: string, tripleKey: string, env: Env): Promise<boolean | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
@@ -657,7 +748,7 @@ async function recordTripleHitD1(username, tripleKey, env) {
 /**
  * Get all triples for a player
  */
-async function getPlayerTriplesD1(username, env) {
+export async function getPlayerTriplesD1(username: string, env: Env): Promise<PlayerTriple[] | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
@@ -666,7 +757,7 @@ async function getPlayerTriplesD1(username, env) {
       FROM player_triples
       WHERE username = ?
       ORDER BY first_hit_at ASC
-    `).bind(username.toLowerCase()).all();
+    `).bind(username.toLowerCase()).all<PlayerTriple>();
 
     return result.results || [];
   } catch (error) {
@@ -678,7 +769,7 @@ async function getPlayerTriplesD1(username, env) {
 /**
  * Get global triple statistics (how many players hit each triple)
  */
-async function getTripleStatsD1(env) {
+export async function getTripleStatsD1(env: Env): Promise<TripleStats[] | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
@@ -690,7 +781,7 @@ async function getTripleStatsD1(env) {
         MIN(first_hit_at) as first_global_hit
       FROM player_triples
       GROUP BY triple_key
-    `).all();
+    `).all<TripleStats>();
 
     return result.results || [];
   } catch (error) {
@@ -698,40 +789,3 @@ async function getTripleStatsD1(env) {
     return null;
   }
 }
-
-// ============================================
-// Exports
-// ============================================
-
-export {
-  // Achievements
-  getPlayerAchievementsD1,
-  unlockAchievementD1,
-  lockAchievementD1,
-  getAchievementStatsD1,
-
-  // Stats
-  getPlayerStatsD1,
-  updatePlayerStatsD1,
-  incrementStatD1,
-  updateBiggestWinD1,
-
-  // Unlocks
-  hasUnlockD1,
-  addUnlockD1,
-  removeUnlockD1,
-  getUnlocksD1,
-
-  // Monthly Login
-  getMonthlyLoginD1,
-  updateMonthlyLoginD1,
-
-  // Triples
-  recordTripleHitD1,
-  getPlayerTriplesD1,
-  getTripleStatsD1,
-
-  // Migration
-  batchMigrateAchievements,
-  rebuildAchievementStats
-};

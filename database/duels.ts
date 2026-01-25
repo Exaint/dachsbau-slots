@@ -23,14 +23,55 @@
 import { DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, KV_TRUE } from '../constants.js';
 import { logError, kvKey } from '../utils.js';
 import { D1_ENABLED } from './d1.js';
+import type { Env, DuelChallenge } from '../types/index.js';
+
+// ============================================
+// Types
+// ============================================
+
+export interface DuelData {
+  target: string;
+  amount: number;
+  createdAt: number;
+}
+
+export interface DuelLogData {
+  challenger: string;
+  target: string;
+  amount: number;
+  challengerGrid: string[];
+  targetGrid: string[];
+  challengerScore: number;
+  targetScore: number;
+  winner: string | null;
+  pot: number;
+}
+
+export interface DuelHistoryEntry {
+  id: number;
+  challenger: string;
+  target: string;
+  amount: number;
+  challengerGrid: string[];
+  targetGrid: string[];
+  challengerScore: number;
+  targetScore: number;
+  winner: string | null;
+  pot: number;
+  createdAt: number;
+}
+
+// ============================================
+// Duel Challenge Operations
+// ============================================
 
 /**
  * Create a new duel challenge
  */
-async function createDuel(challenger, target, amount, env) {
+export async function createDuel(challenger: string, target: string, amount: number, env: Env): Promise<boolean> {
   try {
     const key = kvKey('duel:', challenger);
-    const data = {
+    const data: DuelData = {
       target: target.toLowerCase(),
       amount,
       createdAt: Date.now()
@@ -48,13 +89,13 @@ async function createDuel(challenger, target, amount, env) {
 /**
  * Get active duel challenge from a specific challenger
  */
-async function getDuel(challenger, env) {
+export async function getDuel(challenger: string, env: Env): Promise<DuelChallenge | null> {
   try {
     const key = kvKey('duel:', challenger);
     const value = await env.SLOTS_KV.get(key);
     if (!value) return null;
 
-    const data = JSON.parse(value);
+    const data: DuelData = JSON.parse(value);
 
     // Check if expired
     if (Date.now() > data.createdAt + (DUEL_TIMEOUT_SECONDS * 1000)) {
@@ -72,7 +113,7 @@ async function getDuel(challenger, env) {
 /**
  * Find pending duel where user is the target
  */
-async function findDuelForTarget(target, env) {
+export async function findDuelForTarget(target: string, env: Env): Promise<DuelChallenge | null> {
   try {
     // List all duel keys and find one where target matches
     const list = await env.SLOTS_KV.list({ prefix: 'duel:' });
@@ -82,7 +123,7 @@ async function findDuelForTarget(target, env) {
       if (!value) continue;
 
       try {
-        const data = JSON.parse(value);
+        const data: DuelData = JSON.parse(value);
 
         // Check if this duel targets the user and isn't expired
         if (data.target === target.toLowerCase() &&
@@ -105,7 +146,7 @@ async function findDuelForTarget(target, env) {
 /**
  * Delete a duel challenge (accept/decline/timeout)
  */
-async function deleteDuel(challenger, env) {
+export async function deleteDuel(challenger: string, env: Env): Promise<boolean> {
   try {
     const key = kvKey('duel:', challenger);
     await env.SLOTS_KV.delete(key);
@@ -119,7 +160,7 @@ async function deleteDuel(challenger, env) {
 /**
  * Accept a duel - claim-lock + delete + verify to prevent race conditions
  */
-async function acceptDuel(challenger, env) {
+export async function acceptDuel(challenger: string, env: Env): Promise<DuelChallenge | null> {
   try {
     const key = kvKey('duel:', challenger);
     const claimKey = `${key}:claim`;
@@ -131,7 +172,7 @@ async function acceptDuel(challenger, env) {
     const value = await env.SLOTS_KV.get(key);
     if (!value) return null;
 
-    const data = JSON.parse(value);
+    const data: DuelData = JSON.parse(value);
 
     // Check if expired
     if (Date.now() > data.createdAt + (DUEL_TIMEOUT_SECONDS * 1000)) {
@@ -165,15 +206,19 @@ async function acceptDuel(challenger, env) {
 /**
  * Check if user has an active outgoing challenge
  */
-async function hasActiveDuel(username, env) {
+export async function hasActiveDuel(username: string, env: Env): Promise<boolean> {
   const duel = await getDuel(username, env);
   return duel !== null;
 }
 
+// ============================================
+// Duel Opt-Out
+// ============================================
+
 /**
  * Set user's duel opt-out status
  */
-async function setDuelOptOut(username, optOut, env) {
+export async function setDuelOptOut(username: string, optOut: boolean, env: Env): Promise<boolean> {
   try {
     const key = kvKey('duel_optout:', username);
     if (optOut) {
@@ -191,7 +236,7 @@ async function setDuelOptOut(username, optOut, env) {
 /**
  * Check if user has opted out of duels
  */
-async function isDuelOptedOut(username, env) {
+export async function isDuelOptedOut(username: string, env: Env): Promise<boolean> {
   try {
     const key = kvKey('duel_optout:', username);
     const value = await env.SLOTS_KV.get(key);
@@ -202,11 +247,15 @@ async function isDuelOptedOut(username, env) {
   }
 }
 
+// ============================================
+// Duel Cooldown
+// ============================================
+
 /**
  * Check if user is on duel cooldown
  * Returns remaining seconds if on cooldown, 0 if not
  */
-async function getDuelCooldown(username, env) {
+export async function getDuelCooldown(username: string, env: Env): Promise<number> {
   try {
     const key = kvKey('duel_cooldown:', username);
     const value = await env.SLOTS_KV.get(key);
@@ -224,7 +273,7 @@ async function getDuelCooldown(username, env) {
 /**
  * Set duel cooldown for user
  */
-async function setDuelCooldown(username, env) {
+export async function setDuelCooldown(username: string, env: Env): Promise<boolean> {
   try {
     const key = kvKey('duel_cooldown:', username);
     const expiresAt = Date.now() + (DUEL_COOLDOWN_SECONDS * 1000);
@@ -238,21 +287,14 @@ async function setDuelCooldown(username, env) {
   }
 }
 
+// ============================================
+// Duel Logging (D1)
+// ============================================
+
 /**
  * Log a completed duel to D1 (fire-and-forget)
- * @param {object} data - Duel result data
- * @param {string} data.challenger - Challenger username
- * @param {string} data.target - Target username
- * @param {number} data.amount - Bet amount per player
- * @param {string[]} data.challengerGrid - Challenger's 3 symbols
- * @param {string[]} data.targetGrid - Target's 3 symbols
- * @param {number} data.challengerScore - Challenger's calculated score
- * @param {number} data.targetScore - Target's calculated score
- * @param {string|null} data.winner - Winner username or null for tie
- * @param {number} data.pot - Total pot (amount * 2)
- * @param {object} env - Environment with DB binding
  */
-async function logDuel(data, env) {
+export async function logDuel(data: DuelLogData, env: Env): Promise<void> {
   if (!D1_ENABLED || !env.DB) return;
 
   try {
@@ -277,12 +319,8 @@ async function logDuel(data, env) {
 
 /**
  * Get duel history for a player from D1
- * @param {string} username - Player username
- * @param {number} limit - Max number of duels to return
- * @param {object} env - Environment with DB binding
- * @returns {Promise<Array>} Array of duel records
  */
-async function getDuelHistory(username, limit, env) {
+export async function getDuelHistory(username: string, limit: number, env: Env): Promise<DuelHistoryEntry[]> {
   if (!D1_ENABLED || !env.DB) return [];
 
   try {
@@ -294,15 +332,27 @@ async function getDuelHistory(username, limit, env) {
       WHERE challenger = ? OR target = ?
       ORDER BY created_at DESC
       LIMIT ?
-    `).bind(lowerUsername, lowerUsername, limit).all();
+    `).bind(lowerUsername, lowerUsername, limit).all<{
+      id: number;
+      challenger: string;
+      target: string;
+      amount: number;
+      challenger_grid: string;
+      target_grid: string;
+      challenger_score: number;
+      target_score: number;
+      winner: string | null;
+      pot: number;
+      created_at: number;
+    }>();
 
     return (result.results || []).map(row => ({
       id: row.id,
       challenger: row.challenger,
       target: row.target,
       amount: row.amount,
-      challengerGrid: JSON.parse(row.challenger_grid),
-      targetGrid: JSON.parse(row.target_grid),
+      challengerGrid: JSON.parse(row.challenger_grid) as string[],
+      targetGrid: JSON.parse(row.target_grid) as string[],
       challengerScore: row.challenger_score,
       targetScore: row.target_score,
       winner: row.winner,
@@ -314,18 +364,3 @@ async function getDuelHistory(username, limit, env) {
     return [];
   }
 }
-
-export {
-  createDuel,
-  getDuel,
-  findDuelForTarget,
-  deleteDuel,
-  acceptDuel,
-  hasActiveDuel,
-  setDuelOptOut,
-  isDuelOptedOut,
-  getDuelCooldown,
-  setDuelCooldown,
-  logDuel,
-  getDuelHistory
-};

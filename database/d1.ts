@@ -8,17 +8,55 @@
  * After full migration, KV fallback can be removed.
  */
 
-import { logError, logWarn } from '../utils.js';
+import { logError } from '../utils.js';
+import type { Env } from '../types/index.js';
 
 // ============================================
 // Configuration
 // ============================================
 
 // Set to true to enable D1 (after database is created and migrated)
-const D1_ENABLED = true;
+export const D1_ENABLED = true;
 
 // Set to true to write to both D1 and KV during migration
-const DUAL_WRITE = true;
+export const DUAL_WRITE = true;
+
+// ============================================
+// Types
+// ============================================
+
+export interface D1User {
+  username: string;
+  balance: number;
+  prestige_rank: string | null;
+  disclaimer_accepted: number;
+  leaderboard_hidden: number;
+  duel_opt_out: number;
+  is_blacklisted: number;
+  selfban_timestamp: number | null;
+  last_active_at: number | null;
+  streak_wins?: number;
+  streak_losses?: number;
+  streak_multiplier?: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface UserUpdateData {
+  balance?: number;
+  prestige_rank?: string | null;
+  disclaimer_accepted?: boolean;
+  leaderboard_hidden?: boolean;
+  duel_opt_out?: boolean;
+  is_blacklisted?: boolean;
+  selfban_timestamp?: number | null;
+  last_active_at?: number;
+}
+
+export interface LeaderboardEntry {
+  username: string;
+  balance: number;
+}
 
 // ============================================
 // User Operations (Balance, Flags, Preferences)
@@ -28,13 +66,13 @@ const DUAL_WRITE = true;
  * Get user data from D1
  * Returns null if user doesn't exist
  */
-async function getUser(username, env) {
+export async function getUser(username: string, env: Env): Promise<D1User | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
     const result = await env.DB.prepare(
       'SELECT * FROM users WHERE username = ?'
-    ).bind(username.toLowerCase()).first();
+    ).bind(username.toLowerCase()).first<D1User>();
 
     return result;
   } catch (error) {
@@ -46,7 +84,7 @@ async function getUser(username, env) {
 /**
  * Create or update user in D1
  */
-async function upsertUser(username, data, env) {
+export async function upsertUser(username: string, data: UserUpdateData, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -54,9 +92,9 @@ async function upsertUser(username, data, env) {
     const lowerUsername = username.toLowerCase();
 
     // Build dynamic SET clause based on provided data
-    const fields = ['updated_at'];
-    const values = [now];
-    const placeholders = ['updated_at = ?'];
+    const fields: string[] = ['updated_at'];
+    const values: (string | number | null)[] = [now];
+    const placeholders: string[] = ['updated_at = ?'];
 
     if (data.balance !== undefined) {
       fields.push('balance');
@@ -116,7 +154,7 @@ async function upsertUser(username, data, env) {
 /**
  * Update only the balance for a user (optimized for frequent updates)
  */
-async function updateBalance(username, balance, env) {
+export async function updateBalance(username: string, balance: number, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -138,13 +176,13 @@ async function updateBalance(username, balance, env) {
  * Get balance from D1
  * Returns null if not found (caller should fall back to KV)
  */
-async function getBalance(username, env) {
+export async function getBalance(username: string, env: Env): Promise<number | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
     const result = await env.DB.prepare(
       'SELECT balance FROM users WHERE username = ?'
-    ).bind(username.toLowerCase()).first();
+    ).bind(username.toLowerCase()).first<{ balance: number }>();
 
     return result ? result.balance : null;
   } catch (error) {
@@ -160,7 +198,7 @@ async function getBalance(username, env) {
 /**
  * Get leaderboard from D1 - Single query replaces 2500+ KV operations
  */
-async function getLeaderboard(limit = 25, env) {
+export async function getLeaderboard(limit: number = 25, env: Env): Promise<LeaderboardEntry[] | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
@@ -173,7 +211,7 @@ async function getLeaderboard(limit = 25, env) {
         AND leaderboard_hidden = 0
       ORDER BY balance DESC
       LIMIT ?
-    `).bind(limit).all();
+    `).bind(limit).all<LeaderboardEntry>();
 
     return result.results || [];
   } catch (error) {
@@ -185,14 +223,14 @@ async function getLeaderboard(limit = 25, env) {
 /**
  * Get user rank in leaderboard
  */
-async function getUserRank(username, env) {
+export async function getUserRank(username: string, env: Env): Promise<number | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
     // Get user's balance first
     const user = await env.DB.prepare(
       'SELECT balance FROM users WHERE username = ?'
-    ).bind(username.toLowerCase()).first();
+    ).bind(username.toLowerCase()).first<{ balance: number }>();
 
     if (!user || user.balance <= 0) return null;
 
@@ -204,7 +242,7 @@ async function getUserRank(username, env) {
         AND disclaimer_accepted = 1
         AND is_blacklisted = 0
         AND leaderboard_hidden = 0
-    `).bind(user.balance).first();
+    `).bind(user.balance).first<{ rank: number }>();
 
     return result ? result.rank + 1 : null;
   } catch (error) {
@@ -216,7 +254,7 @@ async function getUserRank(username, env) {
 /**
  * Search users by username prefix
  */
-async function searchUsers(query, limit = 10, env) {
+export async function searchUsers(query: string, limit: number = 10, env: Env): Promise<LeaderboardEntry[] | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
@@ -228,7 +266,7 @@ async function searchUsers(query, limit = 10, env) {
         AND is_blacklisted = 0
       ORDER BY balance DESC
       LIMIT ?
-    `).bind(query.toLowerCase() + '%', limit).all();
+    `).bind(query.toLowerCase() + '%', limit).all<LeaderboardEntry>();
 
     return result.results || [];
   } catch (error) {
@@ -243,11 +281,11 @@ async function searchUsers(query, limit = 10, env) {
 
 /**
  * Upsert a player item in D1
- * @param {string} username
- * @param {string} itemKey - 'insurance', 'wildcard', 'guaranteedpair', 'winmulti', 'freespins'
- * @param {string} value - count, 'active', or JSON string
+ * @param username
+ * @param itemKey - 'insurance', 'wildcard', 'guaranteedpair', 'winmulti', 'freespins'
+ * @param value - count, 'active', or JSON string
  */
-async function upsertItem(username, itemKey, value, env) {
+export async function upsertItem(username: string, itemKey: string, value: string, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -268,7 +306,7 @@ async function upsertItem(username, itemKey, value, env) {
 /**
  * Delete a player item from D1 (consumed/expired)
  */
-async function deleteItem(username, itemKey, env) {
+export async function deleteItem(username: string, itemKey: string, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -290,7 +328,7 @@ async function deleteItem(username, itemKey, env) {
 /**
  * Update weekly purchase limit count in D1
  */
-async function upsertPurchaseLimit(username, itemType, count, weekStart, env) {
+export async function upsertPurchaseLimit(username: string, itemType: string, count: number, weekStart: string, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -315,7 +353,7 @@ async function upsertPurchaseLimit(username, itemType, count, weekStart, env) {
 /**
  * Update streak win/loss counts in D1
  */
-async function updateStreakCounts(username, wins, losses, env) {
+export async function updateStreakCounts(username: string, wins: number, losses: number, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -336,7 +374,7 @@ async function updateStreakCounts(username, wins, losses, env) {
 /**
  * Update streak multiplier in D1
  */
-async function updateStreakMultiplier(username, multiplier, env) {
+export async function updateStreakMultiplier(username: string, multiplier: number, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -358,11 +396,22 @@ async function updateStreakMultiplier(username, multiplier, env) {
 // Migration Helpers
 // ============================================
 
+export interface KVUserData {
+  balance?: number;
+  prestige_rank?: string | null;
+  disclaimer_accepted?: boolean;
+  leaderboard_hidden?: boolean;
+  duel_opt_out?: boolean;
+  is_blacklisted?: boolean;
+  selfban_timestamp?: number | null;
+  last_active_at?: number | null;
+}
+
 /**
  * Migrate a single user from KV to D1
  * Called lazily when user data is accessed
  */
-async function migrateUserFromKV(username, kvData, env) {
+export async function migrateUserFromKV(username: string, kvData: KVUserData, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
   try {
@@ -395,11 +444,21 @@ async function migrateUserFromKV(username, kvData, env) {
   }
 }
 
+export interface BatchMigrateUser {
+  username: string;
+  balance: number;
+}
+
+export interface BatchMigrateResult {
+  success: number;
+  failed: number;
+}
+
 /**
  * Batch migrate users from KV list results
  * Used for initial migration
  */
-async function batchMigrateUsers(users, env) {
+export async function batchMigrateUsers(users: BatchMigrateUser[], env: Env): Promise<BatchMigrateResult> {
   if (!D1_ENABLED || !env.DB) return { success: 0, failed: 0 };
 
   let success = 0;
@@ -440,13 +499,13 @@ async function batchMigrateUsers(users, env) {
 /**
  * Get total user count in D1
  */
-async function getUserCount(env) {
+export async function getUserCount(env: Env): Promise<number | null> {
   if (!D1_ENABLED || !env.DB) return null;
 
   try {
     const result = await env.DB.prepare(
       'SELECT COUNT(*) as count FROM users'
-    ).first();
+    ).first<{ count: number }>();
 
     return result ? result.count : 0;
   } catch (error) {
@@ -454,40 +513,3 @@ async function getUserCount(env) {
     return null;
   }
 }
-
-// ============================================
-// Exports
-// ============================================
-
-export {
-  // Configuration
-  D1_ENABLED,
-  DUAL_WRITE,
-
-  // User operations
-  getUser,
-  upsertUser,
-  updateBalance,
-  getBalance,
-
-  // Leaderboard operations
-  getLeaderboard,
-  getUserRank,
-  searchUsers,
-
-  // Player items
-  upsertItem,
-  deleteItem,
-
-  // Purchase limits
-  upsertPurchaseLimit,
-
-  // Streaks
-  updateStreakCounts,
-  updateStreakMultiplier,
-
-  // Migration helpers
-  migrateUserFromKV,
-  batchMigrateUsers,
-  getUserCount
-};

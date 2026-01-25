@@ -5,9 +5,22 @@
 import { MAX_RETRIES, KV_ACTIVE } from '../constants.js';
 import { exponentialBackoff, logError, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, upsertItem, deleteItem } from './d1.js';
+import type { Env, FreeSpinEntry } from '../types/index.js';
 
+// ============================================
+// Types
+// ============================================
+
+export interface FreeSpinConsumeResult {
+  used: boolean;
+  multiplier: number;
+}
+
+// ============================================
 // Guaranteed Pair
-async function activateGuaranteedPair(username, env) {
+// ============================================
+
+export async function activateGuaranteedPair(username: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('guaranteedpair:', username), KV_ACTIVE);
 
@@ -19,7 +32,7 @@ async function activateGuaranteedPair(username, env) {
   }
 }
 
-async function hasGuaranteedPair(username, env) {
+export async function hasGuaranteedPair(username: string, env: Env): Promise<boolean> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('guaranteedpair:', username));
     return value === KV_ACTIVE;
@@ -29,7 +42,7 @@ async function hasGuaranteedPair(username, env) {
   }
 }
 
-async function consumeGuaranteedPair(username, env) {
+export async function consumeGuaranteedPair(username: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.delete(kvKey('guaranteedpair:', username));
 
@@ -41,8 +54,11 @@ async function consumeGuaranteedPair(username, env) {
   }
 }
 
+// ============================================
 // Wild Card
-async function activateWildCard(username, env) {
+// ============================================
+
+export async function activateWildCard(username: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('wildcard:', username), KV_ACTIVE);
 
@@ -54,7 +70,7 @@ async function activateWildCard(username, env) {
   }
 }
 
-async function hasWildCard(username, env) {
+export async function hasWildCard(username: string, env: Env): Promise<boolean> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('wildcard:', username));
     return value === KV_ACTIVE;
@@ -64,7 +80,7 @@ async function hasWildCard(username, env) {
   }
 }
 
-async function consumeWildCard(username, env) {
+export async function consumeWildCard(username: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.delete(kvKey('wildcard:', username));
 
@@ -76,8 +92,11 @@ async function consumeWildCard(username, env) {
   }
 }
 
+// ============================================
 // Free Spins
-async function getFreeSpins(username, env) {
+// ============================================
+
+export async function getFreeSpins(username: string, env: Env): Promise<FreeSpinEntry[]> {
   try {
     const value = await env.SLOTS_KV.get(kvKey('freespins:', username));
     if (!value || value === 'null' || value === 'undefined') return [];
@@ -89,13 +108,13 @@ async function getFreeSpins(username, env) {
       return [];
     }
 
-    const valid = parsed.filter(fs =>
-      fs &&
+    const valid = parsed.filter((fs: unknown): fs is FreeSpinEntry =>
+      fs !== null &&
       typeof fs === 'object' &&
-      typeof fs.multiplier === 'number' &&
-      typeof fs.count === 'number' &&
-      fs.multiplier > 0 &&
-      fs.count > 0
+      typeof (fs as FreeSpinEntry).multiplier === 'number' &&
+      typeof (fs as FreeSpinEntry).count === 'number' &&
+      (fs as FreeSpinEntry).multiplier > 0 &&
+      (fs as FreeSpinEntry).count > 0
     );
 
     return valid;
@@ -105,7 +124,7 @@ async function getFreeSpins(username, env) {
   }
 }
 
-async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
+export async function addFreeSpinsWithMultiplier(username: string, count: number, multiplier: number, env: Env): Promise<void> {
   try {
     if (typeof count !== 'number' || count <= 0 || typeof multiplier !== 'number' || multiplier <= 0) {
       logError('addFreeSpinsWithMultiplier.invalidParams', new Error('Invalid parameters'), { username, count, multiplier });
@@ -115,7 +134,7 @@ async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
     const freeSpins = await getFreeSpins(username, env);
 
     const hasExisting = freeSpins.some(fs => fs.multiplier === multiplier);
-    const updated = hasExisting
+    const updated: FreeSpinEntry[] = hasExisting
       ? freeSpins.map(fs => fs.multiplier === multiplier ? { ...fs, count: fs.count + count } : fs)
       : [...freeSpins, { multiplier, count }];
 
@@ -133,7 +152,7 @@ async function addFreeSpinsWithMultiplier(username, count, multiplier, env) {
 }
 
 // Atomic free spin consumption with retry mechanism (prevents race conditions)
-async function consumeFreeSpinWithMultiplier(username, env, maxRetries = MAX_RETRIES) {
+export async function consumeFreeSpinWithMultiplier(username: string, env: Env, maxRetries: number = MAX_RETRIES): Promise<FreeSpinConsumeResult> {
   const key = kvKey('freespins:', username);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -144,7 +163,7 @@ async function consumeFreeSpinWithMultiplier(username, env, maxRetries = MAX_RET
         return { used: false, multiplier: 0 };
       }
 
-      const freeSpins = JSON.parse(value);
+      const freeSpins: FreeSpinEntry[] = JSON.parse(value);
       if (!Array.isArray(freeSpins) || freeSpins.length === 0) {
         return { used: false, multiplier: 0 };
       }
@@ -167,7 +186,7 @@ async function consumeFreeSpinWithMultiplier(username, env, maxRetries = MAX_RET
 
       // Prepare update - OPTIMIZED: Use deep copy instead of redundant JSON.parse
       const multiplierToReturn = lowestEntry.multiplier;
-      const updatedFreeSpins = freeSpins.map(entry => ({ ...entry }));
+      const updatedFreeSpins: FreeSpinEntry[] = freeSpins.map(entry => ({ ...entry }));
       updatedFreeSpins[0].count--;
 
       if (updatedFreeSpins[0].count <= 0) {
@@ -180,7 +199,7 @@ async function consumeFreeSpinWithMultiplier(username, env, maxRetries = MAX_RET
 
       // Verify the write succeeded
       const verifyValue = await env.SLOTS_KV.get(key);
-      const verifySpins = verifyValue ? JSON.parse(verifyValue) : [];
+      const verifySpins: FreeSpinEntry[] = verifyValue ? JSON.parse(verifyValue) : [];
 
       // Check if our update was applied (count should match)
       const expectedCount = updatedFreeSpins.length > 0 ? updatedFreeSpins[0]?.count : -1;
@@ -212,15 +231,3 @@ async function consumeFreeSpinWithMultiplier(username, env, maxRetries = MAX_RET
 
   return { used: false, multiplier: 0 };
 }
-
-export {
-  activateGuaranteedPair,
-  hasGuaranteedPair,
-  consumeGuaranteedPair,
-  activateWildCard,
-  hasWildCard,
-  consumeWildCard,
-  getFreeSpins,
-  addFreeSpinsWithMultiplier,
-  consumeFreeSpinWithMultiplier
-};

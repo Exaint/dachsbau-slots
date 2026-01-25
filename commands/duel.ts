@@ -256,9 +256,21 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
     }
 
     // Atomically accept the duel (prevents race conditions)
-    const acceptedDuel = await acceptDuel(duel.challenger, env);
-    if (!acceptedDuel) {
-      return `@${username} Das Duell wurde bereits akzeptiert oder ist abgelaufen.`;
+    const acceptResult = await acceptDuel(duel.challenger, env);
+    if (!acceptResult.success) {
+      switch (acceptResult.reason) {
+        case 'not_found':
+          return `@${username} Duell nicht gefunden - es wurde möglicherweise zurückgezogen.`;
+        case 'expired':
+          return `@${username} Das Duell ist abgelaufen.`;
+        case 'already_claimed':
+          return `@${username} Das Duell wird gerade von einer anderen Anfrage verarbeitet.`;
+        case 'race_condition':
+          return `@${username} Das Duell wurde bereits verarbeitet.`;
+        case 'error':
+        default:
+          return `@${username} Fehler beim Akzeptieren des Duells. Bitte versuche es erneut.`;
+      }
     }
 
     // Re-check balances (could have changed since challenge)

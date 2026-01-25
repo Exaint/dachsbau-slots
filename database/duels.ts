@@ -61,6 +61,10 @@ export interface DuelHistoryEntry {
   createdAt: number;
 }
 
+export type AcceptDuelResult =
+  | { success: true; duel: DuelChallenge }
+  | { success: false; reason: 'not_found' | 'expired' | 'already_claimed' | 'race_condition' | 'error' };
+
 // ============================================
 // Duel Challenge Operations
 // ============================================
@@ -159,26 +163,30 @@ export async function deleteDuel(challenger: string, env: Env): Promise<boolean>
 
 /**
  * Accept a duel - claim-lock + delete + verify to prevent race conditions
+ * Returns detailed result with failure reason
  */
-export async function acceptDuel(challenger: string, env: Env): Promise<DuelChallenge | null> {
+export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDuelResult> {
   try {
     const key = kvKey('duel:', challenger);
-    const claimKey = `${key}:claim`;
 
-    // Check if another request is already claiming this duel
-    const alreadyClaimed = await env.SLOTS_KV.get(claimKey);
-    if (alreadyClaimed) return null;
-
+    // First read the duel to get createdAt for unique claim key
     const value = await env.SLOTS_KV.get(key);
-    if (!value) return null;
+    if (!value) return { success: false, reason: 'not_found' };
 
     const data: DuelData = JSON.parse(value);
 
     // Check if expired
     if (Date.now() > data.createdAt + (DUEL_TIMEOUT_SECONDS * 1000)) {
       await env.SLOTS_KV.delete(key);
-      return null;
+      return { success: false, reason: 'expired' };
     }
+
+    // Unique claim key per duel (prevents stale claim locks from previous duels)
+    const claimKey = `${key}:claim:${data.createdAt}`;
+
+    // Check if another request is already claiming this specific duel
+    const alreadyClaimed = await env.SLOTS_KV.get(claimKey);
+    if (alreadyClaimed) return { success: false, reason: 'already_claimed' };
 
     // Set claim-lock with short TTL (prevents parallel double-accept)
     await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 10 });
@@ -190,16 +198,16 @@ export async function acceptDuel(challenger: string, env: Env): Promise<DuelChal
     const verify = await env.SLOTS_KV.get(key);
     if (verify !== null) {
       await env.SLOTS_KV.delete(claimKey);
-      return null; // Another request accepted it first
+      return { success: false, reason: 'race_condition' }; // Another request accepted it first
     }
 
-    // Cleanup claim lock
-    await env.SLOTS_KV.delete(claimKey);
+    // Cleanup claim lock (fire-and-forget, TTL handles cleanup anyway)
+    env.SLOTS_KV.delete(claimKey).catch(() => {});
 
-    return { challenger: challenger.toLowerCase(), ...data };
+    return { success: true, duel: { challenger: challenger.toLowerCase(), ...data } };
   } catch (error) {
     logError('acceptDuel', error, { challenger });
-    return null;
+    return { success: false, reason: 'error' };
   }
 }
 

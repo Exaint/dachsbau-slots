@@ -268,8 +268,10 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
         case 'race_condition':
           return `@${username} Das Duell wurde bereits verarbeitet.`;
         case 'error':
-        default:
-          return `@${username} Fehler beim Akzeptieren des Duells. Bitte versuche es erneut.`;
+        default: {
+          const debugInfo = acceptResult.debugInfo ? ` [${acceptResult.debugInfo}]` : '';
+          return `@${username} Fehler beim Akzeptieren des Duells.${debugInfo}`;
+        }
       }
     }
 

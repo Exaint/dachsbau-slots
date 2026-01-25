@@ -63,7 +63,7 @@ export interface DuelHistoryEntry {
 
 export type AcceptDuelResult =
   | { success: true; duel: DuelChallenge }
-  | { success: false; reason: 'not_found' | 'expired' | 'already_claimed' | 'race_condition' | 'error' };
+  | { success: false; reason: 'not_found' | 'expired' | 'already_claimed' | 'race_condition' | 'error'; debugInfo?: string };
 
 // ============================================
 // Duel Challenge Operations
@@ -178,7 +178,7 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
     // Validate input
     if (!challenger || typeof challenger !== 'string') {
       logError('acceptDuel', new Error('Invalid challenger'), { challenger });
-      return { success: false, reason: 'error' };
+      return { success: false, reason: 'error', debugInfo: 'invalid_challenger' };
     }
 
     const key = kvKey('duel:', challenger);
@@ -193,11 +193,11 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
       data = JSON.parse(value);
       if (typeof data.target !== 'string' || typeof data.amount !== 'number' || typeof data.createdAt !== 'number') {
         logError('acceptDuel', new Error('Invalid duel data structure'), { challenger, data });
-        return { success: false, reason: 'error' };
+        return { success: false, reason: 'error', debugInfo: `invalid_data:t=${typeof data.target},a=${typeof data.amount},c=${typeof data.createdAt}` };
       }
     } catch (parseError) {
       logError('acceptDuel', parseError, { challenger, value: value.substring(0, 100) });
-      return { success: false, reason: 'error' };
+      return { success: false, reason: 'error', debugInfo: `parse_error:${value.substring(0, 50)}` };
     }
 
     // Check if expired
@@ -231,8 +231,9 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
 
     return { success: true, duel: { challenger: challenger.toLowerCase(), ...data } };
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     logError('acceptDuel', error, { challenger });
-    return { success: false, reason: 'error' };
+    return { success: false, reason: 'error', debugInfo: `exception:${errMsg.substring(0, 50)}` };
   }
 }
 

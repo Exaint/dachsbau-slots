@@ -365,7 +365,7 @@ async function handleSlot(username, amountParam, url, env) {
 
     // Build response
     const totalWin = result.points + totalBonuses;
-    let message = buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage, spinCost);
+    let message = buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage, spinCost, hasWildCardToken);
 
     // Append custom message if available
     if (customMsgAppend) {

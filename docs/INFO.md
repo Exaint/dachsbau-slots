@@ -136,7 +136,7 @@ Kaufe die Unlocks im Shop in dieser Reihenfolge:
 
 | Command | Beschreibung | Voraussetzung |
 |:--------|:-------------|:--------------|
-| `!slots stats` | Persönliche Statistiken | Stats Tracker (#18) |
+| `!slots stats` | Persönliche Statistiken | – |
 | `!slots info / help / commands` | Link zu diesem Dokument | – |
 | `!slots disclaimer` | Glücksspiel-Warnung | – |
 | `!slots selfban` | Selbstausschluss | – |
@@ -416,7 +416,6 @@ Um wieder Duelle zu aktivieren:
 | 21 | !slots 50 | 2.500 DachsTaler | 5× Multiplier |
 | 23 | !slots 100 | 3.250 DachsTaler | 10× Multiplier |
 | 25 | !slots all | 4.444 DachsTaler | All-In |
-| 18 | Stats Tracker | 1.250 DachsTaler | `!slots stats` |
 | 27 | Daily Boost | 10.000 DachsTaler | Daily +250 statt +50 |
 
 </details>

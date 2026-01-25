@@ -870,13 +870,14 @@ export function renderInfoPage(user = null) {
         <details class="faq-item">
           <summary>🃏 Wie funktioniert die Wild Card?</summary>
           <div class="faq-content">
-            <p><code>!shop buy 38</code> (250 DT) → Nächster Spin enthält 🃏</p>
-            <p>Das Wild ersetzt <strong>jedes Symbol</strong> für den besten Outcome:</p>
+            <p><code>!shop buy 38</code> (250 DT) → Optimiert deinen nächsten Spin!</p>
+            <p>Die Wild Card erstellt das <strong>bestmögliche Paar/Triple</strong>:</p>
             <ul>
-              <li><code>🦡 🃏 🦡</code> = Triple-Dachs (15.000 DT!)</li>
-              <li><code>🍒 🃏 🍒</code> = Triple-Kirsche (50 DT)</li>
+              <li><code>⭐ ⭐ 🍒</code> → <code>⭐ ⭐ ⭐</code> Star-Triple (500 DT)</li>
+              <li><code>🦡 ⭐ 🍒</code> → <code>🦡 ⭐ ⭐</code> Star-Paar + Dachs (150 DT)</li>
+              <li><code>⭐ 🍋 🍒</code> → <code>⭐ ⭐ 🍒</code> Star-Paar (50 DT)</li>
             </ul>
-            <p>⚠️ Wild zählt <strong>nicht</strong> für 💎 Free Spins</p>
+            <p>⚠️ Wild Card kann <strong>niemals</strong> zu einem 🦡 werden!</p>
           </div>
           </details>
         </section>

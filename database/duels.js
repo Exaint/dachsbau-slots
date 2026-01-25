@@ -117,11 +117,17 @@ async function deleteDuel(challenger, env) {
 }
 
 /**
- * Accept a duel - atomic delete + verify to prevent race conditions
+ * Accept a duel - claim-lock + delete + verify to prevent race conditions
  */
 async function acceptDuel(challenger, env) {
   try {
     const key = kvKey('duel:', challenger);
+    const claimKey = `${key}:claim`;
+
+    // Check if another request is already claiming this duel
+    const alreadyClaimed = await env.SLOTS_KV.get(claimKey);
+    if (alreadyClaimed) return null;
+
     const value = await env.SLOTS_KV.get(key);
     if (!value) return null;
 
@@ -133,14 +139,21 @@ async function acceptDuel(challenger, env) {
       return null;
     }
 
+    // Set claim-lock with short TTL (prevents parallel double-accept)
+    await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 10 });
+
     // Delete the duel
     await env.SLOTS_KV.delete(key);
 
-    // Verify deletion succeeded (prevents double-accept race condition)
+    // Verify deletion succeeded
     const verify = await env.SLOTS_KV.get(key);
     if (verify !== null) {
+      await env.SLOTS_KV.delete(claimKey);
       return null; // Another request accepted it first
     }
+
+    // Cleanup claim lock
+    await env.SLOTS_KV.delete(claimKey);
 
     return { challenger: challenger.toLowerCase(), ...data };
   } catch (error) {

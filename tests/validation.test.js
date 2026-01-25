@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { sanitizeUsername, validateAmount, kvKey, checkRateLimit } from '../utils.js';
+import { sanitizeUsername, validateAmount, kvKey, checkRateLimit, isAdmin, getAdminList, containsProfanity, formatTimeRemaining, safeJsonParse, validateAndCleanTarget } from '../utils.js';
 
 describe('sanitizeUsername', () => {
   it('normalisiert Großbuchstaben', () => {
@@ -152,5 +152,134 @@ describe('checkRateLimit', () => {
     const result = await checkRateLimit('new:user', 10, 60, env);
     expect(result).toBe(true);
     expect(env.SLOTS_KV.put).toHaveBeenCalledWith('rl:new:user', '1', { expirationTtl: 60 });
+  });
+});
+
+describe('isAdmin', () => {
+  it('erkennt hardcoded Admins (lowercase)', () => {
+    expect(isAdmin('exaint_')).toBe(true);
+    expect(isAdmin('frechhdachs')).toBe(true);
+  });
+
+  it('erkennt Admins unabhängig von Groß-/Kleinschreibung', () => {
+    expect(isAdmin('EXAINT_')).toBe(true);
+    expect(isAdmin('FreCHHdachS')).toBe(true);
+  });
+
+  it('gibt false für Nicht-Admins zurück', () => {
+    expect(isAdmin('random_user')).toBe(false);
+    expect(isAdmin('admin')).toBe(false);
+  });
+});
+
+describe('getAdminList', () => {
+  it('gibt Array mit Admin-Usernames zurück', () => {
+    const list = getAdminList();
+    expect(Array.isArray(list)).toBe(true);
+    expect(list).toContain('exaint_');
+    expect(list).toContain('frechhdachs');
+    expect(list.length).toBe(2);
+  });
+});
+
+describe('containsProfanity', () => {
+  it('erkennt deutsche Schimpfwörter', () => {
+    expect(containsProfanity('hurensohn')).toBe(true);
+    expect(containsProfanity('wichser')).toBe(true);
+    expect(containsProfanity('arschloch')).toBe(true);
+  });
+
+  it('erkennt englische Schimpfwörter', () => {
+    expect(containsProfanity('fuck')).toBe(true);
+    expect(containsProfanity('shit')).toBe(true);
+    expect(containsProfanity('bitch')).toBe(true);
+  });
+
+  it('erkennt Leetspeak-Varianten', () => {
+    expect(containsProfanity('h0rens0hn')).toBe(true);
+    expect(containsProfanity('w1chser')).toBe(true);
+    expect(containsProfanity('f0ck')).toBe(true);
+  });
+
+  it('erkennt Wörter in Sätzen', () => {
+    expect(containsProfanity('Du bist ein hurensohn!')).toBe(true);
+    expect(containsProfanity('Was für ein scheiß Tag')).toBe(true);
+  });
+
+  it('gibt false für sauberen Text zurück', () => {
+    expect(containsProfanity('Heute ist ein guter Tag!')).toBe(false);
+    expect(containsProfanity('GG gut gespielt')).toBe(false);
+    expect(containsProfanity('Viel Glück beim Spielen')).toBe(false);
+  });
+
+  it('behandelt leeren/ungültigen Input', () => {
+    expect(containsProfanity('')).toBe(false);
+    expect(containsProfanity(null)).toBe(false);
+    expect(containsProfanity(undefined)).toBe(false);
+    expect(containsProfanity(123)).toBe(false);
+  });
+});
+
+describe('formatTimeRemaining', () => {
+  it('formatiert Stunden und Minuten', () => {
+    expect(formatTimeRemaining(3600000 + 1800000)).toBe('1h 30m'); // 1.5h
+    expect(formatTimeRemaining(7200000 + 900000)).toBe('2h 15m'); // 2h 15m
+  });
+
+  it('zeigt nur Minuten bei weniger als 1 Stunde', () => {
+    expect(formatTimeRemaining(1800000)).toBe('30m');
+    expect(formatTimeRemaining(300000)).toBe('5m');
+  });
+
+  it('zeigt 0m für sehr kleine Werte', () => {
+    expect(formatTimeRemaining(0)).toBe('0m');
+    expect(formatTimeRemaining(30000)).toBe('0m'); // 30 Sekunden
+  });
+
+  it('rundet Minuten korrekt ab', () => {
+    expect(formatTimeRemaining(90000)).toBe('1m'); // 1.5 Minuten → 1m
+  });
+});
+
+describe('safeJsonParse', () => {
+  it('parst gültiges JSON', () => {
+    expect(safeJsonParse('{"key": "value"}')).toEqual({ key: 'value' });
+    expect(safeJsonParse('[1, 2, 3]')).toEqual([1, 2, 3]);
+  });
+
+  it('gibt Fallback für ungültiges JSON zurück', () => {
+    expect(safeJsonParse('invalid')).toBeNull();
+    expect(safeJsonParse('invalid', {})).toEqual({});
+    expect(safeJsonParse('', [])).toEqual([]);
+  });
+
+  it('gibt Fallback für null/undefined zurück', () => {
+    expect(safeJsonParse(null)).toBeNull();
+    expect(safeJsonParse(undefined, 'default')).toBe('default');
+  });
+});
+
+describe('validateAndCleanTarget', () => {
+  it('validiert und säubert Target mit @', () => {
+    const result = validateAndCleanTarget('@TestUser');
+    expect(result.error).toBeNull();
+    expect(result.cleanTarget).toBe('testuser');
+  });
+
+  it('validiert und säubert Target ohne @', () => {
+    const result = validateAndCleanTarget('TestUser');
+    expect(result.error).toBeNull();
+    expect(result.cleanTarget).toBe('testuser');
+  });
+
+  it('gibt missing-Error für leeren Target zurück', () => {
+    expect(validateAndCleanTarget('').error).toBe('missing');
+    expect(validateAndCleanTarget(null).error).toBe('missing');
+    expect(validateAndCleanTarget(undefined).error).toBe('missing');
+  });
+
+  it('gibt invalid-Error für ungültigen Username zurück', () => {
+    expect(validateAndCleanTarget('!!!').error).toBe('invalid');
+    expect(validateAndCleanTarget('@').error).toBe('invalid');
   });
 });

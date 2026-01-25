@@ -267,6 +267,17 @@ const DEFAULT_STATS = {
   dailysClaimed: 0
 };
 
+// Whitelist of valid stat keys for SQL safety (prevents SQL injection via statKey)
+const VALID_STAT_KEYS = new Set(Object.keys(DEFAULT_STATS));
+
+// Convert camelCase to snake_case for D1 column names
+function statKeyToColumn(statKey) {
+  if (!VALID_STAT_KEYS.has(statKey)) {
+    throw new Error(`Invalid stat key: ${statKey}`);
+  }
+  return statKey.replace(/([A-Z])/g, '_$1').toLowerCase();
+}
+
 async function getStats(username, env) {
   try {
     const value = await env.SLOTS_KV.get(kvKey('stats:', username));
@@ -421,10 +432,12 @@ async function batchUpdateStats(username, increments, maxUpdates, env) {
     for (const [statKey, newValue] of (maxUpdates || [])) {
       if (statKey in stats && newValue > stats[statKey]) {
         stats[statKey] = newValue;
+        // Use validated column name to prevent SQL injection
+        const column = statKeyToColumn(statKey);
         d1Promises.push(() =>
           env.DB.prepare(`
-            UPDATE player_stats SET ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} = ?
-            WHERE username = ? AND ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} < ?
+            UPDATE player_stats SET ${column} = ?
+            WHERE username = ? AND ${column} < ?
           `).bind(newValue, username.toLowerCase(), newValue).run()
         );
       }
@@ -454,9 +467,11 @@ async function updateMaxStat(username, statKey, newValue, env) {
 
       // DUAL_WRITE: Fire-and-forget D1 write
       if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        // Use validated column name to prevent SQL injection
+        const column = statKeyToColumn(statKey);
         env.DB.prepare(`
-          UPDATE player_stats SET ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} = ?
-          WHERE username = ? AND ${statKey.replace(/([A-Z])/g, '_$1').toLowerCase()} < ?
+          UPDATE player_stats SET ${column} = ?
+          WHERE username = ? AND ${column} < ?
         `).bind(newValue, username.toLowerCase(), newValue).run()
           .catch(err => logError('updateMaxStat.d1', err, { username, statKey }));
       }

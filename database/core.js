@@ -14,14 +14,22 @@ async function getBalance(username, env) {
     const key = kvKey('user:', username);
     const value = await env.SLOTS_KV.get(key);
     if (value === null) {
-      await setBalance(username, STARTING_BALANCE, env);
-      return STARTING_BALANCE;
+      // New user: Only grant starting balance if disclaimer accepted
+      // Legacy users already have balance in KV, so they bypass this check
+      const disclaimerKey = kvKey('disclaimer:', username);
+      const hasDisclaimer = await env.SLOTS_KV.get(disclaimerKey);
+      if (hasDisclaimer === KV_ACCEPTED) {
+        await setBalance(username, STARTING_BALANCE, env);
+        return STARTING_BALANCE;
+      }
+      // No disclaimer, no balance - return 0 (user must accept first)
+      return 0;
     }
     const balance = parseInt(value, 10);
-    return isNaN(balance) ? STARTING_BALANCE : Math.min(balance, MAX_BALANCE);
+    return isNaN(balance) ? 0 : Math.min(balance, MAX_BALANCE);
   } catch (error) {
     logError('getBalance', error, { username });
-    return STARTING_BALANCE;
+    return 0;
   }
 }
 
@@ -93,6 +101,12 @@ async function hasAcceptedDisclaimer(username, env) {
 async function setDisclaimerAccepted(username, env) {
   try {
     await env.SLOTS_KV.put(kvKey('disclaimer:', username), KV_ACCEPTED);
+
+    // Grant starting balance for new users (if they don't have one yet)
+    const existingBalance = await env.SLOTS_KV.get(kvKey('user:', username));
+    if (existingBalance === null) {
+      await setBalance(username, STARTING_BALANCE, env);
+    }
 
     // Invalidate web leaderboard cache
     env.SLOTS_KV.delete('cache:web_leaderboard').catch(() => {});

@@ -16,7 +16,7 @@ import {
   KV_ACTIVE,
   ACHIEVEMENTS
 } from '../constants.js';
-import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight } from '../utils.js';
+import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight, checkRateLimit } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -110,14 +110,24 @@ async function trackTransferReceived(username, amount, env) {
   }
 }
 
-// Helper: Get days in current month (German timezone)
+// Helper: Get days in current month (German timezone) - cached per month
+let _daysInMonthCache = { key: '', days: 0 };
 function getDaysInCurrentMonth() {
   const now = new Date();
   const germanDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
   const year = germanDate.getFullYear();
   const month = germanDate.getMonth();
-  // Day 0 of next month = last day of current month
-  return new Date(year, month + 1, 0).getDate();
+  const cacheKey = `${year}-${month}`;
+
+  // Return cached value if same month
+  if (_daysInMonthCache.key === cacheKey) {
+    return _daysInMonthCache.days;
+  }
+
+  // Calculate and cache
+  const days = new Date(year, month + 1, 0).getDate();
+  _daysInMonthCache = { key: cacheKey, days };
+  return days;
 }
 
 // Static: Timed buff definitions (avoid recreation per request)
@@ -168,6 +178,12 @@ async function handleStats(username, env) {
 
 async function handleDaily(username, env) {
   try {
+    // Rate limit: max 5 requests per 60 seconds
+    const allowed = await checkRateLimit(`daily:${username}`, 5, 60, env);
+    if (!allowed) {
+      return new Response(`@${username} ⏰ Zu viele Anfragen, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
+    }
+
     const [hasAccepted, hasBoost, lastDaily, currentBalance, monthlyLogin] = await Promise.all([
       hasAcceptedDisclaimer(username, env),
       hasUnlock(username, 'daily_boost', env),

@@ -94,10 +94,93 @@ async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWild
   }
 
   if (hasWildCardToken) {
-    const wildPos = secureRandomInt(0, 2);
-    grid[wildPos] = '🃏';
+    // Wild Card: Replace worst symbol with best for maximum payout
+    applyWildCardOptimization(grid);
     await consumeWildCard(username, env);
   }
+}
+
+/**
+ * Wild Card optimization: Create best possible non-Dachs outcome
+ * Rules:
+ * - Wild Card can NEVER become a Dachs
+ * - Non-Dachs pair → complete to triple
+ * - Dachs pair → don't change (already good)
+ * - No pair → create best non-Dachs adjacent pair
+ * @param {string[]} grid - Grid array (modified in place)
+ * @returns {boolean} Whether optimization was applied
+ */
+function applyWildCardOptimization(grid) {
+  // Symbol value hierarchy (excluding Dachs - Wild can't become Dachs)
+  const SYMBOL_VALUES = {
+    '⭐': 50,    // Star pair payout (best regular)
+    '🍉': 25,    // Watermelon
+    '🍇': 15,    // Grapes
+    '🍊': 10,    // Orange
+    '🍋': 8,     // Lemon
+    '🍒': 5,     // Cherry
+    '💎': 1     // Diamond (lowest for pairs)
+  };
+
+  // Helper: Check if symbol is Dachs
+  const isDachs = (s) => s === '🦡';
+
+  // Check for existing pairs
+  const pair01 = grid[0] === grid[1] && grid[0] !== grid[2];
+  const pair12 = grid[1] === grid[2] && grid[0] !== grid[1];
+  const pair02 = grid[0] === grid[2] && grid[0] !== grid[1];
+
+  // If NON-DACHS pair exists → complete to triple
+  if (pair01 && !isDachs(grid[0])) {
+    grid[2] = grid[0];
+    return true;
+  }
+  if (pair12 && !isDachs(grid[1])) {
+    grid[0] = grid[1];
+    return true;
+  }
+  if (pair02 && !isDachs(grid[0])) {
+    grid[1] = grid[0];
+    return true;
+  }
+
+  // If DACHS pair exists → don't change (Wild can't become Dachs)
+  if (pair01 || pair12 || pair02) {
+    return false; // Already have a Dachs pair, can't improve
+  }
+
+  // No pair exists → create best non-Dachs adjacent pair
+  // Find best non-Dachs symbol and its position
+  let bestValue = -1;
+  let bestIndex = -1;
+  let bestSymbol = null;
+
+  for (let i = 0; i < 3; i++) {
+    if (!isDachs(grid[i])) {
+      const value = SYMBOL_VALUES[grid[i]] || 0;
+      if (value > bestValue) {
+        bestValue = value;
+        bestIndex = i;
+        bestSymbol = grid[i];
+      }
+    }
+  }
+
+  // If no non-Dachs symbol found (all Dachs?!), can't do anything
+  if (bestIndex === -1) return false;
+
+  // Replace adjacent position to create pair
+  // Best at 0 → replace 1, Best at 1 → replace 0 or 2, Best at 2 → replace 1
+  if (bestIndex === 0) {
+    grid[1] = bestSymbol;
+  } else if (bestIndex === 2) {
+    grid[1] = bestSymbol;
+  } else {
+    // Best at 1 → replace 0 (arbitrary choice)
+    grid[0] = bestSymbol;
+  }
+
+  return true;
 }
 
 /**
@@ -197,7 +280,11 @@ function calculateWin(grid) {
  * Build response message in D2 format
  * Format: [ Grid ] Result! +X DachsTaler 💰 ║ Natural Bonuses ║ 🛒 Shop Buffs ║ Kontostand: X DachsTaler
  */
-function buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage, spinCost = 0) {
+function buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage, spinCost = 0, wildCardUsed = false) {
+  // Add Wild Card to shop buffs if used
+  if (wildCardUsed) {
+    shopBuffs.push('🃏 Wild');
+  }
   const rankSymbol = rank ? `${rank} ` : '';
   const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DachsTaler)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
   const middleRow = grid.join(' ');

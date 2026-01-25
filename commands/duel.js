@@ -36,17 +36,25 @@ import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
  * @param {number} winnings - Amount won (only for winner)
  * @param {object} env - Environment with KV binding
  */
-async function trackDuelAchievements(player, isWinner, winnings, env) {
+/**
+ * Track duel achievements and stats
+ * @param {string} player - Player username
+ * @param {'win'|'loss'|'tie'} result - Duel result
+ * @param {number} winnings - Amount won (0 for loss/tie)
+ * @param {object} env - Environment
+ */
+async function trackDuelAchievements(player, result, winnings, env) {
   try {
     // Step 1: Batch all achievement stat updates in a single atomic read-modify-write
     // This prevents race conditions on the achievements:{username} KV key
     const statUpdates = [['duelsPlayed', 1]];
-    if (isWinner) {
+    if (result === 'win') {
       statUpdates.push(['duelsWon', 1]);
       statUpdates.push(['totalDuelWinnings', winnings]);
-    } else {
+    } else if (result === 'loss') {
       statUpdates.push(['duelsLost', 1]);
     }
+    // Ties: only duelsPlayed is incremented (no win or loss)
     await updateAchievementStatBatch(player, statUpdates, env);
 
     // Step 2: One-time achievement (reads fresh data after batch save)
@@ -54,16 +62,17 @@ async function trackDuelAchievements(player, isWinner, winnings, env) {
 
     // Step 3: KV stats + streak (separate keys, safe to run in parallel)
     const kvPromises = [incrementStat(player, 'duelsPlayed', 1, env)];
-    if (isWinner) {
+    if (result === 'win') {
       kvPromises.push(incrementStat(player, 'totalDuelWinnings', winnings, env));
       kvPromises.push(trackDuelStreak(player, true, env));
-    } else {
+    } else if (result === 'loss') {
       kvPromises.push(incrementStat(player, 'duelsLost', 1, env));
       kvPromises.push(trackDuelStreak(player, false, env));
     }
+    // Ties: don't affect duel streak
     await Promise.all(kvPromises);
   } catch (error) {
-    logError('trackDuelAchievements', error, { player, isWinner });
+    logError('trackDuelAchievements', error, { player, result });
   }
 }
 
@@ -271,8 +280,8 @@ async function handleDuelAccept(username, env) {
       ]);
       resultMessage = `🏆 @${duel.challenger} GEWINNT ${pot} DachsTaler!`;
       // Fire-and-forget achievement tracking
-      trackDuelAchievements(duel.challenger, true, pot, env);
-      trackDuelAchievements(username, false, 0, env);
+      trackDuelAchievements(duel.challenger, 'win', pot, env);
+      trackDuelAchievements(username, 'loss', 0, env);
       checkBalanceAchievements(duel.challenger, newChallengerBalance, env);
     } else if (targetScore.score > challengerScore.score) {
       // Target wins
@@ -283,15 +292,15 @@ async function handleDuelAccept(username, env) {
       ]);
       resultMessage = `🏆 @${username} GEWINNT ${pot} DachsTaler!`;
       // Fire-and-forget achievement tracking
-      trackDuelAchievements(username, true, pot, env);
-      trackDuelAchievements(duel.challenger, false, 0, env);
+      trackDuelAchievements(username, 'win', pot, env);
+      trackDuelAchievements(duel.challenger, 'loss', 0, env);
       checkBalanceAchievements(username, newTargetBalance, env);
     } else {
       // True tie - return bets (both participated, neither won)
       resultMessage = `🤝 UNENTSCHIEDEN! Beide behalten ihren Einsatz.`;
-      // Fire-and-forget achievement tracking (both get participation, no winner)
-      trackDuelAchievements(duel.challenger, false, 0, env);
-      trackDuelAchievements(username, false, 0, env);
+      // Fire-and-forget achievement tracking (ties: only duelsPlayed, no win/loss)
+      trackDuelAchievements(duel.challenger, 'tie', 0, env);
+      trackDuelAchievements(username, 'tie', 0, env);
     }
 
     // Fire-and-forget D1 duel log

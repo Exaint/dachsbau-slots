@@ -2,7 +2,7 @@
  * Admin Economy Commands - Give, balance, buffs, stats
  */
 
-import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, SHOP_ITEM_MAX } from '../../constants.js';
+import { RESPONSE_HEADERS, MAX_BALANCE, SHOP_ITEMS, SHOP_ITEM_MAX, ALL_BUFF_KEYS, ALL_SYMBOLS } from '../../constants.js';
 import { requireAdmin, requireAdminWithTarget, validateAmount, sanitizeUsername, logError, logAudit, createErrorResponse } from '../../utils.js';
 import {
   getBalance,

@@ -194,16 +194,14 @@
 
 | # | Item | Preis | Command | Beschreibung |
 |---|------|-------|---------|--------------|
-| **18** | 📊 Stats Tracker | 1.250 DachsTaler | `!shop buy 18` | Schaltet `!slots stats` frei (Permanent) |
 | **27** | 💎 Daily Interest Boost | 10.000 DachsTaler | `!shop buy 27` | Daily Bonus: 50 → 250 DachsTaler (Permanent, +5x!) |
 | **28** | ✏️ Custom Win Message | 10.000 DachsTaler | `!shop buy 28` | Personalisierte Gewinn-Nachricht |
 
 > 💡 **Investment-Guide - Empfohlene Reihenfolge:**
-> 1. **Start:** Stats Tracker (#18) - 1.250 DachsTaler → Verfolge deinen Progress!
-> 2. **Early Game:** !slots 20 & 30 (#13, #19) - 2.500 DachsTaler gesamt → 2x-3x Gewinne
-> 3. **Mid Game:** !slots 50 & 100 (#21, #23) - 5.750 DachsTaler gesamt → 5x-10x Gewinne
-> 4. **End Game:** Freie Einsätze (#25) - 4.444 DachsTaler → !slots 1-∞ (jeder Betrag)
-> 5. **Late Game:** Daily Boost (#27) - 10.000 DachsTaler → Passive Income x5
+> 1. **Early Game:** !slots 20 & 30 (#13, #19) - 2.500 DachsTaler gesamt → 2x-3x Gewinne
+> 2. **Mid Game:** !slots 50 & 100 (#21, #23) - 5.750 DachsTaler gesamt → 5x-10x Gewinne
+> 3. **End Game:** Freie Einsätze (#25) - 4.444 DachsTaler → !slots 1-∞ (jeder Betrag)
+> 4. **Late Game:** Daily Boost (#27) - 10.000 DachsTaler → Passive Income x5
 
 ---
 

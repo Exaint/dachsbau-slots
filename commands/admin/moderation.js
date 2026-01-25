@@ -138,6 +138,7 @@ async function handleWipe(username, target, env) {
       env.SLOTS_KV.delete(`selfban:${cleanTarget}`),
       env.SLOTS_KV.delete(`bundle_purchases:${cleanTarget}`),
       env.SLOTS_KV.delete(`dachsboost_purchases:${cleanTarget}`),
+      env.SLOTS_KV.delete(`achievements:${cleanTarget}`),
       ...ALL_BUFF_KEYS.map(key => env.SLOTS_KV.delete(`buff:${cleanTarget}:${key}`)),
       ...ALL_SYMBOLS.map(symbol => env.SLOTS_KV.delete(`boost:${cleanTarget}:${symbol}`)),
       ...ALL_UNLOCK_KEYS.map(unlock => env.SLOTS_KV.delete(`unlock:${cleanTarget}:${unlock}`))

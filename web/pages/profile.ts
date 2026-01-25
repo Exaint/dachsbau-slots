@@ -315,6 +315,21 @@ export function renderProfilePage(data: ProfileData): string {
     return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
 
+  // Extract symbol sum from duel score (removes triple/pair bonus)
+  // Score system: Triple = 3000000 + symbolSum, Pair = 2000000 + symbolSum, else = symbolSum
+  const getDuelSymbolSum = (score: number): number => {
+    if (score >= 3000000) return score - 3000000;
+    if (score >= 2000000) return score - 2000000;
+    return score;
+  };
+
+  // Get score type indicator
+  const getScoreType = (score: number): string => {
+    if (score >= 3000000) return '3x';
+    if (score >= 2000000) return '2x';
+    return '';
+  };
+
   const duelHistoryHtml = duelHistory.length > 0 ? `
     <div class="duel-history collapsed">
       <div class="duel-history-header" onclick="toggleDuelHistory()">
@@ -334,6 +349,8 @@ export function renderProfilePage(data: ProfileData): string {
           const resultClass = isTie ? 'tie' : (isWinner ? 'win' : 'loss');
           const resultText = isTie ? 'Unentschieden' : (isWinner ? `+${formatNumber(duel.pot)} DT` : `-${formatNumber(duel.amount)} DT`);
           const resultIcon = isTie ? '🤝' : (isWinner ? '🏆' : '💀');
+          const myScoreDisplay = `${getScoreType(myScore)}${getDuelSymbolSum(myScore)}`;
+          const opponentScoreDisplay = `${getScoreType(opponentScore)}${getDuelSymbolSum(opponentScore)}`;
 
           return `
             <div class="duel-entry ${resultClass}">
@@ -345,9 +362,9 @@ export function renderProfilePage(data: ProfileData): string {
               </div>
               <div class="duel-grids">
                 <span class="duel-grid">${myGrid.join(' ')}</span>
-                <span class="duel-score">${myScore}</span>
+                <span class="duel-score">${myScoreDisplay}</span>
                 <span class="duel-separator">:</span>
-                <span class="duel-score">${opponentScore}</span>
+                <span class="duel-score">${opponentScoreDisplay}</span>
                 <span class="duel-grid">${opponentGrid.join(' ')}</span>
               </div>
               <div class="duel-result ${resultClass}">

@@ -192,8 +192,19 @@ export async function trackSlotAchievements(
     }
 
     // Triple tracking - use displayGrid (what the user sees)
-    if (displayGrid[0] === displayGrid[1] && displayGrid[1] === displayGrid[2] && displayGrid[0] !== '🃏') {
-      await markTripleCollected(username, displayGrid[0], env);
+    // Defensive check: ensure displayGrid has exactly 3 elements
+    if (displayGrid && displayGrid.length === 3 &&
+        displayGrid[0] === displayGrid[1] && displayGrid[1] === displayGrid[2] && displayGrid[0] !== '🃏') {
+      const tripleSymbol = displayGrid[0];
+      try {
+        const unlockedAchievements = await markTripleCollected(username, tripleSymbol, env);
+        // Log successful triple tracking for debugging
+        if (unlockedAchievements.length > 0) {
+          console.log(`[TRIPLE] ${username}: ${tripleSymbol}${tripleSymbol}${tripleSymbol} - unlocked: ${unlockedAchievements.map(a => a.achievement.id).join(', ')}`);
+        }
+      } catch (tripleError) {
+        logError('trackSlotAchievements.triple', tripleError, { username, tripleSymbol });
+      }
     }
 
     // Balance achievements

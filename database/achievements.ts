@@ -17,7 +17,7 @@
 import type { Env, Achievement } from '../types/index.d.ts';
 import { ACHIEVEMENTS, ACHIEVEMENTS_REWARDS_ENABLED, getAchievementById } from '../constants/achievements.js';
 import { logError, kvKey } from '../utils.js';
-import { D1_ENABLED, DUAL_WRITE } from './d1.js';
+import { D1_ENABLED, DUAL_WRITE, executeD1Write } from './d1.js';
 import { unlockAchievementD1, lockAchievementD1, incrementStatD1, updatePlayerStatsD1, recordTripleHitD1 } from './d1-achievements.js';
 
 // === Type Definitions ===
@@ -947,13 +947,17 @@ async function markTripleCollected(username: string, symbol: string, env: Env): 
     const symbolKey = getTripleKey(symbol);
 
     if (!symbolKey) {
+      logError('markTripleCollected.unknownSymbol', new Error('Unknown triple symbol'), { username, symbol });
       return []; // Unknown symbol
     }
 
-    // DUAL_WRITE: Fire-and-forget D1 write (increments counter even if already collected)
+    // D1 write with retry mechanism (replaces fire-and-forget for reliability)
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
       const d1Key = symbolKey === 'dachs' ? 'dachs_triple' : symbolKey;
-      recordTripleHitD1(username, d1Key, env).catch(err => logError('markTripleCollected.d1', err as Error, { username, symbolKey }));
+      executeD1Write(
+        () => recordTripleHitD1(username, d1Key, env),
+        { name: 'markTripleCollected', params: { username, symbolKey: d1Key } }
+      );
     }
 
     // Check if already collected in KV (for achievement tracking)
@@ -965,6 +969,8 @@ async function markTripleCollected(username: string, symbol: string, env: Env): 
     if (!data.stats.triplesCollected) {
       data.stats.triplesCollected = { ...DEFAULT_STATS.triplesCollected };
     }
+
+    // Mark triple as collected
     data.stats.triplesCollected[symbolKey as keyof TriplesCollected] = true;
 
     const unlockedAchievements: UnlockedAchievement[] = [];
@@ -1013,7 +1019,9 @@ async function markTripleCollected(username: string, symbol: string, env: Env): 
       unlockedAchievements.push({ achievement: ACHIEVEMENTS.ALL_TRIPLES, reward });
     }
 
+    // Save to KV (this also updates D1 player_stats via savePlayerAchievements)
     await savePlayerAchievements(username, data, env);
+
     return unlockedAchievements;
   } catch (error) {
     logError('markTripleCollected', error as Error, { username, symbol });
@@ -1028,10 +1036,13 @@ async function markTripleCollected(username: string, symbol: string, env: Env): 
 function recordDachsHit(username: string, count: number, env: Env): void {
   if (!D1_ENABLED || !DUAL_WRITE || !env.DB) return;
 
-  // Fire-and-forget D1 write
+  // D1 write with retry mechanism
   const key = count === 1 ? 'dachs_single' : count === 2 ? 'dachs_double' : null;
   if (key) {
-    recordTripleHitD1(username, key, env).catch(err => logError('recordDachsHit.d1', err as Error, { username, count }));
+    executeD1Write(
+      () => recordTripleHitD1(username, key, env),
+      { name: 'recordDachsHit', params: { username, key } }
+    );
   }
 }
 

@@ -39,7 +39,7 @@ import { getLeaderboard as getD1Leaderboard, D1_ENABLED } from '../database/d1.j
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
 import { logError, isAdmin, sanitizeUsername, checkRateLimit } from '../utils.js';
 import { RATE_LIMIT_SEARCH, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';
-import type { Env, PlayerStats, Achievement } from '../types/index.js';
+import type { Env, Achievement } from '../types/index.js';
 
 interface LoggedInUser {
   username: string;
@@ -157,11 +157,12 @@ async function handleAchievementsApi(username: string | null, env: Env): Promise
     let progress: AchievementProgress | null = null;
     if (ach.requirement && !unlocked) {
       const statKey = getStatKeyForAchievement(ach.id);
-      if (statKey && (data.stats as Record<string, number>)[statKey] !== undefined) {
+      const statsRecord = data.stats as unknown as Record<string, number>;
+      if (statKey && statsRecord[statKey] !== undefined) {
         progress = {
-          current: (data.stats as Record<string, number>)[statKey],
+          current: statsRecord[statKey],
           required: ach.requirement,
-          percent: Math.min(100, Math.round(((data.stats as Record<string, number>)[statKey] / ach.requirement) * 100))
+          percent: Math.min(100, Math.round((statsRecord[statKey] / ach.requirement) * 100))
         };
       }
     }

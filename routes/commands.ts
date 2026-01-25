@@ -179,26 +179,26 @@ export async function handleSlotSubcommands(cleanUsername: string, lower: string
   if (lower === 'daily') return await handleDaily(cleanUsername, env);
   if (lower === 'stats') return await handleStats(cleanUsername, env);
   if (lower === 'buffs') return await handleBuffs(cleanUsername, env);
-  if (lower === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
+  if (lower === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target') || '', url.searchParams.get('giveamount') || '', env);
 
   // Admin commands with target only
   if (ADMIN_COMMANDS_TARGET[lower]) {
-    return await ADMIN_COMMANDS_TARGET[lower](cleanUsername, url.searchParams.get('target'), env);
+    return await ADMIN_COMMANDS_TARGET[lower](cleanUsername, url.searchParams.get('target') || '', env);
   }
 
   // Admin commands with target and amount
   if (ADMIN_COMMANDS_AMOUNT[lower]) {
-    return await ADMIN_COMMANDS_AMOUNT[lower](cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), env);
+    return await ADMIN_COMMANDS_AMOUNT[lower](cleanUsername, url.searchParams.get('target') || '', url.searchParams.get('giveamount') || '', env);
   }
 
   // Admin commands with target only (no amount)
   if (ADMIN_COMMANDS_TARGET_ONLY[lower]) {
-    return await ADMIN_COMMANDS_TARGET_ONLY[lower](cleanUsername, url.searchParams.get('target'), env);
+    return await ADMIN_COMMANDS_TARGET_ONLY[lower](cleanUsername, url.searchParams.get('target') || '', env);
   }
 
   // Special admin commands with unique signatures
-  if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target'), env);
-  if (lower === 'givefreespins') return await handleGiveFreespins(cleanUsername, url.searchParams.get('target'), url.searchParams.get('giveamount'), url.searchParams.get('multiplier'), env);
+  if (lower === 'maintenance') return await handleMaintenance(cleanUsername, url.searchParams.get('target') || '', env);
+  if (lower === 'givefreespins') return await handleGiveFreespins(cleanUsername, url.searchParams.get('target') || '', url.searchParams.get('giveamount') || '', url.searchParams.get('multiplier') || '', env);
 
   // Disclaimer command
   if (lower === 'disclaimer') {
@@ -289,8 +289,8 @@ export async function handleLegacyActions(action: string, cleanUsername: string,
   if (securityError) return securityError;
 
   if (action === 'daily') return await handleDaily(cleanUsername, env);
-  if (action === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target'), url.searchParams.get('amount'), env);
-  if (action === 'shop') return await handleShop(cleanUsername, url.searchParams.get('item'), env);
+  if (action === 'transfer') return await handleTransfer(cleanUsername, url.searchParams.get('target') || '', url.searchParams.get('amount') || '', env);
+  if (action === 'shop') return await handleShop(cleanUsername, url.searchParams.get('item') || '', env);
 
   return null;
 }

@@ -114,19 +114,21 @@ describe('kvKey', () => {
 });
 
 describe('checkRateLimit', () => {
-  function createMockKV() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function createMockKV(): any {
     const store = new Map();
     return {
-      get: vi.fn(async (key) => store.get(key) || null),
-      put: vi.fn(async (key, value) => { store.set(key, value); })
+      get: vi.fn(async (key: string) => store.get(key) || null),
+      put: vi.fn(async (key: string, value: string) => { store.set(key, value); })
     };
   }
 
   it('erlaubt Anfragen unter dem Limit', async () => {
-    const env = { SLOTS_KV: createMockKV() };
+    const mockKV = createMockKV();
+    const env = { SLOTS_KV: mockKV };
     const result = await checkRateLimit('test:ip', 5, 60, env);
     expect(result).toBe(true);
-    expect(env.SLOTS_KV.put).toHaveBeenCalledWith('rl:test:ip', '1', { expirationTtl: 60 });
+    expect(mockKV.put).toHaveBeenCalledWith('rl:test:ip', '1', { expirationTtl: 60 });
   });
 
   it('blockiert Anfragen bei erreichtem Limit', async () => {
@@ -148,10 +150,11 @@ describe('checkRateLimit', () => {
   });
 
   it('behandelt fehlenden KV-Eintrag als 0', async () => {
-    const env = { SLOTS_KV: createMockKV() };
+    const mockKV = createMockKV();
+    const env = { SLOTS_KV: mockKV };
     const result = await checkRateLimit('new:user', 10, 60, env);
     expect(result).toBe(true);
-    expect(env.SLOTS_KV.put).toHaveBeenCalledWith('rl:new:user', '1', { expirationTtl: 60 });
+    expect(mockKV.put).toHaveBeenCalledWith('rl:new:user', '1', { expirationTtl: 60 });
   });
 });
 

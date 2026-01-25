@@ -46,9 +46,9 @@ interface DuelHistoryEntry {
 }
 
 interface TwitchData {
-  avatar?: string;
-  displayName?: string;
-  role?: string;
+  avatar: string | null;
+  displayName: string;
+  role: string | null;
 }
 
 interface ProfileData {
@@ -93,7 +93,8 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
   const balance = rawBalance !== null ? parseInt(rawBalance, 10) || 0 : 0;
 
   // Fetch remaining data in parallel with error fallback
-  let rank: string | null, stats: Partial<PlayerStats & { duelsWon?: number; duelsLost?: number }>, achievementData: { unlockedAt: Record<string, number>; stats: Record<string, number>; pendingRewards: number }, lastActive: number | null, achievementStats: { totalPlayers: number; counts: Record<string, number> }, duelOptOut: boolean, selfBanned: boolean, leaderboardHidden: boolean, twitchData: TwitchData | null, hasCustomMsgUnlock: boolean, customMessages: CustomMessages | null, duelHistory: DuelHistoryEntry[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let rank: string | null, stats: Partial<PlayerStats & { duelsWon?: number; duelsLost?: number }>, achievementData: { unlockedAt: Record<string, number>; stats: any; pendingRewards: number }, lastActive: number | null, achievementStats: { totalPlayers: number; counts: Record<string, number> }, duelOptOut: boolean, selfBanned: boolean, leaderboardHidden: boolean, twitchData: TwitchData | null, hasCustomMsgUnlock: boolean, customMessages: CustomMessages | null, duelHistory: DuelHistoryEntry[];
   try {
     [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory] = await Promise.all([
       getPrestigeRank(username, env).catch(() => null),
@@ -102,7 +103,7 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
       getLastActive(username, env).catch(() => null),
       getAchievementStats(env).catch(() => ({ totalPlayers: 0, counts: {} })),
       isDuelOptedOut(username, env).catch(() => false),
-      isSelfBanned(username, env).catch(() => false),
+      isSelfBanned(username, env).then(result => !!result).catch(() => false),
       isLeaderboardHidden(username, env).catch(() => false),
       getTwitchProfileData(username, env).catch(() => null),
       hasUnlock(username, 'custom_message', env).catch(() => false),

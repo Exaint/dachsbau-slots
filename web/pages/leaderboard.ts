@@ -133,7 +133,7 @@ export async function handleLeaderboardPage(
   try {
     // Admin showAll bypasses cache (rare, needs different data)
     if (actualShowAll) {
-      return await handleLeaderboardUncached(env, loggedInUser, true, isAdminUser);
+      return await handleLeaderboardUncached(env, loggedInUser, true, !!isAdminUser);
     }
 
     // Try cache
@@ -175,7 +175,7 @@ export async function handleLeaderboardPage(
       }
     }
 
-    return htmlResponse(renderLeaderboardPage(data.topPlayers, loggedInUser, false, isAdminUser, currentUserRank, data.allUsers));
+    return htmlResponse(renderLeaderboardPage(data.topPlayers, loggedInUser, false, !!isAdminUser, currentUserRank, data.allUsers));
   } catch (error) {
     logError('handleLeaderboardPage', error);
     const { renderErrorPage } = await import('./errors.js');

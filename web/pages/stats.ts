@@ -2,16 +2,35 @@
  * Global Statistics Page Handler and Renderer
  */
 
+import type { Env, LoggedInUser } from '../../types/index.d.ts';
 import { getAchievementStats } from '../../database.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES } from '../../constants.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { CATEGORY_ICONS, CATEGORY_NAMES } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
 
+interface AchievementWithCount {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  count: number;
+  percent: number;
+}
+
+interface GlobalStatsData {
+  totalPlayers: number;
+  totalAchievements: number;
+  totalUnlocked: number;
+  rarestAchievements: AchievementWithCount[];
+  mostCommonAchievements: AchievementWithCount[];
+  achievementsWithCounts: AchievementWithCount[];
+}
+
 /**
  * Global Statistics page handler
  */
-export async function handleGlobalStatsPage(env, loggedInUser = null) {
+export async function handleGlobalStatsPage(env: Env, loggedInUser: LoggedInUser | null = null): Promise<Response> {
   // Fetch achievement stats and player data
   const achievementStats = await getAchievementStats(env);
   const { totalPlayers, counts } = achievementStats;
@@ -20,10 +39,10 @@ export async function handleGlobalStatsPage(env, loggedInUser = null) {
   const allAchievements = getAllAchievements();
 
   // Calculate total achievements unlocked
-  const totalUnlocked = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  const totalUnlocked = Object.values(counts as Record<string, number>).reduce((sum, count) => sum + count, 0);
 
   // Find rarest and most common achievements
-  const achievementsWithCounts = allAchievements.map(ach => ({
+  const achievementsWithCounts: AchievementWithCount[] = allAchievements.map(ach => ({
     ...ach,
     count: counts[ach.id] || 0,
     percent: totalPlayers > 0 ? Math.round((counts[ach.id] || 0) / totalPlayers * 100) : 0
@@ -52,10 +71,10 @@ export async function handleGlobalStatsPage(env, loggedInUser = null) {
 /**
  * Global Statistics page renderer
  */
-export function renderGlobalStatsPage(data, user = null) {
+export function renderGlobalStatsPage(data: GlobalStatsData, user: LoggedInUser | null = null): string {
   const { totalPlayers, totalAchievements, totalUnlocked, rarestAchievements, mostCommonAchievements, achievementsWithCounts } = data;
 
-  const avgAchievementsPerPlayer = totalPlayers > 0 ? (totalUnlocked / totalPlayers).toFixed(1) : 0;
+  const avgAchievementsPerPlayer = totalPlayers > 0 ? (totalUnlocked / totalPlayers).toFixed(1) : '0';
 
   // Rarest achievements HTML (with description)
   const rarestHtml = rarestAchievements.map((ach, index) => `
@@ -82,7 +101,7 @@ export function renderGlobalStatsPage(data, user = null) {
   `).join('');
 
   // Category breakdown
-  const categoryStats = {};
+  const categoryStats: Record<string, { total: number; unlocked: number; avgPercent: number }> = {};
   for (const cat of Object.values(ACHIEVEMENT_CATEGORIES)) {
     const catAchievements = achievementsWithCounts.filter(a => a.category === cat);
     const catUnlocked = catAchievements.reduce((sum, a) => sum + a.count, 0);

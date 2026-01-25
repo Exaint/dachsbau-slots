@@ -5,20 +5,21 @@
  * All page renderers are in separate files under ./pages/
  *
  * ARCHITECTURE:
- * - ./pages/utils.js - escapeHtml, formatNumber
- * - ./pages/ui-config.js - CATEGORY_ICONS, ROLE_BADGES, PRESTIGE_RANK_NAMES
+ * - ./pages/utils.ts - escapeHtml, formatNumber
+ * - ./pages/ui-config.ts - CATEGORY_ICONS, ROLE_BADGES, PRESTIGE_RANK_NAMES
  * - ./pages/template.js - baseTemplate, htmlResponse (with all client-side JS)
- * - ./pages/home.js - Home page
+ * - ./pages/home.ts - Home page
  * - ./pages/profile.js - Profile page
  * - ./pages/leaderboard.js - Leaderboard page
  * - ./pages/info.js - Info page
  * - ./pages/shop.js - Shop page
  * - ./pages/stats.js - Global stats page
- * - ./pages/changelog.js - Changelog page
- * - ./pages/legal.js - Impressum and Datenschutz
- * - ./pages/errors.js - Not found and error pages
+ * - ./pages/changelog.ts - Changelog page
+ * - ./pages/legal.ts - Impressum and Datenschutz
+ * - ./pages/errors.ts - Not found and error pages
  */
 
+import type { Env, LoggedInUser } from '../types/index.d.ts';
 import { hasAcceptedDisclaimer } from '../database.js';
 import { logError } from '../utils.js';
 
@@ -36,13 +37,14 @@ import { renderNotFoundPage, renderErrorPage } from './pages/errors.js';
 
 /**
  * Handle web page requests
- * @param {string} page - Page name
- * @param {URL} url - Request URL
- * @param {object} env - Environment bindings
- * @param {object|null} loggedInUser - Logged in user from JWT cookie
- * @param {object|null} ctx - Cloudflare Worker execution context
  */
-export async function handleWebPage(page, url, env, loggedInUser = null, ctx = null) {
+export async function handleWebPage(
+  page: string,
+  url: URL,
+  env: Env,
+  loggedInUser: LoggedInUser | null = null,
+  ctx: ExecutionContext | null = null
+): Promise<Response> {
   try {
     // Check if logged-in user has accepted disclaimer
     if (loggedInUser) {

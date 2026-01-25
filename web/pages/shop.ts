@@ -2,14 +2,34 @@
  * Shop Page Renderer
  */
 
+import type { Env, LoggedInUser } from '../../types/index.d.ts';
 import { getBalance, getPrestigeRank, hasUnlock } from '../../database.js';
 import { SHOP_ITEMS } from '../../constants.js';
 import { isWebPurchasable } from '../../routes/shop.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { baseTemplate } from './template.js';
 
+interface ShopItem {
+  id: number;
+  name: string;
+  price: number;
+  type: string;
+  unlockKey?: string;
+  rank?: string;
+  requires?: string;
+  requiresRank?: string;
+  weeklyLimit?: boolean;
+}
+
+interface ShopCategory {
+  title: string;
+  icon: string;
+  desc: string;
+  items: ShopItem[];
+}
+
 // Item descriptions for shop
-const ITEM_DESCRIPTIONS = {
+const ITEM_DESCRIPTIONS: Record<number, string> = {
   1: 'Zeigt dir das nächste Symbol bevor du spinnst',
   2: 'Erhöht die Chance auf 🍒 Kirschen für den nächsten Spin',
   3: 'Erhöht die Chance auf 🍋 Zitronen für den nächsten Spin',
@@ -54,7 +74,7 @@ const ITEM_DESCRIPTIONS = {
 const R2_BASE = 'https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev';
 
 // Item icons for shop
-const ITEM_ICONS = {
+const ITEM_ICONS: Record<number, string> = {
   1: `<img src="${R2_BASE}/Peek.png" alt="Peek Token" class="shop-item-img">`,
   2: '🍒', 3: '🍋', 4: '🍊', 5: '🍇', 6: '🍉', 7: '⭐', 8: '🦡',
   9: `<img src="${R2_BASE}/Hingabe.png" alt="Insurance" class="shop-item-img">`,
@@ -77,11 +97,11 @@ const ITEM_ICONS = {
 /**
  * Shop page renderer
  */
-export async function renderShopPage(env, user = null) {
+export async function renderShopPage(env: Env, user: LoggedInUser | null = null): Promise<string> {
   // If user is logged in, fetch their balance, unlocks and prestige rank
   let userBalanceHtml = '';
-  let userUnlocks = new Set();
-  let userPrestigeRank = null;
+  let userUnlocks = new Set<string>();
+  let userPrestigeRank: string | null = null;
   let userBalance = 0;
 
   if (user) {
@@ -124,7 +144,7 @@ export async function renderShopPage(env, user = null) {
   }
 
   // Group items by category
-  const categories = {
+  const categories: Record<string, ShopCategory> = {
     boosts: { title: 'Symbol-Boosts', icon: '🎰', desc: 'Erhöhe die Chance auf bestimmte Symbole', items: [] },
     instant: { title: 'Sofort-Items', icon: '⚡', desc: 'Einmalige Effekte die sofort wirken', items: [] },
     timed: { title: 'Timed Buffs', icon: '⏰', desc: 'Zeitlich begrenzte Boni', items: [] },
@@ -134,7 +154,7 @@ export async function renderShopPage(env, user = null) {
 
   Object.entries(SHOP_ITEMS).forEach(([id, item]) => {
     const numId = parseInt(id, 10);
-    const itemData = { id: numId, ...item };
+    const itemData: ShopItem = { id: numId, ...item };
 
     if (item.type === 'boost') {
       categories.boosts.items.push(itemData);
@@ -152,7 +172,7 @@ export async function renderShopPage(env, user = null) {
   // Prestige rank hierarchy for checking owned status
   const RANK_HIERARCHY = ['🥉', '🥈', '🥇', '💎', '👑'];
 
-  const renderCategory = (cat, tip = '') => {
+  const renderCategory = (cat: ShopCategory, tip = ''): string => {
     if (cat.items.length === 0) return '';
 
     // Sort items by price

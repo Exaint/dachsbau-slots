@@ -2,6 +2,7 @@
  * Leaderboard Page Handler and Renderer
  */
 
+import type { Env, LoggedInUser } from '../../types/index.d.ts';
 import { hasAcceptedDisclaimer } from '../../database.js';
 import { isSelfBanned } from '../../database.js';
 import { isLeaderboardHidden } from '../../database/core.js';
@@ -14,11 +15,35 @@ import { escapeHtml, formatNumber } from './utils.js';
 import { ROLE_BADGES, R2_BASE } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
 
+interface LeaderboardPlayer {
+  username: string;
+  balance: number;
+  hasDisclaimer: boolean;
+  role?: string | null;
+  avatar?: string | null;
+}
+
+interface LeaderboardUserEntry {
+  u: string;
+  b: number;
+  r: number;
+}
+
+interface LeaderboardData {
+  topPlayers: LeaderboardPlayer[];
+  allUsers: LeaderboardUserEntry[];
+  timestamp: number;
+}
+
+interface CurrentUserRank extends LeaderboardPlayer {
+  rank: number;
+}
+
 /**
  * Compute leaderboard data (expensive: ~2000 KV operations)
  * Returns { topPlayers, allUsers, timestamp }
  */
-async function computeLeaderboardData(env) {
+async function computeLeaderboardData(env: Env): Promise<LeaderboardData> {
   const BATCH_SIZE = 100;
 
   const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
@@ -27,7 +52,7 @@ async function computeLeaderboardData(env) {
     return { topPlayers: [], allUsers: [], timestamp: Date.now() };
   }
 
-  const users = [];
+  const users: { username: string; balance: number; hasDisclaimer: boolean }[] = [];
 
   for (let i = 0; i < listResult.keys.length; i += BATCH_SIZE) {
     const batch = listResult.keys.slice(i, i + BATCH_SIZE);
@@ -42,7 +67,7 @@ async function computeLeaderboardData(env) {
 
     for (let j = 0; j < batch.length; j++) {
       if (balances[j]) {
-        const balance = parseInt(balances[j], 10);
+        const balance = parseInt(balances[j] as string, 10);
         const username = usernames[j];
         const lowerUsername = username.toLowerCase();
         const hasDisclaimer = disclaimerStatuses[j];
@@ -68,13 +93,13 @@ async function computeLeaderboardData(env) {
     Promise.all(topN.map(user => getTwitchUser(user.username, env)))
   ]);
 
-  const topPlayers = topN.map((user, index) => ({
+  const topPlayers: LeaderboardPlayer[] = topN.map((user, index) => ({
     ...user,
     role: roles[index],
     avatar: twitchUsers[index]?.avatar || null
   }));
 
-  const allUsers = users.map((u, i) => ({ u: u.username, b: u.balance, r: i + 1 }));
+  const allUsers: LeaderboardUserEntry[] = users.map((u, i) => ({ u: u.username, b: u.balance, r: i + 1 }));
 
   return { topPlayers, allUsers, timestamp: Date.now() };
 }
@@ -82,7 +107,7 @@ async function computeLeaderboardData(env) {
 /**
  * Compute and store leaderboard data in KV cache
  */
-async function computeAndCache(env) {
+async function computeAndCache(env: Env): Promise<LeaderboardData> {
   const data = await computeLeaderboardData(env);
   await env.SLOTS_KV.put(CACHE_KEY, JSON.stringify(data), {
     expirationTtl: WEB_LEADERBOARD_CACHE_TTL * 5
@@ -93,7 +118,12 @@ async function computeAndCache(env) {
 /**
  * Leaderboard page handler with stale-while-revalidate caching
  */
-export async function handleLeaderboardPage(env, loggedInUser = null, showAll = false, ctx = null) {
+export async function handleLeaderboardPage(
+  env: Env,
+  loggedInUser: LoggedInUser | null = null,
+  showAll = false,
+  ctx: ExecutionContext | null = null
+): Promise<Response> {
   const isAdminUser = loggedInUser && isAdmin(loggedInUser.username);
   const actualShowAll = isAdminUser && showAll;
 
@@ -105,12 +135,12 @@ export async function handleLeaderboardPage(env, loggedInUser = null, showAll = 
 
     // Try cache
     const cached = await env.SLOTS_KV.get(CACHE_KEY);
-    let data;
+    let data: LeaderboardData | null = null;
 
     if (cached) {
       try {
         data = JSON.parse(cached);
-        const age = Date.now() - data.timestamp;
+        const age = Date.now() - data!.timestamp;
 
         if (age > WEB_LEADERBOARD_CACHE_TTL * 1000 && ctx) {
           // Stale: serve immediately, revalidate in background
@@ -127,7 +157,7 @@ export async function handleLeaderboardPage(env, loggedInUser = null, showAll = 
     }
 
     // Derive current user's rank from cached allUsers (cheap)
-    let currentUserRank = null;
+    let currentUserRank: CurrentUserRank | null = null;
     if (loggedInUser && data.allUsers) {
       const userEntry = data.allUsers.find(u => u.u.toLowerCase() === loggedInUser.username.toLowerCase());
       if (userEntry && userEntry.r > LEADERBOARD_DISPLAY_LIMIT) {
@@ -153,7 +183,12 @@ export async function handleLeaderboardPage(env, loggedInUser = null, showAll = 
 /**
  * Uncached leaderboard handler (for admin showAll)
  */
-async function handleLeaderboardUncached(env, loggedInUser, showAll, isAdminUser) {
+async function handleLeaderboardUncached(
+  env: Env,
+  loggedInUser: LoggedInUser | null,
+  showAll: boolean,
+  isAdminUser: boolean
+): Promise<Response> {
   const BATCH_SIZE = 100;
   const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
 
@@ -161,7 +196,7 @@ async function handleLeaderboardUncached(env, loggedInUser, showAll, isAdminUser
     return htmlResponse(renderLeaderboardPage([], loggedInUser, showAll, isAdminUser));
   }
 
-  const users = [];
+  const users: { username: string; balance: number; hasDisclaimer: boolean }[] = [];
 
   for (let i = 0; i < listResult.keys.length; i += BATCH_SIZE) {
     const batch = listResult.keys.slice(i, i + BATCH_SIZE);
@@ -176,7 +211,7 @@ async function handleLeaderboardUncached(env, loggedInUser, showAll, isAdminUser
 
     for (let j = 0; j < batch.length; j++) {
       if (balances[j]) {
-        const balance = parseInt(balances[j], 10);
+        const balance = parseInt(balances[j] as string, 10);
         const username = usernames[j];
         const lowerUsername = username.toLowerCase();
 
@@ -197,28 +232,29 @@ async function handleLeaderboardUncached(env, loggedInUser, showAll, isAdminUser
     Promise.all(topN.map(user => getTwitchUser(user.username, env)))
   ]);
 
-  const topPlayers = topN.map((user, index) => ({
+  const topPlayers: LeaderboardPlayer[] = topN.map((user, index) => ({
     ...user,
     role: roles[index],
     avatar: twitchUsers[index]?.avatar || null
   }));
 
-  const allUsers = users.map((u, i) => ({ u: u.username, b: u.balance, r: i + 1 }));
+  const allUsers: LeaderboardUserEntry[] = users.map((u, i) => ({ u: u.username, b: u.balance, r: i + 1 }));
 
   return htmlResponse(renderLeaderboardPage(topPlayers, loggedInUser, showAll, isAdminUser, null, allUsers));
 }
 
 /**
  * Leaderboard page renderer
- * @param {Array} players - Top N players
- * @param {Object|null} user - Logged in user
- * @param {boolean} showAll - Admin show all mode
- * @param {boolean} isAdminUser - Is admin
- * @param {Object|null} currentUserRank - Current user's rank data if not in top N
- * @param {Array} allUsers - All users (username, balance, rank) for search
  */
-export function renderLeaderboardPage(players, user = null, showAll = false, isAdminUser = false, currentUserRank = null, allUsers = []) {
-  const getRankDisplay = (rank) => {
+export function renderLeaderboardPage(
+  players: LeaderboardPlayer[],
+  user: LoggedInUser | null = null,
+  showAll = false,
+  isAdminUser = false,
+  currentUserRank: CurrentUserRank | null = null,
+  allUsers: LeaderboardUserEntry[] = []
+): string {
+  const getRankDisplay = (rank: number): string => {
     if (rank >= 1 && rank <= 10) {
       return `<img src="${R2_BASE}/Platz${rank}.png" alt="#${rank}" class="leaderboard-rank-img">`;
     }
@@ -226,7 +262,7 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
   };
 
   // Get role badge HTML for a player
-  const getRoleBadge = (username, role) => {
+  const getRoleBadge = (username: string, role: string | null | undefined): string => {
     const lowerUsername = username.toLowerCase();
 
     // Special admin badges
@@ -249,7 +285,7 @@ export function renderLeaderboardPage(players, user = null, showAll = false, isA
   };
 
   // Helper to render a single leaderboard item
-  const renderPlayerItem = (player, rank, extraClass = '') => {
+  const renderPlayerItem = (player: LeaderboardPlayer | CurrentUserRank, rank: number, extraClass = ''): string => {
     const roleBadgeHtml = getRoleBadge(player.username, player.role);
     const avatarHtml = player.avatar
       ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar" loading="lazy" width="32" height="32">`

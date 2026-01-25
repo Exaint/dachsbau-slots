@@ -2,6 +2,7 @@
  * Profile Page Handler and Renderer
  */
 
+import type { Env, LoggedInUser, PlayerStats, CustomMessages } from '../../types/index.d.ts';
 import { getPlayerAchievements, getStats, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned, hasUnlock, getCustomMessages } from '../../database.js';
 import { isDuelOptedOut, getDuelHistory } from '../../database/duels.js';
 import { isLeaderboardHidden } from '../../database/core.js';
@@ -14,10 +15,66 @@ import { baseTemplate, htmlResponse } from './template.js';
 import { renderHomePage } from './home.js';
 import { renderNotFoundPage } from './errors.js';
 
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  reward?: number;
+  requirement?: number;
+  hidden?: boolean;
+}
+
+interface AchievementWithStatus extends Achievement {
+  unlocked: boolean;
+  unlockedAt: number | null;
+  progress: { current: number; required: number; percent: number } | null;
+  rarity: { percent: number; count: number; total: number };
+}
+
+interface DuelHistoryEntry {
+  challenger: string;
+  target: string;
+  challengerGrid: string[];
+  targetGrid: string[];
+  challengerScore: number;
+  targetScore: number;
+  winner: string | null;
+  pot: number;
+  amount: number;
+  createdAt: number;
+}
+
+interface TwitchData {
+  avatar?: string;
+  displayName?: string;
+  role?: string;
+}
+
+interface ProfileData {
+  username: string;
+  balance: number;
+  rank: string | null;
+  stats: Partial<PlayerStats & { duelsWon?: number; duelsLost?: number }>;
+  achievements: AchievementWithStatus[];
+  byCategory: Record<string, AchievementWithStatus[]>;
+  pendingRewards?: number;
+  lastActive: number | null;
+  duelOptOut: boolean;
+  selfBanned: boolean;
+  leaderboardHidden: boolean;
+  hasDisclaimer: boolean;
+  twitchData: TwitchData | null;
+  loggedInUser: LoggedInUser | null;
+  hasCustomMsgUnlock: boolean;
+  customMessages: CustomMessages | null;
+  duelHistory: DuelHistoryEntry[];
+}
+
 /**
  * Profile page handler
  */
-export async function handleProfilePage(url, env, loggedInUser = null) {
+export async function handleProfilePage(url: URL, env: Env, loggedInUser: LoggedInUser | null = null): Promise<Response> {
   const username = url.searchParams.get('user');
 
   if (!username) {
@@ -36,7 +93,7 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
   const balance = rawBalance !== null ? parseInt(rawBalance, 10) || 0 : 0;
 
   // Fetch remaining data in parallel with error fallback
-  let rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory;
+  let rank: string | null, stats: Partial<PlayerStats & { duelsWon?: number; duelsLost?: number }>, achievementData: { unlockedAt: Record<string, number>; stats: Record<string, number>; pendingRewards: number }, lastActive: number | null, achievementStats: { totalPlayers: number; counts: Record<string, number> }, duelOptOut: boolean, selfBanned: boolean, leaderboardHidden: boolean, twitchData: TwitchData | null, hasCustomMsgUnlock: boolean, customMessages: CustomMessages | null, duelHistory: DuelHistoryEntry[];
   try {
     [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory] = await Promise.all([
       getPrestigeRank(username, env).catch(() => null),
@@ -52,7 +109,7 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
       getCustomMessages(username, env).catch(() => null),
       getDuelHistory(username, 10, env).catch(() => [])
     ]);
-  } catch (e) {
+  } catch {
     rank = null; stats = {}; achievementData = { unlockedAt: {}, stats: {}, pendingRewards: 0 };
     lastActive = null; achievementStats = { totalPlayers: 0, counts: {} };
     duelOptOut = false; selfBanned = false; leaderboardHidden = false; twitchData = null;
@@ -63,12 +120,12 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
 
   // Build achievements with unlock status and rarity
   const { totalPlayers, counts } = achievementStats;
-  const achievements = allAchievements.map(ach => {
+  const achievements: AchievementWithStatus[] = allAchievements.map(ach => {
     const unlocked = !!achievementData.unlockedAt[ach.id];
     const unlockedAt = achievementData.unlockedAt[ach.id] || null;
 
     // Calculate progress
-    let progress = null;
+    let progress: { current: number; required: number; percent: number } | null = null;
     if (ach.requirement && !unlocked) {
       const statKey = getStatKeyForAchievement(ach.id);
       if (statKey && achievementData.stats[statKey] !== undefined) {
@@ -98,7 +155,7 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
   });
 
   // Group by category
-  const byCategory = {};
+  const byCategory: Record<string, AchievementWithStatus[]> = {};
   for (const cat of Object.values(ACHIEVEMENT_CATEGORIES)) {
     byCategory[cat] = achievements.filter(a => a.category === cat);
   }
@@ -127,7 +184,7 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
 /**
  * Profile page renderer
  */
-export function renderProfilePage(data) {
+export function renderProfilePage(data: ProfileData): string {
   const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, leaderboardHidden, hasDisclaimer, twitchData, loggedInUser, hasCustomMsgUnlock, customMessages, duelHistory = [] } = data;
 
   // Check if logged-in user is admin
@@ -138,7 +195,7 @@ export function renderProfilePage(data) {
   const progressPercent = Math.round((unlockedCount / totalCount) * 100);
 
   // Format last active time
-  const formatLastActive = (timestamp) => {
+  const formatLastActive = (timestamp: number | null): string | null => {
     if (!timestamp) return null;
     const now = Date.now();
     const diff = now - timestamp;
@@ -212,7 +269,7 @@ export function renderProfilePage(data) {
         <div class="custom-messages-type">
           <label class="custom-messages-label">Win-Nachrichten (bei Gewinn):</label>
           <div class="custom-messages-list" id="winMessages">
-            ${winMsgs.map((msg, i) => `
+            ${winMsgs.map((msg) => `
               <div class="custom-message-row">
                 <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht..." oninput="updateCharCount(this)">
                 <span class="custom-message-chars">${50 - msg.length}</span>
@@ -228,7 +285,7 @@ export function renderProfilePage(data) {
         <div class="custom-messages-type">
           <label class="custom-messages-label">Lose-Nachrichten (bei Verlust):</label>
           <div class="custom-messages-list" id="lossMessages">
-            ${lossMsgs.map((msg, i) => `
+            ${lossMsgs.map((msg) => `
               <div class="custom-message-row">
                 <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht..." oninput="updateCharCount(this)">
                 <span class="custom-message-chars">${50 - msg.length}</span>
@@ -251,7 +308,7 @@ export function renderProfilePage(data) {
   ` : '';
 
   // Duel History HTML
-  const formatDuelDate = (timestamp) => {
+  const formatDuelDate = (timestamp: number): string => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
     return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -336,8 +393,7 @@ export function renderProfilePage(data) {
       }
 
       // Rarity display with color coding
-      // < 5% = legendary (orange), < 15% = epic (purple), < 30% = rare (blue), >= 30% = common (gray)
-      const getRarityClass = (percent) => {
+      const getRarityClass = (percent: number): string => {
         if (percent < 5) return 'rarity-legendary';
         if (percent < 15) return 'rarity-epic';
         if (percent < 30) return 'rarity-rare';
@@ -407,7 +463,7 @@ export function renderProfilePage(data) {
 
   // Build role badges array
   const lowerUsername = username.toLowerCase();
-  const roleBadges = [];
+  const roleBadges: Array<{ icon: string; label: string; color: string }> = [];
 
   // Admin/special user badge overrides
   if (ADMIN_ROLE_OVERRIDES[lowerUsername]) {

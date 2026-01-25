@@ -2218,6 +2218,10 @@ body {
   margin: 12px 0;
 }
 
+[data-theme="light"] .mobile-nav-divider {
+  background: #94a3b8;
+}
+
 .mobile-theme-toggle {
   display: flex;
   align-items: center;

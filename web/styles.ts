@@ -581,23 +581,24 @@ body {
 .user-section {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   background: var(--bg-tertiary);
-  padding: 4px 8px;
-  border-radius: var(--radius-md);
+  padding: 4px 6px 4px 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  height: 38px;
+  min-height: 52px;
   box-sizing: border-box;
 }
 
 .user-profile-link {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   text-decoration: none;
   color: var(--text-primary);
-  padding: 2px 6px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  min-height: 44px;
+  border-radius: var(--radius-md);
   transition: background 0.2s;
 }
 
@@ -606,8 +607,8 @@ body {
 }
 
 .user-avatar-small {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--accent);
@@ -615,8 +616,8 @@ body {
 
 .user-display-name {
   font-weight: 600;
-  font-size: 0.85rem;
-  max-width: 100px;
+  font-size: 0.9rem;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

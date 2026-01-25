@@ -123,11 +123,19 @@ export async function findDuelForTarget(target: string, env: Env): Promise<DuelC
     const list = await env.SLOTS_KV.list({ prefix: 'duel:' });
 
     for (const key of list.keys) {
+      // Skip claim keys (they contain :claim:)
+      if (key.name.includes(':claim:')) continue;
+
       const value = await env.SLOTS_KV.get(key.name);
       if (!value) continue;
 
       try {
         const data: DuelData = JSON.parse(value);
+
+        // Validate data structure
+        if (typeof data.target !== 'string' || typeof data.amount !== 'number' || typeof data.createdAt !== 'number') {
+          continue;
+        }
 
         // Check if this duel targets the user and isn't expired
         if (data.target === target.toLowerCase() &&
@@ -167,13 +175,30 @@ export async function deleteDuel(challenger: string, env: Env): Promise<boolean>
  */
 export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDuelResult> {
   try {
+    // Validate input
+    if (!challenger || typeof challenger !== 'string') {
+      logError('acceptDuel', new Error('Invalid challenger'), { challenger });
+      return { success: false, reason: 'error' };
+    }
+
     const key = kvKey('duel:', challenger);
 
     // First read the duel to get createdAt for unique claim key
     const value = await env.SLOTS_KV.get(key);
     if (!value) return { success: false, reason: 'not_found' };
 
-    const data: DuelData = JSON.parse(value);
+    // Parse and validate duel data
+    let data: DuelData;
+    try {
+      data = JSON.parse(value);
+      if (typeof data.target !== 'string' || typeof data.amount !== 'number' || typeof data.createdAt !== 'number') {
+        logError('acceptDuel', new Error('Invalid duel data structure'), { challenger, data });
+        return { success: false, reason: 'error' };
+      }
+    } catch (parseError) {
+      logError('acceptDuel', parseError, { challenger, value: value.substring(0, 100) });
+      return { success: false, reason: 'error' };
+    }
 
     // Check if expired
     if (Date.now() > data.createdAt + (DUEL_TIMEOUT_SECONDS * 1000)) {

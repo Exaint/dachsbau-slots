@@ -35,7 +35,7 @@ import {
   addFreeSpinsWithMultiplier,
   batchUpdateStats
 } from '../../database.js';
-import type { Env, WinResult, SpinAmountResult, StreakBonusResult, StreakData, PreloadedBuffs } from '../../types/index.js';
+import type { Env, WinResult, SpinAmountResult, StreakBonusResult, StreakData, PreloadedBuffs, PlayerStats } from '../../types/index.js';
 
 // Unlock prices for error messages
 const UNLOCK_PRICES: Record<number | string, number> = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
@@ -102,6 +102,7 @@ export async function trackSlotAchievements(
     }
 
     // Batch extended stats (D1/progression tracking, fire-and-forget)
+    // Note: These stat keys are for extended tracking, not core PlayerStats
     const statIncrements: [string, number][] = [];
     const maxUpdates: [string, number][] = [];
 
@@ -117,7 +118,7 @@ export async function trackSlotAchievements(
 
     // Fire-and-forget: single atomic batch update for D1/progression
     if (statIncrements.length > 0 || maxUpdates.length > 0) {
-      batchUpdateStats(username, statIncrements, maxUpdates, env)
+      batchUpdateStats(username, statIncrements as [keyof PlayerStats, number][], maxUpdates as [keyof PlayerStats, number][], env)
         .catch(err => logError('trackSlotAchievements.extended', err, { username }));
     }
 
@@ -384,7 +385,7 @@ export async function applyMultipliersAndBuffs(
  */
 export async function calculateStreakBonuses(
   lowerUsername: string,
-  username: string,
+  _username: string,
   isWin: boolean,
   previousStreak: StreakData,
   env: Env

@@ -12,6 +12,7 @@ import { BROADCASTER_LOGIN } from '../constants.js';
 const AVATAR_CACHE_TTL = 86400; // 24 hours
 const ROLES_CACHE_TTL = 3600;   // 1 hour
 const TOKEN_CACHE_TTL = 3600;   // 1 hour (tokens last longer but we refresh early)
+const STREAM_STATUS_CACHE_TTL = 60; // 1 minute (stream status changes frequently)
 
 // User session constants
 const USER_SESSION_COOKIE = 'dachsbau_session';
@@ -755,6 +756,64 @@ function createLogoutResponse(origin: string): Response {
   });
 }
 
+// ==================== STREAM STATUS ====================
+
+interface StreamResponse {
+  data: Array<{
+    id: string;
+    user_login: string;
+    type: string; // 'live' when streaming
+  }>;
+}
+
+/**
+ * Check if broadcaster stream is currently online
+ * Uses short cache (60s) to balance API limits with freshness
+ */
+async function isStreamOnline(env: Env): Promise<boolean> {
+  try {
+    // Check cache first
+    const cacheKey = 'twitch:stream_status';
+    const cached = await env.SLOTS_KV.get(cacheKey);
+    if (cached !== null) {
+      return cached === 'online';
+    }
+
+    const token = await getAppAccessToken(env);
+    if (!token) {
+      // If we can't get a token, assume online to not block users
+      return true;
+    }
+
+    const response = await fetch(`${TWITCH_API}/streams?user_login=${BROADCASTER_LOGIN}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Client-Id': env.TWITCH_CLIENT_ID!
+      }
+    });
+
+    if (!response.ok) {
+      // On API error, assume online to not block users
+      logError('isStreamOnline', new Error(`Stream check failed: ${response.status}`));
+      return true;
+    }
+
+    const data = await response.json() as StreamResponse;
+    const isLive = data.data && data.data.length > 0 && data.data[0].type === 'live';
+
+    // Cache result
+    await env.SLOTS_KV.put(cacheKey, isLive ? 'online' : 'offline', {
+      expirationTtl: STREAM_STATUS_CACHE_TTL
+    });
+
+    return isLive;
+  } catch (error) {
+    logError('isStreamOnline', error);
+    // On error, assume online to not block users
+    return true;
+  }
+}
+
 export {
   getTwitchUser,
   getUserRole,
@@ -766,5 +825,7 @@ export {
   getUserFromRequest,
   getUserLoginUrl,
   handleUserOAuthCallback,
-  createLogoutResponse
+  createLogoutResponse,
+  // Stream status
+  isStreamOnline
 };

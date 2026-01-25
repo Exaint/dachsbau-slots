@@ -39,18 +39,8 @@ import {
 } from '../constants.js';
 import type { Env, ShopItem } from '../types/index.js';
 
-// Extended ShopItem with optional properties for specific item types
-interface ExtendedShopItem extends ShopItem {
-  rank?: string;
-  requiresRank?: string;
-  unlockKey?: string;
-  requires?: string;
-  buffKey?: string;
-  duration?: number;
-  uses?: number;
-  symbol?: string;
-  weeklyLimit?: boolean;
-}
+// ShopItem from types/index.d.ts includes all needed fields
+type ExtendedShopItem = ShopItem;
 
 interface LoggedInUser {
   username: string;
@@ -272,7 +262,7 @@ async function processWebPurchase(username: string, itemId: number, env: Env): P
   }
 }
 
-async function purchasePrestige(username: string, item: ExtendedShopItem, itemId: number, currentRank: string | null, env: Env): Promise<PurchaseResult> {
+async function purchasePrestige(username: string, item: ExtendedShopItem, _itemId: number, currentRank: string | null, env: Env): Promise<PurchaseResult> {
   const currentIndex = currentRank ? PRESTIGE_RANKS.indexOf(currentRank) : -1;
   const newIndex = PRESTIGE_RANKS.indexOf(item.rank!);
 
@@ -302,7 +292,7 @@ async function purchasePrestige(username: string, item: ExtendedShopItem, itemId
   };
 }
 
-async function purchaseUnlock(username: string, item: ExtendedShopItem, itemId: number, hasPrerequisite: boolean, hasExistingUnlock: boolean, env: Env): Promise<PurchaseResult> {
+async function purchaseUnlock(username: string, item: ExtendedShopItem, _itemId: number, hasPrerequisite: boolean, hasExistingUnlock: boolean, env: Env): Promise<PurchaseResult> {
   if (item.requires && !hasPrerequisite) {
     return { success: false, error: `Du musst zuerst ${PREREQUISITE_NAMES[item.requires]} freischalten!` };
   }

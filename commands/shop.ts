@@ -93,12 +93,8 @@ interface WheelResult {
   prize: number;
 }
 
-interface ExtendedShopItem extends ShopItem {
-  symbol?: string;
-  buffKey?: string;
-  duration?: number;
-  uses?: number;
-}
+// ShopItem from types/index.d.ts includes all needed fields
+type ExtendedShopItem = ShopItem;
 
 // Static: Mystery Box item pool (avoid recreation per request)
 const MYSTERY_BOX_ITEMS = [
@@ -121,7 +117,7 @@ async function trackShopAchievements(
   env: Env
 ): Promise<void> {
   try {
-    const promises: Promise<void>[] = [];
+    const promises: Promise<unknown>[] = [];
 
     // Track shop purchase stat
     promises.push(updateAchievementStat(username, 'shopPurchases', 1, env));
@@ -271,7 +267,7 @@ async function handleUnlockItem(
 async function handleTimedItem(
   username: string,
   item: ExtendedShopItem,
-  itemId: number,
+  _itemId: number,
   balance: number,
   env: Env
 ): Promise<Response> {
@@ -297,7 +293,7 @@ async function handleTimedItem(
 async function handleBoostItem(
   username: string,
   item: ExtendedShopItem,
-  itemId: number,
+  _itemId: number,
   balance: number,
   env: Env
 ): Promise<Response> {
@@ -338,7 +334,7 @@ async function handleBoostItem(
 async function handleInsuranceItem(
   username: string,
   item: ExtendedShopItem,
-  itemId: number,
+  _itemId: number,
   balance: number,
   env: Env
 ): Promise<Response> {
@@ -352,7 +348,7 @@ async function handleInsuranceItem(
 async function handleWinMultiItem(
   username: string,
   item: ExtendedShopItem,
-  itemId: number,
+  _itemId: number,
   balance: number,
   env: Env
 ): Promise<Response> {
@@ -366,7 +362,7 @@ async function handleWinMultiItem(
 async function handleBundleItem(
   username: string,
   item: ExtendedShopItem,
-  itemId: number,
+  _itemId: number,
   balance: number,
   env: Env
 ): Promise<Response> {
@@ -388,7 +384,7 @@ async function handleBundleItem(
 async function handlePeekItem(
   username: string,
   item: ExtendedShopItem,
-  itemId: number,
+  _itemId: number,
   balance: number,
   env: Env
 ): Promise<Response> {
@@ -409,11 +405,11 @@ async function handlePeekItem(
   let peekDachsChance = DACHS_BASE_CHANCE;
   if (hasLuckyCharm) peekDachsChance *= 2;
   if (dachsLocator) {
-    const data = safeJsonParse<{ expireAt: number; uses: number }>(dachsLocator, null);
+    const data = safeJsonParse(dachsLocator) as { expireAt: number; uses: number } | null;
     if (data && Date.now() < data.expireAt && data.uses > 0) peekDachsChance *= 3;
   }
   if (rageMode) {
-    const data = safeJsonParse<{ expireAt: number; stack: number }>(rageMode, null);
+    const data = safeJsonParse(rageMode) as { expireAt: number; stack: number } | null;
     if (data && Date.now() < data.expireAt && data.stack > 0) {
       peekDachsChance *= (1 + data.stack / 100);
     }

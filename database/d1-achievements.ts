@@ -6,7 +6,7 @@
  */
 
 import { logError } from '../utils.js';
-import { D1_ENABLED, DUAL_WRITE } from './d1.js';
+import { D1_ENABLED } from './d1.js';
 import type { Env, MonthlyLoginData } from '../types/index.js';
 
 // ============================================

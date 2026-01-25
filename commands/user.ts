@@ -37,15 +37,13 @@ import {
   getInsuranceCount,
   hasGuaranteedPair,
   hasWildCard,
-  getPrestigeRank,
-  isBuffActive,
   hasAcceptedDisclaimer,
   checkAndUnlockAchievement,
   updateAchievementStat,
   checkBalanceAchievements,
   incrementStat
 } from '../database.js';
-import type { Env, FreeSpinEntry, MonthlyLoginData } from '../types/index.js';
+import type { Env } from '../types/index.js';
 
 // ============================================
 // Types
@@ -73,7 +71,7 @@ interface SymbolBoostDef {
  */
 async function trackDailyAchievements(username: string, monthlyDays: number, env: Env): Promise<void> {
   try {
-    const promises: Promise<void>[] = [];
+    const promises: Promise<unknown>[] = [];
 
     // FIRST_DAILY
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_DAILY.id, env));
@@ -103,7 +101,7 @@ async function trackDailyAchievements(username: string, monthlyDays: number, env
  */
 async function trackTransferAchievements(username: string, amount: number, env: Env): Promise<void> {
   try {
-    const promises: Promise<void>[] = [];
+    const promises: Promise<unknown>[] = [];
 
     // FIRST_TRANSFER
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_TRANSFER.id, env));
@@ -364,8 +362,9 @@ async function handleBuffs(username: string, env: Env): Promise<Response> {
     }
 
     // Insurance Pack
-    if (insuranceCount > 0) {
-      buffs.push(`🛡️ Insurance Pack (${insuranceCount}x)`);
+    const insuranceNum = typeof insuranceCount === 'number' ? insuranceCount : 0;
+    if (insuranceNum > 0) {
+      buffs.push(`🛡️ Insurance Pack (${insuranceNum}x)`);
     }
 
     // Guaranteed Pair

@@ -97,6 +97,24 @@ export interface BuffWithStack {
   data: BuffStackData | null;
 }
 
+/** Result from getBuffWithUses */
+export interface BuffWithUsesResult {
+  /** Whether buff is active */
+  active: boolean;
+  /** Buff data if active */
+  data: BuffUsesData | null;
+}
+
+/** Result from getBuffWithStack */
+export interface BuffWithStackResult {
+  /** Whether buff is active */
+  active: boolean;
+  /** Buff data if active */
+  data: BuffStackData | null;
+  /** Current stack level (convenience accessor) */
+  stack: number;
+}
+
 // ============================================================================
 // User Types
 // ============================================================================
@@ -137,6 +155,24 @@ export interface AchievementData {
   wins: number;
 }
 
+/** Achievement definition */
+export interface Achievement {
+  /** Unique achievement ID */
+  id: string;
+  /** Display name */
+  name: string;
+  /** Description text */
+  description: string;
+  /** Category for grouping */
+  category: string;
+  /** DachsTaler reward */
+  reward: number;
+  /** Whether achievement is hidden until unlocked */
+  hidden: boolean;
+  /** Requirement value for progressive achievements */
+  requirement?: number;
+}
+
 /** Logged-in user from JWT cookie */
 export interface LoggedInUser {
   /** Twitch user ID */
@@ -162,7 +198,9 @@ export interface ShopItem {
   /** Item price in DachsTaler */
   price: number;
   /** Item type */
-  type: 'boost' | 'instant' | 'timed' | 'unlock' | 'prestige';
+  type: 'boost' | 'instant' | 'timed' | 'unlock' | 'prestige' | 'insurance' | 'winmulti' | 'peek' | 'bundle';
+  /** Symbol emoji */
+  symbol: string;
   /** KV key for unlock items */
   unlockKey?: string;
   /** Prestige rank symbol */
@@ -173,6 +211,12 @@ export interface ShopItem {
   requiresRank?: string;
   /** Whether item has weekly purchase limit */
   weeklyLimit?: boolean;
+  /** Buff key for timed buffs */
+  buffKey?: string;
+  /** Duration in seconds for timed buffs */
+  duration?: number;
+  /** Uses for limited-use buffs */
+  uses?: number;
 }
 
 /** Free spin entry stored in KV */

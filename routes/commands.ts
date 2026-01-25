@@ -67,7 +67,7 @@ export const SAFE_COMMANDS = new Set([
 ]);
 
 // Admin commands that take (username, target, env)
-const ADMIN_COMMANDS_TARGET: Record<string, (username: string, target: string | null, env: Env) => Promise<Response>> = {
+const ADMIN_COMMANDS_TARGET: Record<string, (username: string, target: string, env: Env) => Promise<Response>> = {
   ban: handleBan,
   unban: handleUnban,
   reset: handleReset,
@@ -82,7 +82,7 @@ const ADMIN_COMMANDS_TARGET: Record<string, (username: string, target: string | 
 };
 
 // Admin commands that take (username, target, amount, env)
-const ADMIN_COMMANDS_AMOUNT: Record<string, (username: string, target: string | null, amount: string | null, env: Env) => Promise<Response>> = {
+const ADMIN_COMMANDS_AMOUNT: Record<string, (username: string, target: string, amount: string, env: Env) => Promise<Response>> = {
   give: handleGive,
   setbalance: handleSetBalance,
   givebuff: handleGiveBuff,
@@ -91,7 +91,7 @@ const ADMIN_COMMANDS_AMOUNT: Record<string, (username: string, target: string | 
 };
 
 // Admin commands that take (username, target, env) - target only, no amount
-const ADMIN_COMMANDS_TARGET_ONLY: Record<string, (username: string, target: string | null, env: Env) => Promise<Response>> = {
+const ADMIN_COMMANDS_TARGET_ONLY: Record<string, (username: string, target: string, env: Env) => Promise<Response>> = {
   getmonthlylogin: handleGetMonthlyLogin,
   resetweeklylimits: handleResetWeeklyLimits,
   givewinmulti: handleGiveWinMulti

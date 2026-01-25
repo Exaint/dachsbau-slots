@@ -49,7 +49,7 @@ async function generateGrid(
 
   if (storedPeek) {
     await env.SLOTS_KV.delete(peekKey);
-    const parsedPeek = safeJsonParse<string[]>(storedPeek, null);
+    const parsedPeek = safeJsonParse(storedPeek) as string[] | null;
     if (parsedPeek && Array.isArray(parsedPeek) && parsedPeek.length === GRID_SIZE) {
       return parsedPeek;
     }

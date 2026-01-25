@@ -165,7 +165,7 @@ export async function migrateAllUsersToD1(env: Env, options: MigrationOptions = 
         }
       }
 
-      cursor = result.cursor || null;
+      cursor = 'cursor' in result ? result.cursor : null;
 
       if (maxUsers && allUsers.length >= maxUsers) {
         allUsers = allUsers.slice(0, maxUsers);
@@ -381,7 +381,7 @@ export async function getMigrationStatus(env: Env): Promise<MigrationStatusResul
 
       const result = await env.SLOTS_KV.list(listOptions);
       kvCount += result.keys.length;
-      cursor = result.cursor || null;
+      cursor = 'cursor' in result ? result.cursor : null;
     } while (cursor);
 
     const d1CountValue = d1Count?.count || 0;
@@ -438,7 +438,7 @@ export async function migrateAchievementsToD1(env: Env, options: MigrationOption
         allAchievementData.push({ username, key: key.name });
       }
 
-      cursor = result.cursor || null;
+      cursor = 'cursor' in result ? result.cursor : null;
 
       if (maxUsers && allAchievementData.length >= maxUsers) {
         allAchievementData = allAchievementData.slice(0, maxUsers);
@@ -564,7 +564,7 @@ export async function migrateUnlocksToD1(env: Env, options: { dryRun?: boolean }
         }
       }
 
-      cursor = result.cursor || null;
+      cursor = 'cursor' in result ? result.cursor : null;
     } while (cursor);
 
     stats.total = unlocks.length;
@@ -652,7 +652,7 @@ export async function migrateMonthlyLoginToD1(env: Env, options: { dryRun?: bool
         logins.push({ username, kvKey: key.name });
       }
 
-      cursor = result.cursor || null;
+      cursor = 'cursor' in result ? result.cursor : null;
     } while (cursor);
 
     stats.total = logins.length;
@@ -828,7 +828,7 @@ export async function getFullMigrationStatus(env: Env): Promise<FullMigrationSta
         kvCounts[key] += result.keys.filter(k =>
           !k.name.includes('spieler')
         ).length;
-        cursor = result.cursor || null;
+        cursor = 'cursor' in result ? result.cursor : null;
       } while (cursor);
     }
 

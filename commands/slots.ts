@@ -36,7 +36,7 @@ import {
   FREE_SPIN_COST_THRESHOLD,
   HOURLY_JACKPOT_AMOUNT
 } from '../constants.js';
-import { logError, logWarn, getCurrentDate, getGermanDateFromTimestamp, kvKey, calculateBuffTTL } from '../utils.js';
+import { logError, logWarn, getCurrentDate, getGermanDateFromTimestamp, kvKey, calculateBuffTTL, isAdmin } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -67,6 +67,7 @@ import {
   checkAndClaimHourlyJackpot
 } from '../database.js';
 import type { Env, WinResult, StreakData, FreeSpinEntry, BuffWithUsesResult, BuffWithStackResult, CustomMessages } from '../types/index.js';
+import { isStreamOnline } from '../web/twitch.js';
 
 // Engine functions
 import { generateGrid, applySpecialItems, calculateWin, buildResponseMessage } from './slots/engine.js';
@@ -96,7 +97,7 @@ interface FreeSpinConsumeResult {
 // Main Slot Handler
 // ============================================
 
-async function handleSlot(username: string, amountParam: string | undefined, url: URL, env: Env): Promise<Response> {
+async function handleSlot(username: string, amountParam: string | undefined, _url: URL, env: Env): Promise<Response> {
   try {
     const lowerUsername = username.toLowerCase();
 
@@ -109,6 +110,14 @@ async function handleSlot(username: string, amountParam: string | undefined, url
     }
 
     const now = Date.now();
+
+    // Stream Online Check - !slots only works when Maria is live (admins bypass)
+    if (!isAdmin(username)) {
+      const streamOnline = await isStreamOnline(env);
+      if (!streamOnline) {
+        return new Response(`@${username} 🦡 !slots funktioniert nur wenn Maria live ist! Schau währenddessen doch gerne auf dem Dachsbau Discord vorbei: https://discord.gg/dachsbau`, { headers: RESPONSE_HEADERS });
+      }
+    }
 
     // =========================================================================
     // TWO-STAGE BUFF LOADING - Performance Optimization
@@ -284,7 +293,7 @@ async function handleSlot(username: string, amountParam: string | undefined, url
     const { shopBuffs, streakMulti } = await applyMultipliersAndBuffs(username, result, multiplier, grid, env, preloadedBuffs);
 
     // OPTIMIZED: Calculate streak bonuses with pre-loaded streak
-    const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
+    const isWin = result.points > 0 || !!(result.freeSpins && result.freeSpins > 0);
     const streakBonusResult = await calculateStreakBonuses(lowerUsername, username, isWin, previousStreak, env);
     const { streakBonus, comboBonus, naturalBonuses } = streakBonusResult;
     let lossWarningMessage = streakBonusResult.lossWarningMessage;
@@ -323,7 +332,7 @@ async function handleSlot(username: string, amountParam: string | undefined, url
       const newBalanceWithRefund = Math.max(0, Math.min(uncappedBalance, MAX_BALANCE));
       // Log if balance was capped (edge case: extremely high balance)
       if (uncappedBalance > MAX_BALANCE) {
-        logWarn('Insurance refund capped at MAX_BALANCE', { username, uncappedBalance, capped: MAX_BALANCE });
+        logWarn('handleSlot', 'Insurance refund capped at MAX_BALANCE', { username, uncappedBalance, capped: MAX_BALANCE });
       }
 
       await Promise.all([

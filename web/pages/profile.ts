@@ -341,7 +341,7 @@ export function renderProfilePage(data: ProfileData): string {
               <div class="duel-players">
                 <span class="duel-player me">${escapeHtml(username)}</span>
                 <span class="duel-vs">vs</span>
-                <span class="duel-player opponent">${escapeHtml(opponent)}</span>
+                <a href="/u/${encodeURIComponent(opponent)}" class="duel-player opponent">${escapeHtml(opponent)}</a>
               </div>
               <div class="duel-grids">
                 <span class="duel-grid">${myGrid.join(' ')}</span>

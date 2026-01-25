@@ -1201,8 +1201,15 @@ body {
   color: var(--text-primary);
 }
 
-.duel-player.opponent {
+a.duel-player.opponent {
   color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+a.duel-player.opponent:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 .duel-vs {

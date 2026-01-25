@@ -309,10 +309,12 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
         setBalance(username, targetBalance - duel.amount, env)
       ]);
       resultMessage = `🏆 @${duel.challenger} GEWINNT ${pot} DachsTaler!`;
-      // Fire-and-forget achievement tracking
-      trackDuelAchievements(duel.challenger, 'win', pot, env);
-      trackDuelAchievements(username, 'loss', 0, env);
-      checkBalanceAchievements(duel.challenger, newChallengerBalance, env);
+      // Achievement tracking (must await, otherwise worker terminates before completion)
+      await Promise.all([
+        trackDuelAchievements(duel.challenger, 'win', pot, env),
+        trackDuelAchievements(username, 'loss', 0, env),
+        checkBalanceAchievements(duel.challenger, newChallengerBalance, env)
+      ]);
     } else if (targetScore.score > challengerScore.score) {
       // Target wins
       const newTargetBalance = targetBalance + duel.amount;
@@ -321,16 +323,20 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
         setBalance(username, newTargetBalance, env)
       ]);
       resultMessage = `🏆 @${username} GEWINNT ${pot} DachsTaler!`;
-      // Fire-and-forget achievement tracking
-      trackDuelAchievements(username, 'win', pot, env);
-      trackDuelAchievements(duel.challenger, 'loss', 0, env);
-      checkBalanceAchievements(username, newTargetBalance, env);
+      // Achievement tracking (must await, otherwise worker terminates before completion)
+      await Promise.all([
+        trackDuelAchievements(username, 'win', pot, env),
+        trackDuelAchievements(duel.challenger, 'loss', 0, env),
+        checkBalanceAchievements(username, newTargetBalance, env)
+      ]);
     } else {
       // True tie - return bets (both participated, neither won)
       resultMessage = `🤝 UNENTSCHIEDEN! Beide behalten ihren Einsatz.`;
-      // Fire-and-forget achievement tracking (ties: only duelsPlayed, no win/loss)
-      trackDuelAchievements(duel.challenger, 'tie', 0, env);
-      trackDuelAchievements(username, 'tie', 0, env);
+      // Achievement tracking (ties: only duelsPlayed, no win/loss)
+      await Promise.all([
+        trackDuelAchievements(duel.challenger, 'tie', 0, env),
+        trackDuelAchievements(username, 'tie', 0, env)
+      ]);
     }
 
     // Log duel to D1 (must await, otherwise worker terminates before insert completes)

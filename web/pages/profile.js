@@ -3,7 +3,7 @@
  */
 
 import { getPlayerAchievements, getStats, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned, hasUnlock, getCustomMessages } from '../../database.js';
-import { isDuelOptedOut } from '../../database/duels.js';
+import { isDuelOptedOut, getDuelHistory } from '../../database/duels.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getTwitchProfileData } from '../twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement } from '../../constants.js';
@@ -36,9 +36,9 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
   const balance = rawBalance !== null ? parseInt(rawBalance, 10) || 0 : 0;
 
   // Fetch remaining data in parallel with error fallback
-  let rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages;
+  let rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory;
   try {
-    [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages] = await Promise.all([
+    [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory] = await Promise.all([
       getPrestigeRank(username, env).catch(() => null),
       getStats(username, env).catch(() => ({})),
       getPlayerAchievements(username, env).catch(() => ({ unlockedAt: {}, stats: {}, pendingRewards: 0 })),
@@ -49,13 +49,14 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
       isLeaderboardHidden(username, env).catch(() => false),
       getTwitchProfileData(username, env).catch(() => null),
       hasUnlock(username, 'custom_message', env).catch(() => false),
-      getCustomMessages(username, env).catch(() => null)
+      getCustomMessages(username, env).catch(() => null),
+      getDuelHistory(username, 10, env).catch(() => [])
     ]);
   } catch (e) {
     rank = null; stats = {}; achievementData = { unlockedAt: {}, stats: {}, pendingRewards: 0 };
     lastActive = null; achievementStats = { totalPlayers: 0, counts: {} };
     duelOptOut = false; selfBanned = false; leaderboardHidden = false; twitchData = null;
-    hasCustomMsgUnlock = false; customMessages = null;
+    hasCustomMsgUnlock = false; customMessages = null; duelHistory = [];
   }
 
   const allAchievements = getAllAchievements();
@@ -118,7 +119,8 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
     twitchData,
     loggedInUser,
     hasCustomMsgUnlock,
-    customMessages
+    customMessages,
+    duelHistory
   }));
 }
 
@@ -126,7 +128,7 @@ export async function handleProfilePage(url, env, loggedInUser = null) {
  * Profile page renderer
  */
 export function renderProfilePage(data) {
-  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, leaderboardHidden, hasDisclaimer, twitchData, loggedInUser, hasCustomMsgUnlock, customMessages } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, leaderboardHidden, hasDisclaimer, twitchData, loggedInUser, hasCustomMsgUnlock, customMessages, duelHistory = [] } = data;
 
   // Check if logged-in user is admin
   const showAdminPanel = loggedInUser && isAdmin(loggedInUser.username);
@@ -183,6 +185,14 @@ export function renderProfilePage(data) {
         <div class="stat-value">${formatNumber(stats.totalLost || 0)}</div>
         <div class="stat-label">Gesamt verloren</div>
       </div>
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(stats.duelsWon || 0)}</div>
+        <div class="stat-label">Duelle gewonnen</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(stats.duelsLost || 0)}</div>
+        <div class="stat-label">Duelle verloren</div>
+      </div>
     </div>
   `;
 
@@ -237,6 +247,56 @@ export function renderProfilePage(data) {
         <button class="custom-messages-save" onclick="saveCustomMessages()">💾 Speichern</button>
       </div>
       <div class="custom-messages-status" id="customMsgStatus"></div>
+    </div>
+  ` : '';
+
+  // Duel History HTML
+  const formatDuelDate = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const duelHistoryHtml = duelHistory.length > 0 ? `
+    <div class="duel-history">
+      <h3>⚔️ Duell-Historie</h3>
+      <div class="duel-history-list">
+        ${duelHistory.map(duel => {
+          const isChallenger = duel.challenger === username.toLowerCase();
+          const opponent = isChallenger ? duel.target : duel.challenger;
+          const myGrid = isChallenger ? duel.challengerGrid : duel.targetGrid;
+          const opponentGrid = isChallenger ? duel.targetGrid : duel.challengerGrid;
+          const myScore = isChallenger ? duel.challengerScore : duel.targetScore;
+          const opponentScore = isChallenger ? duel.targetScore : duel.challengerScore;
+          const isWinner = duel.winner === username.toLowerCase();
+          const isTie = duel.winner === null;
+          const resultClass = isTie ? 'tie' : (isWinner ? 'win' : 'loss');
+          const resultText = isTie ? 'Unentschieden' : (isWinner ? `+${formatNumber(duel.pot)} DT` : `-${formatNumber(duel.amount)} DT`);
+          const resultIcon = isTie ? '🤝' : (isWinner ? '🏆' : '💀');
+
+          return `
+            <div class="duel-entry ${resultClass}">
+              <div class="duel-date">${formatDuelDate(duel.createdAt)}</div>
+              <div class="duel-players">
+                <span class="duel-player me">${escapeHtml(username)}</span>
+                <span class="duel-vs">vs</span>
+                <span class="duel-player opponent">${escapeHtml(opponent)}</span>
+              </div>
+              <div class="duel-grids">
+                <span class="duel-grid">${myGrid.join(' ')}</span>
+                <span class="duel-score">${myScore}</span>
+                <span class="duel-separator">:</span>
+                <span class="duel-score">${opponentScore}</span>
+                <span class="duel-grid">${opponentGrid.join(' ')}</span>
+              </div>
+              <div class="duel-result ${resultClass}">
+                <span class="duel-result-icon">${resultIcon}</span>
+                <span class="duel-result-text">${resultText}</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
     </div>
   ` : '';
 
@@ -467,6 +527,7 @@ export function renderProfilePage(data) {
       </div>
       ${statsHtml}
       ${customMessagesHtml}
+      ${duelHistoryHtml}
       <div class="achievement-summary">
         <div class="achievement-count">
           <span class="achievement-count-label">🏆 Achievements</span>

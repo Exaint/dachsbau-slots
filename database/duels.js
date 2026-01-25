@@ -262,6 +262,46 @@ async function logDuel(data, env) {
   }
 }
 
+/**
+ * Get duel history for a player from D1
+ * @param {string} username - Player username
+ * @param {number} limit - Max number of duels to return
+ * @param {object} env - Environment with DB binding
+ * @returns {Promise<Array>} Array of duel records
+ */
+async function getDuelHistory(username, limit, env) {
+  if (!D1_ENABLED || !env.DB) return [];
+
+  try {
+    const lowerUsername = username.toLowerCase();
+    const result = await env.DB.prepare(`
+      SELECT id, challenger, target, amount, challenger_grid, target_grid,
+             challenger_score, target_score, winner, pot, created_at
+      FROM duel_log
+      WHERE challenger = ? OR target = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `).bind(lowerUsername, lowerUsername, limit).all();
+
+    return (result.results || []).map(row => ({
+      id: row.id,
+      challenger: row.challenger,
+      target: row.target,
+      amount: row.amount,
+      challengerGrid: JSON.parse(row.challenger_grid),
+      targetGrid: JSON.parse(row.target_grid),
+      challengerScore: row.challenger_score,
+      targetScore: row.target_score,
+      winner: row.winner,
+      pot: row.pot,
+      createdAt: row.created_at
+    }));
+  } catch (error) {
+    logError('getDuelHistory', error, { username });
+    return [];
+  }
+}
+
 export {
   createDuel,
   getDuel,
@@ -273,5 +313,6 @@ export {
   isDuelOptedOut,
   getDuelCooldown,
   setDuelCooldown,
-  logDuel
+  logDuel,
+  getDuelHistory
 };

@@ -1073,6 +1073,107 @@ body {
 .custom-messages-status.error { color: var(--error); }
 .custom-messages-status.saving { color: var(--text-muted); }
 
+/* Duel History */
+.duel-history {
+  margin-top: 24px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+.duel-history h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.duel-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.duel-entry {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--border);
+}
+
+.duel-entry.win { border-left-color: var(--success); }
+.duel-entry.loss { border-left-color: var(--error); }
+.duel-entry.tie { border-left-color: var(--warning, #f59e0b); }
+
+.duel-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.duel-players {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.duel-player.me {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.duel-player.opponent {
+  color: var(--text-secondary);
+}
+
+.duel-vs {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.duel-grids {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.duel-grid {
+  font-family: 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
+}
+
+.duel-score {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  min-width: 24px;
+  text-align: center;
+}
+
+.duel-separator {
+  color: var(--text-muted);
+}
+
+.duel-result {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-width: 80px;
+  justify-content: flex-end;
+}
+
+.duel-result.win { color: var(--success); }
+.duel-result.loss { color: var(--error); }
+.duel-result.tie { color: var(--warning, #f59e0b); }
+
+.duel-result-icon { font-size: 1rem; }
+
 /* Custom Messages Purchase Modal */
 .modal-overlay {
   position: fixed;
@@ -3286,6 +3387,35 @@ body {
   /* Stats 3 columns on tablet */
   .profile-stats {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* Duel history responsive */
+  .duel-entry {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    gap: 8px;
+  }
+
+  .duel-date {
+    grid-column: 1 / -1;
+  }
+
+  .duel-players {
+    grid-column: 1 / -1;
+  }
+
+  .duel-grids {
+    grid-column: 1;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .duel-result {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 60px;
   }
 }
 

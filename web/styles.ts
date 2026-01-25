@@ -282,13 +282,13 @@ body {
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
 }
 
-[data-theme="light"] .btn-search {
+[data-theme="light"] .btn.btn-search {
   background: #ffffff;
   border-color: var(--border);
   color: var(--text-secondary);
 }
 
-[data-theme="light"] .btn-search:hover {
+[data-theme="light"] .btn.btn-search:hover {
   background: var(--bg-tertiary);
   border-color: var(--accent);
   color: var(--text-primary);
@@ -453,7 +453,7 @@ body {
   color: var(--text-muted);
 }
 
-.btn-search {
+.btn.btn-search {
   padding: 8px 14px;
   min-width: auto;
   font-size: 1rem;
@@ -469,7 +469,7 @@ body {
   color: var(--text-secondary);
 }
 
-.btn-search:hover {
+.btn.btn-search:hover {
   background: var(--bg-card);
   border-color: var(--accent);
   color: var(--text-primary);

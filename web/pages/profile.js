@@ -517,7 +517,7 @@ export function renderProfilePage(data) {
           </div>
           <div class="profile-badges">
             ${roleBadgesHtml}
-            ${rank && PRESTIGE_RANK_NAMES[rank] ? `<span class="profile-prestige-badge" style="--prestige-color: ${PRESTIGE_RANK_NAMES[rank].color}">${rank} ${PRESTIGE_RANK_NAMES[rank].name}</span>` : ''}
+            ${rank && PRESTIGE_RANK_NAMES[rank] ? `<span class="profile-prestige-badge" style="--prestige-color: ${PRESTIGE_RANK_NAMES[rank].color}">Prestige Rang: ${rank} ${PRESTIGE_RANK_NAMES[rank].name}</span>` : ''}
             <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}</span>
             <span class="profile-duel-hint">Duelle an/aus: <code>!slots duelopt</code></span>
             ${selfBanned ? `<span class="profile-selfban-status banned">🚫 Selbst-gesperrt</span>` : ''}

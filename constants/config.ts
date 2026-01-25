@@ -54,7 +54,7 @@ export const KV_PREFIX = {
   LEADERBOARD_BLOCKED: 'lb_blocked:',
   DUEL: 'duel:',
   DUEL_OPTOUT: 'duel_optout:'
-};
+} as const;
 
 // ===========================================
 // 2. Time Constants
@@ -147,11 +147,11 @@ export const RATE_LIMIT_WINDOW_SECONDS = 60; // Zeitfenster in Sekunden
 // 12. HTTP & URLs
 // ===========================================
 
-export const RESPONSE_HEADERS = { 'Content-Type': 'text/plain; charset=utf-8' };
+export const RESPONSE_HEADERS: HeadersInit = { 'Content-Type': 'text/plain; charset=utf-8' };
 
 export const URLS = {
   INFO: 'https://git.new/DachsbauSlotInfos',
   SHOP: 'https://git.new/DachsbauSlotsShop',
   UNLOCK: 'https://dub.sh/SlotUnlock',
   WEBSITE: 'https://dachsbau-slots.exaint.workers.dev'
-};
+} as const;

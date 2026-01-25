@@ -5,16 +5,27 @@
 
 import { SHOP_ITEMS } from './shop.js';
 
+export interface RefundableItem {
+  type: 'prestige' | 'unlock';
+  rank?: string;
+  unlockKey?: string;
+  symbol: string;
+  shopId: number;
+  name: string;
+  price: number;
+  blockedBy: string[];
+}
+
 // Prestige ranks in order (lowest to highest)
 // Must be refunded in REVERSE order (highest first)
-export const PRESTIGE_CHAIN = ['🥉', '🥈', '🥇', '💎', '👑'];
+export const PRESTIGE_CHAIN: string[] = ['🥉', '🥈', '🥇', '💎', '👑'];
 
 // Slot unlocks in order (lowest to highest)
 // Must be refunded in REVERSE order (highest first)
-export const SLOT_UNLOCK_CHAIN = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all'];
+export const SLOT_UNLOCK_CHAIN: string[] = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all'];
 
 // Map unlock keys to shop item IDs for price lookup
-export const UNLOCK_TO_SHOP_ID = {
+export const UNLOCK_TO_SHOP_ID: Record<string, number> = {
   'slots_20': 13,
   'slots_30': 19,
   'slots_50': 21,
@@ -25,7 +36,7 @@ export const UNLOCK_TO_SHOP_ID = {
 };
 
 // Map prestige ranks to shop item IDs for price lookup
-export const PRESTIGE_TO_SHOP_ID = {
+export const PRESTIGE_TO_SHOP_ID: Record<string, number> = {
   '🥉': 17,  // Bronze
   '🥈': 22,  // Silber
   '🥇': 26,  // Gold
@@ -34,7 +45,7 @@ export const PRESTIGE_TO_SHOP_ID = {
 };
 
 // All refundable items with metadata
-export const REFUNDABLE_ITEMS = {
+export const REFUNDABLE_ITEMS: Record<string, RefundableItem> = {
   // Prestige Ranks
   prestige_bronze: {
     type: 'prestige',
@@ -151,7 +162,7 @@ export const REFUNDABLE_ITEMS = {
 /**
  * Get refund price for an item
  */
-export function getRefundPrice(itemKey) {
+export function getRefundPrice(itemKey: string): number {
   const item = REFUNDABLE_ITEMS[itemKey];
   return item ? item.price : 0;
 }
@@ -160,7 +171,7 @@ export function getRefundPrice(itemKey) {
  * Get the previous rank in the prestige chain
  * Returns null if no previous rank exists
  */
-export function getPreviousPrestigeRank(currentRank) {
+export function getPreviousPrestigeRank(currentRank: string): string | null {
   const index = PRESTIGE_CHAIN.indexOf(currentRank);
   if (index <= 0) return null;
   return PRESTIGE_CHAIN[index - 1];

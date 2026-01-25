@@ -12,7 +12,7 @@
 // Befehle nutzen dürfen (lowercase).
 // OPTIMIZED: Set for O(1) lookup instead of Array.includes()
 // --------------------------------------------
-const ADMINS = new Set([
+const ADMINS: Set<string> = new Set([
   'exaint_',
   'frechhdachs'
 ]);
@@ -23,8 +23,8 @@ const ADMINS = new Set([
 // Validates configuration at module load time.
 // Throws errors early if config is invalid.
 // --------------------------------------------
-function validateConfig() {
-  const errors = [];
+function validateConfig(): void {
+  const errors: string[] = [];
 
   // Validate ADMINS
   if (!(ADMINS instanceof Set)) {

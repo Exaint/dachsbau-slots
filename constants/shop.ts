@@ -2,7 +2,22 @@
  * Shop Constants - Items, limits, and prerequisite mappings
  */
 
-export const SHOP_ITEMS = {
+export interface ShopItem {
+  name: string;
+  price: number;
+  type: string;
+  symbol: string;
+  unlockKey?: string;
+  rank?: string;
+  requires?: string;
+  requiresRank?: string;
+  weeklyLimit?: boolean;
+  buffKey?: string;
+  duration?: number;
+  uses?: number;
+}
+
+export const SHOP_ITEMS: Record<number, ShopItem> = {
   1: { name: 'Peek Token', price: 75, type: 'peek', symbol: '👁️' },
   2: { name: 'Kirschen-Boost', price: 50, type: 'boost', symbol: '🍒' },
   3: { name: 'Zitronen-Boost', price: 50, type: 'boost', symbol: '🍋' },
@@ -43,7 +58,7 @@ export const SHOP_ITEMS = {
   39: { name: 'Diamond Rush', price: 2000, type: 'timed', buffKey: 'diamond_rush', duration: 3600, symbol: '💎' }
 };
 
-export const PREREQUISITE_NAMES = {
+export const PREREQUISITE_NAMES: Record<string, string> = {
   'slots_20': '!slots 20',
   'slots_30': '!slots 30',
   'slots_50': '!slots 50',

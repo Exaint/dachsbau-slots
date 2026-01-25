@@ -137,3 +137,9 @@ export {
   getAllAchievements,
   getStatKeyForAchievement
 } from './achievements.js';
+
+// Types re-exports
+export type { ShopItem } from './shop.js';
+export type { Achievement } from './achievements.js';
+export type { SymbolWeight, CumulativeWeight, BuffSymbol } from './symbols.js';
+export type { RefundableItem } from './refund.js';

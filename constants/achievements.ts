@@ -18,6 +18,16 @@
  * - special: Rare/hidden achievements
  */
 
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  reward: number;
+  hidden: boolean;
+  requirement?: number;
+}
+
 // Master switch for reward payouts (false = tracked but no DT added)
 export const ACHIEVEMENTS_REWARDS_ENABLED = false;
 
@@ -32,7 +42,7 @@ export const ACHIEVEMENT_CATEGORIES = {
   SHOPPING: 'shopping',
   ITEMS: 'items',
   SPECIAL: 'special'
-};
+} as const;
 
 /**
  * All achievements with their definitions
@@ -46,7 +56,7 @@ export const ACHIEVEMENT_CATEGORIES = {
  * - hidden: If true, not shown until unlocked
  * - requirement: Numeric threshold (for progressive achievements)
  */
-export const ACHIEVEMENTS = {
+export const ACHIEVEMENTS: Record<string, Achievement> = {
   // ========================================
   // SPINNING - Slot Machine Milestones
   // ========================================
@@ -906,27 +916,27 @@ export const ACHIEVEMENTS = {
 };
 
 // Helper: Get achievement by ID
-export function getAchievementById(id) {
+export function getAchievementById(id: string): Achievement | null {
   return Object.values(ACHIEVEMENTS).find(a => a.id === id) || null;
 }
 
 // Helper: Get all achievements in a category
-export function getAchievementsByCategory(category) {
+export function getAchievementsByCategory(category: string): Achievement[] {
   return Object.values(ACHIEVEMENTS).filter(a => a.category === category);
 }
 
 // Helper: Get all visible achievements
-export function getVisibleAchievements() {
+export function getVisibleAchievements(): Achievement[] {
   return Object.values(ACHIEVEMENTS).filter(a => !a.hidden);
 }
 
 // Helper: Get all achievements as array
-export function getAllAchievements() {
+export function getAllAchievements(): Achievement[] {
   return Object.values(ACHIEVEMENTS);
 }
 
 // Map achievement IDs to stat keys for progress tracking
-const ACHIEVEMENT_STAT_MAPPING = {
+const ACHIEVEMENT_STAT_MAPPING: Record<string, string> = {
   // Spinning
   'spin_100': 'totalSpins',
   'spin_500': 'totalSpins',
@@ -996,6 +1006,6 @@ const ACHIEVEMENT_STAT_MAPPING = {
   'free_spin_100': 'freeSpinsUsed'
 };
 
-export function getStatKeyForAchievement(achievementId) {
+export function getStatKeyForAchievement(achievementId: string): string | null {
   return ACHIEVEMENT_STAT_MAPPING[achievementId] || null;
 }

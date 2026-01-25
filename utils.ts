@@ -1,6 +1,34 @@
 import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS, MS_PER_HOUR, MS_PER_MINUTE, RESPONSE_HEADERS, MAX_RETRIES } from './constants.js';
 import { ADMINS } from './config.js';
 
+// Environment type for KV operations
+interface Env {
+  SLOTS_KV: KVNamespace;
+}
+
+interface ValidateTargetResult {
+  error: 'missing' | 'invalid' | null;
+  cleanTarget: string | null;
+}
+
+interface AdminWithTargetResult {
+  valid: boolean;
+  response?: Response;
+  cleanTarget?: string;
+}
+
+interface AtomicKvOperationResult<T> {
+  newValue: string | null;
+  result: T;
+  options?: KVNamespacePutOptions;
+}
+
+interface AtomicKvUpdateResult<T> {
+  success: boolean;
+  result: T | null;
+  error?: Error;
+}
+
 // OPTIMIZED: Cached DateTimeFormat instances (avoid recreation per request)
 const GERMAN_DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
   timeZone: 'Europe/Berlin',
@@ -13,14 +41,14 @@ const GERMAN_DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
 const USERNAME_SANITIZE_REGEX = /[^a-z0-9_]/gi;
 
 // Cryptographically secure random number generator (0 to 1, like Math.random but secure)
-function secureRandom() {
+function secureRandom(): number {
   const buffer = new Uint32Array(1);
   crypto.getRandomValues(buffer);
   return buffer[0] / (0xFFFFFFFF + 1);
 }
 
 // Secure random integer in range [min, max] (inclusive)
-function secureRandomInt(min, max) {
+function secureRandomInt(min: number, max: number): number {
   const range = max - min + 1;
   const buffer = new Uint32Array(1);
   crypto.getRandomValues(buffer);
@@ -28,7 +56,7 @@ function secureRandomInt(min, max) {
 }
 
 // OPTIMIZED: Function to get weighted random symbol using pre-computed cumulative weights
-function getWeightedSymbol() {
+function getWeightedSymbol(): string {
   const rand = secureRandom() * TOTAL_WEIGHT;
   // Use pre-computed cumulative weights for faster lookup
   for (const { symbol, cumulative } of CUMULATIVE_WEIGHTS) {
@@ -39,16 +67,16 @@ function getWeightedSymbol() {
 
 // Helper function to check if user is admin (uses config.js)
 // OPTIMIZED: ADMINS is now a Set, uses .has() for O(1) lookup
-function isAdmin(username) {
+function isAdmin(username: string): boolean {
   return ADMINS.has(username.toLowerCase());
 }
 
 // Helper function to get admin list as array (for display purposes)
-function getAdminList() {
+function getAdminList(): string[] {
   return Array.from(ADMINS);
 }
 
-function sanitizeUsername(username) {
+function sanitizeUsername(username: unknown): string | null {
   if (!username || typeof username !== 'string') return null;
   const clean = username.trim().toLowerCase().replace(USERNAME_SANITIZE_REGEX, '');
   if (clean.length < USERNAME_MIN_LENGTH || clean.length > USERNAME_MAX_LENGTH) return null;
@@ -56,7 +84,7 @@ function sanitizeUsername(username) {
 }
 
 // Helper: Validate and clean target username for admin commands
-function validateAndCleanTarget(target) {
+function validateAndCleanTarget(target: string | null | undefined): ValidateTargetResult {
   if (!target) return { error: 'missing', cleanTarget: null };
   const cleanTarget = sanitizeUsername(target.replace('@', ''));
   if (!cleanTarget) return { error: 'invalid', cleanTarget: null };
@@ -64,7 +92,7 @@ function validateAndCleanTarget(target) {
 }
 
 // Helper: Check admin permission (returns Response if not admin, null if admin)
-function requireAdmin(username) {
+function requireAdmin(username: string): Response | null {
   if (!isAdmin(username)) {
     return createErrorResponse(username, 'Du hast keine Berechtigung für diesen Command!');
   }
@@ -72,7 +100,7 @@ function requireAdmin(username) {
 }
 
 // Helper: Combined admin check with target validation (reduces boilerplate in admin commands)
-function requireAdminWithTarget(username, target, usageHint = '') {
+function requireAdminWithTarget(username: string, target: string | null | undefined, usageHint = ''): AdminWithTargetResult {
   if (!isAdmin(username)) {
     return { valid: false, response: createErrorResponse(username, 'Du hast keine Berechtigung für diesen Command!') };
   }
@@ -83,63 +111,71 @@ function requireAdminWithTarget(username, target, usageHint = '') {
   if (error === 'invalid') {
     return { valid: false, response: createErrorResponse(username, 'Ungültiger Username!') };
   }
-  return { valid: true, cleanTarget };
+  return { valid: true, cleanTarget: cleanTarget! };
 }
 
 // Helper: Safe JSON parse with fallback
-function safeJsonParse(value, fallback = null) {
+function safeJsonParse<T>(value: string | null | undefined, fallback: T): T;
+function safeJsonParse(value: string | null | undefined): unknown;
+function safeJsonParse<T>(value: string | null | undefined, fallback: T | null = null): T | null {
   if (!value) return fallback;
   try {
-    return JSON.parse(value);
+    return JSON.parse(value) as T;
   } catch {
     return fallback;
   }
 }
 
-function validateAmount(amount, min = 1, max = 100000) {
-  const parsed = parseInt(amount, 10);
+function validateAmount(amount: string | number, min = 1, max = 100000): number | null {
+  const parsed = parseInt(String(amount), 10);
   if (isNaN(parsed) || parsed < min || parsed > max) return null;
   return parsed;
 }
 
 // Helper to build KV keys with consistent lowercase username
-function kvKey(prefix, username, ...parts) {
+function kvKey(prefix: string, username: string, ...parts: string[]): string {
   const base = `${prefix}${username.toLowerCase()}`;
   return parts.length ? `${base}:${parts.join(':')}` : base;
 }
 
+interface DateParts {
+  year: string;
+  month: string;
+  day: string;
+}
+
 // Helper to get date parts in German timezone (Europe/Berlin)
-function getGermanDateParts() {
+function getGermanDateParts(): DateParts {
   const now = new Date();
   const parts = GERMAN_DATE_FORMATTER.formatToParts(now);
-  const year = parts.find(p => p.type === 'year').value;
-  const month = parts.find(p => p.type === 'month').value;
-  const day = parts.find(p => p.type === 'day').value;
+  const year = parts.find(p => p.type === 'year')!.value;
+  const month = parts.find(p => p.type === 'month')!.value;
+  const day = parts.find(p => p.type === 'day')!.value;
   return { year, month, day };
 }
 
-function getCurrentMonth() {
+function getCurrentMonth(): string {
   const { year, month } = getGermanDateParts();
   return `${year}-${month}`;
 }
 
-function getCurrentDate() {
+function getCurrentDate(): string {
   const { year, month, day } = getGermanDateParts();
   return `${year}-${month}-${day}`;
 }
 
 // Get German date string from a timestamp (for comparing daily claims)
-function getGermanDateFromTimestamp(timestamp) {
+function getGermanDateFromTimestamp(timestamp: number): string {
   const date = new Date(timestamp);
   const parts = GERMAN_DATE_FORMATTER.formatToParts(date);
-  const year = parts.find(p => p.type === 'year').value;
-  const month = parts.find(p => p.type === 'month').value;
-  const day = parts.find(p => p.type === 'day').value;
+  const year = parts.find(p => p.type === 'year')!.value;
+  const month = parts.find(p => p.type === 'month')!.value;
+  const day = parts.find(p => p.type === 'day')!.value;
   return `${year}-${month}-${day}`;
 }
 
 // Get milliseconds until next German midnight
-function getMsUntilGermanMidnight() {
+function getMsUntilGermanMidnight(): number {
   const now = new Date();
   // Get current German time components
   const germanTimeFormatter = new Intl.DateTimeFormat('de-DE', {
@@ -150,16 +186,16 @@ function getMsUntilGermanMidnight() {
     hour12: false
   });
   const timeParts = germanTimeFormatter.formatToParts(now);
-  const hours = parseInt(timeParts.find(p => p.type === 'hour').value, 10);
-  const minutes = parseInt(timeParts.find(p => p.type === 'minute').value, 10);
-  const seconds = parseInt(timeParts.find(p => p.type === 'second').value, 10);
+  const hours = parseInt(timeParts.find(p => p.type === 'hour')!.value, 10);
+  const minutes = parseInt(timeParts.find(p => p.type === 'minute')!.value, 10);
+  const seconds = parseInt(timeParts.find(p => p.type === 'second')!.value, 10);
 
   // Calculate remaining time until midnight (in ms)
   return ((23 - hours) * 3600 + (59 - minutes) * 60 + (60 - seconds)) * 1000;
 }
 
 // Calculate week start (Monday) in German timezone - always fresh
-function calculateWeekStart() {
+function calculateWeekStart(): string {
   // Use Intl.DateTimeFormat for reliable timezone handling
   const { year, month, day } = getGermanDateParts();
   const germanDate = new Date(`${year}-${month}-${day}T12:00:00`);
@@ -177,9 +213,9 @@ function calculateWeekStart() {
 }
 
 // OPTIMIZED: Cache for getWeekStart (recalculated every 60 seconds max)
-let weekStartCache = { value: null, expires: 0 };
+let weekStartCache: { value: string | null; expires: number } = { value: null, expires: 0 };
 
-function getWeekStart() {
+function getWeekStart(): string {
   const now = Date.now();
   if (weekStartCache.value && now < weekStartCache.expires) {
     return weekStartCache.value;
@@ -193,34 +229,32 @@ function getWeekStart() {
 }
 
 // OPTIMIZED: Static Set for O(1) lookup instead of Array.includes()
-const LEADERBOARD_BLOCKLIST = new Set([]);
+const LEADERBOARD_BLOCKLIST: Set<string> = new Set([]);
 
-function isLeaderboardBlocked(username) {
+function isLeaderboardBlocked(username: string): boolean {
   return LEADERBOARD_BLOCKLIST.has(username.toLowerCase());
 }
 
 // OPTIMIZED: Helper function to calculate TTL for buffs (avoids repeated inline calculation)
-function calculateBuffTTL(expireAt, minTTL = BUFF_TTL_BUFFER_SECONDS) {
+function calculateBuffTTL(expireAt: number, minTTL = BUFF_TTL_BUFFER_SECONDS): number {
   return Math.max(minTTL, Math.floor((expireAt - Date.now()) / 1000) + BUFF_TTL_BUFFER_SECONDS);
 }
 
 // OPTIMIZED: Helper for exponential backoff delay (avoids code duplication)
-function exponentialBackoff(attempt, baseMs = EXPONENTIAL_BACKOFF_BASE_MS) {
+function exponentialBackoff(attempt: number, baseMs = EXPONENTIAL_BACKOFF_BASE_MS): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, baseMs * Math.pow(2, attempt)));
 }
 
 /**
  * Generic atomic KV operation with retry mechanism
- * @param {Object} env - Cloudflare environment with SLOTS_KV
- * @param {string} key - KV key to operate on
- * @param {Function} operation - async (currentValue) => { newValue, result }
- *   - currentValue: current KV value (string or null)
- *   - returns: { newValue: string|null (null to delete), result: any (returned on success) }
- * @param {Function} verify - async (expectedValue) => boolean - verification function
- * @param {number} maxRetries - max retry attempts
- * @returns {Promise<{success: boolean, result: any}>}
  */
-async function atomicKvUpdate(env, key, operation, verify, maxRetries = MAX_RETRIES) {
+async function atomicKvUpdate<T>(
+  env: Env,
+  key: string,
+  operation: (currentValue: string | null) => Promise<AtomicKvOperationResult<T>>,
+  verify: (expectedValue: string | null) => Promise<boolean>,
+  maxRetries = MAX_RETRIES
+): Promise<AtomicKvUpdateResult<T>> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const currentValue = await env.SLOTS_KV.get(key);
@@ -241,7 +275,7 @@ async function atomicKvUpdate(env, key, operation, verify, maxRetries = MAX_RETR
       }
     } catch (error) {
       if (attempt === maxRetries - 1) {
-        return { success: false, result: null, error };
+        return { success: false, result: null, error: error as Error };
       }
     }
   }
@@ -249,7 +283,7 @@ async function atomicKvUpdate(env, key, operation, verify, maxRetries = MAX_RETR
 }
 
 // Format remaining time in hours and minutes
-function formatTimeRemaining(ms) {
+function formatTimeRemaining(ms: number): string {
   const hours = Math.floor(ms / MS_PER_HOUR);
   const minutes = Math.floor((ms % MS_PER_HOUR) / MS_PER_MINUTE);
   if (hours > 0) {
@@ -259,18 +293,18 @@ function formatTimeRemaining(ms) {
 }
 
 // Structured error logging with context
-function logError(context, error, extra = {}) {
+function logError(context: string, error: unknown, extra: Record<string, unknown> = {}): void {
   const logEntry = {
     level: 'error',
     context,
-    message: error?.message || String(error),
+    message: error instanceof Error ? error.message : String(error),
     timestamp: new Date().toISOString(),
     ...extra
   };
   console.error(JSON.stringify(logEntry));
 }
 
-function logWarn(context, message, extra = {}) {
+function logWarn(context: string, message: string, extra: Record<string, unknown> = {}): void {
   const logEntry = {
     level: 'warn',
     context,
@@ -281,7 +315,7 @@ function logWarn(context, message, extra = {}) {
   console.warn(JSON.stringify(logEntry));
 }
 
-function logInfo(context, message, extra = {}) {
+function logInfo(context: string, message: string, extra: Record<string, unknown> = {}): void {
   const logEntry = {
     level: 'info',
     context,
@@ -293,7 +327,7 @@ function logInfo(context, message, extra = {}) {
 }
 
 // Audit log for admin actions
-function logAudit(action, admin, target, extra = {}) {
+function logAudit(action: string, admin: string, target: string, extra: Record<string, unknown> = {}): void {
   const logEntry = {
     level: 'audit',
     action,
@@ -306,22 +340,22 @@ function logAudit(action, admin, target, extra = {}) {
 }
 
 // Create standardized error response (uses RESPONSE_HEADERS by default)
-function createErrorResponse(username, message) {
+function createErrorResponse(username: string, message: string): Response {
   return new Response(`@${username} ❌ ${message}`, { headers: RESPONSE_HEADERS });
 }
 
 // Create standardized success response
-function createSuccessResponse(username, message) {
+function createSuccessResponse(username: string, message: string): Response {
   return new Response(`@${username} ✅ ${message}`, { headers: RESPONSE_HEADERS });
 }
 
 // Create standardized info response
-function createInfoResponse(username, message) {
+function createInfoResponse(username: string, message: string): Response {
   return new Response(`@${username} ℹ️ ${message}`, { headers: RESPONSE_HEADERS });
 }
 
 // Profanity filter for custom messages
-const PROFANITY_PATTERNS = [
+const PROFANITY_PATTERNS: RegExp[] = [
   // Deutsche Schimpfwörter
   /h[u0ü]r[e3]ns[o0]hn/i,
   /w[i1]chs[e3]r/i,
@@ -486,7 +520,7 @@ const PROFANITY_PATTERNS = [
   /göt/i,
 ];
 
-function containsProfanity(text) {
+function containsProfanity(text: unknown): boolean {
   if (!text || typeof text !== 'string') return false;
   const normalized = text.toLowerCase()
     .replace(/[0]/g, 'o')
@@ -499,7 +533,7 @@ function containsProfanity(text) {
 }
 
 // Rate-Limit Check via KV Counter mit TTL
-async function checkRateLimit(identifier, limit, windowSeconds, env) {
+async function checkRateLimit(identifier: string, limit: number, windowSeconds: number, env: Env): Promise<boolean> {
   const key = `rl:${identifier}`;
   const count = parseInt(await env.SLOTS_KV.get(key) || '0', 10);
   if (count >= limit) return false;
@@ -541,3 +575,6 @@ export {
   checkRateLimit,
   containsProfanity
 };
+
+// Type exports
+export type { Env, ValidateTargetResult, AdminWithTargetResult };

@@ -14,11 +14,11 @@ export const DACHS_SINGLE_PAYOUT = 100;
 export const DACHS_BASE_CHANCE = 1 / 150;
 
 // Symbol Payouts
-export const TRIPLE_PAYOUTS = { '⭐': 500, '🍉': 250, '🍇': 150, '🍊': 100, '🍋': 75, '🍒': 50 };
-export const PAIR_PAYOUTS = { '⭐': 50, '🍉': 25, '🍇': 15, '🍊': 10, '🍋': 8, '🍒': 5 };
+export const TRIPLE_PAYOUTS: Record<string, number> = { '⭐': 500, '🍉': 250, '🍇': 150, '🍊': 100, '🍋': 75, '🍒': 50 };
+export const PAIR_PAYOUTS: Record<string, number> = { '⭐': 50, '🍉': 25, '🍇': 15, '🍊': 10, '🍋': 8, '🍒': 5 };
 
 // Duell Symbol Values (half of pair payouts, used for tiebreaker)
-export const DUEL_SYMBOL_VALUES = { '🦡': 500, '💎': 100, '⭐': 25, '🍉': 13, '🍇': 8, '🍊': 5, '🍋': 4, '🍒': 3 };
+export const DUEL_SYMBOL_VALUES: Record<string, number> = { '🦡': 500, '💎': 100, '⭐': 25, '🍉': 13, '🍇': 8, '🍊': 5, '🍋': 4, '🍒': 3 };
 
 // Streak System
 export const STREAK_THRESHOLD = 5;
@@ -31,10 +31,10 @@ export const STREAK_MULTIPLIER_MAX = 3.0;
 export const INSURANCE_REFUND_RATE = 0.5;
 
 // Combo Bonuses
-export const COMBO_BONUSES = { 2: 10, 3: 30, 4: 100 };
+export const COMBO_BONUSES: Record<number, number> = { 2: 10, 3: 30, 4: 100 };
 
 // Monthly Login Rewards
-export const MONTHLY_LOGIN_REWARDS = { 1: 50, 5: 150, 10: 400, 15: 750, 20: 1500 };
+export const MONTHLY_LOGIN_REWARDS: Record<number, number> = { 1: 50, 5: 150, 10: 400, 15: 750, 20: 1500 };
 
 // Chaos Spin
 export const CHAOS_SPIN_MIN = -300;
@@ -55,8 +55,8 @@ export const RAGE_MODE_MAX_STACK = 100;
 export const RAGE_MODE_WIN_THRESHOLD = 50;
 
 // Unlock & Multiplier Maps
-export const UNLOCK_MAP = { 20: 'slots_20', 30: 'slots_30', 50: 'slots_50', 100: 'slots_100' };
-export const MULTIPLIER_MAP = { 10: 1, 20: 2, 30: 3, 50: 5, 100: 10 };
+export const UNLOCK_MAP: Record<number, string> = { 20: 'slots_20', 30: 'slots_30', 50: 'slots_50', 100: 'slots_100' };
+export const MULTIPLIER_MAP: Record<number, number> = { 10: 1, 20: 2, 30: 3, 50: 5, 100: 10 };
 
 // Wheel Probabilities (percentages)
 export const WHEEL_JACKPOT_THRESHOLD = 1;        // < 1% for dachs category

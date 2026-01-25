@@ -8,7 +8,7 @@
 // ============================================================================
 
 // Spin loss messages (random selection)
-export const SPIN_LOSS_MESSAGES = [
+export const SPIN_LOSS_MESSAGES: string[] = [
   'Knapp daneben!',
   'Nicht dein Spin!',
   'Der Dachs versteckt sich...',
@@ -38,18 +38,18 @@ export const ERROR_MESSAGES = {
   SELF_BANNED: 'Du hast dich selbst vom Spielen ausgeschlossen',
 
   // Balance
-  INSUFFICIENT_BALANCE: (required, current) => `Nicht genug DachsTaler! Du brauchst ${required} (Aktuell: ${current}) 🦡`,
-  MIN_BALANCE_REQUIRED: (min) => `Du brauchst mindestens ${min} DachsTaler!`,
+  INSUFFICIENT_BALANCE: (required: number, current: number): string => `Nicht genug DachsTaler! Du brauchst ${required} (Aktuell: ${current}) 🦡`,
+  MIN_BALANCE_REQUIRED: (min: number): string => `Du brauchst mindestens ${min} DachsTaler!`,
 
   // Slots
-  SLOT_MIN: (min) => `Minimum ist !slots ${min}! Verfügbar: 10, 20, 30, 50, 100, all 💡`,
+  SLOT_MIN: (min: number): string => `Minimum ist !slots ${min}! Verfügbar: 10, 20, 30, 50, 100, all 💡`,
   SLOT_MAX: 'Maximum ist !slots 100! Verfügbar: 10, 20, 30, 50, 100, all 💡',
-  SLOT_NOT_EXISTS: (amount) => `!slots ${amount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all`,
-  SLOT_NOT_UNLOCKED: (amount, price) => `!slots ${amount} nicht freigeschaltet! Du musst es für ${price} DachsTaler im Shop kaufen!`,
+  SLOT_NOT_EXISTS: (amount: number): string => `!slots ${amount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100, all`,
+  SLOT_NOT_UNLOCKED: (amount: number, price: number): string => `!slots ${amount} nicht freigeschaltet! Du musst es für ${price} DachsTaler im Shop kaufen!`,
   SPIN_ERROR: 'Fehler beim Spin.',
 
   // Cooldown
-  COOLDOWN: (seconds) => `Cooldown: Noch ${seconds} Sekunden!`,
+  COOLDOWN: (seconds: number): string => `Cooldown: Noch ${seconds} Sekunden!`,
 
   // Admin
   NO_PERMISSION: 'Du hast keine Berechtigung für diesen Command!',
@@ -59,25 +59,25 @@ export const ERROR_MESSAGES = {
 
   // Transfer
   TRANSFER_SELF: 'Du kannst dir selbst nichts überweisen!',
-  TRANSFER_MIN: (min) => `Minimum ist ${min} DachsTaler!`,
-  TRANSFER_MAX: (max) => `Maximum ist ${max} DachsTaler pro Transfer!`,
+  TRANSFER_MIN: (min: number): string => `Minimum ist ${min} DachsTaler!`,
+  TRANSFER_MAX: (max: number): string => `Maximum ist ${max} DachsTaler pro Transfer!`,
 
   // Duel
   DUEL_SELF: 'Du kannst dich nicht selbst herausfordern!',
-  DUEL_OPTED_OUT: (user) => `${user} möchte keine Duelle.`,
+  DUEL_OPTED_OUT: (user: string): string => `${user} möchte keine Duelle.`,
   DUEL_NO_PENDING: 'Du hast keine offenen Duel-Anfragen.',
-  DUEL_COOLDOWN: (seconds) => `Du musst noch ${seconds} Sekunden warten bevor du wieder duellieren kannst.`,
+  DUEL_COOLDOWN: (seconds: number): string => `Du musst noch ${seconds} Sekunden warten bevor du wieder duellieren kannst.`,
 
   // Shop
   ITEM_NOT_FOUND: 'Item nicht gefunden!',
   ALREADY_OWNED: 'Du besitzt dieses Item bereits!',
   WEEKLY_LIMIT: 'Du hast das wöchentliche Limit für dieses Item erreicht!',
-  REQUIRES_UNLOCK: (required) => `Du brauchst erst: ${required}`,
+  REQUIRES_UNLOCK: (required: string): string => `Du brauchst erst: ${required}`,
 
   // Auth
   NOT_LOGGED_IN: 'Nicht eingeloggt',
   INVALID_ORIGIN: 'Invalid origin'
-};
+} as const;
 
 // ============================================================================
 // Success Messages
@@ -86,10 +86,10 @@ export const ERROR_MESSAGES = {
 export const SUCCESS_MESSAGES = {
   DISCLAIMER_ACCEPTED: 'Disclaimer akzeptiert! Viel Spaß beim Spielen! 🦡🎰 Nutze !slots zum Spinnen!',
   DISCLAIMER_ALREADY: 'Du hast den Disclaimer bereits akzeptiert! Nutze einfach !slots zum Spielen 🎰',
-  TRANSFER_COMPLETE: (amount, target, newBalance) => `${amount} DachsTaler an ${target} überwiesen! Dein neuer Kontostand: ${newBalance}`,
-  PURCHASE_COMPLETE: (item) => `${item} erfolgreich gekauft!`,
+  TRANSFER_COMPLETE: (amount: number, target: string, newBalance: number): string => `${amount} DachsTaler an ${target} überwiesen! Dein neuer Kontostand: ${newBalance}`,
+  PURCHASE_COMPLETE: (item: string): string => `${item} erfolgreich gekauft!`,
   SELF_BAN_COMPLETE: 'Du wurdest vom Slots spielen ausgeschlossen.'
-};
+} as const;
 
 // ============================================================================
 // Info Messages
@@ -98,11 +98,11 @@ export const SUCCESS_MESSAGES = {
 export const INFO_MESSAGES = {
   WELCOME: 'Willkommen! Dachsbau Slots ist nur zur Unterhaltung - Hier geht es NICHT um Echtgeld!',
   DISCLAIMER: 'Dachsbau Slots dient nur zur Unterhaltung! Es werden keine Echtgeld-Beträge eingesetzt oder gewonnen.',
-  LOW_BALANCE_DAILY: (amount) => `Niedriger Kontostand! Nutze !slots daily für +${amount} DachsTaler`
-};
+  LOW_BALANCE_DAILY: (amount: number): string => `Niedriger Kontostand! Nutze !slots daily für +${amount} DachsTaler`
+} as const;
 
 // Loss streak warnings
-export const LOSS_MESSAGES = {
+export const LOSS_MESSAGES: Record<number, string> = {
   10: ' 😔 10 Losses in Folge - Möchtest du vielleicht eine Pause einlegen?',
   11: ' 🦡 11 Losses - Der Dachs versteckt sich noch... vielleicht eine kurze Pause?',
   12: ' 🦡💤 12 Losses - Der Dachs macht ein Nickerchen... Pause könnte helfen!',
@@ -116,7 +116,7 @@ export const LOSS_MESSAGES = {
   20: ' 🦡☕ 20 Losses - Der Dachs trinkt Kaffee und entspannt... Pause seriously! ☕'
 };
 
-export const ROTATING_LOSS_MESSAGES = [
+export const ROTATING_LOSS_MESSAGES: string[] = [
   ' 🦡🛌 Der Dachs schläft fest... Lass ihn ruhen! 😴',
   ' 🦡🧘 Der Dachs meditiert... Innere Ruhe finden! 🧘‍♂️',
   ' 🦡🎨 Der Dachs malt ein Bild... Kreative Pause! 🎨',

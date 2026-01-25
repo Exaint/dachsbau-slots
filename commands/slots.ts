@@ -36,7 +36,7 @@ import {
   FREE_SPIN_COST_THRESHOLD,
   HOURLY_JACKPOT_AMOUNT
 } from '../constants.js';
-import { logError, logWarn, getCurrentDate, getGermanDateFromTimestamp, kvKey, calculateBuffTTL } from '../utils.js';
+import { logError, logWarn, getCurrentDate, getGermanDateFromTimestamp, kvKey, calculateBuffTTL, secureRandomInt } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -390,7 +390,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
     if (kvMessages) {
       const msgArray = isWin ? kvMessages.win : kvMessages.loss;
       if (msgArray && msgArray.length > 0) {
-        customMsgAppend = msgArray[Math.floor(Math.random() * msgArray.length)];
+        customMsgAppend = msgArray[secureRandomInt(0, msgArray.length - 1)];
       }
     }
 

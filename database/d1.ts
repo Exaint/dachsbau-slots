@@ -21,6 +21,34 @@ export const D1_ENABLED = true;
 // Set to true to write to both D1 and KV during migration
 export const DUAL_WRITE = true;
 
+// Retry configuration for D1 writes
+const D1_WRITE_RETRIES = 2;
+const D1_RETRY_DELAY_MS = 50;
+
+/**
+ * Execute a D1 write operation with retry logic.
+ * Fire-and-forget pattern with automatic retries on failure.
+ * @param operation - The D1 operation to execute (async function)
+ * @param context - Context for logging (operation name, params)
+ */
+export function executeD1Write(
+  operation: () => Promise<unknown>,
+  context: { name: string; params?: Record<string, unknown> }
+): void {
+  const executeWithRetry = async (attempt: number = 0): Promise<void> => {
+    try {
+      await operation();
+    } catch (error) {
+      if (attempt < D1_WRITE_RETRIES) {
+        await new Promise(r => setTimeout(r, D1_RETRY_DELAY_MS * (attempt + 1)));
+        return executeWithRetry(attempt + 1);
+      }
+      logError(`D1Write.${context.name}`, error, { ...context.params, attempts: attempt + 1 });
+    }
+  };
+  executeWithRetry().catch(() => {}); // Ensure no unhandled rejections
+}
+
 // ============================================
 // Types
 // ============================================

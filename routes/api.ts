@@ -5,7 +5,7 @@
 import { getUserFromRequest } from '../web/twitch.js';
 import { handleShopBuyAPI } from './shop.js';
 import { setDisclaimerAccepted, hasUnlock, getCustomMessages, setCustomMessages } from '../database.js';
-import { checkRateLimit, containsProfanity, isAdmin } from '../utils.js';
+import { checkRateLimit, containsProfanity, isAdmin, jsonErrorResponse, jsonSuccessResponse } from '../utils.js';
 import { RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';
 import type { Env } from '../types/index.js';
 
@@ -30,10 +30,7 @@ export function validateCsrf(request: Request, url: URL): Response | null {
     // Check Origin header first (preferred)
     if (origin) {
       if (!origin.startsWith(url.origin)) {
-        return new Response(JSON.stringify({ error: 'Invalid origin' }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return jsonErrorResponse('Invalid origin', 403);
       }
       return null; // Valid Origin
     }
@@ -43,26 +40,17 @@ export function validateCsrf(request: Request, url: URL): Response | null {
       try {
         const refererUrl = new URL(referer);
         if (refererUrl.origin !== url.origin) {
-          return new Response(JSON.stringify({ error: 'Invalid referer' }), {
-            status: 403,
-            headers: { 'Content-Type': 'application/json' }
-          });
+          return jsonErrorResponse('Invalid referer', 403);
         }
         return null; // Valid Referer
       } catch {
         // Invalid Referer URL
-        return new Response(JSON.stringify({ error: 'Invalid referer' }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return jsonErrorResponse('Invalid referer', 403);
       }
     }
 
     // Neither Origin nor Referer present - block the request
-    return new Response(JSON.stringify({ error: 'Missing origin header' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonErrorResponse('Missing origin header', 403);
   }
   return null;
 }
@@ -77,10 +65,7 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
   if (request.method === 'POST') {
     const contentLength = parseInt(request.headers.get('Content-Length') || '0', 10);
     if (contentLength > MAX_BODY_SIZE) {
-      return new Response(JSON.stringify({ error: 'Request body too large' }), {
-        status: 413,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Request body too large', 413);
     }
   }
 
@@ -88,18 +73,12 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
   if (pathname === '/api/shop/buy' && request.method === 'POST') {
     const loggedInUser = await getUserFromRequest(request, env) as LoggedInUser | null;
     if (!loggedInUser) {
-      return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Nicht eingeloggt', 401);
     }
     // Rate-Limit per User
     const allowed = await checkRateLimit(`shop:${loggedInUser.username}`, RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS, env);
     if (!allowed) {
-      return new Response(JSON.stringify({ error: 'Zu viele Käufe, bitte warte kurz' }), {
-        status: 429,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Zu viele Käufe, bitte warte kurz', 429);
     }
     return await handleShopBuyAPI(request, env, loggedInUser);
   }
@@ -108,63 +87,53 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
   if (pathname === '/api/disclaimer/accept' && request.method === 'POST') {
     const loggedInUser = await getUserFromRequest(request, env) as LoggedInUser | null;
     if (!loggedInUser) {
-      return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Nicht eingeloggt', 401);
+    }
+    // Rate limit: 2 per 60 seconds (disclaimer is a one-time action)
+    const allowed = await checkRateLimit(`disclaimer:${loggedInUser.username}`, 2, RATE_LIMIT_WINDOW_SECONDS, env);
+    if (!allowed) {
+      return jsonErrorResponse('Zu viele Anfragen, bitte warte kurz', 429);
     }
     await setDisclaimerAccepted(loggedInUser.username, env);
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonSuccessResponse();
   }
 
   // Custom Messages save endpoint
   if (pathname === '/api/custom-messages' && request.method === 'POST') {
     const loggedInUser = await getUserFromRequest(request, env) as LoggedInUser | null;
     if (!loggedInUser) {
-      return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Nicht eingeloggt', 401);
+    }
+
+    // Rate limit: 5 per 60 seconds
+    const allowed = await checkRateLimit(`custom_msg:${loggedInUser.username}`, 5, RATE_LIMIT_WINDOW_SECONDS, env);
+    if (!allowed) {
+      return jsonErrorResponse('Zu viele Anfragen, bitte warte kurz', 429);
     }
 
     // Check unlock
     const hasCustomMessageUnlock = await hasUnlock(loggedInUser.username, 'custom_message', env);
     if (!hasCustomMessageUnlock) {
-      return new Response(JSON.stringify({ error: 'Custom Messages nicht freigeschaltet' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Custom Messages nicht freigeschaltet', 403);
     }
 
     let body: { win?: unknown; loss?: unknown };
     try {
       body = await request.json();
     } catch {
-      return new Response(JSON.stringify({ error: 'Ungültiges JSON' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Ungültiges JSON');
     }
 
     const { win = [], loss = [] } = body;
 
     // Validate arrays
     if (!Array.isArray(win) || !Array.isArray(loss)) {
-      return new Response(JSON.stringify({ error: 'win und loss müssen Arrays sein' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('win und loss müssen Arrays sein');
     }
 
     // Max 5 per type
     if (win.length > 5 || loss.length > 5) {
-      return new Response(JSON.stringify({ error: 'Maximal 5 Nachrichten pro Typ' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Maximal 5 Nachrichten pro Typ');
     }
 
     // Validate each message
@@ -176,16 +145,10 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
       const trimmed = msg.trim();
       if (!trimmed) continue;
       if (trimmed.length > 50) {
-        return new Response(JSON.stringify({ error: `Nachricht zu lang (max. 50 Zeichen): "${trimmed.slice(0, 20)}..."` }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return jsonErrorResponse(`Nachricht zu lang (max. 50 Zeichen): "${trimmed.slice(0, 20)}..."`);
       }
       if (containsProfanity(trimmed)) {
-        return new Response(JSON.stringify({ error: 'Nachricht enthält unerlaubte Wörter' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return jsonErrorResponse('Nachricht enthält unerlaubte Wörter');
       }
       cleanWin.push(trimmed);
     }
@@ -195,16 +158,10 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
       const trimmed = msg.trim();
       if (!trimmed) continue;
       if (trimmed.length > 50) {
-        return new Response(JSON.stringify({ error: `Nachricht zu lang (max. 50 Zeichen): "${trimmed.slice(0, 20)}..."` }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return jsonErrorResponse(`Nachricht zu lang (max. 50 Zeichen): "${trimmed.slice(0, 20)}..."`);
       }
       if (containsProfanity(trimmed)) {
-        return new Response(JSON.stringify({ error: 'Nachricht enthält unerlaubte Wörter' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return jsonErrorResponse('Nachricht enthält unerlaubte Wörter');
       }
       cleanLoss.push(trimmed);
     }
@@ -213,26 +170,17 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
     const success = await setCustomMessages(loggedInUser.username, messages, env);
 
     if (!success) {
-      return new Response(JSON.stringify({ error: 'Speichern fehlgeschlagen' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Speichern fehlgeschlagen', 500);
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonSuccessResponse();
   }
 
   // Get custom messages endpoint
   if (pathname === '/api/custom-messages' && request.method === 'GET') {
     const loggedInUser = await getUserFromRequest(request, env) as LoggedInUser | null;
     if (!loggedInUser) {
-      return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Nicht eingeloggt', 401);
     }
 
     const targetUser = url.searchParams.get('user') || loggedInUser.username;
@@ -240,17 +188,11 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
 
     // Only own messages or admin can view
     if (!isOwn && !isAdmin(loggedInUser.username)) {
-      return new Response(JSON.stringify({ error: 'Keine Berechtigung' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonErrorResponse('Keine Berechtigung', 403);
     }
 
     const messages = await getCustomMessages(targetUser, env);
-    return new Response(JSON.stringify({ messages: messages || { win: [], loss: [] } }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonSuccessResponse({ messages: messages || { win: [], loss: [] } });
   }
 
   return null;

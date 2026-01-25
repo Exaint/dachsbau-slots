@@ -1,4 +1,4 @@
-import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS, MS_PER_HOUR, MS_PER_MINUTE, RESPONSE_HEADERS, MAX_RETRIES } from './constants.js';
+import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS, MS_PER_HOUR, MS_PER_MINUTE, RESPONSE_HEADERS, MAX_RETRIES, MAX_BALANCE } from './constants.js';
 import { ADMINS } from './config.js';
 
 // Environment type for KV operations
@@ -130,6 +130,11 @@ function validateAmount(amount: string | number, min = 1, max = 100000): number 
   const parsed = parseInt(String(amount), 10);
   if (isNaN(parsed) || parsed < min || parsed > max) return null;
   return parsed;
+}
+
+// Clamp balance to valid range [0, MAX_BALANCE]
+function clampBalance(value: number): number {
+  return Math.max(0, Math.min(value, MAX_BALANCE));
 }
 
 // Helper to build KV keys with consistent lowercase username
@@ -354,6 +359,17 @@ function createInfoResponse(username: string, message: string): Response {
   return new Response(`@${username} ℹ️ ${message}`, { headers: RESPONSE_HEADERS });
 }
 
+// JSON API Responses (for /api/ endpoints)
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+function jsonErrorResponse(error: string, status = 400): Response {
+  return new Response(JSON.stringify({ error }), { status, headers: JSON_HEADERS });
+}
+
+function jsonSuccessResponse(data: Record<string, unknown> = {}, status = 200): Response {
+  return new Response(JSON.stringify({ success: true, ...data }), { status, headers: JSON_HEADERS });
+}
+
 // Profanity filter for custom messages
 const PROFANITY_PATTERNS: RegExp[] = [
   // Deutsche Schimpfwörter
@@ -553,6 +569,7 @@ export {
   requireAdminWithTarget,
   safeJsonParse,
   validateAmount,
+  clampBalance,
   kvKey,
   getCurrentMonth,
   getCurrentDate,
@@ -571,6 +588,8 @@ export {
   createErrorResponse,
   createSuccessResponse,
   createInfoResponse,
+  jsonErrorResponse,
+  jsonSuccessResponse,
   atomicKvUpdate,
   checkRateLimit,
   containsProfanity

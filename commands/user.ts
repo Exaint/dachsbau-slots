@@ -20,7 +20,7 @@ import {
   KV_ACTIVE,
   ACHIEVEMENTS
 } from '../constants.js';
-import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight, checkRateLimit } from '../utils.js';
+import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight, checkRateLimit, secureRandom } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -425,7 +425,7 @@ async function handleTransfer(username: string, target: string, amount: string, 
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       // Try to acquire lock (short TTL to prevent deadlock)
-      const lockValue = `${Date.now()}:${Math.random()}`;
+      const lockValue = `${Date.now()}:${secureRandom()}`;
       const existingLock = await env.SLOTS_KV.get(lockKey);
 
       if (existingLock) {

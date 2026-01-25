@@ -538,7 +538,8 @@ async function handleInstantItem(
 }
 
 // Mystery Box has complex logic with rollback and timeout protection
-const MYSTERY_BOX_TIMEOUT_MS = 5000;
+const MYSTERY_BOX_TIMEOUT_MS = 10000; // 10s to handle cold starts
+const MYSTERY_BOX_ROLLBACK_RETRIES = 3;
 
 async function handleMysteryBox(username: string, item: ExtendedShopItem, balance: number, env: Env): Promise<Response> {
   const mysteryItemId = MYSTERY_BOX_ITEMS[secureRandomInt(0, MYSTERY_BOX_ITEMS.length - 1)];
@@ -570,18 +571,37 @@ async function handleMysteryBox(username: string, item: ExtendedShopItem, balanc
 
     await Promise.race([activationPromise, timeoutPromise]);
   } catch (activationError) {
-    // Rollback: Refund balance and reverse bank update if activation failed
+    // Rollback: Refund balance with retry mechanism
     logError('MysteryBox.activation', activationError, { username, mysteryItemId, mysteryItemName: mysteryResult.name });
-    try {
-      await setBalance(username, balance, env);
-      // Verify rollback succeeded
-      const verifyBalance = await getBalance(username, env);
-      if (verifyBalance !== balance) {
-        logError('MysteryBox.rollback.verify', new Error('Balance mismatch after rollback'), { username, expected: balance, actual: verifyBalance });
+
+    let rollbackSuccess = false;
+    for (let attempt = 0; attempt < MYSTERY_BOX_ROLLBACK_RETRIES; attempt++) {
+      try {
+        await setBalance(username, balance, env);
+        // Verify rollback succeeded
+        const verifyBalance = await getBalance(username, env);
+        if (verifyBalance === balance) {
+          rollbackSuccess = true;
+          break;
+        }
+        logError('MysteryBox.rollback.verify', new Error('Balance mismatch after rollback'), {
+          username, expected: balance, actual: verifyBalance, attempt
+        });
+      } catch (rollbackError) {
+        logError('MysteryBox.rollback.attempt', rollbackError, { username, attempt, originalBalance: balance });
+        if (attempt < MYSTERY_BOX_ROLLBACK_RETRIES - 1) {
+          await new Promise(r => setTimeout(r, 100 * (attempt + 1))); // Exponential backoff
+        }
       }
-    } catch (rollbackError) {
-      logError('MysteryBox.rollback.CRITICAL', rollbackError, { username, originalBalance: balance, itemPrice: item.price });
     }
+
+    if (!rollbackSuccess) {
+      logError('MysteryBox.rollback.CRITICAL', new Error('All rollback attempts failed'), {
+        username, originalBalance: balance, itemPrice: item.price
+      });
+      return new Response(`@${username} ❌ Mystery Box Fehler! Bitte kontaktiere einen Admin für Erstattung.`, { headers: RESPONSE_HEADERS });
+    }
+
     return new Response(`@${username} ❌ Mystery Box Fehler! Dein Einsatz wurde zurückerstattet.`, { headers: RESPONSE_HEADERS });
   }
 

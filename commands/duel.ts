@@ -301,12 +301,26 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
     const pot = duel.amount * 2;
     let resultMessage: string;
 
+    // Final balance verification right before modification (prevents race conditions)
+    const [finalChallengerBalance, finalTargetBalance] = await Promise.all([
+      getBalance(duel.challenger, env),
+      getBalance(username, env)
+    ]);
+
+    if (finalChallengerBalance < duel.amount) {
+      return `@${username} ❌ Duell abgebrochen - @${duel.challenger} hat während des Duells nicht mehr genug DachsTaler.`;
+    }
+    if (finalTargetBalance < duel.amount) {
+      return `@${username} ❌ Duell abgebrochen - Du hast während des Duells nicht mehr genug DachsTaler.`;
+    }
+
     if (challengerScore.score > targetScore.score) {
       // Challenger wins
-      const newChallengerBalance = challengerBalance + duel.amount;
+      const newChallengerBalance = finalChallengerBalance + duel.amount;
+      const newTargetBalance = finalTargetBalance - duel.amount;
       await Promise.all([
         setBalance(duel.challenger, newChallengerBalance, env),
-        setBalance(username, targetBalance - duel.amount, env)
+        setBalance(username, newTargetBalance, env)
       ]);
       resultMessage = `🏆 @${duel.challenger} GEWINNT ${pot} DachsTaler!`;
       // Achievement tracking (must await, otherwise worker terminates before completion)
@@ -317,9 +331,10 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
       ]);
     } else if (targetScore.score > challengerScore.score) {
       // Target wins
-      const newTargetBalance = targetBalance + duel.amount;
+      const newTargetBalance = finalTargetBalance + duel.amount;
+      const newChallengerBalance = finalChallengerBalance - duel.amount;
       await Promise.all([
-        setBalance(duel.challenger, challengerBalance - duel.amount, env),
+        setBalance(duel.challenger, newChallengerBalance, env),
         setBalance(username, newTargetBalance, env)
       ]);
       resultMessage = `🏆 @${username} GEWINNT ${pot} DachsTaler!`;

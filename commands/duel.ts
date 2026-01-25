@@ -24,30 +24,38 @@
  * 4. On decline/timeout: Challenge expires
  */
 
-import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
+import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
 import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStatBatch, setMaxAchievementStat, checkBalanceAchievements, incrementStat, updateMaxStat } from '../database.js';
-import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
+import { createDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
+import type { Env } from '../types/index.js';
+
+// ============================================
+// Types
+// ============================================
+
+interface DuelScore {
+  score: number;
+  isTriple: boolean;
+  isPair: boolean;
+  symbolSum: number;
+  description: string;
+}
+
+type DuelResult = 'win' | 'loss' | 'tie';
+
+// ============================================
+// Achievement Tracking
+// ============================================
 
 /**
- * Track duel achievements (fire-and-forget)
- * @param {string} player - Player username
- * @param {boolean} isWinner - Whether this player won
- * @param {number} winnings - Amount won (only for winner)
- * @param {object} env - Environment with KV binding
- */
-/**
  * Track duel achievements and stats
- * @param {string} player - Player username
- * @param {'win'|'loss'|'tie'} result - Duel result
- * @param {number} winnings - Amount won (0 for loss/tie)
- * @param {object} env - Environment
  */
-async function trackDuelAchievements(player, result, winnings, env) {
+async function trackDuelAchievements(player: string, result: DuelResult, winnings: number, env: Env): Promise<void> {
   try {
     // Step 1: Batch all achievement stat updates in a single atomic read-modify-write
     // This prevents race conditions on the achievements:{username} KV key
-    const statUpdates = [['duelsPlayed', 1]];
+    const statUpdates: [string, number][] = [['duelsPlayed', 1]];
     if (result === 'win') {
       statUpdates.push(['duelsWon', 1]);
       statUpdates.push(['totalDuelWinnings', winnings]);
@@ -61,7 +69,7 @@ async function trackDuelAchievements(player, result, winnings, env) {
     await checkAndUnlockAchievement(player, ACHIEVEMENTS.FIRST_DUEL.id, env);
 
     // Step 3: KV stats + streak (separate keys, safe to run in parallel)
-    const kvPromises = [incrementStat(player, 'duelsPlayed', 1, env)];
+    const kvPromises: Promise<void>[] = [incrementStat(player, 'duelsPlayed', 1, env)];
     if (result === 'win') {
       kvPromises.push(incrementStat(player, 'totalDuelWinnings', winnings, env));
       kvPromises.push(trackDuelStreak(player, true, env));
@@ -79,7 +87,7 @@ async function trackDuelAchievements(player, result, winnings, env) {
 /**
  * Track duel win streak and check streak achievements
  */
-async function trackDuelStreak(player, isWin, env) {
+async function trackDuelStreak(player: string, isWin: boolean, env: Env): Promise<void> {
   try {
     const key = `duelStreak:${player.toLowerCase()}`;
     if (isWin) {
@@ -96,11 +104,15 @@ async function trackDuelStreak(player, isWin, env) {
   }
 }
 
+// ============================================
+// Grid Generation & Scoring
+// ============================================
+
 /**
  * Generate a fair duel grid (no buffs, no peek, no special items)
  */
-function generateDuelGrid() {
-  const grid = [];
+function generateDuelGrid(): string[] {
+  const grid: string[] = [];
   for (let i = 0; i < GRID_SIZE; i++) {
     if (secureRandom() < DACHS_BASE_CHANCE) {
       grid.push('🦡');
@@ -115,7 +127,7 @@ function generateDuelGrid() {
  * Calculate duel score from grid (triple > pair > symbol sum)
  * Returns: { score, isTriple, isPair, symbolSum, description }
  */
-function calculateDuelScore(grid) {
+function calculateDuelScore(grid: string[]): DuelScore {
   const symbolSum = grid.reduce((sum, s) => sum + (DUEL_SYMBOL_VALUES[s] || 0), 0);
 
   // Check for triple
@@ -151,10 +163,14 @@ function calculateDuelScore(grid) {
   };
 }
 
+// ============================================
+// Command Handlers
+// ============================================
+
 /**
  * Handle !duel @target amount command
  */
-async function handleDuel(username, args, env) {
+async function handleDuel(username: string, args: string[], env: Env): Promise<string> {
   try {
     // Parse arguments
     if (!args || args.length < 2) {
@@ -230,7 +246,7 @@ async function handleDuel(username, args, env) {
 /**
  * Handle !duelaccept command
  */
-async function handleDuelAccept(username, env) {
+async function handleDuelAccept(username: string, env: Env): Promise<string> {
   try {
     // Find pending duel where this user is the target
     const duel = await findDuelForTarget(username, env);
@@ -269,7 +285,7 @@ async function handleDuelAccept(username, env) {
 
     // Determine winner
     const pot = duel.amount * 2;
-    let resultMessage;
+    let resultMessage: string;
 
     if (challengerScore.score > targetScore.score) {
       // Challenger wins
@@ -333,7 +349,7 @@ async function handleDuelAccept(username, env) {
 /**
  * Handle !dueldecline command
  */
-async function handleDuelDecline(username, env) {
+async function handleDuelDecline(username: string, env: Env): Promise<string> {
   try {
     // Find pending duel where this user is the target
     const duel = await findDuelForTarget(username, env);
@@ -355,7 +371,7 @@ async function handleDuelDecline(username, env) {
 /**
  * Handle !duelopt in/out command
  */
-async function handleDuelOpt(username, args, env) {
+async function handleDuelOpt(username: string, args: string[], env: Env): Promise<string> {
   try {
     if (!args || args.length === 0) {
       const isOptedOut = await isDuelOptedOut(username, env);

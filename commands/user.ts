@@ -1,3 +1,7 @@
+/**
+ * User Commands - Balance, stats, daily, buffs, transfer, leaderboard
+ */
+
 import {
   RESPONSE_HEADERS,
   MAX_BALANCE,
@@ -41,14 +45,35 @@ import {
   checkBalanceAchievements,
   incrementStat
 } from '../database.js';
+import type { Env, FreeSpinEntry, MonthlyLoginData } from '../types/index.js';
+
+// ============================================
+// Types
+// ============================================
+
+interface TimedBuffDef {
+  key: string;
+  name: string;
+  emoji: string;
+}
+
+interface SymbolBoostDef {
+  boost: string | null;
+  symbol: string;
+  name: string;
+}
+
+// ============================================
+// Achievement Tracking
+// ============================================
 
 /**
  * Track daily claim achievements (fire-and-forget)
  * Daily achievements are based on monthly login days, not cumulative claims
  */
-async function trackDailyAchievements(username, monthlyDays, env) {
+async function trackDailyAchievements(username: string, monthlyDays: number, env: Env): Promise<void> {
   try {
-    const promises = [];
+    const promises: Promise<void>[] = [];
 
     // FIRST_DAILY
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_DAILY.id, env));
@@ -75,13 +100,10 @@ async function trackDailyAchievements(username, monthlyDays, env) {
 
 /**
  * Track transfer achievements (fire-and-forget)
- * @param {string} username - Sender username
- * @param {number} amount - Transfer amount
- * @param {object} env - Environment with KV binding
  */
-async function trackTransferAchievements(username, amount, env) {
+async function trackTransferAchievements(username: string, amount: number, env: Env): Promise<void> {
   try {
-    const promises = [];
+    const promises: Promise<void>[] = [];
 
     // FIRST_TRANSFER
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_TRANSFER.id, env));
@@ -102,7 +124,7 @@ async function trackTransferAchievements(username, amount, env) {
 /**
  * Track transfer received stats for receiver (fire-and-forget)
  */
-async function trackTransferReceived(username, amount, env) {
+async function trackTransferReceived(username: string, amount: number, env: Env): Promise<void> {
   try {
     await incrementStat(username, 'transfersReceived', amount, env);
   } catch (error) {
@@ -110,9 +132,13 @@ async function trackTransferReceived(username, amount, env) {
   }
 }
 
+// ============================================
+// Helpers
+// ============================================
+
 // Helper: Get days in current month (German timezone) - cached per month
 let _daysInMonthCache = { key: '', days: 0 };
-function getDaysInCurrentMonth() {
+function getDaysInCurrentMonth(): number {
   const now = new Date();
   const germanDate = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
   const year = germanDate.getFullYear();
@@ -131,7 +157,7 @@ function getDaysInCurrentMonth() {
 }
 
 // Static: Timed buff definitions (avoid recreation per request)
-const TIMED_BUFF_KEYS = [
+const TIMED_BUFF_KEYS: TimedBuffDef[] = [
   { key: 'happy_hour', name: 'Happy Hour', emoji: '⚡' },
   { key: 'lucky_charm', name: 'Lucky Charm', emoji: '🍀' },
   { key: 'golden_hour', name: 'Golden Hour', emoji: '✨' },
@@ -140,7 +166,11 @@ const TIMED_BUFF_KEYS = [
   { key: 'diamond_rush', name: 'Diamond Rush', emoji: '💎' }
 ];
 
-async function handleBalance(username, env) {
+// ============================================
+// Command Handlers
+// ============================================
+
+async function handleBalance(username: string, env: Env): Promise<Response> {
   try {
     const [balance, freeSpins] = await Promise.all([
       getBalance(username, env),
@@ -163,10 +193,10 @@ async function handleBalance(username, env) {
   }
 }
 
-async function handleStats(username, env) {
+async function handleStats(username: string, env: Env): Promise<Response> {
   try {
     const stats = await getStats(username, env);
-    const winRate = stats.totalSpins > 0 ? ((stats.wins / stats.totalSpins) * 100).toFixed(1) : 0;
+    const winRate = stats.totalSpins > 0 ? ((stats.wins / stats.totalSpins) * 100).toFixed(1) : '0';
     const netProfit = stats.totalWon - stats.totalLost;
 
     return new Response(`@${username} 📊 Stats: ${stats.totalSpins} Spins | ${stats.wins} Wins (${winRate}%) | Größter Gewinn: ${stats.biggestWin} | Gewonnen: ${stats.totalWon.toLocaleString('de-DE')} | Ausgegeben: ${stats.totalLost.toLocaleString('de-DE')} | Bilanz: ${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString('de-DE')}`, { headers: RESPONSE_HEADERS });
@@ -176,7 +206,7 @@ async function handleStats(username, env) {
   }
 }
 
-async function handleDaily(username, env) {
+async function handleDaily(username: string, env: Env): Promise<Response> {
   try {
     // Rate limit: max 5 requests per 60 seconds
     const allowed = await checkRateLimit(`daily:${username}`, 5, 60, env);
@@ -248,13 +278,13 @@ async function handleDaily(username, env) {
   }
 }
 
-async function handleBuffs(username, env) {
+async function handleBuffs(username: string, env: Env): Promise<Response> {
   try {
-    const buffs = [];
+    const buffs: string[] = [];
     const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once, use everywhere
 
     // Check all timed buffs
-    const timedBuffPromises = TIMED_BUFF_KEYS.map(async buff => {
+    const timedBuffPromises = TIMED_BUFF_KEYS.map(async (buff): Promise<string | null> => {
       const value = await env.SLOTS_KV.get(`buff:${lowerUsername}:${buff.key}`);
       if (!value) return null;
 
@@ -265,7 +295,7 @@ async function handleBuffs(username, env) {
         if (remaining > 0) {
           return `${buff.emoji} ${buff.name} (${formatTimeRemaining(remaining)})`;
         }
-      } catch (e) {
+      } catch {
         // Might be JSON (buffs with uses/stack)
       }
 
@@ -299,7 +329,7 @@ async function handleBuffs(username, env) {
     ]);
 
     // Process timed buffs
-    buffs.push(...timedResults.filter(b => b !== null));
+    buffs.push(...timedResults.filter((b): b is string => b !== null));
 
     // Dachs Locator
     if (dachsLocator.active) {
@@ -313,14 +343,14 @@ async function handleBuffs(username, env) {
     }
 
     // Symbol Boosts - named variables for clarity
-    const symbolBoosts = [
-      { boost: cherryBoost, symbol: '🍒', name: 'Kirschen' },
-      { boost: lemonBoost, symbol: '🍋', name: 'Zitronen' },
-      { boost: orangeBoost, symbol: '🍊', name: 'Orangen' },
-      { boost: grapeBoost, symbol: '🍇', name: 'Trauben' },
-      { boost: melonBoost, symbol: '🍉', name: 'Wassermelonen' },
-      { boost: starBoost, symbol: '⭐', name: 'Stern' },
-      { boost: dachsBoost, symbol: '🦡', name: 'Dachs' }
+    const symbolBoosts: SymbolBoostDef[] = [
+      { boost: cherryBoost as string | null, symbol: '🍒', name: 'Kirschen' },
+      { boost: lemonBoost as string | null, symbol: '🍋', name: 'Zitronen' },
+      { boost: orangeBoost as string | null, symbol: '🍊', name: 'Orangen' },
+      { boost: grapeBoost as string | null, symbol: '🍇', name: 'Trauben' },
+      { boost: melonBoost as string | null, symbol: '🍉', name: 'Wassermelonen' },
+      { boost: starBoost as string | null, symbol: '⭐', name: 'Stern' },
+      { boost: dachsBoost as string | null, symbol: '🦡', name: 'Dachs' }
     ];
     symbolBoosts.forEach(({ boost, symbol, name }) => {
       if (boost === KV_ACTIVE) {
@@ -362,7 +392,7 @@ async function handleBuffs(username, env) {
   }
 }
 
-async function handleTransfer(username, target, amount, env) {
+async function handleTransfer(username: string, target: string, amount: string, env: Env): Promise<Response> {
   try {
     const lowerUsername = username.toLowerCase(); // OPTIMIZED: Cache once
 
@@ -487,13 +517,13 @@ async function handleTransfer(username, target, amount, env) {
   }
 }
 
-async function handleLeaderboard(env) {
+async function handleLeaderboard(env: Env): Promise<Response> {
   try {
     // Try to get cached leaderboard
     const cached = await env.SLOTS_KV.get('leaderboard:cache');
     if (cached) {
       try {
-        const cachedData = JSON.parse(cached);
+        const cachedData = JSON.parse(cached) as { timestamp: number; message: string };
         // Validate cache structure and check if still valid
         if (cachedData.timestamp && cachedData.message &&
             Date.now() - cachedData.timestamp < LEADERBOARD_CACHE_TTL * 1000) {
@@ -518,7 +548,7 @@ async function handleLeaderboard(env) {
     });
 
     // Batch reads in chunks for better performance
-    const users = [];
+    const users: { username: string; balance: number }[] = [];
 
     for (let i = 0; i < validKeys.length; i += LEADERBOARD_BATCH_SIZE) {
       const batch = validKeys.slice(i, i + LEADERBOARD_BATCH_SIZE);
@@ -533,7 +563,7 @@ async function handleLeaderboard(env) {
       for (let j = 0; j < batch.length; j++) {
         // Only include users who have accepted the disclaimer
         if (balances[j] && disclaimerStatuses[j]) {
-          const balance = parseInt(balances[j], 10);
+          const balance = parseInt(balances[j]!, 10);
           if (!isNaN(balance) && balance > 0) {
             users.push({
               username: usernames[j],

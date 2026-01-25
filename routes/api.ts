@@ -7,15 +7,18 @@ import { handleShopBuyAPI } from './shop.js';
 import { setDisclaimerAccepted, hasUnlock, getCustomMessages, setCustomMessages } from '../database.js';
 import { checkRateLimit, containsProfanity, isAdmin } from '../utils.js';
 import { RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';
+import type { Env } from '../types/index.js';
+
+interface LoggedInUser {
+  username: string;
+  displayName?: string;
+}
 
 /**
  * Validate CSRF protection for POST requests
  * Checks Origin header first, falls back to Referer if Origin is missing
- * @param {Request} request - Incoming request
- * @param {URL} url - Request URL
- * @returns {Response|null} Error response or null if valid
  */
-export function validateCsrf(request, url) {
+export function validateCsrf(request: Request, url: URL): Response | null {
   // Check for /api/ paths OR ?api= query parameter (admin API)
   const isApiPath = url.pathname.startsWith('/api/');
   const isApiQuery = url.searchParams.has('api');
@@ -66,15 +69,10 @@ export function validateCsrf(request, url) {
 
 /**
  * Handle API routes
- * @param {string} pathname - Request pathname
- * @param {Request} request - Incoming request
- * @param {URL} url - Request URL
- * @param {object} env - Environment bindings
- * @returns {Promise<Response|null>} API response or null if not an API route
  */
 const MAX_BODY_SIZE = 4096; // 4KB max for API requests
 
-export async function handleApiRoutes(pathname, request, url, env) {
+export async function handleApiRoutes(pathname: string, request: Request, url: URL, env: Env): Promise<Response | null> {
   // Reject oversized request bodies
   if (request.method === 'POST') {
     const contentLength = parseInt(request.headers.get('Content-Length') || '0', 10);
@@ -88,7 +86,7 @@ export async function handleApiRoutes(pathname, request, url, env) {
 
   // Shop buy API endpoint (requires logged-in user)
   if (pathname === '/api/shop/buy' && request.method === 'POST') {
-    const loggedInUser = await getUserFromRequest(request, env);
+    const loggedInUser = await getUserFromRequest(request, env) as LoggedInUser | null;
     if (!loggedInUser) {
       return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
         status: 401,
@@ -108,7 +106,7 @@ export async function handleApiRoutes(pathname, request, url, env) {
 
   // Accept disclaimer endpoint (requires logged-in user)
   if (pathname === '/api/disclaimer/accept' && request.method === 'POST') {
-    const loggedInUser = await getUserFromRequest(request, env);
+    const loggedInUser = await getUserFromRequest(request, env) as LoggedInUser | null;
     if (!loggedInUser) {
       return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
         status: 401,
@@ -124,7 +122,7 @@ export async function handleApiRoutes(pathname, request, url, env) {
 
   // Custom Messages save endpoint
   if (pathname === '/api/custom-messages' && request.method === 'POST') {
-    const loggedInUser = await getUserFromRequest(request, env);
+    const loggedInUser = await getUserFromRequest(request, env) as LoggedInUser | null;
     if (!loggedInUser) {
       return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
         status: 401,
@@ -141,7 +139,7 @@ export async function handleApiRoutes(pathname, request, url, env) {
       });
     }
 
-    let body;
+    let body: { win?: unknown; loss?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -170,8 +168,8 @@ export async function handleApiRoutes(pathname, request, url, env) {
     }
 
     // Validate each message
-    const cleanWin = [];
-    const cleanLoss = [];
+    const cleanWin: string[] = [];
+    const cleanLoss: string[] = [];
 
     for (const msg of win) {
       if (typeof msg !== 'string') continue;
@@ -229,7 +227,7 @@ export async function handleApiRoutes(pathname, request, url, env) {
 
   // Get custom messages endpoint
   if (pathname === '/api/custom-messages' && request.method === 'GET') {
-    const loggedInUser = await getUserFromRequest(request, env);
+    const loggedInUser = await getUserFromRequest(request, env) as LoggedInUser | null;
     if (!loggedInUser) {
       return new Response(JSON.stringify({ error: 'Nicht eingeloggt' }), {
         status: 401,

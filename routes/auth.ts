@@ -3,15 +3,12 @@
  */
 
 import { getUserLoginUrl, handleUserOAuthCallback, createLogoutResponse, handleOAuthCallback } from '../web/twitch.js';
+import type { Env } from '../types/index.js';
 
 /**
  * Handle authentication routes
- * @param {string} pathname - Request pathname
- * @param {URL} url - Request URL
- * @param {object} env - Environment bindings
- * @returns {Promise<Response|null>} Auth response or null if not an auth route
  */
-export async function handleAuthRoutes(pathname, url, env) {
+export async function handleAuthRoutes(pathname: string, url: URL, env: Env): Promise<Response | null> {
   // User login - redirect to Twitch OAuth
   if (pathname === '/auth/login') {
     const loginUrl = await getUserLoginUrl(env, url.origin);

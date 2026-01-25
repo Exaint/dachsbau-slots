@@ -66,6 +66,7 @@ import {
   getCustomMessages,
   checkAndClaimHourlyJackpot
 } from '../database.js';
+import type { Env, WinResult, StreakData, FreeSpinEntry, BuffWithUsesResult, BuffWithStackResult, CustomMessages } from '../types/index.js';
 
 // Engine functions
 import { generateGrid, applySpecialItems, calculateWin, buildResponseMessage } from './slots/engine.js';
@@ -82,8 +83,20 @@ import {
 const INVISIBLE_CHARS_REGEX = /[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u0000-\u001F\u007F-\u009F]+/g;
 const NORMALIZE_SPACES_REGEX = /\s+/g;
 
-// Main slot handler
-async function handleSlot(username, amountParam, url, env) {
+// ============================================
+// Types
+// ============================================
+
+interface FreeSpinConsumeResult {
+  used: boolean;
+  multiplier: number;
+}
+
+// ============================================
+// Main Slot Handler
+// ============================================
+
+async function handleSlot(username: string, amountParam: string | undefined, url: URL, env: Env): Promise<Response> {
   try {
     const lowerUsername = username.toLowerCase();
 
@@ -134,7 +147,21 @@ async function handleSlot(username, amountParam, url, env) {
       getBuffWithUses(username, 'dachs_locator', env),
       getBuffWithStack(username, 'rage_mode', env),
       isBuffActive(username, 'happy_hour', env)
-    ]);
+    ]) as [
+      { timestamp: number; date: string } | null,
+      boolean,
+      number | null,
+      number,
+      boolean,
+      boolean,
+      FreeSpinConsumeResult | null,
+      boolean,
+      boolean,
+      boolean,
+      BuffWithUsesResult,
+      BuffWithStackResult,
+      boolean
+    ];
 
     // STAGE 2: Non-essential buffs (loaded in parallel with remaining logic)
     // These only affect post-grid calculations, not grid generation
@@ -176,13 +203,13 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     // Parse spin amount
-    const spinAmountResult = await parseSpinAmount(username, amountParam, currentBalance, isFreeSpinUsed, env);
+    const spinAmountResult = await parseSpinAmount(username, amountParam || null, currentBalance, isFreeSpinUsed, env);
     if (spinAmountResult.error) {
       return new Response(spinAmountResult.error, { headers: RESPONSE_HEADERS });
     }
 
     let spinCost = isFreeSpinUsed ? 0 : (spinAmountResult.spinCost || BASE_SPIN_COST);
-    let multiplier = isFreeSpinUsed ? freeSpinMultiplier : (spinAmountResult.multiplier || 1);
+    const multiplier = isFreeSpinUsed ? freeSpinMultiplier : (spinAmountResult.multiplier || 1);
 
     // Happy Hour check (already loaded)
     if (!isFreeSpinUsed && spinCost < FREE_SPIN_COST_THRESHOLD && hasHappyHour) {
@@ -219,7 +246,17 @@ async function handleSlot(username, amountParam, url, env) {
       lastDaily,
       hasDailyBoost,
       kvMessages
-    ] = await stage2Promise;
+    ] = await stage2Promise as [
+      number,
+      StreakData,
+      boolean,
+      boolean,
+      number,
+      string | null,
+      number | null,
+      boolean,
+      CustomMessages | null
+    ];
 
     // Decrement Dachs Locator uses (using atomic function with retry mechanism)
     if (hasDachsLocator.active) {
@@ -230,7 +267,7 @@ async function handleSlot(username, amountParam, url, env) {
     await applySpecialItems(username, grid, hasGuaranteedPairToken, hasWildCardToken, env);
 
     // Calculate win
-    let result = calculateWin(grid);
+    const result: WinResult = calculateWin(grid);
 
     // Hourly Jackpot
     let hourlyJackpotWon = false;
@@ -294,7 +331,7 @@ async function handleSlot(username, amountParam, url, env) {
       const rankSymbol = prestigeRank ? `${prestigeRank} ` : '';
 
       // Fire-and-forget achievement tracking (insurance used) - with error handling
-      trackSlotAchievements(username, originalGrid, grid, result, newBalanceWithRefund, isFreeSpinUsed, isAllIn, hasWildCardToken, true, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, { spinCost })
+      trackSlotAchievements(username, originalGrid, grid, result, newBalanceWithRefund, isFreeSpinUsed, isAllIn || false, hasWildCardToken, true, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, { spinCost })
         .catch(err => logError('trackSlotAchievements.insurance', err, { username }));
 
       return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
@@ -315,7 +352,7 @@ async function handleSlot(username, amountParam, url, env) {
 
     const results = await Promise.all(finalUpdates);
     const rank = prestigeRank; // Pre-loaded
-    const remainingFreeSpins = results[4]; // Index shifted due to setLastActive
+    const remainingFreeSpins = results[4] as FreeSpinEntry[]; // Index shifted due to setLastActive
 
     let remainingCount = 0;
     try {
@@ -346,7 +383,7 @@ async function handleSlot(username, amountParam, url, env) {
     }
 
     // Custom Message (KV-based)
-    let customMsgAppend = null;
+    let customMsgAppend: string | null = null;
     if (kvMessages) {
       const msgArray = isWin ? kvMessages.win : kvMessages.loss;
       if (msgArray && msgArray.length > 0) {
@@ -360,7 +397,7 @@ async function handleSlot(username, amountParam, url, env) {
       spinCost,
       currentLossStreak: !isWin ? streakBonusResult.newStreak?.losses || 0 : 0
     };
-    trackSlotAchievements(username, originalGrid, grid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, extendedData)
+    trackSlotAchievements(username, originalGrid, grid, result, newBalance, isFreeSpinUsed, isAllIn || false, hasWildCardToken, false, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, extendedData)
       .catch(err => logError('trackSlotAchievements', err, { username }));
 
     // Build response

@@ -39,20 +39,70 @@ import { getLeaderboard as getD1Leaderboard, D1_ENABLED } from '../database/d1.j
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
 import { logError, isAdmin, sanitizeUsername, checkRateLimit } from '../utils.js';
 import { RATE_LIMIT_SEARCH, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';
+import type { Env, PlayerStats, Achievement } from '../types/index.js';
 
-const JSON_HEADERS = {
+interface LoggedInUser {
+  username: string;
+  displayName?: string;
+}
+
+interface LeaderboardPlayer {
+  username: string;
+  balance: number;
+}
+
+interface AchievementProgress {
+  current: number;
+  required: number;
+  percent: number;
+}
+
+interface AchievementWithStatus {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  reward: number;
+  hidden: boolean;
+  unlocked: boolean;
+  unlockedAt: number | null;
+  progress: AchievementProgress | null;
+}
+
+interface RefundableItem {
+  name: string;
+  price: number;
+  type: 'prestige' | 'unlock';
+  rank?: string;
+  unlockKey?: string;
+  blockedBy: string[];
+}
+
+interface AdminRequestBody {
+  username?: string;
+  balance?: number;
+  accepted?: boolean;
+  banned?: boolean;
+  optedOut?: boolean;
+  hidden?: boolean;
+  achievementId?: string;
+  unlocked?: boolean;
+  itemKey?: string;
+  batchSize?: number;
+  maxUsers?: number | null;
+  dryRun?: boolean;
+  sampleSize?: number;
+  _targetUser?: string;
+}
+
+const JSON_HEADERS: Record<string, string> = {
   'Content-Type': 'application/json; charset=utf-8'
 };
 
 /**
  * Handle API requests
- * @param {string} api - API endpoint name
- * @param {URL} url - Request URL
- * @param {object} env - Environment bindings
- * @param {object|null} loggedInUser - Logged in user from JWT (optional)
- * @param {Request} request - Original request (for POST body)
  */
-export async function handleApi(api, url, env, loggedInUser = null, request = null) {
+export async function handleApi(api: string, url: URL, env: Env, loggedInUser: LoggedInUser | null = null, request: Request | null = null): Promise<Response> {
   const username = url.searchParams.get('user');
 
   try {
@@ -80,8 +130,8 @@ export async function handleApi(api, url, env, loggedInUser = null, request = nu
 /**
  * Get player achievements with progress
  */
-async function handleAchievementsApi(username, env) {
-  const cleanUsername = sanitizeUsername(username);
+async function handleAchievementsApi(username: string | null, env: Env): Promise<Response> {
+  const cleanUsername = sanitizeUsername(username ?? '');
   if (!cleanUsername) {
     return jsonResponse({ error: 'Username required or invalid' }, 400);
   }
@@ -99,19 +149,19 @@ async function handleAchievementsApi(username, env) {
   const allAchievements = getAllAchievements();
 
   // Build achievements with unlock status and progress
-  const achievements = allAchievements.map(ach => {
+  const achievements: AchievementWithStatus[] = allAchievements.map((ach: Achievement) => {
     const unlocked = !!data.unlockedAt[ach.id];
     const unlockedAt = data.unlockedAt[ach.id] || null;
 
     // Calculate progress for requirement-based achievements
-    let progress = null;
+    let progress: AchievementProgress | null = null;
     if (ach.requirement && !unlocked) {
       const statKey = getStatKeyForAchievement(ach.id);
-      if (statKey && data.stats[statKey] !== undefined) {
+      if (statKey && (data.stats as Record<string, number>)[statKey] !== undefined) {
         progress = {
-          current: data.stats[statKey],
+          current: (data.stats as Record<string, number>)[statKey],
           required: ach.requirement,
-          percent: Math.min(100, Math.round((data.stats[statKey] / ach.requirement) * 100))
+          percent: Math.min(100, Math.round(((data.stats as Record<string, number>)[statKey] / ach.requirement) * 100))
         };
       }
     }
@@ -122,7 +172,7 @@ async function handleAchievementsApi(username, env) {
       description: ach.description,
       category: ach.category,
       reward: ach.reward,
-      hidden: ach.hidden,
+      hidden: ach.hidden || false,
       unlocked,
       unlockedAt,
       progress
@@ -130,7 +180,7 @@ async function handleAchievementsApi(username, env) {
   });
 
   // Group by category
-  const byCategory = {};
+  const byCategory: Record<string, AchievementWithStatus[]> = {};
   for (const cat of Object.values(ACHIEVEMENT_CATEGORIES)) {
     byCategory[cat] = achievements.filter(a => a.category === cat);
   }
@@ -155,8 +205,8 @@ async function handleAchievementsApi(username, env) {
 /**
  * Get full player profile (balance, rank, stats, achievements summary)
  */
-async function handleProfileApi(username, env) {
-  const cleanUsername = sanitizeUsername(username);
+async function handleProfileApi(username: string | null, env: Env): Promise<Response> {
+  const cleanUsername = sanitizeUsername(username ?? '');
   if (!cleanUsername) {
     return jsonResponse({ error: 'Username required or invalid' }, 400);
   }
@@ -195,7 +245,7 @@ async function handleProfileApi(username, env) {
  * Get leaderboard data
  * Uses D1 for efficient single-query leaderboard (replaces 2500+ KV operations)
  */
-async function handleLeaderboardApi(env) {
+async function handleLeaderboardApi(env: Env): Promise<Response> {
   try {
     // Try D1 first (single query, much faster)
     if (D1_ENABLED && env.DB) {
@@ -217,7 +267,7 @@ async function handleLeaderboardApi(env) {
       return jsonResponse({ players: [], source: 'kv' });
     }
 
-    const users = [];
+    const users: LeaderboardPlayer[] = [];
 
     // Batch fetch balances and check visibility
     for (let i = 0; i < listResult.keys.length; i += BATCH_SIZE) {
@@ -232,7 +282,7 @@ async function handleLeaderboardApi(env) {
 
       for (let j = 0; j < batch.length; j++) {
         if (balances[j]) {
-          const balance = parseInt(balances[j], 10);
+          const balance = parseInt(balances[j]!, 10);
           const username = usernames[j];
           const lowerUsername = username.toLowerCase();
           const isHidden = hiddenStatuses[j];
@@ -266,7 +316,7 @@ async function handleLeaderboardApi(env) {
 /**
  * Search for players by username prefix
  */
-async function handleSearchApi(query, env, request) {
+async function handleSearchApi(query: string | null, env: Env, request: Request | null): Promise<Response> {
   if (!query || query.length < 2) {
     return jsonResponse({ players: [] });
   }
@@ -290,7 +340,7 @@ async function handleSearchApi(query, env, request) {
     }
 
     // Filter usernames that match the search query
-    const matches = [];
+    const matches: string[] = [];
     for (const key of listResult.keys) {
       const username = key.name.replace('user:', '');
       if (username.toLowerCase().includes(searchQuery)) {
@@ -309,8 +359,8 @@ async function handleSearchApi(query, env, request) {
 /**
  * Helper: Create JSON response
  */
-function jsonResponse(data, status = 200, cacheSeconds = 0) {
-  const headers = { ...JSON_HEADERS };
+function jsonResponse(data: unknown, status = 200, cacheSeconds = 0): Response {
+  const headers: Record<string, string> = { ...JSON_HEADERS };
   if (cacheSeconds > 0) {
     headers['Cache-Control'] = `private, max-age=${cacheSeconds}`;
   }
@@ -326,7 +376,7 @@ function jsonResponse(data, status = 200, cacheSeconds = 0) {
  * Handle admin API requests
  * All admin actions require authentication and admin privileges
  */
-async function handleAdminApi(url, env, loggedInUser, request) {
+async function handleAdminApi(url: URL, env: Env, loggedInUser: LoggedInUser | null, request: Request | null): Promise<Response> {
   // Check authentication
   if (!loggedInUser) {
     return jsonResponse({ error: 'Not authenticated' }, 401);
@@ -347,7 +397,7 @@ async function handleAdminApi(url, env, loggedInUser, request) {
 
   try {
     // Parse JSON body
-    let body = {};
+    let body: AdminRequestBody = {};
     if (request) {
       try {
         body = await request.json();
@@ -358,7 +408,7 @@ async function handleAdminApi(url, env, loggedInUser, request) {
 
     // D1 migration actions don't require a target user
     const d1Actions = ['d1-migrate', 'd1-status', 'd1-verify', 'd1-migrate-achievements', 'd1-migrate-unlocks', 'd1-migrate-monthly', 'd1-migrate-full', 'd1-full-status', 'sync-achievement-stats'];
-    if (d1Actions.includes(action)) {
+    if (action && d1Actions.includes(action)) {
       // Handle D1 actions without targetUser requirement
     } else {
       const targetUser = sanitizeUsername(body.username || '');
@@ -420,7 +470,7 @@ async function handleAdminApi(url, env, loggedInUser, request) {
 /**
  * Admin: Set user balance
  */
-async function handleAdminSetBalance(username, balance, env) {
+async function handleAdminSetBalance(username: string, balance: number | undefined, env: Env): Promise<Response> {
   if (typeof balance !== 'number' || balance < 0) {
     return jsonResponse({ error: 'Invalid balance value' }, 400);
   }
@@ -432,7 +482,7 @@ async function handleAdminSetBalance(username, balance, env) {
 /**
  * Admin: Set disclaimer status
  */
-async function handleAdminSetDisclaimer(username, accepted, env) {
+async function handleAdminSetDisclaimer(username: string, accepted: boolean | undefined, env: Env): Promise<Response> {
   if (typeof accepted !== 'boolean') {
     return jsonResponse({ error: 'Invalid accepted value' }, 400);
   }
@@ -449,7 +499,7 @@ async function handleAdminSetDisclaimer(username, accepted, env) {
 /**
  * Admin: Set self-ban status
  */
-async function handleAdminSetSelfBan(username, banned, env) {
+async function handleAdminSetSelfBan(username: string, banned: boolean | undefined, env: Env): Promise<Response> {
   if (typeof banned !== 'boolean') {
     return jsonResponse({ error: 'Invalid banned value' }, 400);
   }
@@ -465,7 +515,7 @@ async function handleAdminSetSelfBan(username, banned, env) {
 /**
  * Admin: Set duel opt-out status
  */
-async function handleAdminSetDuelOpt(username, optedOut, env) {
+async function handleAdminSetDuelOpt(username: string, optedOut: boolean | undefined, env: Env): Promise<Response> {
   if (typeof optedOut !== 'boolean') {
     return jsonResponse({ error: 'Invalid optedOut value' }, 400);
   }
@@ -477,7 +527,7 @@ async function handleAdminSetDuelOpt(username, optedOut, env) {
 /**
  * Admin: Set leaderboard visibility
  */
-async function handleAdminSetLeaderboardHidden(username, hidden, env) {
+async function handleAdminSetLeaderboardHidden(username: string, hidden: boolean | undefined, env: Env): Promise<Response> {
   if (typeof hidden !== 'boolean') {
     return jsonResponse({ error: 'Invalid hidden value' }, 400);
   }
@@ -489,7 +539,7 @@ async function handleAdminSetLeaderboardHidden(username, hidden, env) {
 /**
  * Admin: Set achievement status (unlock/lock)
  */
-async function handleAdminSetAchievement(username, achievementId, unlocked, env) {
+async function handleAdminSetAchievement(username: string, achievementId: string | undefined, unlocked: boolean | undefined, env: Env): Promise<Response> {
   if (!achievementId || typeof achievementId !== 'string') {
     return jsonResponse({ error: 'Invalid achievementId' }, 400);
   }
@@ -514,7 +564,7 @@ async function handleAdminSetAchievement(username, achievementId, unlocked, env)
 /**
  * Admin: Migrate users from KV to D1
  */
-async function handleD1Migrate(body, env) {
+async function handleD1Migrate(body: AdminRequestBody, env: Env): Promise<Response> {
   const { batchSize = 100, maxUsers = null, dryRun = false } = body;
 
   const result = await migrateAllUsersToD1(env, { batchSize, maxUsers, dryRun });
@@ -524,7 +574,7 @@ async function handleD1Migrate(body, env) {
 /**
  * Admin: Get D1 migration status
  */
-async function handleD1Status(env) {
+async function handleD1Status(env: Env): Promise<Response> {
   // Debug: Check what bindings are available
   const bindings = {
     hasDB: !!env.DB,
@@ -552,7 +602,7 @@ async function handleD1Status(env) {
 /**
  * Admin: Verify D1 migration
  */
-async function handleD1Verify(body, env) {
+async function handleD1Verify(body: AdminRequestBody, env: Env): Promise<Response> {
   const { sampleSize = 50 } = body;
 
   const result = await verifyMigration(env, sampleSize);
@@ -562,7 +612,7 @@ async function handleD1Verify(body, env) {
 /**
  * Admin: Migrate achievements from KV to D1
  */
-async function handleD1MigrateAchievements(body, env) {
+async function handleD1MigrateAchievements(body: AdminRequestBody, env: Env): Promise<Response> {
   const { batchSize = 50, maxUsers = null, dryRun = false } = body;
 
   const result = await migrateAchievementsToD1(env, { batchSize, maxUsers, dryRun });
@@ -572,7 +622,7 @@ async function handleD1MigrateAchievements(body, env) {
 /**
  * Admin: Migrate unlocks from KV to D1
  */
-async function handleD1MigrateUnlocks(body, env) {
+async function handleD1MigrateUnlocks(body: AdminRequestBody, env: Env): Promise<Response> {
   const { dryRun = false } = body;
 
   const result = await migrateUnlocksToD1(env, { dryRun });
@@ -582,7 +632,7 @@ async function handleD1MigrateUnlocks(body, env) {
 /**
  * Admin: Migrate monthly login from KV to D1
  */
-async function handleD1MigrateMonthly(body, env) {
+async function handleD1MigrateMonthly(body: AdminRequestBody, env: Env): Promise<Response> {
   const { dryRun = false } = body;
 
   const result = await migrateMonthlyLoginToD1(env, { dryRun });
@@ -592,7 +642,7 @@ async function handleD1MigrateMonthly(body, env) {
 /**
  * Admin: Run full migration (users + achievements + unlocks + monthly)
  */
-async function handleD1MigrateFull(body, env) {
+async function handleD1MigrateFull(body: AdminRequestBody, env: Env): Promise<Response> {
   const { batchSize = 50, dryRun = false } = body;
 
   const result = await runFullMigration(env, { batchSize, dryRun });
@@ -602,7 +652,7 @@ async function handleD1MigrateFull(body, env) {
 /**
  * Admin: Get comprehensive D1 migration status
  */
-async function handleD1FullStatus(env) {
+async function handleD1FullStatus(env: Env): Promise<Response> {
   const result = await getFullMigrationStatus(env);
   return jsonResponse(result);
 }
@@ -613,7 +663,7 @@ async function handleD1FullStatus(env) {
  * Admin: Get refundable items for a user
  * Returns items the user owns and whether they can be refunded
  */
-async function handleAdminGetRefundableItems(username, env) {
+async function handleAdminGetRefundableItems(username: string, env: Env): Promise<Response> {
   const [currentRank, balance] = await Promise.all([
     getPrestigeRank(username, env),
     getBalance(username, env)
@@ -625,21 +675,27 @@ async function handleAdminGetRefundableItems(username, env) {
     unlockKeys.map(key => hasUnlock(username, key, env))
   );
 
-  const ownedUnlocks = {};
+  const ownedUnlocks: Record<string, boolean> = {};
   unlockKeys.forEach((key, i) => {
     ownedUnlocks[key] = unlockChecks[i];
   });
 
   // Build list of refundable items with status
-  const items = [];
+  interface RefundableItemWithStatus extends RefundableItem {
+    key: string;
+    owned: boolean;
+    canRefund: boolean;
+    blockedReason: string | null;
+  }
+  const items: RefundableItemWithStatus[] = [];
 
   // Add prestige ranks
   const rankOrder = ['🥉', '🥈', '🥇', '💎', '👑'];
-  const currentRankIndex = rankOrder.indexOf(currentRank);
+  const currentRankIndex = rankOrder.indexOf(currentRank || '');
 
-  for (const [itemKey, item] of Object.entries(REFUNDABLE_ITEMS)) {
+  for (const [itemKey, item] of Object.entries(REFUNDABLE_ITEMS) as [string, RefundableItem][]) {
     if (item.type === 'prestige') {
-      const itemRankIndex = rankOrder.indexOf(item.rank);
+      const itemRankIndex = rankOrder.indexOf(item.rank!);
       // User owns this rank if their current rank is equal or higher
       const owned = currentRankIndex >= itemRankIndex && currentRankIndex !== -1;
       // Can only refund the current (highest) rank
@@ -653,7 +709,7 @@ async function handleAdminGetRefundableItems(username, env) {
         blockedReason: owned && !canRefund ? `Muss zuerst höheren Rang refunden` : null
       });
     } else if (item.type === 'unlock') {
-      const owned = ownedUnlocks[item.unlockKey] || false;
+      const owned = ownedUnlocks[item.unlockKey!] || false;
       // Check if blocked by higher unlock
       const blockedByHigherUnlock = item.blockedBy.some(higherKey => ownedUnlocks[higherKey]);
 
@@ -680,12 +736,12 @@ async function handleAdminGetRefundableItems(username, env) {
  * Admin: Refund an item to a user
  * Removes the item and refunds the purchase price
  */
-async function handleAdminRefund(username, itemKey, env) {
+async function handleAdminRefund(username: string, itemKey: string | undefined, env: Env): Promise<Response> {
   if (!itemKey || typeof itemKey !== 'string') {
     return jsonResponse({ error: 'Invalid itemKey' }, 400);
   }
 
-  const item = REFUNDABLE_ITEMS[itemKey];
+  const item = (REFUNDABLE_ITEMS as Record<string, RefundableItem>)[itemKey];
   if (!item) {
     return jsonResponse({ error: 'Item not found' }, 404);
   }
@@ -709,7 +765,7 @@ async function handleAdminRefund(username, itemKey, env) {
 
     // Check if blocked by higher rank
     const rankOrder = ['🥉', '🥈', '🥇', '💎', '👑'];
-    const currentIndex = rankOrder.indexOf(currentRank);
+    const currentIndex = rankOrder.indexOf(currentRank || '');
     for (const higherRank of item.blockedBy) {
       const higherIndex = rankOrder.indexOf(higherRank);
       if (currentIndex >= higherIndex) {
@@ -721,7 +777,7 @@ async function handleAdminRefund(username, itemKey, env) {
     }
 
     // Perform refund: Set to previous rank or remove entirely
-    const previousRank = getPreviousPrestigeRank(item.rank);
+    const previousRank = getPreviousPrestigeRank(item.rank!);
     if (previousRank) {
       await setPrestigeRank(username, previousRank, env);
     } else {
@@ -730,7 +786,7 @@ async function handleAdminRefund(username, itemKey, env) {
 
   } else if (item.type === 'unlock') {
     // Check if user has this unlock
-    const hasThisUnlock = await hasUnlock(username, item.unlockKey, env);
+    const hasThisUnlock = await hasUnlock(username, item.unlockKey!, env);
     if (!hasThisUnlock) {
       return jsonResponse({
         error: 'User does not have this unlock',
@@ -750,7 +806,7 @@ async function handleAdminRefund(username, itemKey, env) {
     }
 
     // Perform refund: Remove the unlock
-    await removeUnlock(username, item.unlockKey, env);
+    await removeUnlock(username, item.unlockKey!, env);
 
     // Also delete custom messages data when custom_message unlock is refunded
     if (item.unlockKey === 'custom_message') {

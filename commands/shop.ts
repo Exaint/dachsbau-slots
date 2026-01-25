@@ -50,7 +50,8 @@ import {
   WHEEL_STAR_PRIZE,
   SECONDS_PER_MINUTE,
   SECONDS_PER_HOUR,
-  KV_ACTIVE
+  KV_ACTIVE,
+  ACHIEVEMENTS
 } from '../constants.js';
 import { getWeightedSymbol, secureRandom, secureRandomInt, logError, safeJsonParse } from '../utils.js';
 import {
@@ -77,11 +78,27 @@ import {
   updateAchievementStat,
   checkAndUnlockAchievement,
   getPlayerAchievements,
-  savePlayerAchievements,
   incrementStat
 } from '../database.js';
-import { ACHIEVEMENTS } from '../constants.js';
 import { calculateWin } from './slots.js';
+import type { Env, ShopItem, WinResult } from '../types/index.js';
+
+// ============================================
+// Types
+// ============================================
+
+interface WheelResult {
+  result: string;
+  message: string;
+  prize: number;
+}
+
+interface ExtendedShopItem extends ShopItem {
+  symbol?: string;
+  buffKey?: string;
+  duration?: number;
+  uses?: number;
+}
 
 // Static: Mystery Box item pool (avoid recreation per request)
 const MYSTERY_BOX_ITEMS = [
@@ -91,10 +108,20 @@ const MYSTERY_BOX_ITEMS = [
   32, 33, 34, 35, 39       // Timed Buffs Premium (5)
 ]; // Total: 17 Items (Unlocks, Prestige, Instants excluded)
 
+// ============================================
+// Achievement Tracking
+// ============================================
+
 // Achievement tracking for shop purchases (fire-and-forget)
-async function trackShopAchievements(username, itemId, item, extraData, env) {
+async function trackShopAchievements(
+  username: string,
+  itemId: number,
+  item: ExtendedShopItem,
+  extraData: { chaosResult?: number; wheelJackpot?: boolean } | null,
+  env: Env
+): Promise<void> {
   try {
-    const promises = [];
+    const promises: Promise<void>[] = [];
 
     // Track shop purchase stat
     promises.push(updateAchievementStat(username, 'shopPurchases', 1, env));
@@ -154,7 +181,7 @@ async function trackShopAchievements(username, itemId, item, extraData, env) {
     }
 
     // CHAOS_SPIN_BIG (Chaos Spin with 1000+ win)
-    if (itemId === 11 && extraData && extraData.chaosResult >= 1000) {
+    if (itemId === 11 && extraData && extraData.chaosResult && extraData.chaosResult >= 1000) {
       promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.CHAOS_SPIN_BIG.id, env));
     }
 
@@ -175,9 +202,16 @@ async function trackShopAchievements(username, itemId, item, extraData, env) {
 // Handler signature: async (username, item, itemId, balance, env) => Response
 // ============================================================================
 
-async function handlePrestigeItem(username, item, itemId, balance, currentRank, env) {
+async function handlePrestigeItem(
+  username: string,
+  item: ExtendedShopItem,
+  itemId: number,
+  balance: number,
+  currentRank: string | null,
+  env: Env
+): Promise<Response> {
   const currentIndex = currentRank ? PRESTIGE_RANKS.indexOf(currentRank) : -1;
-  const newIndex = PRESTIGE_RANKS.indexOf(item.rank);
+  const newIndex = PRESTIGE_RANKS.indexOf(item.rank!);
 
   if (currentIndex >= newIndex) {
     return new Response(`@${username} ❌ Du hast bereits ${currentRank} oder höher!`, { headers: RESPONSE_HEADERS });
@@ -191,7 +225,7 @@ async function handlePrestigeItem(username, item, itemId, balance, currentRank, 
   }
 
   await Promise.all([
-    setPrestigeRank(username, item.rank, env),
+    setPrestigeRank(username, item.rank!, env),
     setBalance(username, balance - item.price, env)
   ]);
 
@@ -201,7 +235,15 @@ async function handlePrestigeItem(username, item, itemId, balance, currentRank, 
   return new Response(`@${username} ✅ ${item.name} gekauft! Dein Rang: ${item.rank} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
-async function handleUnlockItem(username, item, itemId, balance, hasPrerequisite, hasExistingUnlock, env) {
+async function handleUnlockItem(
+  username: string,
+  item: ExtendedShopItem,
+  itemId: number,
+  balance: number,
+  hasPrerequisite: boolean | undefined,
+  hasExistingUnlock: boolean,
+  env: Env
+): Promise<Response> {
   if (item.requires && !hasPrerequisite) {
     return new Response(`@${username} ❌ Du musst zuerst ${PREREQUISITE_NAMES[item.requires]} freischalten!`, { headers: RESPONSE_HEADERS });
   }
@@ -211,7 +253,7 @@ async function handleUnlockItem(username, item, itemId, balance, hasPrerequisite
   }
 
   await Promise.all([
-    setUnlock(username, item.unlockKey, env),
+    setUnlock(username, item.unlockKey!, env),
     setBalance(username, balance - item.price, env)
   ]);
 
@@ -226,27 +268,39 @@ async function handleUnlockItem(username, item, itemId, balance, hasPrerequisite
   return new Response(`@${username} ✅ ${item.name} freigeschaltet! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
-async function handleTimedItem(username, item, itemId, balance, env) {
+async function handleTimedItem(
+  username: string,
+  item: ExtendedShopItem,
+  itemId: number,
+  balance: number,
+  env: Env
+): Promise<Response> {
   await setBalance(username, balance - item.price, env);
 
   if (item.uses) {
-    await activateBuffWithUses(username, item.buffKey, item.duration, item.uses, env);
+    await activateBuffWithUses(username, item.buffKey!, item.duration!, item.uses, env);
     return new Response(`@${username} ✅ ${item.name} aktiviert für ${item.uses} Spins! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
   if (item.buffKey === 'rage_mode') {
-    await activateBuffWithStack(username, item.buffKey, item.duration, env);
-    const minutes = Math.floor(item.duration / SECONDS_PER_MINUTE);
+    await activateBuffWithStack(username, item.buffKey, item.duration!, env);
+    const minutes = Math.floor(item.duration! / SECONDS_PER_MINUTE);
     return new Response(`@${username} ✅ ${item.name} aktiviert für ${minutes} Minuten! Verluste geben +5% Gewinn-Chance (bis 50%)! 🔥 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
-  await activateBuff(username, item.buffKey, item.duration, env);
-  const minutes = Math.floor(item.duration / SECONDS_PER_MINUTE);
-  const hours = item.duration >= SECONDS_PER_HOUR ? Math.floor(item.duration / SECONDS_PER_HOUR) + 'h' : minutes + ' Minuten';
+  await activateBuff(username, item.buffKey!, item.duration!, env);
+  const minutes = Math.floor(item.duration! / SECONDS_PER_MINUTE);
+  const hours = item.duration! >= SECONDS_PER_HOUR ? Math.floor(item.duration! / SECONDS_PER_HOUR) + 'h' : minutes + ' Minuten';
   return new Response(`@${username} ✅ ${item.name} aktiviert für ${hours}! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
-async function handleBoostItem(username, item, itemId, balance, env) {
+async function handleBoostItem(
+  username: string,
+  item: ExtendedShopItem,
+  itemId: number,
+  balance: number,
+  env: Env
+): Promise<Response> {
   const lowerUsername = username.toLowerCase();
 
   // Weekly limit check for Dachs-Boost
@@ -267,7 +321,7 @@ async function handleBoostItem(username, item, itemId, balance, env) {
 
     await Promise.all([
       setBalance(username, balance - item.price, env),
-      addBoost(username, item.symbol, env),
+      addBoost(username, item.symbol!, env),
       incrementDachsBoostPurchases(username, env)
     ]);
 
@@ -276,12 +330,18 @@ async function handleBoostItem(username, item, itemId, balance, env) {
 
   await Promise.all([
     setBalance(username, balance - item.price, env),
-    addBoost(username, item.symbol, env)
+    addBoost(username, item.symbol!, env)
   ]);
   return new Response(`@${username} ✅ ${item.name} aktiviert! Dein nächster Gewinn mit ${item.symbol} wird verdoppelt! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
-async function handleInsuranceItem(username, item, itemId, balance, env) {
+async function handleInsuranceItem(
+  username: string,
+  item: ExtendedShopItem,
+  itemId: number,
+  balance: number,
+  env: Env
+): Promise<Response> {
   await Promise.all([
     setBalance(username, balance - item.price, env),
     addInsurance(username, 5, env)
@@ -289,7 +349,13 @@ async function handleInsuranceItem(username, item, itemId, balance, env) {
   return new Response(`@${username} ✅ Insurance Pack erhalten! Die nächsten 5 Verluste geben 50% des Einsatzes zurück! 🛡️ | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
-async function handleWinMultiItem(username, item, itemId, balance, env) {
+async function handleWinMultiItem(
+  username: string,
+  item: ExtendedShopItem,
+  itemId: number,
+  balance: number,
+  env: Env
+): Promise<Response> {
   await Promise.all([
     setBalance(username, balance - item.price, env),
     addWinMultiplier(username, env)
@@ -297,7 +363,13 @@ async function handleWinMultiItem(username, item, itemId, balance, env) {
   return new Response(`@${username} ✅ Win Multiplier aktiviert! Dein nächster Gewinn wird x2! ⚡ | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
-async function handleBundleItem(username, item, itemId, balance, env) {
+async function handleBundleItem(
+  username: string,
+  item: ExtendedShopItem,
+  itemId: number,
+  balance: number,
+  env: Env
+): Promise<Response> {
   const purchases = await getSpinBundlePurchases(username, env);
   if (purchases.count >= WEEKLY_SPIN_BUNDLE_LIMIT) {
     return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal ${WEEKLY_SPIN_BUNDLE_LIMIT} Spin Bundles pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
@@ -313,7 +385,13 @@ async function handleBundleItem(username, item, itemId, balance, env) {
   return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DachsTaler) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Noch ${remainingPurchases} Käufe diese Woche möglich`, { headers: RESPONSE_HEADERS });
 }
 
-async function handlePeekItem(username, item, itemId, balance, env) {
+async function handlePeekItem(
+  username: string,
+  item: ExtendedShopItem,
+  itemId: number,
+  balance: number,
+  env: Env
+): Promise<Response> {
   const lowerUsername = username.toLowerCase();
 
   // Load all relevant buffs for accurate peek grid
@@ -331,18 +409,18 @@ async function handlePeekItem(username, item, itemId, balance, env) {
   let peekDachsChance = DACHS_BASE_CHANCE;
   if (hasLuckyCharm) peekDachsChance *= 2;
   if (dachsLocator) {
-    const data = safeJsonParse(dachsLocator, null);
+    const data = safeJsonParse<{ expireAt: number; uses: number }>(dachsLocator, null);
     if (data && Date.now() < data.expireAt && data.uses > 0) peekDachsChance *= 3;
   }
   if (rageMode) {
-    const data = safeJsonParse(rageMode, null);
+    const data = safeJsonParse<{ expireAt: number; stack: number }>(rageMode, null);
     if (data && Date.now() < data.expireAt && data.stack > 0) {
       peekDachsChance *= (1 + data.stack / 100);
     }
   }
 
-  const peekGrid = [];
-  const activeBuffs = [];
+  const peekGrid: string[] = [];
+  const activeBuffs: string[] = [];
   if (hasLuckyCharm) activeBuffs.push('🍀');
   if (hasStarMagnet) activeBuffs.push('⭐');
   if (hasDiamondRush) activeBuffs.push('💎');
@@ -376,7 +454,7 @@ async function handlePeekItem(username, item, itemId, balance, env) {
   await env.SLOTS_KV.put(`peek:${lowerUsername}`, JSON.stringify(peekGrid), { expirationTtl: PEEK_TTL_SECONDS });
 
   // Calculate result to show prediction
-  const peekResult = calculateWin(peekGrid);
+  const peekResult: WinResult = calculateWin(peekGrid);
   const willWin = peekResult.points > 0 || (peekResult.freeSpins && peekResult.freeSpins > 0);
   const buffText = activeBuffs.length > 0 ? ` (${activeBuffs.join('')} aktiv!)` : '';
 
@@ -384,7 +462,13 @@ async function handlePeekItem(username, item, itemId, balance, env) {
 }
 
 // Instant items have sub-handlers for different item IDs
-async function handleInstantItem(username, item, itemId, balance, env) {
+async function handleInstantItem(
+  username: string,
+  item: ExtendedShopItem,
+  itemId: number,
+  balance: number,
+  env: Env
+): Promise<Response> {
   // Chaos Spin (ID 11)
   if (itemId === 11) {
     const result = secureRandomInt(CHAOS_SPIN_MIN, CHAOS_SPIN_MAX);
@@ -460,31 +544,31 @@ async function handleInstantItem(username, item, itemId, balance, env) {
 // Mystery Box has complex logic with rollback and timeout protection
 const MYSTERY_BOX_TIMEOUT_MS = 5000;
 
-async function handleMysteryBox(username, item, balance, env) {
+async function handleMysteryBox(username: string, item: ExtendedShopItem, balance: number, env: Env): Promise<Response> {
   const mysteryItemId = MYSTERY_BOX_ITEMS[secureRandomInt(0, MYSTERY_BOX_ITEMS.length - 1)];
-  const mysteryResult = SHOP_ITEMS[mysteryItemId];
+  const mysteryResult = SHOP_ITEMS[mysteryItemId] as ExtendedShopItem;
 
   try {
     // Activation with timeout to prevent hanging operations
     const activationPromise = (async () => {
       if (mysteryResult.type === 'boost') {
-        await addBoost(username, mysteryResult.symbol, env);
+        await addBoost(username, mysteryResult.symbol!, env);
       } else if (mysteryResult.type === 'insurance') {
         await addInsurance(username, 5, env);
       } else if (mysteryResult.type === 'winmulti') {
         await addWinMultiplier(username, env);
       } else if (mysteryResult.type === 'timed') {
         if (mysteryResult.uses) {
-          await activateBuffWithUses(username, mysteryResult.buffKey, mysteryResult.duration, mysteryResult.uses, env);
+          await activateBuffWithUses(username, mysteryResult.buffKey!, mysteryResult.duration!, mysteryResult.uses, env);
         } else if (mysteryResult.buffKey === 'rage_mode') {
-          await activateBuffWithStack(username, mysteryResult.buffKey, mysteryResult.duration, env);
+          await activateBuffWithStack(username, mysteryResult.buffKey, mysteryResult.duration!, env);
         } else {
-          await activateBuff(username, mysteryResult.buffKey, mysteryResult.duration, env);
+          await activateBuff(username, mysteryResult.buffKey!, mysteryResult.duration!, env);
         }
       }
     })();
 
-    const timeoutPromise = new Promise((_, reject) =>
+    const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Mystery Box activation timeout')), MYSTERY_BOX_TIMEOUT_MS)
     );
 
@@ -512,7 +596,9 @@ async function handleMysteryBox(username, item, balance, env) {
 // ITEM TYPE HANDLER MAP
 // Maps item.type to handler function. Extend by adding new entries.
 // ============================================================================
-const ITEM_TYPE_HANDLERS = {
+type ItemHandler = (username: string, item: ExtendedShopItem, itemId: number, balance: number, env: Env) => Promise<Response>;
+
+const ITEM_TYPE_HANDLERS: Record<string, ItemHandler> = {
   timed: handleTimedItem,
   boost: handleBoostItem,
   insurance: handleInsuranceItem,
@@ -523,7 +609,11 @@ const ITEM_TYPE_HANDLERS = {
   // Note: prestige and unlock require special pre-loading, handled in buyShopItem
 };
 
-async function handleShop(username, item, env) {
+// ============================================
+// Main Shop Functions
+// ============================================
+
+async function handleShop(username: string, item: string | undefined, env: Env): Promise<Response> {
   try {
     if (!item) {
       return new Response(`@${username} Hier findest du den Slots Shop: ${URLS.SHOP} | Nutze: !shop buy [Nummer]`, { headers: RESPONSE_HEADERS });
@@ -551,16 +641,19 @@ async function handleShop(username, item, env) {
 // Uses Strategy Pattern - delegates to type-specific handlers above.
 // For new item types: 1) Add handler function 2) Add to ITEM_TYPE_HANDLERS map
 // ============================================================================
-async function buyShopItem(username, itemId, env) {
+async function buyShopItem(username: string, itemId: number, env: Env): Promise<Response> {
   try {
-    const item = SHOP_ITEMS[itemId];
+    const item = SHOP_ITEMS[itemId] as ExtendedShopItem | undefined;
 
     if (!item) {
       return new Response(`@${username} ❌ Item nicht gefunden!`, { headers: RESPONSE_HEADERS });
     }
 
     // OPTIMIZED: Load balance and prerequisites in parallel based on item type
-    let balance, hasPrerequisite, currentRank, hasExistingUnlock;
+    let balance: number;
+    let hasPrerequisite: boolean | undefined;
+    let currentRank: string | null = null;
+    let hasExistingUnlock: boolean = false;
 
     if (item.type === 'prestige') {
       [balance, currentRank] = await Promise.all([
@@ -568,17 +661,17 @@ async function buyShopItem(username, itemId, env) {
         getPrestigeRank(username, env)
       ]);
     } else if (item.type === 'unlock') {
-      const promises = [getBalance(username, env)];
+      const promises: Promise<number | boolean | string | null>[] = [getBalance(username, env)];
       if (item.requires) promises.push(hasUnlock(username, item.requires, env));
-      promises.push(hasUnlock(username, item.unlockKey, env));
+      promises.push(hasUnlock(username, item.unlockKey!, env));
 
       const results = await Promise.all(promises);
-      balance = results[0];
+      balance = results[0] as number;
       if (item.requires) {
-        hasPrerequisite = results[1];
-        hasExistingUnlock = results[2];
+        hasPrerequisite = results[1] as boolean;
+        hasExistingUnlock = results[2] as boolean;
       } else {
-        hasExistingUnlock = results[1];
+        hasExistingUnlock = results[1] as boolean;
       }
     } else {
       balance = await getBalance(username, env);
@@ -619,7 +712,7 @@ async function buyShopItem(username, itemId, env) {
   }
 }
 
-function spinWheel() {
+function spinWheel(): WheelResult {
   const rand = secureRandom() * 100;
   if (rand < WHEEL_JACKPOT_THRESHOLD) {
     if (secureRandom() < WHEEL_JACKPOT_CHANCE) return { result: '🦡 🦡 🦡 🦡 🦡', message: '🔥 5x DACHS JACKPOT! 🔥', prize: WHEEL_JACKPOT_PRIZE };

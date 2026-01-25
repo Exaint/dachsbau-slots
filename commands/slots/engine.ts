@@ -18,31 +18,45 @@ import {
 } from '../../constants.js';
 import { getWeightedSymbol, secureRandom, secureRandomInt, safeJsonParse } from '../../utils.js';
 import { consumeGuaranteedPair, consumeWildCard } from '../../database.js';
+import type { Env, WinResult } from '../../types/index.js';
+
+// ============================================
+// Types
+// ============================================
+
+/** Symbol value hierarchy for wild card optimization */
+interface SymbolValues {
+  [symbol: string]: number;
+}
+
+// ============================================
+// Grid Generation
+// ============================================
 
 /**
  * Generate spin grid with optional buff effects
- * @param {string} lowerUsername - Pre-lowercased username for KV operations
- * @param {number} dachsChance - Current chance for dachs symbol
- * @param {boolean} hasStarMagnet - Star Magnet buff active
- * @param {boolean} hasDiamondRush - Diamond Rush buff active
- * @param {object} env - Cloudflare environment
- * @returns {Promise<string[]>} Grid array [symbol, symbol, symbol]
  */
-async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamondRush, env) {
+async function generateGrid(
+  lowerUsername: string,
+  dachsChance: number,
+  hasStarMagnet: boolean,
+  hasDiamondRush: boolean,
+  env: Env
+): Promise<string[]> {
   // Check if user has a stored peek grid
   const peekKey = `peek:${lowerUsername}`;
   const storedPeek = await env.SLOTS_KV.get(peekKey);
 
   if (storedPeek) {
     await env.SLOTS_KV.delete(peekKey);
-    const parsedPeek = safeJsonParse(storedPeek, null);
+    const parsedPeek = safeJsonParse<string[]>(storedPeek, null);
     if (parsedPeek && Array.isArray(parsedPeek) && parsedPeek.length === GRID_SIZE) {
       return parsedPeek;
     }
     // Invalid peek data, continue with normal grid generation
   }
 
-  const grid = [];
+  const grid: string[] = [];
 
   // Generate 3 elements (the winning row)
   for (let i = 0; i < GRID_SIZE; i++) {
@@ -71,15 +85,20 @@ async function generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamon
   return grid;
 }
 
+// ============================================
+// Special Items
+// ============================================
+
 /**
  * Apply special items (Guaranteed Pair, Wild Card) to grid
- * @param {string} username - Original username
- * @param {string[]} grid - Grid array (modified in place)
- * @param {boolean} hasGuaranteedPairToken - Has Guaranteed Pair token
- * @param {boolean} hasWildCardToken - Has Wild Card token
- * @param {object} env - Cloudflare environment
  */
-async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWildCardToken, env) {
+async function applySpecialItems(
+  username: string,
+  grid: string[],
+  hasGuaranteedPairToken: boolean,
+  hasWildCardToken: boolean,
+  env: Env
+): Promise<void> {
   if (hasGuaranteedPairToken && grid.length >= 2 && GUARANTEED_PAIR_SYMBOLS.length > 0) {
     const hasPair = (grid[0] === grid[1]) || (grid[1] === grid[2]) || (grid[0] === grid[2]);
 
@@ -107,12 +126,10 @@ async function applySpecialItems(username, grid, hasGuaranteedPairToken, hasWild
  * - Non-Dachs pair → complete to triple
  * - Dachs pair → don't change (already good)
  * - No pair → create best non-Dachs adjacent pair
- * @param {string[]} grid - Grid array (modified in place)
- * @returns {boolean} Whether optimization was applied
  */
-function applyWildCardOptimization(grid) {
+function applyWildCardOptimization(grid: string[]): boolean {
   // Symbol value hierarchy (excluding Dachs - Wild can't become Dachs)
-  const SYMBOL_VALUES = {
+  const SYMBOL_VALUES: SymbolValues = {
     '⭐': 50,    // Star pair payout (best regular)
     '🍉': 25,    // Watermelon
     '🍇': 15,    // Grapes
@@ -123,7 +140,7 @@ function applyWildCardOptimization(grid) {
   };
 
   // Helper: Check if symbol is Dachs
-  const isDachs = (s) => s === '🦡';
+  const isDachs = (s: string): boolean => s === '🦡';
 
   // Check for existing pairs
   const pair01 = grid[0] === grid[1] && grid[0] !== grid[2];
@@ -153,7 +170,7 @@ function applyWildCardOptimization(grid) {
   // Find best non-Dachs symbol and its position
   let bestValue = -1;
   let bestIndex = -1;
-  let bestSymbol = null;
+  let bestSymbol: string | null = null;
 
   for (let i = 0; i < 3; i++) {
     if (!isDachs(grid[i])) {
@@ -167,7 +184,7 @@ function applyWildCardOptimization(grid) {
   }
 
   // If no non-Dachs symbol found (all Dachs?!), can't do anything
-  if (bestIndex === -1) return false;
+  if (bestIndex === -1 || bestSymbol === null) return false;
 
   // Replace adjacent position to create pair
   // Best at 0 → replace 1, Best at 1 → replace 0 or 2, Best at 2 → replace 1
@@ -183,12 +200,14 @@ function applyWildCardOptimization(grid) {
   return true;
 }
 
+// ============================================
+// Win Calculation
+// ============================================
+
 /**
  * Calculate win result from grid
- * @param {string[]} grid - Grid array [symbol, symbol, symbol]
- * @returns {{points: number, message: string, freeSpins?: number}}
  */
-function calculateWin(grid) {
+function calculateWin(grid: string[]): WinResult {
   // Count Wild Cards
   const wildCount = grid.filter(s => s === '🃏').length;
   const wildSuffix = wildCount > 0 ? ' (🃏 Wild!)' : '';
@@ -214,7 +233,7 @@ function calculateWin(grid) {
         const symbol1 = nonWildSymbols[0];
         const symbol2 = nonWildSymbols[1];
 
-        const getPairValue = (s) => {
+        const getPairValue = (s: string): number => {
           if (s === '🦡') return DACHS_PAIR_PAYOUT;
           if (s === '💎') return 0;
           return PAIR_PAYOUTS[s] || 5;
@@ -276,11 +295,32 @@ function calculateWin(grid) {
   return { points: 0, message: SPIN_LOSS_MESSAGES[secureRandomInt(0, SPIN_LOSS_MESSAGES.length - 1)] };
 }
 
+// ============================================
+// Response Building
+// ============================================
+
 /**
  * Build response message in D2 format
  * Format: [ Grid ] Result! +X DachsTaler 💰 ║ Natural Bonuses ║ 🛒 Shop Buffs ║ Kontostand: X DachsTaler
  */
-function buildResponseMessage(username, grid, result, totalWin, newBalance, rank, isFreeSpinUsed, multiplier, remainingCount, hourlyJackpotWon, naturalBonuses, shopBuffs, streakMulti, lossWarningMessage, spinCost = 0, wildCardUsed = false) {
+function buildResponseMessage(
+  username: string,
+  grid: string[],
+  result: WinResult,
+  totalWin: number,
+  newBalance: number,
+  rank: string | null,
+  isFreeSpinUsed: boolean,
+  multiplier: number,
+  remainingCount: number,
+  hourlyJackpotWon: boolean,
+  naturalBonuses: string[],
+  shopBuffs: string[],
+  streakMulti: number,
+  lossWarningMessage: string,
+  spinCost: number = 0,
+  wildCardUsed: boolean = false
+): string {
   // Add Wild Card to shop buffs if used
   if (wildCardUsed) {
     shopBuffs.push('🃏 Wild');
@@ -289,7 +329,7 @@ function buildResponseMessage(username, grid, result, totalWin, newBalance, rank
   const freeSpinPrefix = isFreeSpinUsed ? `FREE SPIN (${multiplier * 10} DachsTaler)${remainingCount > 0 ? ` (${remainingCount} übrig)` : ''} ` : '';
   const middleRow = grid.join(' ');
 
-  const messageParts = [`@${username}`, rankSymbol, freeSpinPrefix, `[ ${middleRow} ]`];
+  const messageParts: string[] = [`@${username}`, rankSymbol, freeSpinPrefix, `[ ${middleRow} ]`];
 
   // Free Spins won
   if (result.freeSpins && result.freeSpins > 0) {

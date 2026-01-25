@@ -23,21 +23,22 @@ import {
   activateWildCard,
   getMonthlyLogin
 } from '../../database.js';
+import type { Env, ShopItem } from '../../types/index.js';
 
-async function handleGive(username, target, amount, env) {
+async function handleGive(username: string, target: string, amount: string, env: Env): Promise<Response> {
   try {
     const check = requireAdminWithTarget(username, target, 'Nutze: !slots give @user [Betrag]');
-    if (!check.valid) return check.response;
+    if (!check.valid) return check.response!;
 
     const parsedAmount = validateAmount(amount, 1, MAX_BALANCE);
     if (!parsedAmount) {
       return createErrorResponse(username, `Ungültiger Betrag! (1-${MAX_BALANCE})`);
     }
 
-    const currentBalance = await getBalance(check.cleanTarget, env);
+    const currentBalance = await getBalance(check.cleanTarget!, env);
     const newBalance = Math.min(currentBalance + parsedAmount, MAX_BALANCE);
-    await setBalance(check.cleanTarget, newBalance, env);
-    logAudit('give', username, check.cleanTarget, { amount: parsedAmount, newBalance });
+    await setBalance(check.cleanTarget!, newBalance, env);
+    logAudit('give', username, check.cleanTarget!, { amount: parsedAmount, newBalance });
 
     return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${check.cleanTarget} gutgeschrieben! Neuer Kontostand: ${newBalance} 🦡💰`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -46,10 +47,10 @@ async function handleGive(username, target, amount, env) {
   }
 }
 
-async function handleSetBalance(username, target, amount, env) {
+async function handleSetBalance(username: string, target: string, amount: string, env: Env): Promise<Response> {
   try {
     const check = requireAdminWithTarget(username, target, 'Nutze: !slots setbalance @user [Betrag]');
-    if (!check.valid) return check.response;
+    if (!check.valid) return check.response!;
 
     const parsedAmount = validateAmount(amount, 0, MAX_BALANCE);
     if (parsedAmount === null) {
@@ -57,8 +58,8 @@ async function handleSetBalance(username, target, amount, env) {
     }
 
     const newBalance = Math.min(parsedAmount, MAX_BALANCE);
-    await setBalance(check.cleanTarget, newBalance, env);
-    logAudit('setbalance', username, check.cleanTarget, { newBalance });
+    await setBalance(check.cleanTarget!, newBalance, env);
+    logAudit('setbalance', username, check.cleanTarget!, { newBalance });
 
     return new Response(`@${username} ✅ Balance von @${check.cleanTarget} auf ${newBalance} DachsTaler gesetzt! 💰`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -67,24 +68,24 @@ async function handleSetBalance(username, target, amount, env) {
   }
 }
 
-async function handleGiveBuff(username, target, shopNumber, env) {
+async function handleGiveBuff(username: string, target: string, shopNumber: string, env: Env): Promise<Response> {
   try {
     const check = requireAdminWithTarget(username, target, 'Nutze: !slots givebuff @user [Shopnummer]');
-    if (!check.valid) return check.response;
+    if (!check.valid) return check.response!;
 
     const itemId = validateAmount(shopNumber, 1, SHOP_ITEM_MAX);
     if (!itemId) {
       return createErrorResponse(username, `Ungültige Shopnummer! Nutze 1-${SHOP_ITEM_MAX}.`);
     }
 
-    const cleanTarget = check.cleanTarget;
-    const item = SHOP_ITEMS[itemId];
+    const cleanTarget = check.cleanTarget!;
+    const item = SHOP_ITEMS[itemId] as ShopItem | undefined;
     if (!item) {
       return createErrorResponse(username, `Shopnummer ${itemId} existiert nicht!`);
     }
 
     if (item.type === 'boost') {
-      await addBoost(cleanTarget, item.symbol, env);
+      await addBoost(cleanTarget, (item as ShopItem & { symbol: string }).symbol, env);
       return new Response(`@${username} ✅ ${item.name} an @${cleanTarget} gegeben! 🎁`, { headers: RESPONSE_HEADERS });
     } else if (item.type === 'insurance') {
       await addInsurance(cleanTarget, 5, env);
@@ -93,19 +94,20 @@ async function handleGiveBuff(username, target, shopNumber, env) {
       await addWinMultiplier(cleanTarget, env);
       return new Response(`@${username} ✅ ${item.name} an @${cleanTarget} gegeben! 🎁`, { headers: RESPONSE_HEADERS });
     } else if (item.type === 'timed') {
-      if (item.uses) {
-        await activateBuffWithUses(cleanTarget, item.buffKey, item.duration, item.uses, env);
-      } else if (item.buffKey === 'rage_mode') {
-        await activateBuffWithStack(cleanTarget, item.buffKey, item.duration, env);
+      const timedItem = item as ShopItem & { buffKey: string; duration: number; uses?: number };
+      if (timedItem.uses) {
+        await activateBuffWithUses(cleanTarget, timedItem.buffKey, timedItem.duration, timedItem.uses, env);
+      } else if (timedItem.buffKey === 'rage_mode') {
+        await activateBuffWithStack(cleanTarget, timedItem.buffKey, timedItem.duration, env);
       } else {
-        await activateBuff(cleanTarget, item.buffKey, item.duration, env);
+        await activateBuff(cleanTarget, timedItem.buffKey, timedItem.duration, env);
       }
       return new Response(`@${username} ✅ ${item.name} an @${cleanTarget} aktiviert! 🎁`, { headers: RESPONSE_HEADERS });
     } else if (item.type === 'unlock') {
-      await setUnlock(cleanTarget, item.unlockKey, env);
+      await setUnlock(cleanTarget, item.unlockKey!, env);
       return new Response(`@${username} ✅ ${item.name} für @${cleanTarget} freigeschaltet! 🎁`, { headers: RESPONSE_HEADERS });
     } else if (item.type === 'prestige') {
-      await setPrestigeRank(cleanTarget, item.rank, env);
+      await setPrestigeRank(cleanTarget, item.rank!, env);
       return new Response(`@${username} ✅ ${item.name} an @${cleanTarget} vergeben! 🎁`, { headers: RESPONSE_HEADERS });
     } else if (item.type === 'instant') {
       // Handle specific instant items that can be gifted
@@ -129,15 +131,15 @@ async function handleGiveBuff(username, target, shopNumber, env) {
   }
 }
 
-async function handleRemoveBuff(username, target, shopNumber, env) {
+async function handleRemoveBuff(username: string, target: string, shopNumber: string, env: Env): Promise<Response> {
   try {
     const check = requireAdminWithTarget(username, target, 'Nutze: !slots removebuff @user [Shopnummer]');
-    if (!check.valid) return check.response;
+    if (!check.valid) return check.response!;
 
-    const cleanTarget = check.cleanTarget;
+    const cleanTarget = check.cleanTarget!;
 
     const itemId = parseInt(shopNumber, 10);
-    const item = SHOP_ITEMS[itemId];
+    const item = SHOP_ITEMS[itemId] as ShopItem & { symbol?: string; buffKey?: string } | undefined;
 
     if (!item) {
       return new Response(`@${username} ❌ Ungültige Shopnummer! Nutze 1-${SHOP_ITEM_MAX}.`, { headers: RESPONSE_HEADERS });
@@ -164,7 +166,7 @@ async function handleRemoveBuff(username, target, shopNumber, env) {
   }
 }
 
-async function handleClearAllBuffs(username, target, env) {
+async function handleClearAllBuffs(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -194,7 +196,7 @@ async function handleClearAllBuffs(username, target, env) {
   }
 }
 
-async function handleGetStats(username, target, env) {
+async function handleGetStats(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -223,7 +225,7 @@ async function handleGetStats(username, target, env) {
   }
 }
 
-async function handleGetDaily(username, target, env) {
+async function handleGetDaily(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -256,7 +258,7 @@ async function handleGetDaily(username, target, env) {
   }
 }
 
-async function handleResetDaily(username, target, env) {
+async function handleResetDaily(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -279,7 +281,7 @@ async function handleResetDaily(username, target, env) {
   }
 }
 
-async function handleGiveFreespins(username, target, amount, multiplier, env) {
+async function handleGiveFreespins(username: string, target: string, amount: string, multiplier: string | undefined, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -327,7 +329,7 @@ async function handleGiveFreespins(username, target, amount, multiplier, env) {
   }
 }
 
-async function handleGiveInsurance(username, target, amount, env) {
+async function handleGiveInsurance(username: string, target: string, amount: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -359,7 +361,7 @@ async function handleGiveInsurance(username, target, amount, env) {
   }
 }
 
-async function handleGetMonthlyLogin(username, target, env) {
+async function handleGetMonthlyLogin(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -384,7 +386,7 @@ async function handleGetMonthlyLogin(username, target, env) {
   }
 }
 
-async function handleResetWeeklyLimits(username, target, env) {
+async function handleResetWeeklyLimits(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -411,7 +413,7 @@ async function handleResetWeeklyLimits(username, target, env) {
   }
 }
 
-async function handleGiveWinMulti(username, target, env) {
+async function handleGiveWinMulti(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;

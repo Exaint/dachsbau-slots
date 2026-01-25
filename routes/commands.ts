@@ -50,6 +50,8 @@ import { handleShop } from '../commands/shop.js';
 // Duel commands
 import { handleDuel, handleDuelAccept, handleDuelDecline, handleDuelOpt } from '../commands/duel.js';
 
+import type { Env } from '../types/index.js';
+
 // Command alias sets (O(1) lookup)
 export const LEADERBOARD_ALIASES = new Set(['lb', 'leaderboard', 'rank', 'ranking']);
 export const BALANCE_ALIASES = new Set(['balance', 'konto']);
@@ -65,7 +67,7 @@ export const SAFE_COMMANDS = new Set([
 ]);
 
 // Admin commands that take (username, target, env)
-const ADMIN_COMMANDS_TARGET = {
+const ADMIN_COMMANDS_TARGET: Record<string, (username: string, target: string | null, env: Env) => Promise<Response>> = {
   ban: handleBan,
   unban: handleUnban,
   reset: handleReset,
@@ -80,7 +82,7 @@ const ADMIN_COMMANDS_TARGET = {
 };
 
 // Admin commands that take (username, target, amount, env)
-const ADMIN_COMMANDS_AMOUNT = {
+const ADMIN_COMMANDS_AMOUNT: Record<string, (username: string, target: string | null, amount: string | null, env: Env) => Promise<Response>> = {
   give: handleGive,
   setbalance: handleSetBalance,
   givebuff: handleGiveBuff,
@@ -89,7 +91,7 @@ const ADMIN_COMMANDS_AMOUNT = {
 };
 
 // Admin commands that take (username, target, env) - target only, no amount
-const ADMIN_COMMANDS_TARGET_ONLY = {
+const ADMIN_COMMANDS_TARGET_ONLY: Record<string, (username: string, target: string | null, env: Env) => Promise<Response>> = {
   getmonthlylogin: handleGetMonthlyLogin,
   resetweeklylimits: handleResetWeeklyLimits,
   givewinmulti: handleGiveWinMulti
@@ -97,11 +99,8 @@ const ADMIN_COMMANDS_TARGET_ONLY = {
 
 /**
  * Check security constraints (blacklist, frozen, maintenance)
- * @param {string} username - Username to check
- * @param {object} env - Environment bindings
- * @returns {Promise<Response|null>} Error response if blocked, null if allowed
  */
-export async function checkSecurityConstraints(username, env) {
+export async function checkSecurityConstraints(username: string, env: Env): Promise<Response | null> {
   const [blacklisted, isFrozen, maintenanceMode] = await Promise.all([
     isBlacklisted(username, env),
     env.SLOTS_KV.get(`frozen:${username}`),
@@ -123,13 +122,8 @@ export async function checkSecurityConstraints(username, env) {
 
 /**
  * Handle slot subcommands (amount parameter variations)
- * @param {string} cleanUsername - Sanitized username
- * @param {string} lower - Lowercase amount parameter
- * @param {URL} url - Request URL
- * @param {object} env - Environment bindings
- * @returns {Promise<Response|null>} Command response or null if not a subcommand
  */
-export async function handleSlotSubcommands(cleanUsername, lower, url, env) {
+export async function handleSlotSubcommands(cleanUsername: string, lower: string, url: URL, env: Env): Promise<Response | null> {
   // Detect !slots buy mistake
   if (lower === 'buy') {
     const itemNumber = url.searchParams.get('target');
@@ -144,7 +138,7 @@ export async function handleSlotSubcommands(cleanUsername, lower, url, env) {
     const start = Date.now();
     await env.SLOTS_KV.get(`balance:${cleanUsername}`);
     const kvTime = Date.now() - start;
-    let d1Time = '-';
+    let d1Time: string = '-';
     if (env.DB) {
       const d1Start = Date.now();
       await env.DB.prepare('SELECT 1').first();
@@ -242,7 +236,7 @@ export async function handleSlotSubcommands(cleanUsername, lower, url, env) {
   if (lower === 'duel') {
     const target = url.searchParams.get('target');
     const amount = url.searchParams.get('giveamount');
-    const args = [target, amount].filter(Boolean);
+    const args = [target, amount].filter(Boolean) as string[];
     return new Response(await handleDuel(cleanUsername, args, env), { headers: RESPONSE_HEADERS });
   }
   if (lower === 'duelaccept') {
@@ -262,13 +256,8 @@ export async function handleSlotSubcommands(cleanUsername, lower, url, env) {
 
 /**
  * Handle the main slot action
- * @param {string} cleanUsername - Sanitized username
- * @param {string|null} amountParam - Amount parameter
- * @param {URL} url - Request URL
- * @param {object} env - Environment bindings
- * @returns {Promise<Response>} Slot response
  */
-export async function handleSlotAction(cleanUsername, amountParam, url, env) {
+export async function handleSlotAction(cleanUsername: string, amountParam: string | null, url: URL, env: Env): Promise<Response> {
   if (amountParam) {
     const lower = amountParam.toLowerCase();
 
@@ -283,18 +272,13 @@ export async function handleSlotAction(cleanUsername, amountParam, url, env) {
     if (subcommandResponse) return subcommandResponse;
   }
 
-  return await handleSlot(cleanUsername, amountParam, url, env);
+  return await handleSlot(cleanUsername, amountParam ?? undefined, url, env);
 }
 
 /**
  * Handle legacy action-based commands
- * @param {string} action - Action parameter
- * @param {string} cleanUsername - Sanitized username
- * @param {URL} url - Request URL
- * @param {object} env - Environment bindings
- * @returns {Promise<Response|null>} Action response or null if invalid
  */
-export async function handleLegacyActions(action, cleanUsername, url, env) {
+export async function handleLegacyActions(action: string, cleanUsername: string, url: URL, env: Env): Promise<Response | null> {
   // Safe read-only actions (no security check needed)
   if (action === 'leaderboard') return await handleLeaderboard(env);
   if (action === 'stats') return await handleStats(cleanUsername, env);

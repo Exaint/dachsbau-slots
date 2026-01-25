@@ -5,8 +5,9 @@
 import { RESPONSE_HEADERS, ALL_BUFF_KEYS, ALL_SYMBOLS, ALL_UNLOCK_KEYS } from '../../constants.js';
 import { requireAdmin, validateAndCleanTarget, logError, logAudit } from '../../utils.js';
 import { setBalance, removeSelfBan } from '../../database.js';
+import type { Env } from '../../types/index.js';
 
-async function handleBan(username, target, env) {
+async function handleBan(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -16,7 +17,7 @@ async function handleBan(username, target, env) {
     if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     await env.SLOTS_KV.put(`blacklist:${cleanTarget}`, 'true');
-    logAudit('ban', username, cleanTarget);
+    logAudit('ban', username, cleanTarget!);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde vom Slots-Spiel ausgeschlossen. 🔨`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -25,7 +26,7 @@ async function handleBan(username, target, env) {
   }
 }
 
-async function handleUnban(username, target, env) {
+async function handleUnban(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -36,9 +37,9 @@ async function handleUnban(username, target, env) {
 
     await Promise.all([
       env.SLOTS_KV.delete(`blacklist:${cleanTarget}`),
-      removeSelfBan(cleanTarget, env)
+      removeSelfBan(cleanTarget!, env)
     ]);
-    logAudit('unban', username, cleanTarget);
+    logAudit('unban', username, cleanTarget!);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde entbannt und kann wieder Slots spielen. ✅`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -47,7 +48,7 @@ async function handleUnban(username, target, env) {
   }
 }
 
-async function handleFreeze(username, target, env) {
+async function handleFreeze(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -57,7 +58,7 @@ async function handleFreeze(username, target, env) {
     if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     await env.SLOTS_KV.put(`frozen:${cleanTarget}`, 'true');
-    logAudit('freeze', username, cleanTarget);
+    logAudit('freeze', username, cleanTarget!);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde eingefroren. ❄️`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -66,7 +67,7 @@ async function handleFreeze(username, target, env) {
   }
 }
 
-async function handleUnfreeze(username, target, env) {
+async function handleUnfreeze(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -76,7 +77,7 @@ async function handleUnfreeze(username, target, env) {
     if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     await env.SLOTS_KV.delete(`frozen:${cleanTarget}`);
-    logAudit('unfreeze', username, cleanTarget);
+    logAudit('unfreeze', username, cleanTarget!);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde aufgetaut. ✅`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -85,7 +86,7 @@ async function handleUnfreeze(username, target, env) {
   }
 }
 
-async function handleReset(username, target, env) {
+async function handleReset(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -95,11 +96,11 @@ async function handleReset(username, target, env) {
     if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     await Promise.all([
-      setBalance(cleanTarget, 0, env),
+      setBalance(cleanTarget!, 0, env),
       env.SLOTS_KV.delete(`stats:${cleanTarget}`),
       env.SLOTS_KV.delete(`streak:${cleanTarget}`)
     ]);
-    logAudit('reset', username, cleanTarget);
+    logAudit('reset', username, cleanTarget!);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde zurückgesetzt (Balance & Stats auf 0). 🔄`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -108,7 +109,7 @@ async function handleReset(username, target, env) {
   }
 }
 
-async function handleWipe(username, target, env) {
+async function handleWipe(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -118,7 +119,7 @@ async function handleWipe(username, target, env) {
     if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
     const deletePromises = [
-      setBalance(cleanTarget, 0, env),
+      setBalance(cleanTarget!, 0, env),
       env.SLOTS_KV.delete(`stats:${cleanTarget}`),
       env.SLOTS_KV.delete(`streak:${cleanTarget}`),
       env.SLOTS_KV.delete(`daily:${cleanTarget}`),
@@ -145,7 +146,7 @@ async function handleWipe(username, target, env) {
     ];
 
     await Promise.all(deletePromises);
-    logAudit('wipe', username, cleanTarget);
+    logAudit('wipe', username, cleanTarget!);
 
     return new Response(`@${username} ✅ @${cleanTarget} wurde komplett gelöscht! (Alle Daten, Buffs, Unlocks) 💥`, { headers: RESPONSE_HEADERS });
   } catch (error) {
@@ -154,7 +155,7 @@ async function handleWipe(username, target, env) {
   }
 }
 
-async function handleMaintenance(username, mode, env) {
+async function handleMaintenance(username: string, mode: string | undefined, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -179,7 +180,7 @@ async function handleMaintenance(username, mode, env) {
   }
 }
 
-async function handleRemoveFromLB(username, target, env) {
+async function handleRemoveFromLB(username: string, target: string, env: Env): Promise<Response> {
   try {
     const adminCheck = requireAdmin(username);
     if (adminCheck) return adminCheck;
@@ -188,7 +189,7 @@ async function handleRemoveFromLB(username, target, env) {
     if (error === 'missing') return new Response(`@${username} ❌ Nutze: !slots removefromlb @user`, { headers: RESPONSE_HEADERS });
     if (error === 'invalid') return new Response(`@${username} ❌ Ungültiger Username!`, { headers: RESPONSE_HEADERS });
 
-    await setBalance(cleanTarget, 0, env);
+    await setBalance(cleanTarget!, 0, env);
 
     return new Response(`@${username} ✅ @${cleanTarget} vom Leaderboard entfernt (Balance auf 0 gesetzt). 🗑️`, { headers: RESPONSE_HEADERS });
   } catch (error) {

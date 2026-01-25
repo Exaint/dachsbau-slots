@@ -35,33 +35,55 @@ import {
   addFreeSpinsWithMultiplier,
   batchUpdateStats
 } from '../../database.js';
+import type { Env, WinResult, SpinAmountResult, StreakBonusResult, StreakData, PreloadedBuffs } from '../../types/index.js';
 
 // Unlock prices for error messages
-const UNLOCK_PRICES = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
+const UNLOCK_PRICES: Record<number | string, number> = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
+
+// ============================================
+// Types
+// ============================================
+
+/** Extended tracking data for achievements */
+interface ExtendedData {
+  spinCost?: number;
+  currentLossStreak?: number;
+}
+
+/** Result from applyMultipliersAndBuffs */
+interface MultiplierResult {
+  shopBuffs: string[];
+  streakMulti: number;
+}
+
+// ============================================
+// Achievement Tracking
+// ============================================
 
 /**
  * Achievement tracking (fire-and-forget, non-blocking)
  * IMPORTANT: Operations are run sequentially to avoid race conditions on KV writes
- * @param {string} username - Player username
- * @param {string[]} originalGrid - Grid before special items (for dachs detection)
- * @param {string[]} displayGrid - Grid after special items (for wild card and triple detection)
- * @param {object} result - Win result from calculateWin
- * @param {number} newBalance - Player's new balance after spin
- * @param {boolean} isFreeSpinUsed - Whether a free spin was used
- * @param {boolean} isAllIn - Whether this was an all-in spin
- * @param {boolean} hasWildCardToken - Whether wild card was used
- * @param {boolean} insuranceUsed - Whether insurance was triggered
- * @param {boolean} hourlyJackpotWon - Whether hourly jackpot was won
- * @param {boolean} hotStreakTriggered - Whether hot streak bonus was triggered
- * @param {boolean} comebackTriggered - Whether comeback bonus was triggered
- * @param {object} env - Environment bindings
- * @param {object} extendedData - Extended tracking data (optional)
  */
-export async function trackSlotAchievements(username, originalGrid, displayGrid, result, newBalance, isFreeSpinUsed, isAllIn, hasWildCardToken, insuranceUsed, hourlyJackpotWon, hotStreakTriggered, comebackTriggered, env, extendedData = {}) {
+export async function trackSlotAchievements(
+  username: string,
+  originalGrid: string[],
+  displayGrid: string[],
+  result: WinResult,
+  newBalance: number,
+  isFreeSpinUsed: boolean,
+  isAllIn: boolean,
+  hasWildCardToken: boolean,
+  insuranceUsed: boolean,
+  hourlyJackpotWon: boolean,
+  hotStreakTriggered: boolean,
+  comebackTriggered: boolean,
+  env: Env,
+  extendedData: ExtendedData = {}
+): Promise<void> {
   try {
     // Batch achievement stat updates (single read-modify-write instead of sequential calls)
     const dachsCount = originalGrid.filter(s => s === '🦡').length;
-    const achievementStats = [['totalSpins', 1]];
+    const achievementStats: [string, number][] = [['totalSpins', 1]];
     if (result.points > 0) {
       achievementStats.push(['wins', 1]);
     } else {
@@ -80,8 +102,8 @@ export async function trackSlotAchievements(username, originalGrid, displayGrid,
     }
 
     // Batch extended stats (D1/progression tracking, fire-and-forget)
-    const statIncrements = [];
-    const maxUpdates = [];
+    const statIncrements: [string, number][] = [];
+    const maxUpdates: [string, number][] = [];
 
     if (isAllIn) statIncrements.push(['allInSpins', 1]);
     if (extendedData.spinCost && extendedData.spinCost >= 50) statIncrements.push(['highBetSpins', 1]);
@@ -103,7 +125,7 @@ export async function trackSlotAchievements(username, originalGrid, displayGrid,
     trackPlayDay(username, env).catch(err => logError('trackSlotAchievements.playDay', err, { username }));
 
     // Collect all one-time achievements to unlock
-    const achievementsToUnlock = [];
+    const achievementsToUnlock: string[] = [];
 
     // Win-related achievements
     const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
@@ -185,7 +207,7 @@ export async function trackSlotAchievements(username, originalGrid, displayGrid,
  * Track unique play days for playDays achievement stat
  * Uses a KV key with today's date to avoid double-counting
  */
-async function trackPlayDay(username, env) {
+async function trackPlayDay(username: string, env: Env): Promise<void> {
   try {
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const key = kvKey('playDay:', `${username}:${today}`);
@@ -199,16 +221,20 @@ async function trackPlayDay(username, env) {
   }
 }
 
+// ============================================
+// Spin Parsing
+// ============================================
+
 /**
  * Parse and validate spin cost/multiplier
- * @param {string} username - Player username
- * @param {string|null} amountParam - Amount parameter from command
- * @param {number} currentBalance - Current player balance
- * @param {boolean} isFreeSpinUsed - Whether using a free spin
- * @param {object} env - Environment bindings
- * @returns {Promise<{spinCost: number, multiplier: number}|{error: string}>}
  */
-export async function parseSpinAmount(username, amountParam, currentBalance, isFreeSpinUsed, env) {
+export async function parseSpinAmount(
+  username: string,
+  amountParam: string | null,
+  currentBalance: number,
+  isFreeSpinUsed: boolean,
+  env: Env
+): Promise<SpinAmountResult> {
   if (isFreeSpinUsed || !amountParam) {
     return { spinCost: BASE_SPIN_COST, multiplier: 1 };
   }
@@ -270,19 +296,23 @@ export async function parseSpinAmount(username, amountParam, currentBalance, isF
   return { error: `@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100 | Für freie Beträge: !slots all freischalten | Info: ${URLS.UNLOCK}` };
 }
 
+// ============================================
+// Multipliers and Buffs
+// ============================================
+
 /**
  * Apply multipliers and buffs to win result (uses pre-loaded buff values)
- * @param {string} username - Player username
- * @param {object} result - Win result from calculateWin (modified in place)
- * @param {number} multiplier - Spin multiplier
- * @param {string[]} grid - Spin grid
- * @param {object} env - Environment bindings
- * @param {object} preloadedBuffs - Pre-loaded buff states
- * @returns {Promise<{shopBuffs: string[], streakMulti: number}>}
  */
-export async function applyMultipliersAndBuffs(username, result, multiplier, grid, env, preloadedBuffs) {
+export async function applyMultipliersAndBuffs(
+  username: string,
+  result: WinResult,
+  multiplier: number,
+  grid: string[],
+  env: Env,
+  preloadedBuffs: PreloadedBuffs
+): Promise<MultiplierResult> {
   const { hasGoldenHour, hasProfitDoubler, currentStreakMulti } = preloadedBuffs;
-  const shopBuffs = [];
+  const shopBuffs: string[] = [];
 
   // Award Free Spins
   if (result.freeSpins && result.freeSpins > 0) {
@@ -303,7 +333,7 @@ export async function applyMultipliersAndBuffs(username, result, multiplier, gri
 
   // Symbol Boost - only check for matching symbols (must consume, so needs KV)
   if (result.points > 0) {
-    const matchingSymbols = new Set();
+    const matchingSymbols = new Set<string>();
     if (grid[0] === grid[1]) matchingSymbols.add(grid[0]);
     if (grid[1] === grid[2]) matchingSymbols.add(grid[1]);
     if (grid[0] === grid[2]) matchingSymbols.add(grid[0]);
@@ -339,17 +369,21 @@ export async function applyMultipliersAndBuffs(username, result, multiplier, gri
   return { shopBuffs, streakMulti };
 }
 
+// ============================================
+// Streak Bonuses
+// ============================================
+
 /**
  * Calculate streak bonuses (uses pre-loaded streak)
- * @param {string} lowerUsername - Lowercased username
- * @param {string} username - Original username
- * @param {boolean} isWin - Whether the spin was a win
- * @param {object} previousStreak - Previous streak state {wins, losses}
- * @param {object} env - Environment bindings
- * @returns {Promise<{streakBonus: number, comboBonus: number, naturalBonuses: string[], lossWarningMessage: string, newStreak: object}>}
  */
-export async function calculateStreakBonuses(lowerUsername, username, isWin, previousStreak, env) {
-  const naturalBonuses = [];
+export async function calculateStreakBonuses(
+  lowerUsername: string,
+  username: string,
+  isWin: boolean,
+  previousStreak: StreakData,
+  env: Env
+): Promise<StreakBonusResult> {
+  const naturalBonuses: string[] = [];
   let streakBonus = 0;
   let comboBonus = 0;
   let lossWarningMessage = '';
@@ -369,7 +403,7 @@ export async function calculateStreakBonuses(lowerUsername, username, isWin, pre
     shouldResetStreak = true;
   }
 
-  const newStreak = shouldResetStreak
+  const newStreak: StreakData = shouldResetStreak
     ? { wins: 0, losses: 0 }
     : { wins: isWin ? previousStreak.wins + 1 : 0, losses: isWin ? 0 : previousStreak.losses + 1 };
 

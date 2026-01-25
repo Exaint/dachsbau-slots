@@ -7,10 +7,8 @@ import { serveLogoPng } from '../web/assets.js';
 
 /**
  * Handle short URL redirects (/u/username, /stats, /lb)
- * @param {URL} url - Request URL
- * @returns {Response|null} Redirect response or null if not a short URL
  */
-export function handleShortUrls(url) {
+export function handleShortUrls(url: URL): Response | null {
   const pathname = url.pathname;
 
   // Profile short URL: /u/username
@@ -36,10 +34,8 @@ export function handleShortUrls(url) {
 
 /**
  * Handle static asset requests
- * @param {string} pathname - Request pathname
- * @returns {Response|null} Asset response or null if not an asset
  */
-export function handleStaticAssets(pathname) {
+export function handleStaticAssets(pathname: string): Response | null {
   if (pathname === '/assets/logo.png') {
     return serveLogoPng();
   }

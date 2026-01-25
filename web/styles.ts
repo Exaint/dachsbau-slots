@@ -76,8 +76,8 @@ export const CSS = minifyCSS(`
   --gradient-start: #d8dce8;
   --gradient-end: #e8ecf4;
   --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
+  --text-secondary: #334155; /* WCAG AA: 5.8:1 on #e4e5f1 */
+  --text-muted: #475569; /* WCAG AA: 4.6:1 on #e4e5f1 */
   --border: #cbd5e1;
   /* Adjusted colors for light mode readability */
   --dachs-gold: #92400e;
@@ -433,11 +433,11 @@ body {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 8px 12px;
+  padding: 10px 14px;
   color: var(--text-primary);
-  font-size: 0.85rem;
-  width: 140px;
-  height: 38px;
+  font-size: 0.9rem;
+  width: 150px;
+  height: 44px;
   box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s, width 0.3s ease;
 }
@@ -454,8 +454,9 @@ body {
 }
 
 .btn.btn-search {
-  padding: 8px 14px;
-  min-width: auto;
+  padding: 10px 16px;
+  min-width: 44px;
+  min-height: 44px;
   font-size: 1rem;
   line-height: 1;
   display: flex;
@@ -503,9 +504,12 @@ body {
 }
 
 .suggestion-item {
-  padding: 10px 14px;
+  padding: 12px 16px;
+  min-height: 44px;
   cursor: pointer;
   transition: background 0.15s ease;
+  display: flex;
+  align-items: center;
 }
 
 .suggestion-item:hover {
@@ -550,13 +554,14 @@ body {
 .btn-twitch-login {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background: #9147ff;
   color: white;
   border: none;
   border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 0.85rem;
+  padding: 10px 16px;
+  min-height: 44px;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -622,10 +627,13 @@ body {
   color: var(--text-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 0.8rem;
+  padding: 10px 16px;
+  min-height: 44px;
+  font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
   text-decoration: none;
   transition: all 0.2s;
 }
@@ -1003,9 +1011,14 @@ body {
   color: var(--text-muted);
   font-size: 1.2rem;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 10px 12px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   transition: color 0.2s, background 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .custom-message-remove:hover {
@@ -1049,11 +1062,15 @@ body {
   background: none;
   border: 1px dashed var(--border);
   color: var(--text-secondary);
-  padding: 6px 12px;
+  padding: 10px 16px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   transition: border-color 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .custom-message-add:hover:not(:disabled) {
@@ -1397,10 +1414,13 @@ a.duel-player.opponent:hover {
 .collapse-all-btn {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 6px 14px;
+  border-radius: 22px;
+  padding: 10px 18px;
+  min-height: 44px;
   font-size: 0.85rem;
   color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -3050,14 +3070,18 @@ a.duel-player.opponent:hover {
 
 /* Shop Buy Button */
 .btn-buy {
-  padding: 6px 16px;
+  padding: 10px 20px;
+  min-height: 44px;
   background: var(--accent);
   color: white;
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.2s, transform 0.1s;
   margin-left: auto;
 }
@@ -3361,13 +3385,18 @@ a.duel-player.opponent:hover {
 
 .modal-close {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 8px;
+  right: 8px;
   background: none;
   border: none;
   font-size: 1.5rem;
   color: var(--text-muted);
   cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
@@ -3458,12 +3487,13 @@ a.duel-player.opponent:hover {
   }
 
   .btn-twitch-login {
-    padding: 8px 10px;
+    padding: 10px 12px;
+    min-height: 44px;
   }
 
   /* User section on mobile */
   .user-section {
-    gap: 6px;
+    gap: 8px;
   }
 
   .user-display-name {
@@ -3471,8 +3501,9 @@ a.duel-player.opponent:hover {
   }
 
   .btn-logout {
-    padding: 6px 8px;
-    font-size: 0.8rem;
+    padding: 10px 12px;
+    min-height: 44px;
+    font-size: 0.85rem;
   }
 
   /* Shop user info on mobile */
@@ -4045,8 +4076,10 @@ a.duel-player.opponent:hover {
 }
 
 .toc-item {
-  display: block;
-  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  min-height: 44px;
   background: var(--bg-card);
   border-radius: var(--radius-md);
   color: var(--text-secondary);

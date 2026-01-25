@@ -394,7 +394,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 16px;
 }
 
 .logo {
@@ -426,18 +426,11 @@ body {
 /* Search Form */
 .search-form {
   display: flex;
-  align-items: center;
   gap: 6px;
-  background: var(--bg-tertiary);
-  padding: 4px 6px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  min-height: 52px;
-  box-sizing: border-box;
 }
 
 .search-input {
-  background: var(--bg-secondary);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 10px 14px;
@@ -2189,28 +2182,21 @@ a.duel-player.opponent:hover {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-shrink: 0;
 }
 
 /* Navigation Bar (inline in header) */
 .nav-bar {
   display: flex;
-  align-items: center;
   gap: 4px;
   flex: 1;
   justify-content: center;
   min-width: 0;
-  background: var(--bg-tertiary);
-  padding: 4px 8px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  min-height: 52px;
-  box-sizing: border-box;
 }
 
 .nav-item {
-  padding: 10px 14px;
+  padding: 8px 12px;
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 0.85rem;

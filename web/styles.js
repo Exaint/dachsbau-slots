@@ -745,9 +745,8 @@ body {
   color: var(--prestige-color, var(--dachs-gold));
 }
 
-/* Light mode prestige badge adjustments for better contrast */
+/* Light mode prestige badge - consistent with other badges */
 [data-theme="light"] .profile-prestige-badge {
-  filter: brightness(0.7) saturate(1.2);
   font-weight: 600;
 }
 

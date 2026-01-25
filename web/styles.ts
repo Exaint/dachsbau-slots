@@ -282,6 +282,18 @@ body {
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
 }
 
+[data-theme="light"] .btn-search {
+  background: #ffffff;
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .btn-search:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
 [data-theme="light"] .admin-panel {
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(219, 39, 119, 0.08));
   border-color: rgba(124, 58, 237, 0.25);
@@ -452,6 +464,15 @@ body {
   border-radius: var(--radius-md);
   height: 38px;
   box-sizing: border-box;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.btn-search:hover {
+  background: var(--bg-card);
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .search-icon {

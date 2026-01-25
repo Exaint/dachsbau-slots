@@ -3,7 +3,7 @@
  */
 
 import type { Env, LoggedInUser } from '../../types/index.d.ts';
-import { hasAcceptedDisclaimer } from '../../database.js';
+import { hasAcceptedDisclaimer, getPrestigeRank } from '../../database.js';
 import { isSelfBanned } from '../../database.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getUserRole, getTwitchUser } from '../twitch.js';
@@ -21,6 +21,7 @@ interface LeaderboardPlayer {
   hasDisclaimer: boolean;
   role?: string | null;
   avatar?: string | null;
+  prestigeRank?: string | null;
 }
 
 interface LeaderboardUserEntry {
@@ -87,16 +88,18 @@ async function computeLeaderboardData(env: Env): Promise<LeaderboardData> {
 
   const topN = users.slice(0, LEADERBOARD_DISPLAY_LIMIT);
 
-  // Fetch Twitch roles and avatars for top N
-  const [roles, twitchUsers] = await Promise.all([
+  // Fetch Twitch roles, avatars and prestige ranks for top N
+  const [roles, twitchUsers, prestigeRanks] = await Promise.all([
     Promise.all(topN.map(user => getUserRole(user.username, env))),
-    Promise.all(topN.map(user => getTwitchUser(user.username, env)))
+    Promise.all(topN.map(user => getTwitchUser(user.username, env))),
+    Promise.all(topN.map(user => getPrestigeRank(user.username, env)))
   ]);
 
   const topPlayers: LeaderboardPlayer[] = topN.map((user, index) => ({
     ...user,
     role: roles[index],
-    avatar: twitchUsers[index]?.avatar || null
+    avatar: twitchUsers[index]?.avatar || null,
+    prestigeRank: prestigeRanks[index]
   }));
 
   const allUsers: LeaderboardUserEntry[] = users.map((u, i) => ({ u: u.username, b: u.balance, r: i + 1 }));
@@ -227,15 +230,17 @@ async function handleLeaderboardUncached(
   users.sort((a, b) => b.balance - a.balance);
   const topN = users.slice(0, LEADERBOARD_DISPLAY_LIMIT);
 
-  const [roles, twitchUsers] = await Promise.all([
+  const [roles, twitchUsers, prestigeRanks] = await Promise.all([
     Promise.all(topN.map(user => getUserRole(user.username, env))),
-    Promise.all(topN.map(user => getTwitchUser(user.username, env)))
+    Promise.all(topN.map(user => getTwitchUser(user.username, env))),
+    Promise.all(topN.map(user => getPrestigeRank(user.username, env)))
   ]);
 
   const topPlayers: LeaderboardPlayer[] = topN.map((user, index) => ({
     ...user,
     role: roles[index],
-    avatar: twitchUsers[index]?.avatar || null
+    avatar: twitchUsers[index]?.avatar || null,
+    prestigeRank: prestigeRanks[index]
   }));
 
   const allUsers: LeaderboardUserEntry[] = users.map((u, i) => ({ u: u.username, b: u.balance, r: i + 1 }));
@@ -294,12 +299,16 @@ export function renderLeaderboardPage(
       ? '<span class="no-disclaimer-badge" title="Kein Disclaimer akzeptiert">⚠️</span>'
       : '';
     const noDisclaimerClass = showAll && !player.hasDisclaimer ? ' no-disclaimer' : '';
+    const prestigeRankHtml = player.prestigeRank
+      ? `<span class="leaderboard-prestige" title="Prestige-Rang">${player.prestigeRank}</span>`
+      : '';
     return `
       <div class="leaderboard-item${noDisclaimerClass}${extraClass}">
         <div class="leaderboard-rank">${getRankDisplay(rank)}</div>
         ${avatarHtml}
         <div class="leaderboard-user">
           <a href="?page=profile&user=${encodeURIComponent(player.username)}" class="leaderboard-username-link">${escapeHtml(player.username)}</a>
+          ${prestigeRankHtml}
           ${noDisclaimerBadge}
           ${roleBadgeHtml ? `<span class="leaderboard-role">${roleBadgeHtml}</span>` : ''}
         </div>

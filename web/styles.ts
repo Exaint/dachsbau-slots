@@ -1795,6 +1795,11 @@ body {
   font-weight: 500;
 }
 
+.leaderboard-prestige {
+  font-size: 1.1rem;
+  margin-left: 2px;
+}
+
 .leaderboard-balance {
   font-weight: 700;
   font-size: 1.1rem;

@@ -16,7 +16,7 @@ export function renderImpressumPage(user = null) {
       <section class="legal-section">
         <h2>Verantwortlich für den Inhalt</h2>
         <address>
-          <strong>Exaint i. A. frechhdachs (Maria Kellner)</strong><br>
+          <strong>Exaint i. A. frechhdachs</strong><br>
           c/o OOE-Esports<br>
           Lastenstr. 42<br>
           4020 Linz<br>
@@ -34,7 +34,7 @@ export function renderImpressumPage(user = null) {
       <section class="legal-section">
         <h2>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h2>
         <address>
-          <strong>Exaint i. A. frechhdachs (Maria Kellner)</strong><br>
+          <strong>Exaint i. A. frechhdachs</strong><br>
           c/o OOE-Esports<br>
           Lastenstr. 42<br>
           4020 Linz
@@ -124,7 +124,7 @@ export function renderDatenschutzPage(user = null) {
         <h2>1. Verantwortlicher</h2>
         <p>Verantwortlicher im Sinne der Datenschutz-Grundverordnung (DSGVO):</p>
         <address>
-          <strong>Exaint i. A. frechhdachs (Maria Kellner) c/o OOE-Esports</strong><br>
+          <strong>Exaint i. A. frechhdachs c/o OOE-Esports</strong><br>
           Lastenstr. 42<br>
           4020 Linz<br>
           E-Mail: <a href="mailto:tulpe_salbei6s@icloud.com">tulpe_salbei6s@icloud.com</a>

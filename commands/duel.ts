@@ -333,11 +333,11 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
       trackDuelAchievements(username, 'tie', 0, env);
     }
 
-    // Fire-and-forget D1 duel log
+    // Log duel to D1 (must await, otherwise worker terminates before insert completes)
     const winner = challengerScore.score > targetScore.score ? duel.challenger
       : targetScore.score > challengerScore.score ? username
       : null;
-    logDuel({
+    await logDuel({
       challenger: duel.challenger,
       target: username,
       amount: duel.amount,

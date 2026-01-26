@@ -62,26 +62,20 @@ interface BalanceDeductionResult {
 }
 
 // Items that CAN be purchased via web (no chat interaction needed)
-const WEB_PURCHASABLE_ITEM_IDS = new Set([
-  // Boosts (2-8)
-  2, 3, 4, 5, 6, 7, 8,
-  // Insurance (9)
-  9,
-  // Win Multiplier (10)
-  10,
-  // Unlocks (13, 19, 21, 23, 25)
-  13, 19, 21, 23, 25,
-  // Timed Buffs (14, 18, 20, 24, 32, 33, 34, 35, 39)
-  14, 18, 20, 24, 32, 33, 34, 35, 39,
-  // Spin Bundle (15)
-  15,
-  // Prestige Ranks (17, 22, 26, 29, 30)
-  17, 22, 26, 29, 30,
-  // Daily Boost, Custom Message (27, 28)
-  27, 28,
-  // Spin Tokens - stored for next chat spin (37, 38)
-  37, 38
-]);
+// Dynamically generated from SHOP_ITEMS, excluding specific instant-action items
+const getWebPurchasableItemIds = (): Set<number> => {
+  const nonPurchasableIds = new Set([1, 11, 12, 16, 31, 36]); // Peek, Chaos, Glücksrad, Mystery, Reverse Chaos, Diamond Mine
+  const ids = new Set<number>();
+  Object.keys(SHOP_ITEMS).forEach(id => {
+    const numId = Number(id);
+    if (!nonPurchasableIds.has(numId)) {
+      ids.add(numId);
+    }
+  });
+  return ids;
+};
+
+const WEB_PURCHASABLE_ITEM_IDS = getWebPurchasableItemIds();
 
 // Items that CANNOT be purchased via web (require chat/immediate action)
 // 1 = Peek Token (requires chat output)

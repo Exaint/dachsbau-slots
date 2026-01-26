@@ -21,15 +21,6 @@ import { consumeGuaranteedPair, consumeWildCard } from '../../database.js';
 import type { Env, WinResult } from '../../types/index.js';
 
 // ============================================
-// Types
-// ============================================
-
-/** Symbol value hierarchy for wild card optimization */
-interface SymbolValues {
-  [symbol: string]: number;
-}
-
-// ============================================
 // Grid Generation
 // ============================================
 
@@ -58,17 +49,21 @@ async function generateGrid(
 
   const grid: string[] = [];
 
+  // OPTIMIZED: Pre-generate random values to reduce crypto calls
+  const randomPool = Array.from({length: 6}, () => secureRandom()); // 3 symbols * 2 buff rolls each
+  let randomIndex = 0;
+
   // Generate 3 elements (the winning row)
   for (let i = 0; i < GRID_SIZE; i++) {
-    if (secureRandom() < dachsChance) {
+    if (randomPool[randomIndex++] < dachsChance) {
       grid.push('🦡');
     } else {
       let symbol = getWeightedSymbol();
 
       // Only generate buff random values if buffs are active
       if (hasStarMagnet || hasDiamondRush) {
-        const buffRoll = secureRandom();
-        const boostRoll = secureRandom();
+        const buffRoll = randomPool[randomIndex++];
+        const boostRoll = randomPool[randomIndex++];
 
         // Star Magnet: Only replace if not already a star (consistent with Diamond Rush)
         if (hasStarMagnet && symbol !== '⭐' && buffRoll < BUFF_REROLL_CHANCE && boostRoll < SYMBOL_BOOST_CHANCE) {
@@ -129,73 +124,76 @@ async function applySpecialItems(
  */
 function applyWildCardOptimization(grid: string[]): boolean {
   // Symbol value hierarchy (excluding Dachs - Wild can't become Dachs)
-  const SYMBOL_VALUES: SymbolValues = {
-    '⭐': 50,    // Star pair payout (best regular)
-    '🍉': 25,    // Watermelon
-    '🍇': 15,    // Grapes
-    '🍊': 10,    // Orange
-    '🍋': 8,     // Lemon
-    '🍒': 5,     // Cherry
-    '💎': 1     // Diamond (lowest for pairs)
+  const getSymbolValue = (symbol: string): number => {
+    const values: Record<string, number> = {
+      '⭐': 50,    // Star pair payout (best regular)
+      '🍉': 25,    // Watermelon
+      '🍇': 15,    // Grapes
+      '🍊': 10,    // Orange
+      '🍋': 8,     // Lemon
+      '🍒': 5,     // Cherry
+      '💎': 1     // Diamond (lowest for pairs)
+    };
+    return values[symbol] || 0;
   };
 
   // Helper: Check if symbol is Dachs
   const isDachs = (s: string): boolean => s === '🦡';
 
-  // Check for existing pairs
-  const pair01 = grid[0] === grid[1] && grid[0] !== grid[2];
-  const pair12 = grid[1] === grid[2] && grid[0] !== grid[1];
-  const pair02 = grid[0] === grid[2] && grid[0] !== grid[1];
+  // Helper: Find existing pair
+  const findPair = (grid: string[]): { pairType: '01' | '12' | '02' | null, symbol: string | null } => {
+    const pair01 = grid[0] === grid[1] && grid[0] !== grid[2];
+    const pair12 = grid[1] === grid[2] && grid[0] !== grid[1];
+    const pair02 = grid[0] === grid[2] && grid[0] !== grid[1];
 
-  // If NON-DACHS pair exists → complete to triple
-  if (pair01 && !isDachs(grid[0])) {
-    grid[2] = grid[0];
-    return true;
-  }
-  if (pair12 && !isDachs(grid[1])) {
-    grid[0] = grid[1];
-    return true;
-  }
-  if (pair02 && !isDachs(grid[0])) {
-    grid[1] = grid[0];
-    return true;
-  }
+    if (pair01) return { pairType: '01', symbol: grid[0] };
+    if (pair12) return { pairType: '12', symbol: grid[1] };
+    if (pair02) return { pairType: '02', symbol: grid[0] };
+    return { pairType: null, symbol: null };
+  };
 
-  // If DACHS pair exists → don't change (Wild can't become Dachs)
-  if (pair01 || pair12 || pair02) {
-    return false; // Already have a Dachs pair, can't improve
-  }
+  // Helper: Find best non-Dachs symbol
+  const findBestNonDachs = (grid: string[]): { index: number, symbol: string } | null => {
+    let bestValue = -1;
+    let bestIndex = -1;
+    let bestSymbol: string | null = null;
 
-  // No pair exists → create best non-Dachs adjacent pair
-  // Find best non-Dachs symbol and its position
-  let bestValue = -1;
-  let bestIndex = -1;
-  let bestSymbol: string | null = null;
-
-  for (let i = 0; i < 3; i++) {
-    if (!isDachs(grid[i])) {
-      const value = SYMBOL_VALUES[grid[i]] || 0;
-      if (value > bestValue) {
-        bestValue = value;
-        bestIndex = i;
-        bestSymbol = grid[i];
+    for (let i = 0; i < 3; i++) {
+      if (!isDachs(grid[i])) {
+        const value = getSymbolValue(grid[i]);
+        if (value > bestValue) {
+          bestValue = value;
+          bestIndex = i;
+          bestSymbol = grid[i];
+        }
       }
     }
+
+    return bestIndex !== -1 && bestSymbol ? { index: bestIndex, symbol: bestSymbol } : null;
+  };
+
+  // Main logic
+  const pair = findPair(grid);
+
+  // If NON-DACHS pair exists → complete to triple
+  if (pair.pairType && pair.symbol && !isDachs(pair.symbol)) {
+    if (pair.pairType === '01') grid[2] = pair.symbol;
+    else if (pair.pairType === '12') grid[0] = pair.symbol;
+    else if (pair.pairType === '02') grid[1] = pair.symbol;
+    return true;
   }
 
-  // If no non-Dachs symbol found (all Dachs?!), can't do anything
-  if (bestIndex === -1 || bestSymbol === null) return false;
+  // If DACHS pair exists → don't change
+  if (pair.pairType) return false;
+
+  // No pair exists → create best non-Dachs adjacent pair
+  const best = findBestNonDachs(grid);
+  if (!best) return false;
 
   // Replace adjacent position to create pair
-  // Best at 0 → replace 1, Best at 1 → replace 0 or 2, Best at 2 → replace 1
-  if (bestIndex === 0) {
-    grid[1] = bestSymbol;
-  } else if (bestIndex === 2) {
-    grid[1] = bestSymbol;
-  } else {
-    // Best at 1 → replace 0 (arbitrary choice)
-    grid[0] = bestSymbol;
-  }
+  if (best.index === 0) grid[1] = best.symbol;
+  else if (best.index === 2) grid[1] = best.symbol;
+  else grid[0] = best.symbol; // Best at 1 → replace 0
 
   return true;
 }

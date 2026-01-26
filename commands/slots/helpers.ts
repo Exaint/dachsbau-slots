@@ -61,8 +61,8 @@ interface MultiplierResult {
 // ============================================
 
 /**
- * Achievement tracking (fire-and-forget, non-blocking)
- * IMPORTANT: Operations are run sequentially to avoid race conditions on KV writes
+ * Achievement tracking (called via ctx.waitUntil, runs after response is sent)
+ * IMPORTANT: All operations must be awaited to ensure completion before Worker terminates
  */
 export async function trackSlotAchievements(
   username: string,
@@ -84,7 +84,9 @@ export async function trackSlotAchievements(
     // Batch achievement stat updates (single read-modify-write instead of sequential calls)
     const dachsCount = originalGrid.filter(s => s === '🦡').length;
     const achievementStats: [string, number][] = [['totalSpins', 1]];
-    if (result.points > 0) {
+    // Count as win if points > 0 OR free spins awarded (e.g. diamond-only wins: 💎💎💎 = 0 points + 5 free spins)
+    const isStatWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
+    if (isStatWin) {
       achievementStats.push(['wins', 1]);
     } else {
       achievementStats.push(['losses', 1]);
@@ -97,11 +99,10 @@ export async function trackSlotAchievements(
 
     // Max-value stats (loss streak) - only update if higher
     if (extendedData.currentLossStreak && extendedData.currentLossStreak > 0) {
-      setMaxAchievementStat(username, 'maxLossStreak', extendedData.currentLossStreak, env)
-        .catch(err => logError('trackSlotAchievements.maxLossStreak', err, { username }));
+      await setMaxAchievementStat(username, 'maxLossStreak', extendedData.currentLossStreak, env);
     }
 
-    // Batch extended stats (D1/progression tracking, fire-and-forget)
+    // Batch extended stats (D1/progression tracking)
     // Note: These stat keys are for extended tracking, not core PlayerStats
     const statIncrements: [string, number][] = [];
     const maxUpdates: [string, number][] = [];
@@ -116,17 +117,19 @@ export async function trackSlotAchievements(
       maxUpdates.push(['maxLossStreak', extendedData.currentLossStreak]);
     }
 
-    // Fire-and-forget: single atomic batch update for D1/progression
+    // Batch update for D1/progression
     if (statIncrements.length > 0 || maxUpdates.length > 0) {
-      batchUpdateStats(username, statIncrements as [keyof PlayerStats, number][], maxUpdates as [keyof PlayerStats, number][], env)
-        .catch(err => logError('trackSlotAchievements.extended', err, { username }));
+      await batchUpdateStats(username, statIncrements as [keyof PlayerStats, number][], maxUpdates as [keyof PlayerStats, number][], env);
     }
 
-    // PlayDays tracking (check if player already played today, fire-and-forget)
-    trackPlayDay(username, env).catch(err => logError('trackSlotAchievements.playDay', err, { username }));
+    // PlayDays tracking (check if player already played today)
+    await trackPlayDay(username, env);
 
     // Collect all one-time achievements to unlock
     const achievementsToUnlock: string[] = [];
+
+    // First spin achievement (not in stat mapping, must be explicitly unlocked)
+    achievementsToUnlock.push(ACHIEVEMENTS.FIRST_SPIN.id);
 
     // Win-related achievements
     const isWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);

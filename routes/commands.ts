@@ -258,7 +258,7 @@ export async function handleSlotSubcommands(cleanUsername: string, lower: string
 /**
  * Handle the main slot action
  */
-export async function handleSlotAction(cleanUsername: string, amountParam: string | null, url: URL, env: Env): Promise<Response> {
+export async function handleSlotAction(cleanUsername: string, amountParam: string | null, url: URL, env: Env, ctx?: ExecutionContext): Promise<Response> {
   const lower = amountParam?.toLowerCase() ?? null;
 
   // Security checks for all state-modifying actions (including default spin without amount)
@@ -273,7 +273,7 @@ export async function handleSlotAction(cleanUsername: string, amountParam: strin
     if (subcommandResponse) return subcommandResponse;
   }
 
-  return await handleSlot(cleanUsername, amountParam ?? undefined, url, env);
+  return await handleSlot(cleanUsername, amountParam ?? undefined, url, env, ctx);
 }
 
 /**

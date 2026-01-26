@@ -85,7 +85,7 @@ export default {
       // Handle slot action (includes subcommands)
       if (action === 'slot') {
         const amountParam = url.searchParams.get('amount');
-        return await handleSlotAction(cleanUsername, amountParam, url, env);
+        return await handleSlotAction(cleanUsername, amountParam, url, env, ctx);
       }
 
       // Handle legacy action-based commands

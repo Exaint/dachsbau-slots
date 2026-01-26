@@ -100,17 +100,6 @@ export function renderInfoPage(user: LoggedInUser | null = null): string {
           </div>
         </div>
 
-        <h3>🤖 Fossabot-Besonderheiten</h3>
-        <div class="tip-list">
-          <div class="tip-item">
-            <span class="tip-icon">💡</span>
-            <div>
-              <strong>Keine doppelten Nachrichten</strong>
-              <p>Schreibe zwischen zwei <code>!slots</code> immer eine andere Nachricht! Fossabot ignoriert identische aufeinanderfolgende Befehle.</p>
-            </div>
-          </div>
-        </div>
-
           <h3>🎰 Höhere Einsätze freischalten</h3>
         <p>Höhere Einsätze müssen <strong>zuerst im Shop gekauft</strong> werden:</p>
         <div class="unlock-list">

@@ -82,14 +82,6 @@ Du wirst sofort vom Spielen ausgeschlossen. **Nur Admins** (exaint_, frechhdachs
 | `!slots daily` | **24 Stunden** (UTC Mitternacht) |
 | Alle anderen Commands | Kein Cooldown |
 
-### 🤖 Fossabot-Besonderheiten
-
-| Regel | Erklärung |
-|:------|:----------|
-| **Keine doppelten Nachrichten** | Schreibe zwischen zwei `!slots` immer eine andere Nachricht! Fossabot ignoriert identische aufeinanderfolgende Befehle. |
-| **Keine Leerzeichen nach @** | `!transfer @user 100` ✅ nicht `!transfer @ user 100` ❌ |
-| **Groß/Kleinschreibung egal** | `!SLOTS`, `!Slots`, `!slots` funktionieren alle |
-
 ### 🎰 Höhere Einsätze
 
 > Höhere Einsätze (`!slots 20/30/50/100/all`) müssen **zuerst freigeschaltet** werden!

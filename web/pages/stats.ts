@@ -4,6 +4,7 @@
 
 import type { Env, LoggedInUser } from '../../types/index.d.ts';
 import { getAchievementStats } from '../../database.js';
+import { getHomePageStats } from '../../database/d1.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES } from '../../constants.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { CATEGORY_ICONS, CATEGORY_NAMES } from './ui-config.js';
@@ -32,8 +33,12 @@ interface GlobalStatsData {
  */
 export async function handleGlobalStatsPage(env: Env, loggedInUser: LoggedInUser | null = null): Promise<Response> {
   // Fetch achievement stats and player data
-  const achievementStats = await getAchievementStats(env);
-  const { totalPlayers, counts } = achievementStats;
+  const [achievementStats, homeStats] = await Promise.all([
+    getAchievementStats(env),
+    getHomePageStats(env)
+  ]);
+  const { counts } = achievementStats;
+  const totalPlayers = homeStats?.totalPlayers || achievementStats.totalPlayers;
 
   // Get all achievements
   const allAchievements = getAllAchievements();

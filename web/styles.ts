@@ -2088,6 +2088,7 @@ a.duel-player.opponent:hover {
 }
 
 .home-stat-emoji {
+  display: block;
   font-size: 1.4rem;
   margin-top: 4px;
 }

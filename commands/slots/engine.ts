@@ -264,8 +264,11 @@ function calculateWin(grid: string[]): WinResult {
     diamondFreeSpins = 5;
     diamondMessage = '💎💎💎 DIAMANTEN JACKPOT! +5 FREE SPINS!';
   } else {
-    const realDiamondCount = grid.filter(s => s === '💎').length;
-    if (realDiamondCount === 2) {
+    // Only adjacent diamond pairs count (positions 0+1 or 1+2)
+    const adjacentDiamondPair =
+      (grid[0] === '💎' && grid[1] === '💎') ||
+      (grid[1] === '💎' && grid[2] === '💎');
+    if (adjacentDiamondPair) {
       diamondFreeSpins = 1;
       diamondMessage = '💎💎 +1 FREE SPIN!';
     }

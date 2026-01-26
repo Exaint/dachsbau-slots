@@ -34,10 +34,10 @@ describe('calculateWin', () => {
       expect(result.freeSpins).toBe(1);
     });
 
-    it('Doppel Diamant (nicht-adjazent) = 1 Free Spin', () => {
+    it('Doppel Diamant (nicht-adjazent) = kein Free Spin', () => {
       const result = calculateWin(['💎', '⭐', '💎']);
       expect(result.points).toBe(0);
-      expect(result.freeSpins).toBe(1);
+      expect(result.freeSpins).toBeUndefined();
     });
   });
 

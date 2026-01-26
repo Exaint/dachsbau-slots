@@ -40,6 +40,22 @@ import type { Env, WinResult, SpinAmountResult, StreakBonusResult, StreakData, P
 // Unlock prices for error messages
 const UNLOCK_PRICES: Record<number | string, number> = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
 
+/**
+ * Get list of amounts the user has unlocked (for dynamic error messages)
+ * Only called on error paths, so extra KV reads are acceptable
+ */
+async function getAvailableAmountsText(username: string, env: Env): Promise<string> {
+  const amounts: number[] = [10]; // 10 is always available
+  const unlockAmounts = [20, 30, 50, 100] as const;
+  const checks = await Promise.all(
+    unlockAmounts.map(a => hasUnlock(username, UNLOCK_MAP[a], env))
+  );
+  for (let i = 0; i < unlockAmounts.length; i++) {
+    if (checks[i]) amounts.push(unlockAmounts[i]);
+  }
+  return amounts.join(', ');
+}
+
 // ============================================
 // Types
 // ============================================
@@ -292,7 +308,8 @@ export async function parseSpinAmount(
 
   // Without slots_all: only predefined amounts (10, 20, 30, 50, 100)
   if (customAmount < BASE_SPIN_COST) {
-    return { error: `@${username} ❌ Minimum ist !slots ${BASE_SPIN_COST}! Verfügbar: 10, 20, 30, 50, 100 | Für freie Beträge: !slots all freischalten 💡` };
+    const available = await getAvailableAmountsText(username, env);
+    return { error: `@${username} ❌ Minimum ist !slots ${BASE_SPIN_COST}! Deine Beträge: ${available} | Weitere im Shop freischalten 💡` };
   }
   if (customAmount > 100) {
     return { error: `@${username} ❌ Maximum ist !slots 100! Für freie Beträge: !slots all freischalten 💡` };
@@ -308,7 +325,8 @@ export async function parseSpinAmount(
     return { error: `@${username} ❌ !slots ${customAmount} nicht freigeschaltet! Du musst es für ${UNLOCK_PRICES[customAmount]} DachsTaler im Shop kaufen! Weitere Infos: ${URLS.UNLOCK}` };
   }
 
-  return { error: `@${username} ❌ !slots ${customAmount} existiert nicht! Verfügbar: 10, 20, 30, 50, 100 | Für freie Beträge: !slots all freischalten | Info: ${URLS.UNLOCK}` };
+  const available = await getAvailableAmountsText(username, env);
+  return { error: `@${username} ❌ !slots ${customAmount} gibt es nicht! Deine Beträge: ${available} | Weitere im Shop freischalten: ${URLS.UNLOCK}` };
 }
 
 // ============================================

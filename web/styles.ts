@@ -712,6 +712,17 @@ body {
   flex-shrink: 0;
 }
 
+.profile-avatar-complete {
+  border: 3px solid #ffd700;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+  animation: goldenPulse 2s ease-in-out infinite;
+}
+
+@keyframes goldenPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.6); border-color: #ffd700; }
+  50% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.9); border-color: #ffec80; }
+}
+
 .profile-info {
   flex: 1;
   min-width: 0;

@@ -12,7 +12,7 @@ import { isAdmin, logError } from '../../utils.js';
 
 const CACHE_KEY = 'cache:web_leaderboard';
 import { escapeHtml, formatNumber } from './utils.js';
-import { ROLE_BADGES, R2_BASE, PRESTIGE_RANK_NAMES } from './ui-config.js';
+import { ROLE_BADGES, R2_BASE, PRESTIGE_RANK_NAMES, ADMIN_ROLE_OVERRIDES } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
 
 interface LeaderboardPlayer {
@@ -266,35 +266,36 @@ export function renderLeaderboardPage(
     return `#${rank}`;
   };
 
+  // Get effective role badge for a player (admin overrides first, then Twitch role)
+  const getEffectiveRoleBadge = (username: string, role: string | null | undefined): typeof ROLE_BADGES[string] | null => {
+    const lowerUsername = username.toLowerCase();
+    const overrides = ADMIN_ROLE_OVERRIDES[lowerUsername];
+    if (overrides && overrides.length > 0 && ROLE_BADGES[overrides[0]]) {
+      return ROLE_BADGES[overrides[0]];
+    }
+    if (role && ROLE_BADGES[role]) {
+      return ROLE_BADGES[role];
+    }
+    return null;
+  };
+
   // Get role badge HTML for a player
   const getRoleBadge = (username: string, role: string | null | undefined): string => {
-    const lowerUsername = username.toLowerCase();
-
-    // Special admin badges
-    if (lowerUsername === 'exaint_') {
-      const badge = ROLE_BADGES.leadmod;
+    const badge = getEffectiveRoleBadge(username, role);
+    if (badge) {
       return `<img src="${badge.icon}" alt="${badge.label}" class="leaderboard-badge" title="${badge.label}"><span class="leaderboard-role-label">${badge.label}</span>`;
     }
-    if (lowerUsername === 'frechhdachs') {
-      const badge = ROLE_BADGES.broadcaster;
-      return `<img src="${badge.icon}" alt="${badge.label}" class="leaderboard-badge" title="${badge.label}"><span class="leaderboard-role-label">${badge.label}</span>`;
-    }
-
-    // Regular Twitch roles
-    if (role && ROLE_BADGES[role]) {
-      const badge = ROLE_BADGES[role];
-      return `<img src="${badge.icon}" alt="${badge.label}" class="leaderboard-badge" title="${badge.label}"><span class="leaderboard-role-label">${badge.label}</span>`;
-    }
-
     return '';
   };
 
   // Helper to render a single leaderboard item
   const renderPlayerItem = (player: LeaderboardPlayer | CurrentUserRank, rank: number, extraClass = ''): string => {
     const roleBadgeHtml = getRoleBadge(player.username, player.role);
+    const roleBadge = getEffectiveRoleBadge(player.username, player.role);
+    const borderStyle = roleBadge ? ` style="border: 2px solid ${roleBadge.color}"` : '';
     const avatarHtml = player.avatar
-      ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar" loading="lazy" width="32" height="32">`
-      : `<div class="leaderboard-avatar-placeholder">👤</div>`;
+      ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar"${borderStyle} loading="lazy" width="32" height="32">`
+      : `<div class="leaderboard-avatar-placeholder"${borderStyle}>👤</div>`;
     const noDisclaimerBadge = showAll && !player.hasDisclaimer
       ? '<span class="no-disclaimer-badge" title="Kein Disclaimer akzeptiert">⚠️</span>'
       : '';

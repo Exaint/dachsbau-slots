@@ -591,7 +591,7 @@ export function renderProfilePage(data: ProfileData): string {
     ${isComplete ? '<div class="confetti-container" id="confetti"></div>' : ''}
     <div class="profile-header${isComplete ? ' complete' : ''}">
       <div class="profile-top">
-        ${avatarUrl ? `<img src="${avatarUrl}" alt="${escapeHtml(displayName)}" class="profile-avatar" loading="lazy" width="80" height="80">` : ''}
+        ${avatarUrl ? `<img src="${avatarUrl}" alt="${escapeHtml(displayName)}" class="profile-avatar${isComplete ? ' profile-avatar-complete' : ''}" loading="lazy" width="80" height="80">` : ''}
         <div class="profile-info">
           <div class="profile-name">
             ${escapeHtml(displayName)}

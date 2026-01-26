@@ -222,22 +222,6 @@ function calculateWeekStart(): string {
   return `${mondayYear}-${mondayMonth}-${mondayDay}`;
 }
 
-// OPTIMIZED: Cache for getWeekStart (recalculated every 60 seconds max)
-let weekStartCache: { value: string | null; expires: number } = { value: null, expires: 0 };
-
-function getWeekStart(): string {
-  const now = Date.now();
-  if (weekStartCache.value && now < weekStartCache.expires) {
-    return weekStartCache.value;
-  }
-
-  const result = calculateWeekStart();
-
-  // Cache for 60 seconds
-  weekStartCache = { value: result, expires: now + 60000 };
-  return result;
-}
-
 // OPTIMIZED: Static Set for O(1) lookup instead of Array.includes()
 const LEADERBOARD_BLOCKLIST: Set<string> = new Set([]);
 
@@ -584,7 +568,6 @@ export {
   getCurrentDate,
   getGermanDateFromTimestamp,
   getMsUntilGermanMidnight,
-  getWeekStart,
   calculateWeekStart,
   isLeaderboardBlocked,
   calculateBuffTTL,

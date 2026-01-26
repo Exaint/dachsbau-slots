@@ -14,8 +14,12 @@
  * - No buffs active during duels (fair fights)
  * - Minimum bet: 100 DachsTaler
  * - Both players must have enough balance
- * - Tiebreaker: Sum of DUEL_SYMBOL_VALUES for all 3 symbols
  * - Winner takes pot (both players' bets combined)
+ *
+ * SCORING:
+ * - Dreifach > Paar > Symbolsumme
+ * - Nur NEBENEINANDERLIEGENDE Symbole zählen als Paar (Pos 1+2 oder 2+3, NICHT 1+3)
+ * - Bei Gleichstand: Summe der DUEL_SYMBOL_VALUES aller 3 Symbole als Tiebreaker
  *
  * FLOW:
  * 1. Challenger sends !duel @target amount

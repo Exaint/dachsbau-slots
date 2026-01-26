@@ -74,7 +74,7 @@ export const ROLE_BADGES: Record<string, RoleBadge> = {
   },
   leadmod: {
     icon: 'https://assets.help.twitch.tv/article/img/000002212-07.png',
-    label: 'Lead-Mod',
+    label: 'Lead-Moderator',
     color: '#00ad03'
   },
   admin: {

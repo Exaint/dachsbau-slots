@@ -50,8 +50,10 @@ async function generateGrid(
   const grid: string[] = [];
 
   // OPTIMIZED: Pre-generate random values to reduce crypto calls
-  // Worst case: 3 symbols * 3 rolls each (1 dachs check + 2 buff rolls when buffs active)
-  const randomPool = Array.from({length: 9}, () => secureRandom());
+  // Without buffs: 3 values (1 dachs check per symbol)
+  // With buffs: 9 values (1 dachs check + 2 buff rolls per symbol)
+  const poolSize = (hasStarMagnet || hasDiamondRush) ? 9 : 3;
+  const randomPool = Array.from({length: poolSize}, () => secureRandom());
   let randomIndex = 0;
 
   // Generate 3 elements (the winning row)

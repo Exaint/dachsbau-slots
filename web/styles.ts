@@ -2095,6 +2095,23 @@ a.duel-player.opponent:hover {
   color: var(--error);
 }
 
+/* Home Dachs Stats */
+.home-dachs-stats {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.home-dachs-stats h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.home-dachs-stats .home-stats {
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 500px;
+}
+
 /* Home Discord CTA */
 .home-discord {
   text-align: center;

@@ -3,7 +3,7 @@
  */
 
 import type { Env, LoggedInUser } from '../../types/index.js';
-import { getAchievementStats } from '../../database.js';
+import { getAchievementStats, getTripleStatsD1 } from '../../database.js';
 import { getHomePageStats } from '../../database/d1.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { baseTemplate } from './template.js';
@@ -23,11 +23,15 @@ export async function renderHomePage(errorMessage: string | null = null, user: L
   let totalUnlocked = 0;
   let totalWon = 0;
   let totalLost = 0;
+  let dachsSingles = 0;
+  let dachsDoubles = 0;
+  let dachsTriples = 0;
   if (env) {
     try {
-      const [achievementStats, homeStats] = await Promise.all([
+      const [achievementStats, homeStats, tripleStats] = await Promise.all([
         getAchievementStats(env),
-        getHomePageStats(env)
+        getHomePageStats(env),
+        getTripleStatsD1(env)
       ]);
       totalUnlocked = Object.values(achievementStats.counts as Record<string, number>).reduce((sum, count) => sum + count, 0);
       if (homeStats) {
@@ -36,6 +40,13 @@ export async function renderHomePage(errorMessage: string | null = null, user: L
         totalLost = homeStats.totalLost;
       } else {
         totalPlayers = achievementStats.totalPlayers;
+      }
+      if (tripleStats) {
+        for (const stat of tripleStats) {
+          if (stat.triple_key === 'dachs_single') dachsSingles = stat.total_hits;
+          else if (stat.triple_key === 'dachs_double') dachsDoubles = stat.total_hits;
+          else if (stat.triple_key === 'dachs') dachsTriples = stat.total_hits;
+        }
       }
     } catch (error) {
       logError('homePage.quickStats', error);
@@ -104,6 +115,26 @@ export async function renderHomePage(errorMessage: string | null = null, user: L
     </div>
 
     ${quickStatsHtml}
+
+    ${(dachsSingles + dachsDoubles + dachsTriples) > 0 ? `
+    <div class="home-dachs-stats">
+      <h3>🦡 Dachs-Sichtungen</h3>
+      <div class="home-stats">
+        <div class="home-stat">
+          <span class="home-stat-value">${formatNumber(dachsSingles)}</span>
+          <span class="home-stat-label">Einzel-Dachs</span>
+        </div>
+        <div class="home-stat">
+          <span class="home-stat-value">${formatNumber(dachsDoubles)}</span>
+          <span class="home-stat-label">Doppel-Dachs</span>
+        </div>
+        <div class="home-stat">
+          <span class="home-stat-value">${formatNumber(dachsTriples)}</span>
+          <span class="home-stat-label">Triple-Dachs</span>
+        </div>
+      </div>
+    </div>
+    ` : ''}
 
     <div class="home-discord">
       <div class="home-discord-heading">

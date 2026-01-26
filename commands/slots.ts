@@ -79,6 +79,8 @@ import {
   calculateStreakBonuses
 } from './slots/helpers.js';
 
+import { D1_ENABLED, DUAL_WRITE, upsertItem } from '../database/d1.js';
+
 // Pre-compiled regex patterns
 const INVISIBLE_CHARS_REGEX = /[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u0000-\u001F\u007F-\u009F]+/g;
 const NORMALIZE_SPACES_REGEX = /\s+/g;
@@ -296,17 +298,25 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
     if (!isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = Math.min((data.stack || 0) + RAGE_MODE_LOSS_STACK, RAGE_MODE_MAX_STACK);
+      const serialized = JSON.stringify(data);
       await Promise.all([
-        env.SLOTS_KV.put(rageModeKey, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
+        env.SLOTS_KV.put(rageModeKey, serialized, { expirationTtl: calculateBuffTTL(data.expireAt) }),
         resetStreakMultiplier(username, env)
       ]);
+      if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        upsertItem(username, 'buff:rage_mode', serialized, env).catch(err => logError('rageMode.d1', err, { username }));
+      }
     } else if (isWin && hasRageMode.active && hasRageMode.data) {
       const data = hasRageMode.data;
       data.stack = 0;
+      const serialized = JSON.stringify(data);
       await Promise.all([
-        env.SLOTS_KV.put(rageModeKey, JSON.stringify(data), { expirationTtl: calculateBuffTTL(data.expireAt) }),
+        env.SLOTS_KV.put(rageModeKey, serialized, { expirationTtl: calculateBuffTTL(data.expireAt) }),
         incrementStreakMultiplier(username, env)
       ]);
+      if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        upsertItem(username, 'buff:rage_mode', serialized, env).catch(err => logError('rageMode.d1', err, { username }));
+      }
     } else if (isWin) {
       await incrementStreakMultiplier(username, env);
     } else {

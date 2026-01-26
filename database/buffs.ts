@@ -59,6 +59,10 @@ export async function activateBuff(username: string, buffKey: string, duration: 
   try {
     const expireAt = Date.now() + (duration * 1000);
     await env.SLOTS_KV.put(kvKey('buff:', username, buffKey), expireAt.toString(), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      upsertItem(username, `buff:${buffKey}`, expireAt.toString(), env).catch(err => logError('activateBuff.d1', err, { username, buffKey }));
+    }
   } catch (error) {
     logError('activateBuff', error, { username, buffKey, duration });
   }
@@ -84,6 +88,10 @@ export async function activateBuffWithUses(username: string, buffKey: string, du
     const expireAt = Date.now() + (duration * 1000);
     const data: BuffUsesData = { expireAt, uses };
     await env.SLOTS_KV.put(kvKey('buff:', username, buffKey), JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      upsertItem(username, `buff:${buffKey}`, JSON.stringify(data), env).catch(err => logError('activateBuffWithUses.d1', err, { username, buffKey }));
+    }
   } catch (error) {
     logError('activateBuffWithUses', error, { username, buffKey, duration, uses });
   }
@@ -144,6 +152,9 @@ export async function decrementBuffUses(username: string, buffKey: string, env: 
       const data: BuffUsesData = JSON.parse(value);
       if (Date.now() >= data.expireAt || data.uses <= 0) {
         await env.SLOTS_KV.delete(key);
+        if (D1_ENABLED && DUAL_WRITE && env.DB) {
+          deleteItem(username, `buff:${buffKey}`, env).catch(err => logError('decrementBuffUses.d1.expired', err, { username, buffKey }));
+        }
         return;
       }
 
@@ -161,12 +172,22 @@ export async function decrementBuffUses(username: string, buffKey: string, env: 
       const verifyValue = await env.SLOTS_KV.get(key);
       if (updatedData.uses <= 0) {
         // Should be deleted
-        if (!verifyValue) return; // Success
+        if (!verifyValue) {
+          if (D1_ENABLED && DUAL_WRITE && env.DB) {
+            deleteItem(username, `buff:${buffKey}`, env).catch(err => logError('decrementBuffUses.d1.delete', err, { username, buffKey }));
+          }
+          return; // Success
+        }
       } else {
         // Should have updated uses
         if (verifyValue) {
           const verifyData: BuffUsesData = JSON.parse(verifyValue);
-          if (verifyData.uses === updatedData.uses) return; // Success
+          if (verifyData.uses === updatedData.uses) {
+            if (D1_ENABLED && DUAL_WRITE && env.DB) {
+              upsertItem(username, `buff:${buffKey}`, JSON.stringify(updatedData), env).catch(err => logError('decrementBuffUses.d1.update', err, { username, buffKey }));
+            }
+            return; // Success
+          }
         }
       }
 
@@ -190,6 +211,10 @@ export async function activateBuffWithStack(username: string, buffKey: string, d
     const expireAt = Date.now() + (duration * 1000);
     const data: BuffStackData = { expireAt, stack: 0 };
     await env.SLOTS_KV.put(kvKey('buff:', username, buffKey), JSON.stringify(data), { expirationTtl: duration + BUFF_TTL_BUFFER_SECONDS });
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      upsertItem(username, `buff:${buffKey}`, JSON.stringify(data), env).catch(err => logError('activateBuffWithStack.d1', err, { username, buffKey }));
+    }
   } catch (error) {
     logError('activateBuffWithStack', error, { username, buffKey, duration });
   }
@@ -243,6 +268,10 @@ export async function getBuffWithStack(username: string, buffKey: string, env: E
 export async function addBoost(username: string, symbol: string, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('boost:', username, symbol), KV_ACTIVE);
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      upsertItem(username, `boost:${symbol}`, KV_ACTIVE, env).catch(err => logError('addBoost.d1', err, { username, symbol }));
+    }
   } catch (error) {
     logError('addBoost', error, { username, symbol });
   }

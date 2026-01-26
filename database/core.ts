@@ -6,7 +6,7 @@
 
 import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE, COOLDOWN_TTL_SECONDS, KV_TRUE, KV_ACCEPTED } from '../constants.js';
 import { logError, kvKey } from '../utils.js';
-import { D1_ENABLED, DUAL_WRITE, updateBalance as updateBalanceD1, upsertUser } from './d1.js';
+import { D1_ENABLED, DUAL_WRITE, updateBalance as updateBalanceD1, upsertUser, upsertItem } from './d1.js';
 import type { Env, CustomMessages } from '../types/index.js';
 
 export interface SelfBanData {
@@ -93,6 +93,10 @@ export async function getLastDaily(username: string, env: Env): Promise<number |
 export async function setLastDaily(username: string, timestamp: number, env: Env): Promise<void> {
   try {
     await env.SLOTS_KV.put(kvKey('daily:', username), timestamp.toString(), { expirationTtl: DAILY_TTL_SECONDS });
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      upsertItem(username, 'lastDaily', timestamp.toString(), env).catch(err => logError('setLastDaily.d1', err, { username }));
+    }
   } catch (error) {
     logError('setLastDaily', error, { username });
   }

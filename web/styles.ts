@@ -2003,6 +2003,120 @@ a.duel-player.opponent:hover {
   flex-shrink: 0;
 }
 
+/* Home Feature Cards */
+.home-features {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  max-width: 800px;
+  margin: 0 auto 40px;
+  padding: 0 20px;
+}
+
+.home-feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px 16px;
+  text-align: center;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.home-feature-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.home-feature-icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.home-feature-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.home-feature-card p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* Home Quick Stats */
+.home-stats {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin-bottom: 40px;
+  padding: 24px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.home-stat {
+  text-align: center;
+}
+
+.home-stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.home-stat-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Home Discord CTA */
+.home-discord {
+  text-align: center;
+  padding: 40px 20px;
+  margin-bottom: 20px;
+}
+
+.home-discord h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.btn-discord {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #5865F2;
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px 28px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s, transform 0.2s;
+  cursor: pointer;
+}
+
+.btn-discord:hover {
+  background: #4752C4;
+  transform: translateY(-1px);
+}
+
+.btn-discord svg {
+  flex-shrink: 0;
+}
+
 /* Not Found */
 .not-found {
   text-align: center;
@@ -3595,6 +3709,19 @@ a.duel-player.opponent:hover {
 
   .hero-search .search-input {
     width: 100%;
+  }
+
+  .home-features {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .home-feature-card {
+    padding: 16px 12px;
+  }
+
+  .home-stats {
+    gap: 20px;
   }
 
   .profile-stats {

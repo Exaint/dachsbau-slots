@@ -54,7 +54,7 @@ export async function handleWebPage(
 
     switch (page) {
       case 'home':
-        return htmlResponse(renderHomePage(null, loggedInUser));
+        return htmlResponse(await renderHomePage(null, loggedInUser, env));
       case 'profile':
         return await handleProfilePage(url, env, loggedInUser);
       case 'leaderboard':

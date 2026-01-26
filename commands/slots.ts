@@ -36,7 +36,7 @@ import {
   FREE_SPIN_COST_THRESHOLD,
   HOURLY_JACKPOT_AMOUNT
 } from '../constants.js';
-import { logError, logWarn, getCurrentDate, getGermanDateFromTimestamp, kvKey, calculateBuffTTL, secureRandomInt } from '../utils.js';
+import { logError, logWarn, getCurrentDate, getGermanDateFromTimestamp, kvKey, calculateBuffTTL, secureRandomInt, stripInvisibleChars } from '../utils.js';
 import {
   getBalance,
   setBalance,
@@ -81,10 +81,6 @@ import {
 
 import { D1_ENABLED, DUAL_WRITE, upsertItem } from '../database/d1.js';
 
-// Pre-compiled regex patterns
-const INVISIBLE_CHARS_REGEX = /[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u0000-\u001F\u007F-\u009F]+/g;
-const NORMALIZE_SPACES_REGEX = /\s+/g;
-
 // ============================================
 // Main Slot Handler
 // ============================================
@@ -93,12 +89,9 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
   try {
     const lowerUsername = username.toLowerCase();
 
-    // Sanitize input
+    // Defense-in-depth: strip invisible chars (primary sanitization is in handleSlotAction)
     if (amountParam) {
-      amountParam = amountParam
-        .replace(INVISIBLE_CHARS_REGEX, '')
-        .replace(NORMALIZE_SPACES_REGEX, ' ')
-        .trim();
+      amountParam = stripInvisibleChars(amountParam) || undefined;
     }
 
     const now = Date.now();

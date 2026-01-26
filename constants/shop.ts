@@ -20,7 +20,7 @@ export const SHOP_ITEMS: Record<number, ShopItem> = {
   12: { name: 'Glücksrad Spin', price: 300, type: 'instant', symbol: '🎡' },
   13: { name: '!slots 20 Unlock', price: 500, type: 'unlock', unlockKey: 'slots_20', symbol: '🔓' },
   14: { name: 'Happy Hour', price: 800, type: 'timed', buffKey: 'happy_hour', duration: 3600, symbol: '⚡' },
-  15: { name: 'Spin Bundle', price: 90, type: 'bundle', symbol: '🎰' },
+  15: { name: 'Spin Bundle', price: 90, type: 'bundle', symbol: '🎰', weeklyLimit: true },
   16: { name: 'Mystery Box', price: 1000, type: 'instant', symbol: '📦' },
   17: { name: 'Bronze Dachs Rang', price: 1200, type: 'prestige', rank: '🥉', symbol: '🥉' },
   18: { name: 'Jackpot Booster', price: 1500, type: 'timed', buffKey: 'jackpot_booster', duration: 3600, symbol: '🎰' },
@@ -56,7 +56,7 @@ export const PREREQUISITE_NAMES: Record<string, string> = {
 
 // Shop limits
 export const WEEKLY_DACHS_BOOST_LIMIT = 1;
-export const WEEKLY_SPIN_BUNDLE_LIMIT = 3;
+export const WEEKLY_SPIN_BUNDLE_LIMIT = 1;
 export const SPIN_BUNDLE_COUNT = 10;
 export const SPIN_BUNDLE_MULTIPLIER = 1;
 

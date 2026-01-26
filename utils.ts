@@ -31,6 +31,15 @@ const GERMAN_DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
 // OPTIMIZED: Pre-compiled regex patterns (avoid recompilation per request)
 const USERNAME_SANITIZE_REGEX = /[^a-z0-9_]/gi;
 
+// Invisible character regex - includes 7TV Tags block (U+E0000-E007F) used to bypass Twitch duplicate detection
+const INVISIBLE_CHARS_REGEX = /[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u0000-\u001F\u007F-\u009F\u{E0000}-\u{E007F}]+/gu;
+const NORMALIZE_SPACES_REGEX = /\s+/g;
+
+// Strip all invisible/zero-width characters and normalize whitespace
+function stripInvisibleChars(input: string): string {
+  return input.replace(INVISIBLE_CHARS_REGEX, '').replace(NORMALIZE_SPACES_REGEX, ' ').trim();
+}
+
 // Cryptographically secure random number generator (0 to 1, like Math.random but secure)
 function secureRandom(): number {
   const buffer = new Uint32Array(1);
@@ -574,7 +583,8 @@ export {
   jsonSuccessResponse,
   atomicKvUpdate,
   checkRateLimit,
-  containsProfanity
+  containsProfanity,
+  stripInvisibleChars
 };
 
 // Type exports (Env and ValidateTargetResult re-exported from types/index)

@@ -354,6 +354,24 @@ function buildResponseMessage(
   // Free Spins won
   if (result.freeSpins && result.freeSpins > 0) {
     messageParts.push(result.message);
+
+    // Show bonus DT earned alongside free spins (e.g., Comeback bonus)
+    if (totalWin > 0) {
+      const netWin = totalWin - spinCost;
+      if (netWin > 0) {
+        messageParts.push(`+${netWin} DT 💰`);
+      }
+    }
+
+    // Hourly Jackpot (special natural bonus)
+    if (hourlyJackpotWon) {
+      naturalBonuses.unshift(`⏰ Jackpot +${HOURLY_JACKPOT_AMOUNT}`);
+    }
+
+    // Natural bonuses section (Comeback, Streak, etc.)
+    if (naturalBonuses.length > 0) {
+      messageParts.push(`║ ${naturalBonuses.join(' • ')}`);
+    }
   }
   // Net win (payout >= spin cost)
   else if (totalWin > 0 && totalWin >= spinCost) {

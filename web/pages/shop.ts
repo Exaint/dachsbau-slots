@@ -36,7 +36,7 @@ const ITEM_DESCRIPTIONS: Record<number, string> = {
   12: 'Drehe das Glücksrad für zufällige Preise von 10-1000 DT',
   13: 'Schaltet !slots 20 frei - setze bis zu 20 DT pro Spin',
   14: '1 Stunde lang +50% auf alle Gewinne',
-  15: '10 Spins zum Preis von 9 (1x/Woche, max 3x)',
+  15: '10 Spins zum Preis von 9',
   16: 'Öffne eine Mystery Box mit zufälligem Inhalt',
   17: 'Bronze Prestige-Rang mit 🥉 Badge',
   18: '1 Stunde lang +25% auf alle Triple-Gewinne',
@@ -308,7 +308,7 @@ export async function renderShopPage(env: Env, user: LoggedInUser | null = null)
               <strong>Wichtige Infos</strong>
               <p>• Einige Items sind einmalig (Unlocks & Prestige)<br>
               • Timed Buffs laufen nach Kauf-Zeitpunkt ab<br>
-              • Spin Bundle: Max 3x/Woche (Reset: Montag 00:00 UTC)<br>
+              • Spin Bundle: Max 1x/Woche (Reset: Montag 00:00 UTC)<br>
               • Dachs-Boost: Max 1x/Woche (Reset: Montag 00:00 UTC)</p>
             </div>
           </div>

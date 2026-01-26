@@ -447,10 +447,9 @@ async function purchaseBundle(username: string, item: ShopItem, env: Env): Promi
     incrementSpinBundlePurchases(username, env)
   ]);
 
-  const remainingPurchases = WEEKLY_SPIN_BUNDLE_LIMIT - (purchases.count + 1);
   return {
     success: true,
-    message: `Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins! (Noch ${remainingPurchases} diese Woche)`,
+    message: `Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins!`,
     newBalance: deduction.newBalance
   };
 }

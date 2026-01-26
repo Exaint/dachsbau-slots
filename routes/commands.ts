@@ -3,7 +3,7 @@
  */
 
 import { RESPONSE_HEADERS, URLS, KV_TRUE } from '../constants.js';
-import { sanitizeUsername, isAdmin, getAdminList } from '../utils.js';
+import { sanitizeUsername, isAdmin, getAdminList, stripInvisibleChars } from '../utils.js';
 import { isBlacklisted, setSelfBan, hasAcceptedDisclaimer, setDisclaimerAccepted, getBalance } from '../database.js';
 
 // User commands
@@ -259,6 +259,11 @@ export async function handleSlotSubcommands(cleanUsername: string, lower: string
  * Handle the main slot action
  */
 export async function handleSlotAction(cleanUsername: string, amountParam: string | null, url: URL, env: Env, ctx?: ExecutionContext): Promise<Response> {
+  // Strip 7TV invisible characters before routing (7TV adds Tags block chars to bypass Twitch duplicate detection)
+  if (amountParam) {
+    amountParam = stripInvisibleChars(amountParam);
+    if (!amountParam) amountParam = null;
+  }
   const lower = amountParam?.toLowerCase() ?? null;
 
   // Security checks for all state-modifying actions (including default spin without amount)

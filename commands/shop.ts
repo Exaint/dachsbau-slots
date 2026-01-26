@@ -369,8 +369,7 @@ async function handleBundleItem(
     incrementSpinBundlePurchases(username, env)
   ]);
 
-  const remainingPurchases = WEEKLY_SPIN_BUNDLE_LIMIT - (purchases.count + 1);
-  return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DachsTaler) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Noch ${remainingPurchases} Käufe diese Woche möglich`, { headers: RESPONSE_HEADERS });
+  return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DachsTaler) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Du kannst diese Woche kein weiteres Spin Bundle kaufen`, { headers: RESPONSE_HEADERS });
 }
 
 async function handlePeekItem(

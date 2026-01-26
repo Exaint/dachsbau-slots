@@ -1854,6 +1854,8 @@ a.duel-player.opponent:hover {
   padding: 2px 8px;
   background: var(--bg-tertiary);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--role-color, var(--accent));
+  color: var(--role-color, var(--accent));
   font-size: 0.75rem;
 }
 
@@ -1864,7 +1866,7 @@ a.duel-player.opponent:hover {
 }
 
 .leaderboard-role-label {
-  color: var(--text-secondary);
+  color: var(--role-color, var(--text-secondary));
   font-weight: 500;
 }
 

@@ -91,7 +91,9 @@ export {
   incrementStats,
   batchUpdateStats,
   setStat,
-  updateMaxStat
+  updateMaxStat,
+  updatePlayerStat,
+  updatePlayerStatBatch
 } from './progression.js';
 
 // Shop

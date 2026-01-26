@@ -24,18 +24,18 @@ import {
   hasUnlock,
   consumeWinMultiplier,
   consumeBoost,
-  updateAchievementStat,
   updateAchievementStatBatch,
-  setMaxAchievementStat,
   markTripleCollected,
   recordDachsHit,
   checkAndUnlockAchievement,
   checkBalanceAchievements,
   checkBigWinAchievements,
   addFreeSpinsWithMultiplier,
-  batchUpdateStats
+  updatePlayerStat,
+  updatePlayerStatBatch
 } from '../../database.js';
-import type { Env, WinResult, SpinAmountResult, StreakBonusResult, StreakData, PreloadedBuffs, PlayerStats } from '../../types/index.js';
+import type { Env, WinResult, SpinAmountResult, StreakBonusResult, StreakData, PreloadedBuffs } from '../../types/index.js';
+import type { PlayerStats } from '../../database/progression.js';
 
 // Unlock prices for error messages
 const UNLOCK_PRICES: Record<number | string, number> = { 20: 500, 30: 2000, 50: 2500, 100: 3250, all: 4444 };
@@ -97,45 +97,33 @@ export async function trackSlotAchievements(
   extendedData: ExtendedData = {}
 ): Promise<void> {
   try {
-    // Batch achievement stat updates (single read-modify-write instead of sequential calls)
+    // Core stats: achievement-blob only (stats-KV already handled by updateStats() in slots.ts)
     const dachsCount = originalGrid.filter(s => s === '🦡').length;
-    const achievementStats: [string, number][] = [['totalSpins', 1]];
-    // Count as win if points > 0 OR free spins awarded (e.g. diamond-only wins: 💎💎💎 = 0 points + 5 free spins)
+    const coreStats: [string, number][] = [['totalSpins', 1]];
     const isStatWin = result.points > 0 || (result.freeSpins && result.freeSpins > 0);
     if (isStatWin) {
-      achievementStats.push(['wins', 1]);
+      coreStats.push(['wins', 1]);
     } else {
-      achievementStats.push(['losses', 1]);
+      coreStats.push(['losses', 1]);
     }
-    if (isFreeSpinUsed) achievementStats.push(['freeSpinsUsed', 1]);
-    if (insuranceUsed) achievementStats.push(['insuranceTriggers', 1]);
-    if (hourlyJackpotWon) achievementStats.push(['hourlyJackpots', 1]);
-    if (dachsCount > 0) achievementStats.push(['totalDachsSeen', dachsCount]);
-    await updateAchievementStatBatch(username, achievementStats, env);
+    await updateAchievementStatBatch(username, coreStats, env);
 
-    // Max-value stats (loss streak) - only update if higher
-    if (extendedData.currentLossStreak && extendedData.currentLossStreak > 0) {
-      await setMaxAchievementStat(username, 'maxLossStreak', extendedData.currentLossStreak, env);
-    }
+    // Extended stats: unified (achievement-blob + stats-KV + D1)
+    const extendedStats: [keyof PlayerStats, number][] = [];
+    if (isFreeSpinUsed) extendedStats.push(['freeSpinsUsed', 1]);
+    if (insuranceUsed) extendedStats.push(['insuranceTriggers', 1]);
+    if (hourlyJackpotWon) extendedStats.push(['hourlyJackpots', 1]);
+    if (dachsCount > 0) extendedStats.push(['totalDachsSeen', dachsCount]);
+    if (isAllIn) extendedStats.push(['allInSpins', 1]);
+    if (extendedData.spinCost && extendedData.spinCost >= 50) extendedStats.push(['highBetSpins', 1]);
 
-    // Batch extended stats (D1/progression tracking)
-    // Note: These stat keys are for extended tracking, not core PlayerStats
-    const statIncrements: [string, number][] = [];
-    const maxUpdates: [string, number][] = [];
-
-    if (isAllIn) statIncrements.push(['allInSpins', 1]);
-    if (extendedData.spinCost && extendedData.spinCost >= 50) statIncrements.push(['highBetSpins', 1]);
-    if (isFreeSpinUsed) statIncrements.push(['freeSpinsUsed', 1]);
-    if (insuranceUsed) statIncrements.push(['insuranceTriggers', 1]);
-    if (hourlyJackpotWon) statIncrements.push(['hourlyJackpots', 1]);
-    if (dachsCount > 0) statIncrements.push(['totalDachsSeen', dachsCount]);
+    const maxUpdates: [keyof PlayerStats, number][] = [];
     if (extendedData.currentLossStreak && extendedData.currentLossStreak > 0) {
       maxUpdates.push(['maxLossStreak', extendedData.currentLossStreak]);
     }
 
-    // Batch update for D1/progression
-    if (statIncrements.length > 0 || maxUpdates.length > 0) {
-      await batchUpdateStats(username, statIncrements as [keyof PlayerStats, number][], maxUpdates as [keyof PlayerStats, number][], env);
+    if (extendedStats.length > 0 || maxUpdates.length > 0) {
+      await updatePlayerStatBatch(username, extendedStats, maxUpdates.length > 0 ? maxUpdates : null, env);
     }
 
     // PlayDays tracking (check if player already played today)
@@ -245,7 +233,7 @@ async function trackPlayDay(username: string, env: Env): Promise<void> {
     const existing = await env.SLOTS_KV.get(key);
     if (!existing) {
       await env.SLOTS_KV.put(key, '1', { expirationTtl: 86400 * 2 }); // 2 day TTL
-      await updateAchievementStat(username, 'playDays', 1, env);
+      await updatePlayerStat(username, 'playDays', 1, env);
     }
   } catch (error) {
     logError('trackPlayDay', error, { username });

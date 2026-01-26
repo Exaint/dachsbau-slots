@@ -29,7 +29,8 @@
  */
 
 import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
-import { getBalance, adjustBalance, checkAndUnlockAchievement, updateAchievementStatBatch, setMaxAchievementStat, checkBalanceAchievements, incrementStat, updateMaxStat } from '../database.js';
+import { getBalance, adjustBalance, checkAndUnlockAchievement, checkBalanceAchievements, updatePlayerStatBatch } from '../database.js';
+import type { PlayerStats } from '../database/progression.js';
 import { createDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
 import type { Env } from '../types/index.js';
@@ -57,9 +58,8 @@ type DuelResult = 'win' | 'loss' | 'tie';
  */
 async function trackDuelAchievements(player: string, result: DuelResult, winnings: number, env: Env): Promise<void> {
   try {
-    // Step 1: Batch all achievement stat updates in a single atomic read-modify-write
-    // This prevents race conditions on the achievements:{username} KV key
-    const statUpdates: [string, number][] = [['duelsPlayed', 1]];
+    // Unified batch: achievement-blob + stats-KV + D1 (single D1 write per stat)
+    const statUpdates: [keyof PlayerStats, number][] = [['duelsPlayed', 1]];
     if (result === 'win') {
       statUpdates.push(['duelsWon', 1]);
       statUpdates.push(['totalDuelWinnings', winnings]);
@@ -67,23 +67,17 @@ async function trackDuelAchievements(player: string, result: DuelResult, winning
       statUpdates.push(['duelsLost', 1]);
     }
     // Ties: only duelsPlayed is incremented (no win or loss)
-    await updateAchievementStatBatch(player, statUpdates, env);
+    await updatePlayerStatBatch(player, statUpdates, null, env);
 
-    // Step 2: One-time achievement (reads fresh data after batch save)
+    // One-time achievement (reads fresh data after batch save)
     await checkAndUnlockAchievement(player, ACHIEVEMENTS.FIRST_DUEL.id, env);
 
-    // Step 3: KV stats + streak (separate keys, safe to run in parallel)
-    const kvPromises: Promise<void>[] = [incrementStat(player, 'duelsPlayed', 1, env)];
+    // Streak tracking (separate KV key, not a simple stat increment)
     if (result === 'win') {
-      kvPromises.push(incrementStat(player, 'duelsWon', 1, env));
-      kvPromises.push(incrementStat(player, 'totalDuelWinnings', winnings, env));
-      kvPromises.push(trackDuelStreak(player, true, env));
+      await trackDuelStreak(player, true, env);
     } else if (result === 'loss') {
-      kvPromises.push(incrementStat(player, 'duelsLost', 1, env));
-      kvPromises.push(trackDuelStreak(player, false, env));
+      await trackDuelStreak(player, false, env);
     }
-    // Ties: don't affect duel streak
-    await Promise.all(kvPromises);
   } catch (error) {
     logError('trackDuelAchievements', error, { player, result });
   }
@@ -99,8 +93,8 @@ async function trackDuelStreak(player: string, isWin: boolean, env: Env): Promis
       const current = parseInt(await env.SLOTS_KV.get(key) || '0', 10);
       const newStreak = current + 1;
       await env.SLOTS_KV.put(key, String(newStreak), { expirationTtl: 86400 * 30 });
-      await setMaxAchievementStat(player, 'maxDuelStreak', newStreak, env);
-      updateMaxStat(player, 'maxDuelStreak', newStreak, env).catch(() => {});
+      // Unified: achievement-blob + stats-KV + D1 (single D1 write)
+      await updatePlayerStatBatch(player, [], [['maxDuelStreak', newStreak]], env);
     } else {
       await env.SLOTS_KV.put(key, '0', { expirationTtl: 86400 * 30 });
     }

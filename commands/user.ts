@@ -39,9 +39,8 @@ import {
   hasWildCard,
   hasAcceptedDisclaimer,
   checkAndUnlockAchievement,
-  updateAchievementStat,
   checkBalanceAchievements,
-  incrementStat
+  updatePlayerStat
 } from '../database.js';
 import { D1_ENABLED, getLeaderboard as getLeaderboardD1 } from '../database/d1.js';
 import type { Env } from '../types/index.js';
@@ -77,8 +76,8 @@ async function trackDailyAchievements(username: string, monthlyDays: number, env
     // FIRST_DAILY
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_DAILY.id, env));
 
-    // Track dailysClaimed stat
-    promises.push(incrementStat(username, 'dailysClaimed', 1, env));
+    // Track dailysClaimed stat (unified: achievement-blob + stats-KV + D1)
+    promises.push(updatePlayerStat(username, 'dailysClaimed', 1, env));
 
     // DAILY_7/14/21/28 - Check and unlock based on monthly login days
     if (monthlyDays >= 7) {
@@ -107,12 +106,11 @@ async function trackTransferAchievements(username: string, amount: number, env: 
     // FIRST_TRANSFER
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_TRANSFER.id, env));
 
-    // Track totalTransferred for TRANSFER_1000/10000 achievements
-    promises.push(updateAchievementStat(username, 'totalTransferred', amount, env));
+    // Track totalTransferred for TRANSFER_1000/10000 achievements (unified)
+    promises.push(updatePlayerStat(username, 'totalTransferred', amount, env));
 
-    // Track transfer count for TRANSFER_COUNT_10/50/100 achievements
-    promises.push(updateAchievementStat(username, 'transfersSentCount', 1, env));
-    promises.push(incrementStat(username, 'transfersSentCount', 1, env));
+    // Track transfer count for TRANSFER_COUNT_10/50/100 achievements (unified)
+    promises.push(updatePlayerStat(username, 'transfersSentCount', 1, env));
 
     await Promise.all(promises);
   } catch (error) {
@@ -125,7 +123,7 @@ async function trackTransferAchievements(username: string, amount: number, env: 
  */
 async function trackTransferReceived(username: string, amount: number, env: Env): Promise<void> {
   try {
-    await incrementStat(username, 'transfersReceived', amount, env);
+    await updatePlayerStat(username, 'transfersReceived', amount, env);
   } catch (error) {
     logError('trackTransferReceived', error, { username, amount });
   }

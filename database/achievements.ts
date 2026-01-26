@@ -18,7 +18,7 @@ import type { Env, Achievement } from '../types/index.d.ts';
 import { ACHIEVEMENTS, ACHIEVEMENTS_REWARDS_ENABLED, getAchievementById } from '../constants/achievements.js';
 import { logError, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, executeD1Write } from './d1.js';
-import { unlockAchievementD1, lockAchievementD1, incrementStatD1, updatePlayerStatsD1, recordTripleHitD1 } from './d1-achievements.js';
+import { unlockAchievementD1, lockAchievementD1, incrementStatD1, updateMaxStatD1, updatePlayerStatsD1, recordTripleHitD1 } from './d1-achievements.js';
 
 // === Type Definitions ===
 
@@ -930,6 +930,10 @@ async function setMaxAchievementStat(username: string, statKey: string, newValue
     }
 
     await savePlayerAchievements(username, data, env);
+
+    // D1 dual-write (fire-and-forget)
+    updateMaxStatD1(username, statKey, newValue, env).catch(() => {});
+
     return unlockedAchievements;
   } catch (error) {
     logError('setMaxAchievementStat', error as Error, { username, statKey, newValue });

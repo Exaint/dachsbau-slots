@@ -75,10 +75,9 @@ import {
   activateGuaranteedPair,
   activateWildCard,
   isBuffActive,
-  updateAchievementStat,
   checkAndUnlockAchievement,
   getPlayerAchievements,
-  incrementStat
+  updatePlayerStat
 } from '../database.js';
 import { calculateWin } from './slots.js';
 import type { Env, ShopItem, WinResult } from '../types/index.js';
@@ -119,8 +118,8 @@ async function trackShopAchievements(
   try {
     const promises: Promise<unknown>[] = [];
 
-    // Track shop purchase stat
-    promises.push(updateAchievementStat(username, 'shopPurchases', 1, env));
+    // Track shop purchase stat (unified: achievement-blob + stats-KV + D1)
+    promises.push(updatePlayerStat(username, 'shopPurchases', 1, env));
 
     // FIRST_PURCHASE
     promises.push(checkAndUnlockAchievement(username, ACHIEVEMENTS.FIRST_PURCHASE.id, env));
@@ -128,33 +127,28 @@ async function trackShopAchievements(
     // Track item-specific stats for extended tracking & achievements
     switch (itemId) {
       case 1: // Peek Token
-        promises.push(incrementStat(username, 'peekTokens', 1, env));
+        promises.push(updatePlayerStat(username, 'peekTokens', 1, env));
         break;
       case 11: // Chaos Spin
-        promises.push(updateAchievementStat(username, 'chaosSpins', 1, env));
-        promises.push(incrementStat(username, 'chaosSpins', 1, env));
+        promises.push(updatePlayerStat(username, 'chaosSpins', 1, env));
         break;
       case 12: // Glücksrad
-        promises.push(updateAchievementStat(username, 'wheelSpins', 1, env));
-        promises.push(incrementStat(username, 'wheelSpins', 1, env));
+        promises.push(updatePlayerStat(username, 'wheelSpins', 1, env));
         break;
       case 16: // Mystery Box
-        promises.push(updateAchievementStat(username, 'mysteryBoxes', 1, env));
-        promises.push(incrementStat(username, 'mysteryBoxes', 1, env));
+        promises.push(updatePlayerStat(username, 'mysteryBoxes', 1, env));
         break;
       case 31: // Reverse Chaos
-        promises.push(updateAchievementStat(username, 'reverseChaosSpins', 1, env));
-        promises.push(incrementStat(username, 'reverseChaosSpins', 1, env));
+        promises.push(updatePlayerStat(username, 'reverseChaosSpins', 1, env));
         break;
       case 36: // Diamond Mine
-        promises.push(incrementStat(username, 'diamondMines', 1, env));
+        promises.push(updatePlayerStat(username, 'diamondMines', 1, env));
         break;
       case 37: // Guaranteed Pair
-        promises.push(incrementStat(username, 'guaranteedPairsUsed', 1, env));
+        promises.push(updatePlayerStat(username, 'guaranteedPairsUsed', 1, env));
         break;
       case 38: // Wild Card
-        promises.push(updateAchievementStat(username, 'wildCardsUsed', 1, env));
-        promises.push(incrementStat(username, 'wildCardsUsed', 1, env));
+        promises.push(updatePlayerStat(username, 'wildCardsUsed', 1, env));
         break;
     }
 

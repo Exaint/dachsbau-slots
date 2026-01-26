@@ -290,12 +290,11 @@ export function renderLeaderboardPage(
 
   // Helper to render a single leaderboard item
   const renderPlayerItem = (player: LeaderboardPlayer | CurrentUserRank, rank: number, extraClass = ''): string => {
-    const roleBadgeHtml = getRoleBadge(player.username, player.role);
     const roleBadge = getEffectiveRoleBadge(player.username, player.role);
-    const borderStyle = roleBadge ? ` style="border: 2px solid ${roleBadge.color}"` : '';
+    const roleBadgeHtml = getRoleBadge(player.username, player.role);
     const avatarHtml = player.avatar
-      ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar"${borderStyle} loading="lazy" width="32" height="32">`
-      : `<div class="leaderboard-avatar-placeholder"${borderStyle}>👤</div>`;
+      ? `<img src="${player.avatar}" alt="" class="leaderboard-avatar" loading="lazy" width="32" height="32">`
+      : `<div class="leaderboard-avatar-placeholder">👤</div>`;
     const noDisclaimerBadge = showAll && !player.hasDisclaimer
       ? '<span class="no-disclaimer-badge" title="Kein Disclaimer akzeptiert">⚠️</span>'
       : '';
@@ -311,7 +310,7 @@ export function renderLeaderboardPage(
           <a href="?page=profile&user=${encodeURIComponent(player.username)}" class="leaderboard-username-link">${escapeHtml(player.username)}</a>
           ${prestigeRankHtml}
           ${noDisclaimerBadge}
-          ${roleBadgeHtml ? `<span class="leaderboard-role">${roleBadgeHtml}</span>` : ''}
+          ${roleBadgeHtml ? `<span class="leaderboard-role" style="--role-color: ${roleBadge!.color}">${roleBadgeHtml}</span>` : ''}
         </div>
         <div class="leaderboard-balance">${formatNumber(player.balance)} DT</div>
       </div>

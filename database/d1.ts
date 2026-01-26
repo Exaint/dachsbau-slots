@@ -21,6 +21,9 @@ export const D1_ENABLED = true;
 // Set to true to write to both D1 and KV during migration
 export const DUAL_WRITE = true;
 
+// Which storage reads stats primarily: 'kv' (safe default) or 'd1' (after migration)
+export const STATS_READ_PRIMARY: 'kv' | 'd1' = 'kv';
+
 // Retry configuration for D1 writes
 const D1_WRITE_RETRIES = 2;
 const D1_RETRY_DELAY_MS = 50;

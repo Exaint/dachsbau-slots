@@ -6,8 +6,9 @@
 
 import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, KV_TRUE, MAX_RETRIES } from '../constants.js';
 import { getCurrentMonth, getCurrentDate, logError, kvKey, exponentialBackoff } from '../utils.js';
-import { D1_ENABLED, DUAL_WRITE, upsertUser, updateStreakMultiplier as updateStreakMultiplierD1 } from './d1.js';
-import { addUnlockD1, removeUnlockD1, updateMonthlyLoginD1, incrementStatD1, updateBiggestWinD1 } from './d1-achievements.js';
+import { D1_ENABLED, DUAL_WRITE, STATS_READ_PRIMARY, upsertUser, updateStreakMultiplier as updateStreakMultiplierD1 } from './d1.js';
+import { addUnlockD1, removeUnlockD1, updateMonthlyLoginD1, incrementStatD1, updateBiggestWinD1, updateMaxStatD1, getFullPlayerStatsD1 } from './d1-achievements.js';
+import { updateAchievementStat, updateAchievementStatBatch, setMaxAchievementStat } from './achievements.js';
 import type { Env, MonthlyLoginData, StreakData } from '../types/index.js';
 
 // ============================================
@@ -357,6 +358,22 @@ export async function getStreak(username: string, env: Env): Promise<StreakData>
 
 export async function getStats(username: string, env: Env): Promise<PlayerStats> {
   try {
+    // D1-primary: try D1 first, KV as fallback
+    if (STATS_READ_PRIMARY === 'd1') {
+      const d1Stats = await getFullPlayerStatsD1(username, env);
+      if (d1Stats) {
+        const stats: PlayerStats = { ...DEFAULT_STATS };
+        for (const key of Object.keys(DEFAULT_STATS) as (keyof PlayerStats)[]) {
+          if (typeof d1Stats[key] === 'number') {
+            stats[key] = d1Stats[key];
+          }
+        }
+        return stats;
+      }
+      // D1 returned null → fall through to KV
+    }
+
+    // KV-primary (default) or KV-fallback
     const value = await env.SLOTS_KV.get(kvKey('stats:', username));
     if (!value) return { ...DEFAULT_STATS };
 
@@ -404,6 +421,7 @@ export async function updateStats(username: string, isWin: boolean, winAmount: n
       } else {
         d1Ops.push(incrementStatD1(username, 'losses', 1, env));
         d1Ops.push(incrementStatD1(username, 'totalLost', lostAmount, env));
+        if (wasNewBiggestLoss) d1Ops.push(updateMaxStatD1(username, 'biggestLoss', lostAmount, env));
       }
       Promise.all(d1Ops).catch(err => logError('updateStats.d1', err, { username }));
     }
@@ -553,5 +571,70 @@ export async function updateMaxStat(username: string, statKey: keyof PlayerStats
     }
   } catch (error) {
     logError('updateMaxStat', error, { username, statKey, newValue });
+  }
+}
+
+// ============================================
+// Unified Stat Writers
+// ============================================
+// These functions write to ALL stores (achievement-blob + stats-KV + D1)
+// in a single call, eliminating double D1 writes.
+// Use these instead of calling updateAchievementStat + incrementStat separately.
+
+/**
+ * Unified single-stat writer: achievement-blob + stats-KV + D1 (once)
+ */
+export async function updatePlayerStat(username: string, statKey: keyof PlayerStats, amount: number, env: Env): Promise<void> {
+  // 1. Achievement-blob update + unlock checks + D1 write
+  await updateAchievementStat(username, statKey, amount, env);
+
+  // 2. Stats KV update (D1 already done above, no double write)
+  try {
+    const stats = await getStats(username, env);
+    if (statKey in stats) {
+      stats[statKey] += amount;
+      await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
+    }
+  } catch (error) {
+    logError('updatePlayerStat.kv', error, { username, statKey });
+  }
+}
+
+/**
+ * Unified batch stat writer: achievement-blob + stats-KV + D1 (once per stat)
+ * Handles both increments and max-value updates in a single call.
+ */
+export async function updatePlayerStatBatch(
+  username: string,
+  increments: [keyof PlayerStats, number][],
+  maxUpdates: [keyof PlayerStats, number][] | null,
+  env: Env
+): Promise<void> {
+  // 1. Achievement-blob batch update + D1 writes (increments)
+  if (increments.length > 0) {
+    await updateAchievementStatBatch(username, increments.map(([k, v]) => [k as string, v]), env);
+  }
+
+  // 2. Max-value achievement stats + D1 writes
+  if (maxUpdates && maxUpdates.length > 0) {
+    for (const [statKey, value] of maxUpdates) {
+      await setMaxAchievementStat(username, statKey, value, env);
+    }
+  }
+
+  // 3. Stats KV update (D1 already done above, no double writes)
+  try {
+    const stats = await getStats(username, env);
+    for (const [statKey, amount] of increments) {
+      if (statKey in stats) stats[statKey] += amount;
+    }
+    if (maxUpdates) {
+      for (const [statKey, value] of maxUpdates) {
+        if (statKey in stats && value > stats[statKey]) stats[statKey] = value;
+      }
+    }
+    await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
+  } catch (error) {
+    logError('updatePlayerStatBatch.kv', error, { username });
   }
 }

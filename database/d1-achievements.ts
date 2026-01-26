@@ -70,6 +70,60 @@ export interface BatchMigrateUser {
 }
 
 // ============================================
+// Stat Key → D1 Column Mapping
+// ============================================
+
+/** Maps camelCase stat keys (PlayerStats) to snake_case D1 column names */
+const STAT_COLUMN_MAP: Record<string, string> = {
+  // Core stats
+  totalSpins: 'total_spins',
+  wins: 'wins',
+  biggestWin: 'biggest_win',
+  totalWon: 'total_won',
+  totalLost: 'total_lost',
+  // Loss tracking
+  losses: 'losses',
+  biggestLoss: 'biggest_loss',
+  maxLossStreak: 'max_loss_streak',
+  // Item/Buff usage
+  chaosSpins: 'chaos_spins',
+  reverseChaosSpins: 'reverse_chaos_spins',
+  wheelSpins: 'wheel_spins',
+  mysteryBoxes: 'mystery_boxes',
+  peekTokens: 'peek_tokens',
+  insuranceTriggers: 'insurance_triggers',
+  wildCardsUsed: 'wild_cards_used',
+  guaranteedPairsUsed: 'guaranteed_pairs_used',
+  freeSpinsUsed: 'free_spins_used',
+  diamondMines: 'diamond_mines',
+  // Duel extended
+  duelsPlayed: 'duels_played',
+  duelsWon: 'duels_won',
+  duelsLost: 'duels_lost',
+  maxDuelStreak: 'max_duel_streak',
+  totalDuelWinnings: 'total_duel_winnings',
+  // Transfer extended
+  totalTransferred: 'total_transferred',
+  transfersReceived: 'transfers_received',
+  transfersSentCount: 'transfers_sent_count',
+  // Time/Activity
+  playDays: 'play_days',
+  firstSpinAt: 'first_spin_at',
+  maxDailyStreak: 'max_daily_streak',
+  // Spin types
+  allInSpins: 'all_in_spins',
+  highBetSpins: 'high_bet_spins',
+  // Dachs tracking
+  totalDachsSeen: 'total_dachs_seen',
+  // Hourly jackpot
+  hourlyJackpots: 'hourly_jackpots',
+  // Shop
+  shopPurchases: 'shop_purchases',
+  // Daily
+  dailysClaimed: 'dailys_claimed',
+};
+
+// ============================================
 // Player Achievements
 // ============================================
 
@@ -365,21 +419,7 @@ export async function updatePlayerStatsD1(username: string, stats: StatsUpdate, 
 export async function incrementStatD1(username: string, statKey: string, increment: number, env: Env): Promise<boolean> {
   if (!D1_ENABLED || !env.DB) return false;
 
-  // Map stat keys to D1 column names
-  const columnMap: Record<string, string> = {
-    totalSpins: 'total_spins',
-    wins: 'wins',
-    biggestWin: 'biggest_win',
-    totalWon: 'total_won',
-    totalLost: 'total_lost',
-    totalTransferred: 'total_transferred',
-    shopPurchases: 'shop_purchases',
-    duelsPlayed: 'duels_played',
-    duelsWon: 'duels_won',
-    dailysClaimed: 'dailys_claimed'
-  };
-
-  const column = columnMap[statKey];
+  const column = STAT_COLUMN_MAP[statKey];
   if (!column) return false;
 
   try {
@@ -422,6 +462,64 @@ export async function updateBiggestWinD1(username: string, winAmount: number, en
   } catch (error) {
     logError('d1.updateBiggestWin', error, { username, winAmount });
     return false;
+  }
+}
+
+/**
+ * Update a max-value stat in D1 (only updates if new value is higher)
+ * Generic version for stats like maxLossStreak, maxDuelStreak, biggestLoss, maxDailyStreak
+ */
+export async function updateMaxStatD1(username: string, statKey: string, newValue: number, env: Env): Promise<boolean> {
+  if (!D1_ENABLED || !env.DB) return false;
+
+  const column = STAT_COLUMN_MAP[statKey];
+  if (!column) return false;
+
+  try {
+    const now = Date.now();
+    const lowerUsername = username.toLowerCase();
+
+    await env.DB.prepare(`
+      INSERT INTO player_stats (username, ${column}, created_at, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(username) DO UPDATE SET
+        ${column} = MAX(${column}, ?),
+        updated_at = ?
+    `).bind(lowerUsername, newValue, now, now, newValue, now).run();
+
+    return true;
+  } catch (error) {
+    logError('d1.updateMaxStat', error, { username, statKey, newValue });
+    return false;
+  }
+}
+
+/**
+ * Read all player stats from D1 as camelCase Record
+ * Returns null if D1 is disabled, player not found, or on error
+ */
+export async function getFullPlayerStatsD1(username: string, env: Env): Promise<Record<string, number> | null> {
+  if (!D1_ENABLED || !env.DB) return null;
+
+  try {
+    const row = await env.DB.prepare(
+      'SELECT * FROM player_stats WHERE username = ?'
+    ).bind(username.toLowerCase()).first();
+
+    if (!row) return null;
+
+    // Map D1 snake_case columns back to camelCase stat keys
+    const stats: Record<string, number> = {};
+    for (const [statKey, column] of Object.entries(STAT_COLUMN_MAP)) {
+      const value = row[column];
+      if (typeof value === 'number') {
+        stats[statKey] = value;
+      }
+    }
+    return stats;
+  } catch (error) {
+    logError('d1.getFullPlayerStats', error, { username });
+    return null;
   }
 }
 

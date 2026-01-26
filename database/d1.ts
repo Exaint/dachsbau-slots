@@ -544,3 +544,39 @@ export async function getUserCount(env: Env): Promise<number | null> {
     return null;
   }
 }
+
+export interface HomePageStats {
+  totalPlayers: number;
+  totalBalance: number;
+  totalWon: number;
+  totalLost: number;
+}
+
+/**
+ * Get aggregate stats for home page display
+ * Returns total players, DT in circulation, total won/lost
+ */
+export async function getHomePageStats(env: Env): Promise<HomePageStats | null> {
+  if (!D1_ENABLED || !env.DB) return null;
+
+  try {
+    const [usersResult, statsResult] = await Promise.all([
+      env.DB.prepare(
+        'SELECT COUNT(*) as total_players, COALESCE(SUM(balance), 0) as total_balance FROM users'
+      ).first<{ total_players: number; total_balance: number }>(),
+      env.DB.prepare(
+        'SELECT COALESCE(SUM(total_won), 0) as total_won, COALESCE(SUM(total_lost), 0) as total_lost FROM player_stats'
+      ).first<{ total_won: number; total_lost: number }>()
+    ]);
+
+    return {
+      totalPlayers: usersResult?.total_players || 0,
+      totalBalance: usersResult?.total_balance || 0,
+      totalWon: statsResult?.total_won || 0,
+      totalLost: statsResult?.total_lost || 0
+    };
+  } catch (error) {
+    logError('d1.getHomePageStats', error);
+    return null;
+  }
+}

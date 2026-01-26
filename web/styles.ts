@@ -2058,15 +2058,15 @@ a.duel-player.opponent:hover {
 
 /* Home Quick Stats */
 .home-stats {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px 32px;
   margin-bottom: 40px;
   padding: 24px 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  max-width: 500px;
+  max-width: 600px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -2092,6 +2092,19 @@ a.duel-player.opponent:hover {
   text-align: center;
   padding: 40px 20px;
   margin-bottom: 20px;
+}
+
+.home-discord-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.home-discord-mascot {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 
 .home-discord h2 {
@@ -3735,7 +3748,8 @@ a.duel-player.opponent:hover {
   }
 
   .home-stats {
-    gap: 20px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
   }
 
   .profile-stats {

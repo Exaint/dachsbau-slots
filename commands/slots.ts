@@ -6,7 +6,7 @@
  * ARCHITECTURE NOTES (for future coding sessions):
  * ================================================
  * - handleSlot() uses TWO-STAGE BUFF LOADING for performance optimization
- *   Stage 1: Essential buffs needed for grid generation (blocking)
+ *   Stage 1: D1 cooldown claim + essential KV reads (all parallel)
  *   Stage 2: Non-essential buffs loaded in parallel with grid generation
  *
  * - Pre-loaded values are passed to helper functions to avoid redundant KV reads
@@ -14,7 +14,7 @@
  * - Race conditions are prevented via retry mechanisms in database/buffs.js
  *
  * KEY PERFORMANCE PATTERNS:
- * - Promise.all() for parallel KV reads (21 operations → ~13 Stage 1 + 8 Stage 2)
+ * - Promise.all() for parallel reads (D1 claim + 13 KV Stage 1 + 10 Stage 2)
  * - Pre-computed values cached at module level (regex patterns)
  * - Only check symbol boosts for symbols that appear in the grid (1-3 vs 7)
  */
@@ -79,7 +79,7 @@ import {
   calculateStreakBonuses
 } from './slots/helpers.js';
 
-import { D1_ENABLED, DUAL_WRITE, upsertItem, claimSpinSlot } from '../database/d1.js';
+import { D1_ENABLED, DUAL_WRITE, upsertItem, claimSpinSlot, type SpinClaimResult } from '../database/d1.js';
 
 // ============================================
 // Main Slot Handler
@@ -95,17 +95,19 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
     }
 
     const now = Date.now();
+    const cooldownMs = COOLDOWN_SECONDS * 1000;
 
     // =========================================================================
     // TWO-STAGE BUFF LOADING - Performance Optimization
-    // Stage 1: Essential data for validation + grid generation (blocking)
+    // Stage 1: D1 cooldown claim + essential KV reads (all parallel)
     // Stage 2: Non-essential buffs loaded after grid (parallel with grid gen)
-    // This reduces cold-start latency by ~50-100ms
+    // D1 claim runs parallel with KV reads → zero-latency race condition detection
     // =========================================================================
 
-    // STAGE 1: Essential reads - validation + grid generation buffs
+    // STAGE 1: D1 atomic claim + essential reads (all parallel for fastest rejection)
     // NOTE: Free spins are only READ here (not consumed) to avoid losing them on security check failures
     const [
+      spinClaim,
       selfBanData,
       hasAccepted,
       lastSpin,
@@ -121,6 +123,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       hasRageMode,
       hasHappyHour
     ] = await Promise.all([
+      claimSpinSlot(lowerUsername, now, cooldownMs, env),
       isSelfBanned(username, env),
       hasAcceptedDisclaimer(username, env),
       getLastSpin(username, env),
@@ -135,6 +138,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       getBuffWithStack(username, 'rage_mode', env),
       isBuffActive(username, 'happy_hour', env)
     ]) as [
+      SpinClaimResult,
       { timestamp: number; date: string } | null,
       boolean,
       number | null,
@@ -165,6 +169,18 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       getCustomMessages(username, env)
     ]);
 
+    // D1 cooldown claim (checked FIRST for fastest race condition rejection)
+    // Ran in parallel with KV reads above — no additional latency
+    if (!spinClaim.claimed) {
+      const RACE_CONDITION_WINDOW = 3000; // 3 seconds
+      if (spinClaim.remainingMs && spinClaim.remainingMs > cooldownMs - RACE_CONDITION_WINDOW) {
+        // Race condition: another request just claimed → return empty (Fossabot ignores empty responses)
+        return new Response('', { headers: RESPONSE_HEADERS });
+      }
+      const remainingSec = spinClaim.remainingMs ? Math.ceil(spinClaim.remainingMs / 1000) : COOLDOWN_SECONDS;
+      return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
+    }
+
     // Selfban Check
     if (selfBanData) {
       return new Response(`@${username} 🚫 Du hast dich selbst vom Spielen ausgeschlossen (seit ${selfBanData.date}). Kontaktiere einen Admin für eine Freischaltung. Hilfe: ${URLS.INFO}`, { headers: RESPONSE_HEADERS });
@@ -175,17 +191,9 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - Hier geht es NICHT um Echtgeld! Verstanden? Schreib "!slots accept" zum Spielen! Weitere Infos: ${URLS.INFO} | Shop: ${URLS.SHOP} 🎰`, { headers: RESPONSE_HEADERS });
     }
 
-    // Cooldown Check (fast-path via KV)
-    const cooldownMs = COOLDOWN_SECONDS * 1000;
-    if (lastSpin && (now - lastSpin) < cooldownMs) {
+    // KV cooldown fallback (only when D1 is disabled)
+    if ((!D1_ENABLED || !env.DB) && lastSpin && (now - lastSpin) < cooldownMs) {
       const remainingSec = Math.ceil((cooldownMs - (now - lastSpin)) / 1000);
-      return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
-    }
-
-    // Atomic D1 cooldown claim (prevents race condition when concurrent requests bypass KV)
-    const spinClaim = await claimSpinSlot(lowerUsername, now, cooldownMs, env);
-    if (!spinClaim.claimed) {
-      const remainingSec = spinClaim.remainingMs ? Math.ceil(spinClaim.remainingMs / 1000) : COOLDOWN_SECONDS;
       return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
     }
 

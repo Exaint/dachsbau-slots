@@ -5,7 +5,7 @@
 
 import type { Env, LoggedInUser } from './types/index.js';
 import { RESPONSE_HEADERS } from './constants.js';
-import { sanitizeUsername, logError } from './utils.js';
+import { sanitizeUsername, logError, stripInvisibleChars } from './utils.js';
 
 // Web pages and API
 import { handleWebPage } from './web/pages.js';
@@ -84,7 +84,23 @@ export default {
 
       const action = url.searchParams.get('action') || 'slot';
       const username = url.searchParams.get('user') || 'Spieler';
-      const amountRaw = url.searchParams.get('amount');
+
+      // Support unified args format: ?args=$(urlencode $(query))
+      // 7TV appends invisible chars (U+034F) to every other message for Twitch dedup bypass.
+      // This breaks Fossabot's $(2)/$(3)/$(4) URL params. Using a single args param avoids this.
+      // Falls back to individual params (amount, target, giveamount, multiplier) for backward compat.
+      const argsRaw = url.searchParams.get('args');
+      let amountRaw: string | null;
+
+      if (argsRaw !== null) {
+        const parts = argsRaw.split(/\s+/).map(p => stripInvisibleChars(p)).filter(Boolean);
+        amountRaw = parts[0] || null;
+        if (parts[1]) url.searchParams.set('target', parts[1]);
+        if (parts[2]) url.searchParams.set('giveamount', parts[2]);
+        if (parts[3]) url.searchParams.set('multiplier', parts[3]);
+      } else {
+        amountRaw = url.searchParams.get('amount');
+      }
 
       const cleanUsername = sanitizeUsername(username);
       if (!cleanUsername) {
@@ -93,17 +109,10 @@ export default {
 
       // Handle slot action (includes subcommands)
       if (action === 'slot') {
-        const reqStart = Date.now();
-        console.log(`[DEBUG] REQUEST user=${cleanUsername} amount=${amountRaw} ts=${new Date().toISOString()}`);
-
         const response = await handleSlotAction(cleanUsername, amountRaw, url, env, ctx);
 
         // Append random invisible char to prevent Twitch duplicate message filter
         const body = await response.text();
-        const isEmpty = body.trim().length === 0;
-        const elapsed = Date.now() - reqStart;
-        console.log(`[DEBUG] RESPONSE user=${cleanUsername} empty=${isEmpty} len=${body.length} ms=${elapsed} preview=${body.substring(0, 80).replace(/\n/g, ' ')}`);
-
         const dedupChar = String.fromCodePoint(0xE0001 + Math.floor(Math.random() * 95));
         return new Response(body + dedupChar, { status: response.status, headers: RESPONSE_HEADERS });
       }

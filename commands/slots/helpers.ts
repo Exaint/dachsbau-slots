@@ -45,15 +45,15 @@ const UNLOCK_PRICES: Record<number | string, number> = { 20: 500, 30: 2000, 50: 
  * Only called on error paths, so extra KV reads are acceptable
  */
 async function getAvailableAmountsText(username: string, env: Env): Promise<string> {
-  const amounts: number[] = [10]; // 10 is always available
+  const parts: string[] = ['!slots', '!slots 10']; // always available
   const unlockAmounts = [20, 30, 50, 100] as const;
   const checks = await Promise.all(
     unlockAmounts.map(a => hasUnlock(username, UNLOCK_MAP[a], env))
   );
   for (let i = 0; i < unlockAmounts.length; i++) {
-    if (checks[i]) amounts.push(unlockAmounts[i]);
+    if (checks[i]) parts.push(`!slots ${unlockAmounts[i]}`);
   }
-  return amounts.join(', ');
+  return parts.join(', ');
 }
 
 // ============================================
@@ -297,7 +297,7 @@ export async function parseSpinAmount(
   // Without slots_all: only predefined amounts (10, 20, 30, 50, 100)
   if (customAmount < BASE_SPIN_COST) {
     const available = await getAvailableAmountsText(username, env);
-    return { error: `@${username} ❌ Minimum ist !slots ${BASE_SPIN_COST}! Deine Beträge: ${available} | Weitere im Shop freischalten 💡` };
+    return { error: `@${username} ❌ Minimum ist !slots ${BASE_SPIN_COST}! Du kannst verwenden: ${available} | Weitere Unlocks im Shop: ${URLS.UNLOCK}` };
   }
   if (customAmount > 100) {
     return { error: `@${username} ❌ Maximum ist !slots 100! Für freie Beträge: !slots all freischalten 💡` };
@@ -314,7 +314,7 @@ export async function parseSpinAmount(
   }
 
   const available = await getAvailableAmountsText(username, env);
-  return { error: `@${username} ❌ !slots ${customAmount} gibt es nicht! Deine Beträge: ${available} | Weitere im Shop freischalten: ${URLS.UNLOCK}` };
+  return { error: `@${username} ❌ Du kannst !slots ${customAmount} noch nicht verwenden. Um freie Einsätze zu nutzen, kaufe !slots all für ${UNLOCK_PRICES.all} DT im Shop. Du kannst verwenden: ${available} | Weitere Unlocks im Shop: ${URLS.UNLOCK}` };
 }
 
 // ============================================

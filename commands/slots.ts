@@ -79,7 +79,7 @@ import {
   calculateStreakBonuses
 } from './slots/helpers.js';
 
-import { D1_ENABLED, DUAL_WRITE, upsertItem } from '../database/d1.js';
+import { D1_ENABLED, DUAL_WRITE, upsertItem, claimSpinSlot } from '../database/d1.js';
 
 // ============================================
 // Main Slot Handler
@@ -175,10 +175,17 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       return new Response(`@${username} 🦡 Willkommen! Dachsbau Slots ist nur zur Unterhaltung - Hier geht es NICHT um Echtgeld! Verstanden? Schreib "!slots accept" zum Spielen! Weitere Infos: ${URLS.INFO} | Shop: ${URLS.SHOP} 🎰`, { headers: RESPONSE_HEADERS });
     }
 
-    // Cooldown Check
+    // Cooldown Check (fast-path via KV)
     const cooldownMs = COOLDOWN_SECONDS * 1000;
     if (lastSpin && (now - lastSpin) < cooldownMs) {
       const remainingSec = Math.ceil((cooldownMs - (now - lastSpin)) / 1000);
+      return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
+    }
+
+    // Atomic D1 cooldown claim (prevents race condition when concurrent requests bypass KV)
+    const spinClaim = await claimSpinSlot(lowerUsername, now, cooldownMs, env);
+    if (!spinClaim.claimed) {
+      const remainingSec = spinClaim.remainingMs ? Math.ceil(spinClaim.remainingMs / 1000) : COOLDOWN_SECONDS;
       return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
     }
 

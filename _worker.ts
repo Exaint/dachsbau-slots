@@ -85,18 +85,6 @@ export default {
       const action = url.searchParams.get('action') || 'slot';
       const username = url.searchParams.get('user') || 'Spieler';
       const amountRaw = url.searchParams.get('amount');
-      const targetRaw = url.searchParams.get('target');
-
-      // DEBUG: Log all incoming bot requests (raw params before any sanitization)
-      console.log(JSON.stringify({
-        _tag: 'BOT_REQUEST',
-        ts: new Date().toISOString(),
-        action,
-        user: username,
-        amount: amountRaw,
-        target: targetRaw,
-        amountCodepoints: amountRaw ? [...amountRaw].map(c => c.codePointAt(0)!.toString(16)).join(',') : null
-      }));
 
       const cleanUsername = sanitizeUsername(username);
       if (!cleanUsername) {
@@ -107,19 +95,10 @@ export default {
       if (action === 'slot') {
         const response = await handleSlotAction(cleanUsername, amountRaw, url, env, ctx);
 
-        // DEBUG: Log response body
-        const body = await response.clone().text();
-        console.log(JSON.stringify({
-          _tag: 'BOT_RESPONSE',
-          ts: new Date().toISOString(),
-          user: cleanUsername,
-          action,
-          amount: amountRaw,
-          responseLength: body.length,
-          responsePreview: body.substring(0, 150)
-        }));
-
-        return response;
+        // Append random invisible char to prevent Twitch duplicate message filter
+        const body = await response.text();
+        const dedupChar = String.fromCodePoint(0xE0001 + Math.floor(Math.random() * 95));
+        return new Response(body + dedupChar, { status: response.status, headers: RESPONSE_HEADERS });
       }
 
       // Handle legacy action-based commands

@@ -424,6 +424,63 @@ export async function updateStreakMultiplier(username: string, multiplier: numbe
 }
 
 // ============================================
+// Atomic Spin Cooldown Claim
+// ============================================
+
+export interface SpinClaimResult {
+  claimed: boolean;
+  remainingMs?: number;
+}
+
+/**
+ * Atomically claim a spin slot for a user.
+ * Uses conditional INSERT/UPDATE to prevent race conditions from concurrent requests.
+ *
+ * How it works:
+ * - New user: INSERT succeeds → changes = 1 → claimed
+ * - Existing user, cooldown elapsed: UPDATE WHERE matches → changes = 1 → claimed
+ * - Existing user, cooldown active: UPDATE WHERE fails → changes = 0 → rejected
+ *
+ * On D1 error, returns claimed=true to fall through to KV-based cooldown (graceful degradation).
+ */
+export async function claimSpinSlot(
+  username: string,
+  now: number,
+  cooldownMs: number,
+  env: Env
+): Promise<SpinClaimResult> {
+  if (!D1_ENABLED || !env.DB) return { claimed: true };
+
+  try {
+    const lowerUsername = username.toLowerCase();
+    const result = await env.DB.prepare(`
+      INSERT INTO users (username, last_spin_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(username) DO UPDATE
+      SET last_spin_at = excluded.last_spin_at, updated_at = excluded.updated_at
+      WHERE users.last_spin_at IS NULL OR ? - users.last_spin_at >= ?
+    `).bind(lowerUsername, now, now, now, now, cooldownMs).run();
+
+    if (result.meta.changes > 0) {
+      return { claimed: true };
+    }
+
+    // Claim failed - get remaining time for user-facing message
+    const row = await env.DB.prepare(
+      'SELECT last_spin_at FROM users WHERE username = ?'
+    ).bind(lowerUsername).first<{ last_spin_at: number | null }>();
+
+    const lastSpinAt = row?.last_spin_at ?? 0;
+    const remainingMs = Math.max(0, cooldownMs - (now - lastSpinAt));
+
+    return { claimed: false, remainingMs };
+  } catch (error) {
+    logError('d1.claimSpinSlot', error, { username });
+    return { claimed: true }; // graceful degradation: allow (KV is backup)
+  }
+}
+
+// ============================================
 // Migration Helpers
 // ============================================
 

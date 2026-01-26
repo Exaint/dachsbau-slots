@@ -137,7 +137,8 @@ describe('checkRateLimit', () => {
     const env = { SLOTS_KV: mockKV };
     const result = await checkRateLimit('test:ip', 5, 60, env);
     expect(result).toBe(false);
-    expect(mockKV.put).not.toHaveBeenCalled();
+    // Write-first pattern: counter is always incremented before check
+    expect(mockKV.put).toHaveBeenCalledWith('rl:test:ip', '6', { expirationTtl: 60 });
   });
 
   it('inkrementiert den Counter korrekt', async () => {

@@ -93,10 +93,17 @@ export default {
 
       // Handle slot action (includes subcommands)
       if (action === 'slot') {
+        const reqStart = Date.now();
+        console.log(`[DEBUG] REQUEST user=${cleanUsername} amount=${amountRaw} ts=${new Date().toISOString()}`);
+
         const response = await handleSlotAction(cleanUsername, amountRaw, url, env, ctx);
 
         // Append random invisible char to prevent Twitch duplicate message filter
         const body = await response.text();
+        const isEmpty = body.trim().length === 0;
+        const elapsed = Date.now() - reqStart;
+        console.log(`[DEBUG] RESPONSE user=${cleanUsername} empty=${isEmpty} len=${body.length} ms=${elapsed} preview=${body.substring(0, 80).replace(/\n/g, ' ')}`);
+
         const dedupChar = String.fromCodePoint(0xE0001 + Math.floor(Math.random() * 95));
         return new Response(body + dedupChar, { status: response.status, headers: RESPONSE_HEADERS });
       }

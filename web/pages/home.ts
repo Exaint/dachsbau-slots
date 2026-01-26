@@ -5,7 +5,6 @@
 import type { Env, LoggedInUser } from '../../types/index.js';
 import { getAchievementStats } from '../../database.js';
 import { getHomePageStats } from '../../database/d1.js';
-import { getAllAchievements } from '../../constants.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { baseTemplate } from './template.js';
 import { R2_BASE } from './ui-config.js';
@@ -21,9 +20,7 @@ export async function renderHomePage(errorMessage: string | null = null, user: L
 
   // Fetch quick stats
   let totalPlayers = 0;
-  let totalAchievements = 0;
   let totalUnlocked = 0;
-  let totalBalance = 0;
   let totalWon = 0;
   let totalLost = 0;
   if (env) {
@@ -33,10 +30,8 @@ export async function renderHomePage(errorMessage: string | null = null, user: L
         getHomePageStats(env)
       ]);
       totalUnlocked = Object.values(achievementStats.counts as Record<string, number>).reduce((sum, count) => sum + count, 0);
-      totalAchievements = getAllAchievements().length;
       if (homeStats) {
         totalPlayers = homeStats.totalPlayers;
-        totalBalance = homeStats.totalBalance;
         totalWon = homeStats.totalWon;
         totalLost = homeStats.totalLost;
       } else {
@@ -54,24 +49,16 @@ export async function renderHomePage(errorMessage: string | null = null, user: L
         <span class="home-stat-label">Spieler</span>
       </div>
       <div class="home-stat">
-        <span class="home-stat-value">${formatNumber(totalBalance)} DT</span>
-        <span class="home-stat-label">im Umlauf</span>
-      </div>
-      <div class="home-stat">
-        <span class="home-stat-value">${formatNumber(totalWon)} DT</span>
+        <span class="home-stat-value home-stat-won">${formatNumber(totalWon)} DachsTaler</span>
         <span class="home-stat-label">gewonnen</span>
       </div>
       <div class="home-stat">
-        <span class="home-stat-value">${formatNumber(totalLost)} DT</span>
+        <span class="home-stat-value home-stat-lost">${formatNumber(totalLost)} DachsTaler</span>
         <span class="home-stat-label">verloren</span>
       </div>
       <div class="home-stat">
-        <span class="home-stat-value">${formatNumber(totalAchievements)}</span>
-        <span class="home-stat-label">Achievements</span>
-      </div>
-      <div class="home-stat">
         <span class="home-stat-value">${formatNumber(totalUnlocked)}</span>
-        <span class="home-stat-label">freigeschaltet</span>
+        <span class="home-stat-label">Erfolge freigeschaltet</span>
       </div>
     </div>
   ` : '';

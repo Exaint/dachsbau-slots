@@ -2059,14 +2059,14 @@ a.duel-player.opponent:hover {
 /* Home Quick Stats */
 .home-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px 32px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px 24px;
   margin-bottom: 40px;
   padding: 24px 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  max-width: 600px;
+  max-width: 700px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -2085,6 +2085,14 @@ a.duel-player.opponent:hover {
 .home-stat-label {
   font-size: 0.8rem;
   color: var(--text-secondary);
+}
+
+.home-stat-won {
+  color: var(--success);
+}
+
+.home-stat-lost {
+  color: var(--error);
 }
 
 /* Home Discord CTA */

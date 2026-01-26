@@ -73,7 +73,15 @@ export default {
         return Response.redirect(`${url.origin}/?page=home`, 302);
       }
 
-      // Twitch bot commands
+      // Twitch bot commands - verify shared secret if configured
+      // Fossabot URL format: ?action=slot&user=$(user)&key=SECRET
+      if (env.BOT_SECRET) {
+        const providedKey = url.searchParams.get('key');
+        if (providedKey !== env.BOT_SECRET) {
+          return new Response('Unauthorized', { status: 403, headers: RESPONSE_HEADERS });
+        }
+      }
+
       const action = url.searchParams.get('action') || 'slot';
       const username = url.searchParams.get('user') || 'Spieler';
 

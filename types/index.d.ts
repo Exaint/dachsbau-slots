@@ -277,6 +277,8 @@ export interface Env {
   TWITCH_CLIENT_SECRET?: string;
   /** Secret for JWT signing */
   JWT_SECRET?: string;
+  /** Shared secret for bot command authentication (Fossabot → Worker) */
+  BOT_SECRET?: string;
 }
 
 // ============================================================================

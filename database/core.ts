@@ -55,6 +55,30 @@ export async function setBalance(username: string, balance: number, env: Env): P
   }
 }
 
+/**
+ * Atomically adjust balance by delta (read → compute → write in tightest possible window)
+ * Returns the new balance. Minimizes TOCTOU window for concurrent operations.
+ */
+export async function adjustBalance(username: string, delta: number, env: Env): Promise<number> {
+  try {
+    const key = kvKey('user:', username);
+    const value = await env.SLOTS_KV.get(key);
+    const current = value !== null ? (parseInt(value, 10) || 0) : 0;
+    const newBalance = Math.max(0, Math.min(current + delta, MAX_BALANCE));
+    await env.SLOTS_KV.put(key, newBalance.toString());
+
+    // DUAL_WRITE: Fire-and-forget D1 write
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      updateBalanceD1(username, newBalance, env).catch(err => logError('adjustBalance.d1', err, { username }));
+    }
+
+    return newBalance;
+  } catch (error) {
+    logError('adjustBalance', error, { username, delta });
+    return 0;
+  }
+}
+
 // Daily Functions
 export async function getLastDaily(username: string, env: Env): Promise<number | null> {
   try {

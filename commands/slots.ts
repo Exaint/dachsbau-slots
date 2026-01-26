@@ -84,15 +84,6 @@ const INVISIBLE_CHARS_REGEX = /[\u200B-\u200D\uFEFF\u00AD\u034F\u061C\u180E\u000
 const NORMALIZE_SPACES_REGEX = /\s+/g;
 
 // ============================================
-// Types
-// ============================================
-
-interface FreeSpinConsumeResult {
-  used: boolean;
-  multiplier: number;
-}
-
-// ============================================
 // Main Slot Handler
 // ============================================
 
@@ -118,6 +109,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
     // =========================================================================
 
     // STAGE 1: Essential reads - validation + grid generation buffs
+    // NOTE: Free spins are only READ here (not consumed) to avoid losing them on security check failures
     const [
       selfBanData,
       hasAccepted,
@@ -125,7 +117,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       currentBalance,
       hasGuaranteedPairToken,
       hasWildCardToken,
-      freeSpinResult,
+      availableFreeSpins,
       // Grid generation buffs (affect symbol probabilities)
       hasStarMagnet,
       hasDiamondRush,
@@ -140,7 +132,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       getBalance(username, env),
       hasGuaranteedPair(username, env),
       hasWildCard(username, env),
-      consumeFreeSpinWithMultiplier(username, env).catch(err => { logError('handleSlot.consumeFreeSpin', err, { username }); return null; }),
+      getFreeSpins(username, env).catch(err => { logError('handleSlot.getFreeSpins', err, { username }); return [] as FreeSpinEntry[]; }),
       isBuffActive(username, 'star_magnet', env),
       isBuffActive(username, 'diamond_rush', env),
       isBuffActive(username, 'lucky_charm', env),
@@ -154,7 +146,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       number,
       boolean,
       boolean,
-      FreeSpinConsumeResult | null,
+      FreeSpinEntry[],
       boolean,
       boolean,
       boolean,
@@ -195,12 +187,17 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       return new Response(`@${username} ⏱️ Cooldown: Noch ${remainingSec} Sekunden!     `, { headers: RESPONSE_HEADERS });
     }
 
-    // Free Spins (already loaded)
+    // Free Spins - consume AFTER security checks pass (avoids losing spins on rejected requests)
     let isFreeSpinUsed = false;
     let freeSpinMultiplier = 1;
-    if (freeSpinResult && typeof freeSpinResult === 'object') {
-      isFreeSpinUsed = freeSpinResult.used === true;
-      freeSpinMultiplier = (typeof freeSpinResult.multiplier === 'number' && freeSpinResult.multiplier > 0) ? freeSpinResult.multiplier : 1;
+    const hasAvailableFreeSpins = Array.isArray(availableFreeSpins) && availableFreeSpins.some(fs => fs.count > 0);
+    if (hasAvailableFreeSpins) {
+      const freeSpinResult = await consumeFreeSpinWithMultiplier(username, env)
+        .catch(err => { logError('handleSlot.consumeFreeSpin', err, { username }); return null; });
+      if (freeSpinResult && typeof freeSpinResult === 'object') {
+        isFreeSpinUsed = freeSpinResult.used === true;
+        freeSpinMultiplier = (typeof freeSpinResult.multiplier === 'number' && freeSpinResult.multiplier > 0) ? freeSpinResult.multiplier : 1;
+      }
     }
 
     // Parse spin amount

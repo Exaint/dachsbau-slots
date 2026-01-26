@@ -19,6 +19,7 @@
 export {
   getBalance,
   setBalance,
+  adjustBalance,
   getLastDaily,
   setLastDaily,
   getLastSpin,

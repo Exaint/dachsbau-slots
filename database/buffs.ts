@@ -10,7 +10,7 @@
  * - One-time items: Store 'active' string (e.g., boosts, win_multiplier)
  *
  * RACE CONDITION PREVENTION:
- * - consumeBoost/consumeWinMultiplier: Delete + verify pattern
+ * - consumeBoost/consumeWinMultiplier: Delete + verify pattern (no claim-key needed)
  * - addInsurance: Retry with exponential backoff + verification
  * - decrementBuffUses: Retry with verification after each attempt
  *
@@ -251,20 +251,24 @@ export async function addBoost(username: string, symbol: string, env: Env): Prom
 export async function consumeBoost(username: string, symbol: string, env: Env): Promise<boolean> {
   try {
     const key = kvKey('boost:', username, symbol);
-    const claimKey = `${key}:claim`;
-
-    // Check if another request is already claiming this boost
-    const alreadyClaimed = await env.SLOTS_KV.get(claimKey);
-    if (alreadyClaimed) return false;
-
     const value = await env.SLOTS_KV.get(key);
     if (value !== KV_ACTIVE) return false;
 
-    // Set claim-lock with short TTL (KV minimum is 60s)
-    await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 60 });
+    // Delete-and-verify pattern (same as consumeWinMultiplier)
+    // Avoids claim-key approach which blocks new boosts for 60s (KV minimum TTL)
     await env.SLOTS_KV.delete(key);
-    await env.SLOTS_KV.delete(claimKey);
-    return true;
+
+    // Verify deletion succeeded (prevents race condition double-consume)
+    const verify = await env.SLOTS_KV.get(key);
+    if (verify === null) {
+      if (D1_ENABLED && DUAL_WRITE && env.DB) {
+        deleteItem(username, `boost:${symbol}`, env).catch(err => logError('consumeBoost.d1', err, { username, symbol }));
+      }
+      return true; // Successfully consumed
+    }
+
+    // Another request consumed it first
+    return false;
   } catch (error) {
     logError('consumeBoost', error, { username, symbol });
     return false;

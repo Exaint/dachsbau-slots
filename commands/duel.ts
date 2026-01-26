@@ -25,7 +25,7 @@
  */
 
 import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
-import { getBalance, setBalance, checkAndUnlockAchievement, updateAchievementStatBatch, setMaxAchievementStat, checkBalanceAchievements, incrementStat, updateMaxStat } from '../database.js';
+import { getBalance, adjustBalance, checkAndUnlockAchievement, updateAchievementStatBatch, setMaxAchievementStat, checkBalanceAchievements, incrementStat, updateMaxStat } from '../database.js';
 import { createDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
 import type { Env } from '../types/index.js';
@@ -302,7 +302,7 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
     const pot = duel.amount * 2;
     let resultMessage: string;
 
-    // Final balance verification right before modification (prevents race conditions)
+    // Final balance verification before modification
     const [finalChallengerBalance, finalTargetBalance] = await Promise.all([
       getBalance(duel.challenger, env),
       getBalance(username, env)
@@ -316,34 +316,30 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
     }
 
     if (challengerScore.score > targetScore.score) {
-      // Challenger wins
-      const newChallengerBalance = finalChallengerBalance + duel.amount;
-      const newTargetBalance = finalTargetBalance - duel.amount;
-      await Promise.all([
-        setBalance(duel.challenger, newChallengerBalance, env),
-        setBalance(username, newTargetBalance, env)
+      // Challenger wins - use adjustBalance (delta-based) to minimize TOCTOU window
+      const [winnerBalanceC] = await Promise.all([
+        adjustBalance(duel.challenger, +duel.amount, env),
+        adjustBalance(username, -duel.amount, env)
       ]);
       resultMessage = `🏆 @${duel.challenger} GEWINNT ${pot} DachsTaler!`;
       // Achievement tracking (must await, otherwise worker terminates before completion)
       await Promise.all([
         trackDuelAchievements(duel.challenger, 'win', pot, env),
         trackDuelAchievements(username, 'loss', 0, env),
-        checkBalanceAchievements(duel.challenger, newChallengerBalance, env)
+        checkBalanceAchievements(duel.challenger, winnerBalanceC, env)
       ]);
     } else if (targetScore.score > challengerScore.score) {
-      // Target wins
-      const newTargetBalance = finalTargetBalance + duel.amount;
-      const newChallengerBalance = finalChallengerBalance - duel.amount;
-      await Promise.all([
-        setBalance(duel.challenger, newChallengerBalance, env),
-        setBalance(username, newTargetBalance, env)
+      // Target wins - use adjustBalance (delta-based) to minimize TOCTOU window
+      const [, winnerBalanceT] = await Promise.all([
+        adjustBalance(duel.challenger, -duel.amount, env),
+        adjustBalance(username, +duel.amount, env)
       ]);
       resultMessage = `🏆 @${username} GEWINNT ${pot} DachsTaler!`;
       // Achievement tracking (must await, otherwise worker terminates before completion)
       await Promise.all([
         trackDuelAchievements(username, 'win', pot, env),
         trackDuelAchievements(duel.challenger, 'loss', 0, env),
-        checkBalanceAchievements(username, newTargetBalance, env)
+        checkBalanceAchievements(username, winnerBalanceT, env)
       ]);
     } else {
       // True tie - return bets (both participated, neither won)

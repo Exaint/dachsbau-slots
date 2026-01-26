@@ -48,10 +48,15 @@ function secureRandom(): number {
 }
 
 // Secure random integer in range [min, max] (inclusive)
+// Uses rejection sampling to avoid modulo bias
 function secureRandomInt(min: number, max: number): number {
   const range = max - min + 1;
   const buffer = new Uint32Array(1);
-  crypto.getRandomValues(buffer);
+  // Reject values that would cause modulo bias
+  const limit = 0x100000000 - (0x100000000 % range);
+  do {
+    crypto.getRandomValues(buffer);
+  } while (buffer[0] >= limit);
   return (buffer[0] % range) + min;
 }
 
@@ -549,12 +554,16 @@ function containsProfanity(text: unknown): boolean {
 }
 
 // Rate-Limit Check via KV Counter mit TTL
+// Pattern: read → increment → check (write-first reduces race window vs read → check → write)
+// KV has no atomic increment, so concurrent requests may exceed limit by 1-2. Acceptable for this use case.
 async function checkRateLimit(identifier: string, limit: number, windowSeconds: number, env: Env): Promise<boolean> {
   const key = `rl:${identifier}`;
-  const count = parseInt(await env.SLOTS_KV.get(key) || '0', 10);
-  if (count >= limit) return false;
-  await env.SLOTS_KV.put(key, String(count + 1), { expirationTtl: windowSeconds });
-  return true;
+  const current = parseInt(await env.SLOTS_KV.get(key) || '0', 10);
+  // Increment immediately (conservative: blocks future requests even if this one is rejected)
+  const newCount = current + 1;
+  await env.SLOTS_KV.put(key, String(newCount), { expirationTtl: windowSeconds });
+  // Reject if over limit
+  return newCount <= limit;
 }
 
 export {

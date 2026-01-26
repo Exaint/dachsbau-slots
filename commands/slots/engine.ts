@@ -110,8 +110,12 @@ async function applySpecialItems(
 
   if (hasWildCardToken) {
     // Wild Card: Replace worst symbol with best for maximum payout
-    applyWildCardOptimization(grid);
-    await consumeWildCard(username, env);
+    // Only consume token if it actually changed the grid (consistent with Guaranteed Pair behavior)
+    const wildApplied = applyWildCardOptimization(grid);
+    if (wildApplied) {
+      await consumeWildCard(username, env);
+    }
+    // If not applied (e.g. Dachs pair), save token for next spin
   }
 }
 

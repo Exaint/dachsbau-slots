@@ -27,7 +27,7 @@ export const SYMBOL_WEIGHTS: SymbolWeight[] = [
   { symbol: '🍉', weight: 11 },
   { symbol: '⭐', weight: 10 }
 ];
-export const TOTAL_WEIGHT = 120;
+export const TOTAL_WEIGHT = SYMBOL_WEIGHTS.reduce((sum, s) => sum + s.weight, 0);
 
 // Pre-computed cumulative weights for O(1) binary search lookup
 export const CUMULATIVE_WEIGHTS: CumulativeWeight[] = SYMBOL_WEIGHTS.reduce<CumulativeWeight[]>((acc, { symbol, weight }) => {

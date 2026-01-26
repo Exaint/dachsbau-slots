@@ -43,6 +43,7 @@ import {
   checkBalanceAchievements,
   incrementStat
 } from '../database.js';
+import { D1_ENABLED, getLeaderboard as getLeaderboardD1 } from '../database/d1.js';
 import type { Env } from '../types/index.js';
 
 // ============================================
@@ -420,31 +421,38 @@ async function handleTransfer(username: string, target: string, amount: string, 
     }
 
     // Atomic transfer with lock mechanism to prevent double-spend race conditions
+    // Uses write-first pattern: write lock → verify ownership (eliminates check-then-acquire race window)
+    // Stale lock detection: locks older than 15s are considered abandoned and can be overridden
     const lockKey = `transfer_lock:${lowerUsername}`;
     const maxRetries = MAX_RETRIES;
+    const STALE_LOCK_MS = 15_000; // 15 seconds
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      // Try to acquire lock (short TTL to prevent deadlock)
       const lockValue = `${Date.now()}:${secureRandom()}`;
-      const existingLock = await env.SLOTS_KV.get(lockKey);
 
+      // Check for existing lock - only wait if it's fresh (not stale)
+      const existingLock = await env.SLOTS_KV.get(lockKey);
       if (existingLock) {
-        // Lock exists - wait and retry
-        if (attempt < maxRetries - 1) {
-          await exponentialBackoff(attempt);
-          continue;
+        const lockTimestamp = parseInt(existingLock.split(':')[0], 10);
+        if (!isNaN(lockTimestamp) && (Date.now() - lockTimestamp) < STALE_LOCK_MS) {
+          // Fresh lock from another request - wait and retry
+          if (attempt < maxRetries - 1) {
+            await exponentialBackoff(attempt);
+            continue;
+          }
+          return new Response(`@${username} ❌ Transfer wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
         }
-        return new Response(`@${username} ❌ Transfer wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
+        // Stale lock - override it
       }
 
-      // Acquire lock (KV minimum TTL is 60 seconds)
+      // Write-first: acquire lock optimistically (KV minimum TTL is 60 seconds)
       await env.SLOTS_KV.put(lockKey, lockValue, { expirationTtl: 60 });
 
       try {
-        // Verify we got the lock
+        // Verify we got the lock (handles concurrent write race)
         const verifyLock = await env.SLOTS_KV.get(lockKey);
         if (verifyLock !== lockValue) {
-          // Another request got the lock first
+          // Another request won the lock race
           if (attempt < maxRetries - 1) {
             await exponentialBackoff(attempt);
             continue;
@@ -533,54 +541,69 @@ async function handleLeaderboard(env: Env): Promise<Response> {
       }
     }
 
-    // Cache miss or expired - rebuild leaderboard
-    const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
+    // D1 fast path: Single query replaces 2500+ KV operations
+    // Filters: balance > 0, disclaimer_accepted, not blacklisted, not leaderboard_hidden
+    let users: { username: string; balance: number }[] = [];
 
-    if (!listResult.keys || listResult.keys.length === 0) {
+    if (D1_ENABLED && env.DB) {
+      const d1Result = await getLeaderboardD1(5, env);
+      if (d1Result && d1Result.length > 0) {
+        users = d1Result;
+      }
+    }
+
+    // KV fallback (when D1 unavailable or returned no results)
+    if (users.length === 0) {
+      const listResult = await env.SLOTS_KV.list({ prefix: 'user:', limit: LEADERBOARD_LIMIT });
+
+      if (!listResult.keys || listResult.keys.length === 0) {
+        return new Response(`🏆 Leaderboard: Noch keine Spieler vorhanden!`, { headers: RESPONSE_HEADERS });
+      }
+
+      // Filter blocked users first, then batch KV reads
+      const validKeys = listResult.keys.filter(key => {
+        const username = key.name.replace('user:', '');
+        return !isLeaderboardBlocked(username);
+      });
+
+      // Batch reads in chunks for better performance
+      for (let i = 0; i < validKeys.length; i += LEADERBOARD_BATCH_SIZE) {
+        const batch = validKeys.slice(i, i + LEADERBOARD_BATCH_SIZE);
+        const usernames = batch.map(key => key.name.replace('user:', ''));
+
+        // Fetch balances and disclaimer status in parallel
+        const [balances, disclaimerStatuses] = await Promise.all([
+          Promise.all(batch.map(key => env.SLOTS_KV.get(key.name))),
+          Promise.all(usernames.map(username => hasAcceptedDisclaimer(username, env)))
+        ]);
+
+        for (let j = 0; j < batch.length; j++) {
+          // Only include users who have accepted the disclaimer
+          if (balances[j] && disclaimerStatuses[j]) {
+            const balance = parseInt(balances[j]!, 10);
+            if (!isNaN(balance) && balance > 0) {
+              users.push({
+                username: usernames[j],
+                balance
+              });
+            }
+          }
+        }
+
+        // Early exit if we have enough high-balance users
+        if (users.length >= LEADERBOARD_MIN_USERS) break;
+      }
+
+      users.sort((a, b) => b.balance - a.balance);
+      users = users.slice(0, 5);
+    }
+
+    if (users.length === 0) {
       return new Response(`🏆 Leaderboard: Noch keine Spieler vorhanden!`, { headers: RESPONSE_HEADERS });
     }
 
-    // Filter blocked users first, then batch KV reads
-    const validKeys = listResult.keys.filter(key => {
-      const username = key.name.replace('user:', '');
-      return !isLeaderboardBlocked(username);
-    });
-
-    // Batch reads in chunks for better performance
-    const users: { username: string; balance: number }[] = [];
-
-    for (let i = 0; i < validKeys.length; i += LEADERBOARD_BATCH_SIZE) {
-      const batch = validKeys.slice(i, i + LEADERBOARD_BATCH_SIZE);
-      const usernames = batch.map(key => key.name.replace('user:', ''));
-
-      // Fetch balances and disclaimer status in parallel
-      const [balances, disclaimerStatuses] = await Promise.all([
-        Promise.all(batch.map(key => env.SLOTS_KV.get(key.name))),
-        Promise.all(usernames.map(username => hasAcceptedDisclaimer(username, env)))
-      ]);
-
-      for (let j = 0; j < batch.length; j++) {
-        // Only include users who have accepted the disclaimer
-        if (balances[j] && disclaimerStatuses[j]) {
-          const balance = parseInt(balances[j]!, 10);
-          if (!isNaN(balance) && balance > 0) {
-            users.push({
-              username: usernames[j],
-              balance
-            });
-          }
-        }
-      }
-
-      // Early exit if we have enough high-balance users
-      if (users.length >= LEADERBOARD_MIN_USERS) break;
-    }
-
-    users.sort((a, b) => b.balance - a.balance);
-    const top5 = users.slice(0, 5);
-
     const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
-    const leaderboardText = top5.map((user, index) =>
+    const leaderboardText = users.map((user, index) =>
       `${medals[index]} ${user.username}: ${user.balance.toLocaleString('de-DE')} DachsTaler`
     ).join(' ║ ');
 

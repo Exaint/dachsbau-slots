@@ -2087,6 +2087,11 @@ a.duel-player.opponent:hover {
   color: var(--text-secondary);
 }
 
+.home-stat-emoji {
+  font-size: 1.4rem;
+  margin-top: 4px;
+}
+
 .home-stat-won {
   color: var(--success);
 }

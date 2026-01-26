@@ -45,7 +45,7 @@ export async function renderHomePage(errorMessage: string | null = null, user: L
         for (const stat of tripleStats) {
           if (stat.triple_key === 'dachs_single') dachsSingles = stat.total_hits;
           else if (stat.triple_key === 'dachs_double') dachsDoubles = stat.total_hits;
-          else if (stat.triple_key === 'dachs') dachsTriples = stat.total_hits;
+          else if (stat.triple_key === 'dachs_triple') dachsTriples = stat.total_hits;
         }
       }
     } catch (error) {
@@ -123,14 +123,17 @@ export async function renderHomePage(errorMessage: string | null = null, user: L
         <div class="home-stat">
           <span class="home-stat-value">${formatNumber(dachsSingles)}</span>
           <span class="home-stat-label">Einzel-Dachs</span>
+          <span class="home-stat-emoji">🦡</span>
         </div>
         <div class="home-stat">
           <span class="home-stat-value">${formatNumber(dachsDoubles)}</span>
           <span class="home-stat-label">Doppel-Dachs</span>
+          <span class="home-stat-emoji">🦡🦡</span>
         </div>
         <div class="home-stat">
           <span class="home-stat-value">${formatNumber(dachsTriples)}</span>
           <span class="home-stat-label">Triple-Dachs</span>
+          <span class="home-stat-emoji">🦡🦡🦡</span>
         </div>
       </div>
     </div>

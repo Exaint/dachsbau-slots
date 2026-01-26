@@ -6,6 +6,8 @@
  * KV KEYS:
  * - duel:{challenger} - Active challenge from this user
  *   Value: JSON { target, amount, createdAt }
+ * - duel_target:{target} - Reverse lookup: who challenged this user
+ *   Value: challenger username (for strongly-consistent lookups)
  * - duel_optout:{username} - User has opted out of duels
  *   Value: 'true'
  *
@@ -75,14 +77,21 @@ export type AcceptDuelResult =
 export async function createDuel(challenger: string, target: string, amount: number, env: Env): Promise<boolean> {
   try {
     const key = kvKey('duel:', challenger);
+    const lowerTarget = target.toLowerCase();
     const data: DuelData = {
-      target: target.toLowerCase(),
+      target: lowerTarget,
       amount,
       createdAt: Date.now()
     };
-    await env.SLOTS_KV.put(key, JSON.stringify(data), {
-      expirationTtl: DUEL_TIMEOUT_SECONDS + 10
-    });
+    await Promise.all([
+      env.SLOTS_KV.put(key, JSON.stringify(data), {
+        expirationTtl: DUEL_TIMEOUT_SECONDS + 10
+      }),
+      // Reverse lookup for strongly-consistent target queries (KV.list is eventually consistent)
+      env.SLOTS_KV.put(kvKey('duel_target:', lowerTarget), challenger.toLowerCase(), {
+        expirationTtl: DUEL_TIMEOUT_SECONDS + 10
+      })
+    ]);
     return true;
   } catch (error) {
     logError('createDuel', error, { challenger, target, amount });
@@ -103,7 +112,10 @@ export async function getDuel(challenger: string, env: Env): Promise<DuelChallen
 
     // Check if expired
     if (Date.now() > data.createdAt + (DUEL_TIMEOUT_SECONDS * 1000)) {
-      await env.SLOTS_KV.delete(key);
+      await Promise.all([
+        env.SLOTS_KV.delete(key),
+        env.SLOTS_KV.delete(kvKey('duel_target:', data.target))
+      ]);
       return null;
     }
 
@@ -119,12 +131,26 @@ export async function getDuel(challenger: string, env: Env): Promise<DuelChallen
  */
 export async function findDuelForTarget(target: string, env: Env): Promise<DuelChallenge | null> {
   try {
-    // List all duel keys and find one where target matches
+    const lowerTarget = target.toLowerCase();
+
+    // Fast path: use reverse lookup key (strongly consistent, unlike KV.list)
+    const reverseKey = kvKey('duel_target:', lowerTarget);
+    const challenger = await env.SLOTS_KV.get(reverseKey);
+    if (challenger) {
+      const duel = await getDuel(challenger, env);
+      if (duel && duel.target === lowerTarget) {
+        return duel;
+      }
+      // Reverse lookup was stale - clean it up
+      await env.SLOTS_KV.delete(reverseKey);
+    }
+
+    // Fallback: scan all duel keys (eventually consistent, may miss recent entries)
     const list = await env.SLOTS_KV.list({ prefix: 'duel:' });
 
     for (const key of list.keys) {
-      // Skip claim keys (they contain :claim:)
-      if (key.name.includes(':claim:')) continue;
+      // Skip claim keys and reverse lookup keys
+      if (key.name.includes(':claim:') || key.name.startsWith('duel_target:')) continue;
 
       const value = await env.SLOTS_KV.get(key.name);
       if (!value) continue;
@@ -138,10 +164,10 @@ export async function findDuelForTarget(target: string, env: Env): Promise<DuelC
         }
 
         // Check if this duel targets the user and isn't expired
-        if (data.target === target.toLowerCase() &&
+        if (data.target === lowerTarget &&
             Date.now() <= data.createdAt + (DUEL_TIMEOUT_SECONDS * 1000)) {
-          const challenger = key.name.replace('duel:', '');
-          return { challenger, ...data };
+          const challengerName = key.name.replace('duel:', '');
+          return { challenger: challengerName, ...data };
         }
       } catch {
         continue;
@@ -161,7 +187,18 @@ export async function findDuelForTarget(target: string, env: Env): Promise<DuelC
 export async function deleteDuel(challenger: string, env: Env): Promise<boolean> {
   try {
     const key = kvKey('duel:', challenger);
-    await env.SLOTS_KV.delete(key);
+    // Read duel first to get target for reverse lookup cleanup
+    const value = await env.SLOTS_KV.get(key);
+    const deletePromises: Promise<unknown>[] = [env.SLOTS_KV.delete(key)];
+    if (value) {
+      try {
+        const data: DuelData = JSON.parse(value);
+        if (data.target) {
+          deletePromises.push(env.SLOTS_KV.delete(kvKey('duel_target:', data.target)));
+        }
+      } catch { /* ignore parse errors */ }
+    }
+    await Promise.all(deletePromises);
     return true;
   } catch (error) {
     logError('deleteDuel', error, { challenger });
@@ -202,7 +239,10 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
 
     // Check if expired
     if (Date.now() > data.createdAt + (DUEL_TIMEOUT_SECONDS * 1000)) {
-      await env.SLOTS_KV.delete(key);
+      await Promise.all([
+        env.SLOTS_KV.delete(key),
+        env.SLOTS_KV.delete(kvKey('duel_target:', data.target))
+      ]);
       return { success: false, reason: 'expired' };
     }
 
@@ -217,8 +257,11 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
     // Note: KV minimum TTL is 60 seconds
     await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 60 });
 
-    // Delete the duel
-    await env.SLOTS_KV.delete(key);
+    // Delete the duel and reverse lookup
+    await Promise.all([
+      env.SLOTS_KV.delete(key),
+      env.SLOTS_KV.delete(kvKey('duel_target:', data.target))
+    ]);
 
     // Verify deletion succeeded
     const verify = await env.SLOTS_KV.get(key);
@@ -349,6 +392,48 @@ export async function logDuel(data: DuelLogData, env: Env): Promise<void> {
     ).run();
   } catch (error) {
     logError('logDuel', error, { challenger: data.challenger, target: data.target });
+  }
+}
+
+export interface DuelStats {
+  played: number;
+  won: number;
+  lost: number;
+  tied: number;
+}
+
+/**
+ * Get accurate duel win/loss/tie counts from D1
+ */
+export async function getDuelStats(username: string, env: Env): Promise<DuelStats> {
+  if (!D1_ENABLED || !env.DB) return { played: 0, won: 0, lost: 0, tied: 0 };
+
+  try {
+    const lower = username.toLowerCase();
+    const result = await env.DB.prepare(`
+      SELECT
+        COUNT(*) as played,
+        SUM(CASE WHEN winner = ? THEN 1 ELSE 0 END) as won,
+        SUM(CASE WHEN winner IS NOT NULL AND winner != ? THEN 1 ELSE 0 END) as lost,
+        SUM(CASE WHEN winner IS NULL THEN 1 ELSE 0 END) as tied
+      FROM duel_log
+      WHERE challenger = ? OR target = ?
+    `).bind(lower, lower, lower, lower).first<{
+      played: number;
+      won: number;
+      lost: number;
+      tied: number;
+    }>();
+
+    return {
+      played: result?.played || 0,
+      won: result?.won || 0,
+      lost: result?.lost || 0,
+      tied: result?.tied || 0
+    };
+  } catch (error) {
+    logError('getDuelStats', error, { username });
+    return { played: 0, won: 0, lost: 0, tied: 0 };
   }
 }
 

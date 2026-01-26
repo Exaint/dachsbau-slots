@@ -71,6 +71,7 @@ async function trackDuelAchievements(player: string, result: DuelResult, winning
     // Step 3: KV stats + streak (separate keys, safe to run in parallel)
     const kvPromises: Promise<void>[] = [incrementStat(player, 'duelsPlayed', 1, env)];
     if (result === 'win') {
+      kvPromises.push(incrementStat(player, 'duelsWon', 1, env));
       kvPromises.push(incrementStat(player, 'totalDuelWinnings', winnings, env));
       kvPromises.push(trackDuelStreak(player, true, env));
     } else if (result === 'loss') {

@@ -259,15 +259,15 @@ export async function handleSlotSubcommands(cleanUsername: string, lower: string
  * Handle the main slot action
  */
 export async function handleSlotAction(cleanUsername: string, amountParam: string | null, url: URL, env: Env): Promise<Response> {
-  if (amountParam) {
-    const lower = amountParam.toLowerCase();
+  const lower = amountParam?.toLowerCase() ?? null;
 
-    // Skip security checks for safe read-only commands
-    if (!SAFE_COMMANDS.has(lower)) {
-      const securityError = await checkSecurityConstraints(cleanUsername, env);
-      if (securityError) return securityError;
-    }
+  // Security checks for all state-modifying actions (including default spin without amount)
+  if (!lower || !SAFE_COMMANDS.has(lower)) {
+    const securityError = await checkSecurityConstraints(cleanUsername, env);
+    if (securityError) return securityError;
+  }
 
+  if (lower) {
     // Try subcommands first
     const subcommandResponse = await handleSlotSubcommands(cleanUsername, lower, url, env);
     if (subcommandResponse) return subcommandResponse;

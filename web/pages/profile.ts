@@ -4,7 +4,8 @@
 
 import type { Env, LoggedInUser, PlayerStats, CustomMessages } from '../../types/index.d.ts';
 import { getPlayerAchievements, getStats, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned, hasUnlock, getCustomMessages } from '../../database.js';
-import { isDuelOptedOut, getDuelHistory } from '../../database/duels.js';
+import { isDuelOptedOut, getDuelHistory, getDuelStats } from '../../database/duels.js';
+import type { DuelStats } from '../../database/duels.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getTwitchProfileData } from '../twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement } from '../../constants.js';
@@ -55,7 +56,7 @@ interface ProfileData {
   username: string;
   balance: number;
   rank: string | null;
-  stats: Partial<PlayerStats & { duelsWon?: number; duelsLost?: number }>;
+  stats: Partial<PlayerStats>;
   achievements: AchievementWithStatus[];
   byCategory: Record<string, AchievementWithStatus[]>;
   pendingRewards?: number;
@@ -69,6 +70,7 @@ interface ProfileData {
   hasCustomMsgUnlock: boolean;
   customMessages: CustomMessages | null;
   duelHistory: DuelHistoryEntry[];
+  duelStats: DuelStats;
 }
 
 /**
@@ -94,9 +96,9 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
 
   // Fetch remaining data in parallel with error fallback
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let rank: string | null, stats: Partial<PlayerStats & { duelsWon?: number; duelsLost?: number }>, achievementData: { unlockedAt: Record<string, number>; stats: any; pendingRewards: number }, lastActive: number | null, achievementStats: { totalPlayers: number; counts: Record<string, number> }, duelOptOut: boolean, selfBanned: boolean, leaderboardHidden: boolean, twitchData: TwitchData | null, hasCustomMsgUnlock: boolean, customMessages: CustomMessages | null, duelHistory: DuelHistoryEntry[];
+  let rank: string | null, stats: Partial<PlayerStats>, achievementData: { unlockedAt: Record<string, number>; stats: any; pendingRewards: number }, lastActive: number | null, achievementStats: { totalPlayers: number; counts: Record<string, number> }, duelOptOut: boolean, selfBanned: boolean, leaderboardHidden: boolean, twitchData: TwitchData | null, hasCustomMsgUnlock: boolean, customMessages: CustomMessages | null, duelHistory: DuelHistoryEntry[], duelStats: DuelStats;
   try {
-    [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory] = await Promise.all([
+    [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory, duelStats] = await Promise.all([
       getPrestigeRank(username, env).catch(() => null),
       getStats(username, env).catch(() => ({})),
       getPlayerAchievements(username, env).catch(() => ({ unlockedAt: {}, stats: {}, pendingRewards: 0 })),
@@ -108,13 +110,15 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
       getTwitchProfileData(username, env).catch(() => null),
       hasUnlock(username, 'custom_message', env).catch(() => false),
       getCustomMessages(username, env).catch(() => null),
-      getDuelHistory(username, 10, env).catch(() => [])
+      getDuelHistory(username, 10, env).catch(() => []),
+      getDuelStats(username, env).catch(() => ({ played: 0, won: 0, lost: 0, tied: 0 }))
     ]);
   } catch {
     rank = null; stats = {}; achievementData = { unlockedAt: {}, stats: {}, pendingRewards: 0 };
     lastActive = null; achievementStats = { totalPlayers: 0, counts: {} };
     duelOptOut = false; selfBanned = false; leaderboardHidden = false; twitchData = null;
     hasCustomMsgUnlock = false; customMessages = null; duelHistory = [];
+    duelStats = { played: 0, won: 0, lost: 0, tied: 0 };
   }
 
   const allAchievements = getAllAchievements();
@@ -178,7 +182,8 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
     loggedInUser,
     hasCustomMsgUnlock,
     customMessages,
-    duelHistory
+    duelHistory,
+    duelStats
   }));
 }
 
@@ -186,7 +191,7 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
  * Profile page renderer
  */
 export function renderProfilePage(data: ProfileData): string {
-  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, leaderboardHidden, hasDisclaimer, twitchData, loggedInUser, hasCustomMsgUnlock, customMessages, duelHistory = [] } = data;
+  const { username, balance, rank, stats, achievements, byCategory, lastActive, duelOptOut, selfBanned, leaderboardHidden, hasDisclaimer, twitchData, loggedInUser, hasCustomMsgUnlock, customMessages, duelHistory = [], duelStats } = data;
 
   // Check if logged-in user is admin
   const showAdminPanel = loggedInUser && isAdmin(loggedInUser.username);
@@ -244,11 +249,11 @@ export function renderProfilePage(data: ProfileData): string {
         <div class="stat-label">Gesamt verloren</div>
       </div>
       <div class="stat-box stat-win">
-        <div class="stat-value">${formatNumber(stats.duelsWon || 0)}</div>
+        <div class="stat-value">${formatNumber(duelStats.won)}</div>
         <div class="stat-label">Duelle gewonnen</div>
       </div>
       <div class="stat-box stat-loss">
-        <div class="stat-value">${formatNumber(stats.duelsLost || 0)}</div>
+        <div class="stat-value">${formatNumber(duelStats.lost)}</div>
         <div class="stat-label">Duelle verloren</div>
       </div>
     </div>

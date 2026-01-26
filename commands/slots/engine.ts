@@ -50,7 +50,8 @@ async function generateGrid(
   const grid: string[] = [];
 
   // OPTIMIZED: Pre-generate random values to reduce crypto calls
-  const randomPool = Array.from({length: 6}, () => secureRandom()); // 3 symbols * 2 buff rolls each
+  // Worst case: 3 symbols * 3 rolls each (1 dachs check + 2 buff rolls when buffs active)
+  const randomPool = Array.from({length: 9}, () => secureRandom());
   let randomIndex = 0;
 
   // Generate 3 elements (the winning row)

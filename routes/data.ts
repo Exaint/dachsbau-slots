@@ -33,7 +33,8 @@ import {
   migrateUnlocksToD1,
   migrateMonthlyLoginToD1,
   runFullMigration,
-  getFullMigrationStatus
+  getFullMigrationStatus,
+  migrateStatsToD1
 } from '../database/migration.js';
 import { getLeaderboard as getD1Leaderboard, D1_ENABLED } from '../database/d1.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
@@ -408,7 +409,7 @@ async function handleAdminApi(url: URL, env: Env, loggedInUser: LoggedInUser | n
     }
 
     // D1 migration actions don't require a target user
-    const d1Actions = ['d1-migrate', 'd1-status', 'd1-verify', 'd1-migrate-achievements', 'd1-migrate-unlocks', 'd1-migrate-monthly', 'd1-migrate-full', 'd1-full-status', 'sync-achievement-stats'];
+    const d1Actions = ['d1-migrate', 'd1-status', 'd1-verify', 'd1-migrate-achievements', 'd1-migrate-unlocks', 'd1-migrate-monthly', 'd1-migrate-full', 'd1-full-status', 'sync-achievement-stats', 'd1-migrate-stats'];
     if (action && d1Actions.includes(action)) {
       // Handle D1 actions without targetUser requirement
     } else {
@@ -459,6 +460,8 @@ async function handleAdminApi(url: URL, env: Env, loggedInUser: LoggedInUser | n
       case 'sync-achievement-stats':
         const syncResults = await syncAllPlayerAchievementStats(env);
         return jsonResponse({ success: true, ...syncResults });
+      case 'd1-migrate-stats':
+        return await handleD1MigrateStats(body, env);
       default:
         return jsonResponse({ error: 'Unknown admin action' }, 400);
     }
@@ -655,6 +658,16 @@ async function handleD1MigrateFull(body: AdminRequestBody, env: Env): Promise<Re
  */
 async function handleD1FullStatus(env: Env): Promise<Response> {
   const result = await getFullMigrationStatus(env);
+  return jsonResponse(result);
+}
+
+/**
+ * Admin: Sync player stats from KV to D1 (full overwrite)
+ */
+async function handleD1MigrateStats(body: AdminRequestBody, env: Env): Promise<Response> {
+  const { batchSize = 25, maxUsers = null, dryRun = false } = body;
+
+  const result = await migrateStatsToD1(env, { batchSize, maxUsers, dryRun });
   return jsonResponse(result);
 }
 

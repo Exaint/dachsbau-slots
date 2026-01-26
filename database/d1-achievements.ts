@@ -74,7 +74,7 @@ export interface BatchMigrateUser {
 // ============================================
 
 /** Maps camelCase stat keys (PlayerStats) to snake_case D1 column names */
-const STAT_COLUMN_MAP: Record<string, string> = {
+export const STAT_COLUMN_MAP: Record<string, string> = {
   // Core stats
   totalSpins: 'total_spins',
   wins: 'wins',

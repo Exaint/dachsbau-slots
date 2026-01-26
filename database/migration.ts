@@ -7,7 +7,7 @@
 
 import type { Env } from '../types/index.d.ts';
 import { logError } from '../utils.js';
-import { batchMigrateAchievements, rebuildAchievementStats } from './d1-achievements.js';
+import { batchMigrateAchievements, rebuildAchievementStats, STAT_COLUMN_MAP } from './d1-achievements.js';
 
 // === Type Definitions ===
 
@@ -857,5 +857,133 @@ export async function getFullMigrationStatus(env: Env): Promise<FullMigrationSta
   } catch (error) {
     logError('migration.getFullMigrationStatus', error as Error);
     return { success: false, error: (error as Error).message };
+  }
+}
+
+/**
+ * Sync all player stats from KV to D1 (full overwrite, not incremental)
+ * Reads stats:{username} KV keys and upserts into player_stats D1 table
+ */
+export async function migrateStatsToD1(env: Env, options: MigrationOptions = {}): Promise<MigrationResult> {
+  const {
+    batchSize = 25,
+    maxUsers = null,
+    dryRun = false
+  } = options;
+
+  if (!env.DB) {
+    return { success: false, error: 'D1 database not configured' };
+  }
+
+  const stats: MigrationStats = {
+    total: 0,
+    migrated: 0,
+    skipped: 0,
+    errors: 0,
+    startTime: Date.now()
+  };
+
+  try {
+    // Build column lists from STAT_COLUMN_MAP
+    const statKeys = Object.keys(STAT_COLUMN_MAP);
+    const columns = statKeys.map(k => STAT_COLUMN_MAP[k]);
+
+    // Build SQL dynamically
+    const columnList = ['username', ...columns, 'updated_at'].join(', ');
+    const placeholders = ['?', ...columns.map(() => '?'), '?'].join(', ');
+    const updateSet = columns.map(col => `${col} = excluded.${col}`).join(', ');
+    const sql = `INSERT INTO player_stats (${columnList}) VALUES (${placeholders}) ON CONFLICT(username) DO UPDATE SET ${updateSet}, updated_at = excluded.updated_at`;
+
+    // Get all stats entries from KV
+    let cursor: string | null = null;
+    let allStatsData: Array<{ username: string; kvKey: string }> = [];
+
+    do {
+      const listOptions: { prefix: string; limit: number; cursor?: string } = { prefix: 'stats:', limit: 1000 };
+      if (cursor) listOptions.cursor = cursor;
+
+      const result = await env.SLOTS_KV.list(listOptions);
+
+      for (const key of result.keys) {
+        const username = key.name.replace('stats:', '');
+        if (username) {
+          allStatsData.push({ username, kvKey: key.name });
+        }
+      }
+
+      cursor = 'cursor' in result ? result.cursor : null;
+
+      if (maxUsers && allStatsData.length >= maxUsers) {
+        allStatsData = allStatsData.slice(0, maxUsers);
+        break;
+      }
+    } while (cursor);
+
+    stats.total = allStatsData.length;
+
+    if (dryRun) {
+      return {
+        success: true,
+        dryRun: true,
+        stats,
+        message: `Would sync stats for ${stats.total} users`
+      };
+    }
+
+    // Process in batches
+    for (let i = 0; i < allStatsData.length; i += batchSize) {
+      const batch = allStatsData.slice(i, i + batchSize);
+
+      try {
+        // Fetch stats data for each user in batch
+        const now = Date.now();
+        const statements: ReturnType<typeof env.DB.prepare>[] = [];
+
+        for (const item of batch) {
+          const data = await env.SLOTS_KV.get(item.kvKey);
+          if (!data) {
+            stats.skipped++;
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(data) as Record<string, number>;
+            // Build values array: username, then each stat value, then updated_at
+            const values: (string | number)[] = [item.username.toLowerCase()];
+            for (const key of statKeys) {
+              values.push(typeof parsed[key] === 'number' ? parsed[key] : 0);
+            }
+            values.push(now);
+
+            statements.push(env.DB!.prepare(sql).bind(...values));
+          } catch {
+            stats.skipped++;
+          }
+        }
+
+        if (statements.length > 0) {
+          await env.DB!.batch(statements);
+          stats.migrated += statements.length;
+        }
+      } catch (batchError) {
+        logError('migration.statsBatch', batchError as Error, { batchStart: i, batchSize: batch.length });
+        stats.errors += batch.length;
+      }
+    }
+
+    stats.duration = Date.now() - stats.startTime;
+
+    return {
+      success: true,
+      stats,
+      message: `Synced ${stats.migrated}/${stats.total} player stats in ${stats.duration}ms (${stats.skipped} skipped, ${stats.errors} errors)`
+    };
+  } catch (error) {
+    logError('migration.migrateStatsToD1', error as Error);
+    return {
+      success: false,
+      error: (error as Error).message,
+      stats
+    };
   }
 }

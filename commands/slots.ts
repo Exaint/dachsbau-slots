@@ -345,7 +345,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
     // OPTIMIZED: Final updates (prestigeRank already pre-loaded)
     const finalUpdates = [
       setBalance(username, newBalance, env),
-      updateStats(username, result.points > 0, result.points, spinCost, env),
+      updateStats(username, result.points > 0, Math.max(0, result.points - spinCost), spinCost, env),
       setLastSpin(username, now, env),
       setLastActive(username, env),
       getFreeSpins(username, env)

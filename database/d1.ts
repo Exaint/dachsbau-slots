@@ -22,7 +22,7 @@ export const D1_ENABLED = true;
 export const DUAL_WRITE = true;
 
 // Which storage reads stats primarily: 'kv' (safe default) or 'd1' (after migration)
-export const STATS_READ_PRIMARY: 'kv' | 'd1' = 'kv';
+export const STATS_READ_PRIMARY: 'kv' | 'd1' = 'd1';
 
 // Retry configuration for D1 writes
 const D1_WRITE_RETRIES = 2;

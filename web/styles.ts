@@ -2035,6 +2035,14 @@ a.duel-player.opponent:hover {
   margin-bottom: 8px;
 }
 
+.home-feature-gif {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 8px;
+}
+
 .home-feature-card h3 {
   font-size: 1rem;
   font-weight: 700;
@@ -2089,6 +2097,12 @@ a.duel-player.opponent:hover {
 .home-discord h2 {
   font-size: 1.5rem;
   font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.home-discord-sub {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
   margin-bottom: 20px;
 }
 

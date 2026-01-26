@@ -123,9 +123,13 @@ describe('checkRateLimit', () => {
     };
   }
 
+  function createMockEnv(mockKV: any) {
+    return { SLOTS_KV: mockKV, DB: {} as D1Database };
+  }
+
   it('erlaubt Anfragen unter dem Limit', async () => {
     const mockKV = createMockKV();
-    const env = { SLOTS_KV: mockKV };
+    const env = createMockEnv(mockKV);
     const result = await checkRateLimit('test:ip', 5, 60, env);
     expect(result).toBe(true);
     expect(mockKV.put).toHaveBeenCalledWith('rl:test:ip', '1', { expirationTtl: 60 });
@@ -134,7 +138,7 @@ describe('checkRateLimit', () => {
   it('blockiert Anfragen bei erreichtem Limit', async () => {
     const mockKV = createMockKV();
     mockKV.get.mockResolvedValue('5');
-    const env = { SLOTS_KV: mockKV };
+    const env = createMockEnv(mockKV);
     const result = await checkRateLimit('test:ip', 5, 60, env);
     expect(result).toBe(false);
     // Write-first pattern: counter is always incremented before check
@@ -144,7 +148,7 @@ describe('checkRateLimit', () => {
   it('inkrementiert den Counter korrekt', async () => {
     const mockKV = createMockKV();
     mockKV.get.mockResolvedValue('3');
-    const env = { SLOTS_KV: mockKV };
+    const env = createMockEnv(mockKV);
     const result = await checkRateLimit('test:ip', 5, 60, env);
     expect(result).toBe(true);
     expect(mockKV.put).toHaveBeenCalledWith('rl:test:ip', '4', { expirationTtl: 60 });
@@ -152,7 +156,7 @@ describe('checkRateLimit', () => {
 
   it('behandelt fehlenden KV-Eintrag als 0', async () => {
     const mockKV = createMockKV();
-    const env = { SLOTS_KV: mockKV };
+    const env = createMockEnv(mockKV);
     const result = await checkRateLimit('new:user', 10, 60, env);
     expect(result).toBe(true);
     expect(mockKV.put).toHaveBeenCalledWith('rl:new:user', '1', { expirationTtl: 60 });

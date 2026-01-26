@@ -2,7 +2,7 @@
  * Leaderboard Page Handler and Renderer
  */
 
-import type { Env, LoggedInUser } from '../../types/index.d.ts';
+import type { Env, LoggedInUser } from '../../types/index.js';
 import { hasAcceptedDisclaimer, getPrestigeRank } from '../../database.js';
 import { isSelfBanned } from '../../database.js';
 import { isLeaderboardHidden } from '../../database/core.js';

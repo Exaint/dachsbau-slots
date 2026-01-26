@@ -2,13 +2,13 @@
  * Profile Page Handler and Renderer
  */
 
-import type { Env, LoggedInUser, PlayerStats, CustomMessages } from '../../types/index.d.ts';
+import type { Env, LoggedInUser, PlayerStats, CustomMessages, Achievement, DuelHistoryEntry } from '../../types/index.js';
 import { getPlayerAchievements, getStats, getPrestigeRank, hasAcceptedDisclaimer, getLastActive, getAchievementStats, isSelfBanned, hasUnlock, getCustomMessages } from '../../database.js';
 import { isDuelOptedOut, getDuelHistory, getDuelStats } from '../../database/duels.js';
 import type { DuelStats } from '../../database/duels.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getTwitchProfileData } from '../twitch.js';
-import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement } from '../../constants.js';
+import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, DUEL_SCORE_TRIPLE_OFFSET, DUEL_SCORE_PAIR_OFFSET, CUSTOM_MESSAGE_MAX_LENGTH, CUSTOM_MESSAGES_MAX_COUNT } from '../../constants.js';
 import { isAdmin } from '../../utils.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { CATEGORY_ICONS, CATEGORY_NAMES, PRESTIGE_RANK_NAMES, ROLE_BADGES, ADMIN_ROLE_OVERRIDES } from './ui-config.js';
@@ -16,34 +16,11 @@ import { baseTemplate, htmlResponse } from './template.js';
 import { renderHomePage } from './home.js';
 import { renderNotFoundPage } from './errors.js';
 
-interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  reward?: number;
-  requirement?: number;
-  hidden?: boolean;
-}
-
 interface AchievementWithStatus extends Achievement {
   unlocked: boolean;
   unlockedAt: number | null;
   progress: { current: number; required: number; percent: number } | null;
   rarity: { percent: number; count: number; total: number };
-}
-
-interface DuelHistoryEntry {
-  challenger: string;
-  target: string;
-  challengerGrid: string[];
-  targetGrid: string[];
-  challengerScore: number;
-  targetScore: number;
-  winner: string | null;
-  pot: number;
-  amount: number;
-  createdAt: number;
 }
 
 interface TwitchData {
@@ -95,13 +72,14 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
   const balance = rawBalance !== null ? parseInt(rawBalance, 10) || 0 : 0;
 
   // Fetch remaining data in parallel with error fallback
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let rank: string | null, stats: Partial<PlayerStats>, achievementData: { unlockedAt: Record<string, number>; stats: any; pendingRewards: number }, lastActive: number | null, achievementStats: { totalPlayers: number; counts: Record<string, number> }, duelOptOut: boolean, selfBanned: boolean, leaderboardHidden: boolean, twitchData: TwitchData | null, hasCustomMsgUnlock: boolean, customMessages: CustomMessages | null, duelHistory: DuelHistoryEntry[], duelStats: DuelStats;
+  // achievementData.stats is accessed via dynamic keys for progress calculation
+  type AchievementDataView = { unlockedAt: Record<string, number>; stats: { [key: string]: number }; pendingRewards: number };
+  let rank: string | null, stats: Partial<PlayerStats>, achievementData: AchievementDataView, lastActive: number | null, achievementStats: { totalPlayers: number; counts: Record<string, number> }, duelOptOut: boolean, selfBanned: boolean, leaderboardHidden: boolean, twitchData: TwitchData | null, hasCustomMsgUnlock: boolean, customMessages: CustomMessages | null, duelHistory: DuelHistoryEntry[], duelStats: DuelStats;
   try {
     [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory, duelStats] = await Promise.all([
       getPrestigeRank(username, env).catch(() => null),
       getStats(username, env).catch(() => ({})),
-      getPlayerAchievements(username, env).catch(() => ({ unlockedAt: {}, stats: {}, pendingRewards: 0 })),
+      getPlayerAchievements(username, env).catch(() => ({ unlockedAt: {}, stats: {}, pendingRewards: 0 })) as Promise<AchievementDataView>,
       getLastActive(username, env).catch(() => null),
       getAchievementStats(env).catch(() => ({ totalPlayers: 0, counts: {} })),
       isDuelOptedOut(username, env).catch(() => false),
@@ -277,15 +255,15 @@ export function renderProfilePage(data: ProfileData): string {
           <div class="custom-messages-list" id="winMessages">
             ${winMsgs.map((msg) => `
               <div class="custom-message-row">
-                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht..." oninput="updateCharCount(this)">
-                <span class="custom-message-chars">${50 - msg.length}</span>
+                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="${CUSTOM_MESSAGE_MAX_LENGTH}" placeholder="Nachricht..." oninput="updateCharCount(this)">
+                <span class="custom-message-chars">${CUSTOM_MESSAGE_MAX_LENGTH - msg.length}</span>
                 <button class="custom-message-remove" onclick="removeMessageRow(this)" title="Entfernen">&times;</button>
               </div>
             `).join('')}
           </div>
           <div class="custom-messages-actions">
-            <button class="custom-message-add" onclick="addMessageRow('win')" ${winMsgs.length >= 5 ? 'disabled' : ''}>+ Nachricht hinzufügen</button>
-            <span class="custom-messages-counter" id="winCounter">${winMsgs.length}/5</span>
+            <button class="custom-message-add" onclick="addMessageRow('win')" ${winMsgs.length >= CUSTOM_MESSAGES_MAX_COUNT ? 'disabled' : ''}>+ Nachricht hinzufügen</button>
+            <span class="custom-messages-counter" id="winCounter">${winMsgs.length}/${CUSTOM_MESSAGES_MAX_COUNT}</span>
           </div>
         </div>
         <div class="custom-messages-type">
@@ -293,20 +271,20 @@ export function renderProfilePage(data: ProfileData): string {
           <div class="custom-messages-list" id="lossMessages">
             ${lossMsgs.map((msg) => `
               <div class="custom-message-row">
-                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="50" placeholder="Nachricht..." oninput="updateCharCount(this)">
-                <span class="custom-message-chars">${50 - msg.length}</span>
+                <input type="text" class="custom-message-input" value="${escapeHtml(msg)}" maxlength="${CUSTOM_MESSAGE_MAX_LENGTH}" placeholder="Nachricht..." oninput="updateCharCount(this)">
+                <span class="custom-message-chars">${CUSTOM_MESSAGE_MAX_LENGTH - msg.length}</span>
                 <button class="custom-message-remove" onclick="removeMessageRow(this)" title="Entfernen">&times;</button>
               </div>
             `).join('')}
           </div>
           <div class="custom-messages-actions">
-            <button class="custom-message-add" onclick="addMessageRow('loss')" ${lossMsgs.length >= 5 ? 'disabled' : ''}>+ Nachricht hinzufügen</button>
-            <span class="custom-messages-counter" id="lossCounter">${lossMsgs.length}/5</span>
+            <button class="custom-message-add" onclick="addMessageRow('loss')" ${lossMsgs.length >= CUSTOM_MESSAGES_MAX_COUNT ? 'disabled' : ''}>+ Nachricht hinzufügen</button>
+            <span class="custom-messages-counter" id="lossCounter">${lossMsgs.length}/${CUSTOM_MESSAGES_MAX_COUNT}</span>
           </div>
         </div>
       </div>
       <div class="custom-messages-footer">
-        <span class="custom-messages-charlimit">Max. 50 Zeichen pro Nachricht</span>
+        <span class="custom-messages-charlimit">Max. ${CUSTOM_MESSAGE_MAX_LENGTH} Zeichen pro Nachricht</span>
         <button class="custom-messages-save" onclick="saveCustomMessages()">💾 Speichern</button>
       </div>
       <div class="custom-messages-status" id="customMsgStatus"></div>
@@ -321,17 +299,16 @@ export function renderProfilePage(data: ProfileData): string {
   };
 
   // Extract symbol sum from duel score (removes triple/pair bonus)
-  // Score system: Triple = 3000000 + symbolSum, Pair = 2000000 + symbolSum, else = symbolSum
   const getDuelSymbolSum = (score: number): number => {
-    if (score >= 3000000) return score - 3000000;
-    if (score >= 2000000) return score - 2000000;
+    if (score >= DUEL_SCORE_TRIPLE_OFFSET) return score - DUEL_SCORE_TRIPLE_OFFSET;
+    if (score >= DUEL_SCORE_PAIR_OFFSET) return score - DUEL_SCORE_PAIR_OFFSET;
     return score;
   };
 
   // Get score type indicator
   const getScoreType = (score: number): string => {
-    if (score >= 3000000) return '3x';
-    if (score >= 2000000) return '2x';
+    if (score >= DUEL_SCORE_TRIPLE_OFFSET) return '3x';
+    if (score >= DUEL_SCORE_PAIR_OFFSET) return '2x';
     return '';
   };
 

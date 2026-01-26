@@ -120,6 +120,8 @@ export const LEADERBOARD_MIN_USERS = 100;
 export const DUEL_MIN_AMOUNT = 100;
 export const DUEL_TIMEOUT_SECONDS = 60;
 export const DUEL_COOLDOWN_SECONDS = 60;
+export const DUEL_SCORE_TRIPLE_OFFSET = 3_000_000;
+export const DUEL_SCORE_PAIR_OFFSET = 2_000_000;
 
 // ===========================================
 // 9. Validation Settings
@@ -127,6 +129,8 @@ export const DUEL_COOLDOWN_SECONDS = 60;
 
 export const USERNAME_MIN_LENGTH = 1;
 export const USERNAME_MAX_LENGTH = 25;
+export const CUSTOM_MESSAGE_MAX_LENGTH = 50;
+export const CUSTOM_MESSAGES_MAX_COUNT = 5;
 
 // ===========================================
 // 10. Retry Settings

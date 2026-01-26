@@ -56,8 +56,16 @@ export async function setBalance(username: string, balance: number, env: Env): P
 }
 
 /**
- * Atomically adjust balance by delta (read → compute → write in tightest possible window)
- * Returns the new balance. Minimizes TOCTOU window for concurrent operations.
+ * Adjust balance by delta (read → compute → write).
+ * Returns the new balance.
+ *
+ * KNOWN LIMITATION: KV doesn't support atomic compare-and-swap, so there's a
+ * TOCTOU window between the GET and PUT. In practice this is mitigated by:
+ *   - Spin cooldowns prevent concurrent operations per user
+ *   - Duel acceptance uses its own claim-lock pattern
+ *   - Transfer commands are serialized through Twitch chat
+ * When D1 becomes the primary data store, use SQL `UPDATE ... SET balance = balance + ?`
+ * for true atomicity.
  */
 export async function adjustBalance(username: string, delta: number, env: Env): Promise<number> {
   try {

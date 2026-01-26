@@ -2,7 +2,7 @@
  * Info Page Renderer
  */
 
-import type { LoggedInUser } from '../../types/index.d.ts';
+import type { LoggedInUser } from '../../types/index.js';
 import { isAdmin } from '../../utils.js';
 import { baseTemplate } from './template.js';
 

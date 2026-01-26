@@ -4,7 +4,7 @@
  * Also handles user authentication via OAuth
  */
 
-import type { Env, LoggedInUser } from '../types/index.d.ts';
+import type { Env, LoggedInUser } from '../types/index.js';
 import { logError } from '../utils.js';
 import { BROADCASTER_LOGIN } from '../constants.js';
 
@@ -16,6 +16,8 @@ const TOKEN_CACHE_TTL = 3600;   // 1 hour (tokens last longer but we refresh ear
 // User session constants
 const USER_SESSION_COOKIE = 'dachsbau_session';
 const SESSION_TTL_SECONDS = 604800; // 7 days
+const TOKEN_REFRESH_THRESHOLD_MS = 300000; // 5 minutes before expiry
+const OAUTH_STATE_TTL_SECONDS = 600; // 10 minutes
 
 // Twitch API endpoints
 const TWITCH_API = 'https://api.twitch.tv/helix';
@@ -119,7 +121,7 @@ async function getBroadcasterToken(env: Env): Promise<string | null> {
     }
 
     // Check if token is expired
-    if (tokenData.expiresAt && Date.now() > tokenData.expiresAt - 300000) {
+    if (tokenData.expiresAt && Date.now() > tokenData.expiresAt - TOKEN_REFRESH_THRESHOLD_MS) {
       // Token expired or expiring soon, try to refresh
       return await refreshBroadcasterToken(tokenData.refreshToken, env);
     }
@@ -480,7 +482,7 @@ async function getAuthorizationUrl(env: Env, origin: string): Promise<string> {
   const state = generateOAuthState();
 
   // Store state in KV with short TTL (10 minutes)
-  await env.SLOTS_KV.put(`oauth_state:broadcaster:${state}`, 'valid', { expirationTtl: 600 });
+  await env.SLOTS_KV.put(`oauth_state:broadcaster:${state}`, 'valid', { expirationTtl: OAUTH_STATE_TTL_SECONDS });
 
   const params = new URLSearchParams({
     client_id: env.TWITCH_CLIENT_ID!,
@@ -627,7 +629,7 @@ async function getUserLoginUrl(env: Env, origin: string): Promise<string> {
   const state = generateOAuthState();
 
   // Store state in KV with short TTL (10 minutes)
-  await env.SLOTS_KV.put(`oauth_state:user:${state}`, 'valid', { expirationTtl: 600 });
+  await env.SLOTS_KV.put(`oauth_state:user:${state}`, 'valid', { expirationTtl: OAUTH_STATE_TTL_SECONDS });
 
   const params = new URLSearchParams({
     client_id: env.TWITCH_CLIENT_ID!,

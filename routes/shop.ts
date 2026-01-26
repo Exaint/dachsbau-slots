@@ -37,15 +37,7 @@ import {
   SECONDS_PER_MINUTE,
   SECONDS_PER_HOUR
 } from '../constants.js';
-import type { Env, ShopItem } from '../types/index.js';
-
-// ShopItem from types/index.d.ts includes all needed fields
-type ExtendedShopItem = ShopItem;
-
-interface LoggedInUser {
-  username: string;
-  displayName?: string;
-}
+import type { Env, ShopItem, LoggedInUser } from '../types/index.js';
 
 interface PurchaseResult {
   success: boolean;
@@ -209,7 +201,7 @@ async function atomicBalanceDeduction(username: string, price: number, env: Env,
  * Returns { success, message, newBalance } or { success: false, error }
  */
 async function processWebPurchase(username: string, itemId: number, env: Env): Promise<PurchaseResult> {
-  const item = SHOP_ITEMS[itemId] as ExtendedShopItem;
+  const item = SHOP_ITEMS[itemId] as ShopItem;
 
   // Load type-specific data first (without balance - that's checked atomically)
   let currentRank: string | null = null;
@@ -256,7 +248,7 @@ async function processWebPurchase(username: string, itemId: number, env: Env): P
   }
 }
 
-async function purchasePrestige(username: string, item: ExtendedShopItem, _itemId: number, currentRank: string | null, env: Env): Promise<PurchaseResult> {
+async function purchasePrestige(username: string, item: ShopItem, _itemId: number, currentRank: string | null, env: Env): Promise<PurchaseResult> {
   const currentIndex = currentRank ? PRESTIGE_RANKS.indexOf(currentRank) : -1;
   const newIndex = PRESTIGE_RANKS.indexOf(item.rank!);
 
@@ -286,7 +278,7 @@ async function purchasePrestige(username: string, item: ExtendedShopItem, _itemI
   };
 }
 
-async function purchaseUnlock(username: string, item: ExtendedShopItem, _itemId: number, hasPrerequisite: boolean, hasExistingUnlock: boolean, env: Env): Promise<PurchaseResult> {
+async function purchaseUnlock(username: string, item: ShopItem, _itemId: number, hasPrerequisite: boolean, hasExistingUnlock: boolean, env: Env): Promise<PurchaseResult> {
   if (item.requires && !hasPrerequisite) {
     return { success: false, error: `Du musst zuerst ${PREREQUISITE_NAMES[item.requires]} freischalten!` };
   }
@@ -316,7 +308,7 @@ async function purchaseUnlock(username: string, item: ExtendedShopItem, _itemId:
   return result;
 }
 
-async function purchaseTimed(username: string, item: ExtendedShopItem, env: Env): Promise<PurchaseResult> {
+async function purchaseTimed(username: string, item: ShopItem, env: Env): Promise<PurchaseResult> {
   // Atomic balance deduction with race condition protection
   const deduction = await atomicBalanceDeduction(username, item.price, env);
   if (!deduction.success) {
@@ -354,7 +346,7 @@ async function purchaseTimed(username: string, item: ExtendedShopItem, env: Env)
   };
 }
 
-async function purchaseBoost(username: string, item: ExtendedShopItem, env: Env): Promise<PurchaseResult> {
+async function purchaseBoost(username: string, item: ShopItem, env: Env): Promise<PurchaseResult> {
   const lowerUsername = username.toLowerCase();
 
   // Weekly limit check for Dachs-Boost
@@ -406,7 +398,7 @@ async function purchaseBoost(username: string, item: ExtendedShopItem, env: Env)
   };
 }
 
-async function purchaseInsurance(username: string, item: ExtendedShopItem, env: Env): Promise<PurchaseResult> {
+async function purchaseInsurance(username: string, item: ShopItem, env: Env): Promise<PurchaseResult> {
   // Atomic balance deduction with race condition protection
   const deduction = await atomicBalanceDeduction(username, item.price, env);
   if (!deduction.success) {
@@ -422,7 +414,7 @@ async function purchaseInsurance(username: string, item: ExtendedShopItem, env: 
   };
 }
 
-async function purchaseWinMulti(username: string, item: ExtendedShopItem, env: Env): Promise<PurchaseResult> {
+async function purchaseWinMulti(username: string, item: ShopItem, env: Env): Promise<PurchaseResult> {
   // Atomic balance deduction with race condition protection
   const deduction = await atomicBalanceDeduction(username, item.price, env);
   if (!deduction.success) {
@@ -438,7 +430,7 @@ async function purchaseWinMulti(username: string, item: ExtendedShopItem, env: E
   };
 }
 
-async function purchaseBundle(username: string, item: ExtendedShopItem, env: Env): Promise<PurchaseResult> {
+async function purchaseBundle(username: string, item: ShopItem, env: Env): Promise<PurchaseResult> {
   const purchases = await getSpinBundlePurchases(username, env);
   if (purchases.count >= WEEKLY_SPIN_BUNDLE_LIMIT) {
     return { success: false, error: `Wöchentliches Limit erreicht! Max. ${WEEKLY_SPIN_BUNDLE_LIMIT} Spin Bundles pro Woche.` };
@@ -463,7 +455,7 @@ async function purchaseBundle(username: string, item: ExtendedShopItem, env: Env
   };
 }
 
-async function purchaseSpinToken(username: string, item: ExtendedShopItem, itemId: number, env: Env): Promise<PurchaseResult> {
+async function purchaseSpinToken(username: string, item: ShopItem, itemId: number, env: Env): Promise<PurchaseResult> {
   // Atomic balance deduction with race condition protection
   const deduction = await atomicBalanceDeduction(username, item.price, env);
   if (!deduction.success) {

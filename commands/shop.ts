@@ -92,8 +92,6 @@ interface WheelResult {
   prize: number;
 }
 
-// ShopItem from types/index.d.ts includes all needed fields
-type ExtendedShopItem = ShopItem;
 
 // Static: Mystery Box item pool (avoid recreation per request)
 const MYSTERY_BOX_ITEMS = [
@@ -111,7 +109,7 @@ const MYSTERY_BOX_ITEMS = [
 async function trackShopAchievements(
   username: string,
   itemId: number,
-  item: ExtendedShopItem,
+  item: ShopItem,
   extraData: { chaosResult?: number; wheelJackpot?: boolean } | null,
   env: Env
 ): Promise<void> {
@@ -194,7 +192,7 @@ async function trackShopAchievements(
 
 async function handlePrestigeItem(
   username: string,
-  item: ExtendedShopItem,
+  item: ShopItem,
   itemId: number,
   balance: number,
   currentRank: string | null,
@@ -227,7 +225,7 @@ async function handlePrestigeItem(
 
 async function handleUnlockItem(
   username: string,
-  item: ExtendedShopItem,
+  item: ShopItem,
   itemId: number,
   balance: number,
   hasPrerequisite: boolean | undefined,
@@ -260,7 +258,7 @@ async function handleUnlockItem(
 
 async function handleTimedItem(
   username: string,
-  item: ExtendedShopItem,
+  item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
@@ -286,7 +284,7 @@ async function handleTimedItem(
 
 async function handleBoostItem(
   username: string,
-  item: ExtendedShopItem,
+  item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
@@ -327,7 +325,7 @@ async function handleBoostItem(
 
 async function handleInsuranceItem(
   username: string,
-  item: ExtendedShopItem,
+  item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
@@ -341,7 +339,7 @@ async function handleInsuranceItem(
 
 async function handleWinMultiItem(
   username: string,
-  item: ExtendedShopItem,
+  item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
@@ -355,7 +353,7 @@ async function handleWinMultiItem(
 
 async function handleBundleItem(
   username: string,
-  item: ExtendedShopItem,
+  item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
@@ -377,7 +375,7 @@ async function handleBundleItem(
 
 async function handlePeekItem(
   username: string,
-  item: ExtendedShopItem,
+  item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
@@ -454,7 +452,7 @@ async function handlePeekItem(
 // Instant items have sub-handlers for different item IDs
 async function handleInstantItem(
   username: string,
-  item: ExtendedShopItem,
+  item: ShopItem,
   itemId: number,
   balance: number,
   env: Env
@@ -535,9 +533,9 @@ async function handleInstantItem(
 const MYSTERY_BOX_TIMEOUT_MS = 10000; // 10s to handle cold starts
 const MYSTERY_BOX_ROLLBACK_RETRIES = 3;
 
-async function handleMysteryBox(username: string, item: ExtendedShopItem, balance: number, env: Env): Promise<Response> {
+async function handleMysteryBox(username: string, item: ShopItem, balance: number, env: Env): Promise<Response> {
   const mysteryItemId = MYSTERY_BOX_ITEMS[secureRandomInt(0, MYSTERY_BOX_ITEMS.length - 1)];
-  const mysteryResult = SHOP_ITEMS[mysteryItemId] as ExtendedShopItem;
+  const mysteryResult = SHOP_ITEMS[mysteryItemId] as ShopItem;
 
   try {
     // Activation with timeout to prevent hanging operations
@@ -606,7 +604,7 @@ async function handleMysteryBox(username: string, item: ExtendedShopItem, balanc
 // ITEM TYPE HANDLER MAP
 // Maps item.type to handler function. Extend by adding new entries.
 // ============================================================================
-type ItemHandler = (username: string, item: ExtendedShopItem, itemId: number, balance: number, env: Env) => Promise<Response>;
+type ItemHandler = (username: string, item: ShopItem, itemId: number, balance: number, env: Env) => Promise<Response>;
 
 const ITEM_TYPE_HANDLERS: Record<string, ItemHandler> = {
   timed: handleTimedItem,
@@ -653,7 +651,7 @@ async function handleShop(username: string, item: string | undefined, env: Env):
 // ============================================================================
 async function buyShopItem(username: string, itemId: number, env: Env): Promise<Response> {
   try {
-    const item = SHOP_ITEMS[itemId] as ExtendedShopItem | undefined;
+    const item = SHOP_ITEMS[itemId] as ShopItem | undefined;
 
     if (!item) {
       return new Response(`@${username} ❌ Item nicht gefunden!`, { headers: RESPONSE_HEADERS });

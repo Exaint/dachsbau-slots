@@ -3,9 +3,10 @@
  * This is the main layout wrapper for all pages
  */
 
-import type { LoggedInUser } from '../../types/index.d.ts';
+import type { LoggedInUser } from '../../types/index.js';
 import { CSS } from '../styles.js';
 import { escapeHtml } from './utils.js';
+import { CUSTOM_MESSAGE_MAX_LENGTH, CUSTOM_MESSAGES_MAX_COUNT } from '../../constants/config.js';
 
 // Disclaimer HTML shown on all pages
 const DISCLAIMER_HTML = `
@@ -221,6 +222,14 @@ export function baseTemplate(title: string, content: string, activePage: string 
  */
 function getClientScripts(): string {
   return `<script>
+    // UI timing constants
+    const TOAST_DISPLAY_MS = 4000;
+    const TOAST_REMOVE_MS = 300;
+    const STATUS_RESET_MS = 3000;
+    const RELOAD_DELAY_MS = 1500;
+    const CUSTOM_MSG_MAX_LEN = ${CUSTOM_MESSAGE_MAX_LENGTH};
+    const CUSTOM_MSG_MAX_COUNT = ${CUSTOM_MESSAGES_MAX_COUNT};
+
     // Achievement detail modal
     function showAchievementDetail(el) {
       const modal = document.getElementById('achievementModal');
@@ -356,7 +365,7 @@ function getClientScripts(): string {
     });
 
     // Toast notification system
-    function showToast(message, type = 'error', duration = 4000) {
+    function showToast(message, type = 'error', duration = TOAST_DISPLAY_MS) {
       const container = document.getElementById('toastContainer');
       const toast = document.createElement('div');
       toast.className = 'toast toast-' + type;
@@ -365,7 +374,7 @@ function getClientScripts(): string {
       requestAnimationFrame(() => toast.classList.add('visible'));
       setTimeout(() => {
         toast.classList.remove('visible');
-        setTimeout(() => toast.remove(), 300);
+        setTimeout(() => toast.remove(), TOAST_REMOVE_MS);
       }, duration);
     }
 
@@ -708,7 +717,7 @@ function getClientScripts(): string {
             msgEl.className = 'admin-message success';
             msgEl.textContent = '✓ Erfolgreich aktualisiert!';
           }
-          setTimeout(() => location.reload(), 1500);
+          setTimeout(() => location.reload(), RELOAD_DELAY_MS);
         } else {
           const errMsg = result.error || 'Unbekannter Fehler';
           showToast('Fehler: ' + errMsg, 'error');
@@ -929,7 +938,7 @@ function getClientScripts(): string {
       // Flash animation
       const flashTarget = category || target;
       flashTarget.classList.add('shop-flash');
-      setTimeout(() => flashTarget.classList.remove('shop-flash'), 1500);
+      setTimeout(() => flashTarget.classList.remove('shop-flash'), RELOAD_DELAY_MS);
     }
 
     // Category collapse toggle (profile achievements) with localStorage persistence
@@ -1037,7 +1046,7 @@ function getClientScripts(): string {
             feedback.className = 'purchase-feedback success';
             feedback.textContent = '✓ ' + result.message;
             feedback.style.display = 'block';
-            setTimeout(() => { feedback.style.display = 'none'; }, 4000);
+            setTimeout(() => { feedback.style.display = 'none'; }, TOAST_DISPLAY_MS);
           }
 
           // Update button to show purchased (for one-time items)
@@ -1111,7 +1120,7 @@ function getClientScripts(): string {
       }
 
       // Auto-remove after 4 seconds
-      setTimeout(() => { errorEl.remove(); }, 4000);
+      setTimeout(() => { errorEl.remove(); }, TOAST_DISPLAY_MS);
     }
 
     // Update all buy buttons based on new balance
@@ -1197,7 +1206,7 @@ function getClientScripts(): string {
       const row = input.parentElement;
       const charSpan = row.querySelector('.custom-message-chars');
       if (charSpan) {
-        const remaining = 50 - input.value.length;
+        const remaining = CUSTOM_MSG_MAX_LEN - input.value.length;
         charSpan.textContent = remaining;
         charSpan.classList.toggle('chars-low', remaining <= 10);
         charSpan.classList.toggle('chars-zero', remaining <= 0);
@@ -1225,18 +1234,18 @@ function getClientScripts(): string {
       const counter = document.getElementById(type === 'win' ? 'winCounter' : 'lossCounter');
       const addBtn = container.parentElement.querySelector('.custom-message-add');
       const count = container.querySelectorAll('.custom-message-row').length;
-      if (count >= 5) return;
+      if (count >= CUSTOM_MSG_MAX_COUNT) return;
 
       const row = document.createElement('div');
       row.className = 'custom-message-row';
-      row.innerHTML = '<input type="text" class="custom-message-input" maxlength="50" placeholder="Nachricht..." oninput="updateCharCount(this)">' +
-        '<span class="custom-message-chars">50</span>' +
+      row.innerHTML = '<input type="text" class="custom-message-input" maxlength="' + CUSTOM_MSG_MAX_LEN + '" placeholder="Nachricht..." oninput="updateCharCount(this)">' +
+        '<span class="custom-message-chars">' + CUSTOM_MSG_MAX_LEN + '</span>' +
         '<button class="custom-message-remove" onclick="removeMessageRow(this)" title="Entfernen">&times;</button>';
       container.appendChild(row);
 
       const newCount = count + 1;
-      counter.textContent = newCount + '/5';
-      if (newCount >= 5) addBtn.disabled = true;
+      counter.textContent = newCount + '/' + CUSTOM_MSG_MAX_COUNT;
+      if (newCount >= CUSTOM_MSG_MAX_COUNT) addBtn.disabled = true;
     }
 
     function removeMessageRow(btn) {
@@ -1248,7 +1257,7 @@ function getClientScripts(): string {
       row.remove();
 
       const count = container.querySelectorAll('.custom-message-row').length;
-      counter.textContent = count + '/5';
+      counter.textContent = count + '/' + CUSTOM_MSG_MAX_COUNT;
       addBtn.disabled = false;
     }
 
@@ -1265,11 +1274,11 @@ function getClientScripts(): string {
       allInputs.forEach(function(input) {
         const val = input.value.trim();
         if (!val) return;
-        if (val.length > 50 || checkProfanity(val)) {
+        if (val.length > CUSTOM_MSG_MAX_LEN || checkProfanity(val)) {
           input.classList.add('input-error');
           const err = document.createElement('div');
           err.className = 'custom-message-error';
-          err.textContent = val.length > 50 ? 'Nachricht zu lang (max. 50 Zeichen)' : 'Nachricht enth\\u00e4lt unerlaubte W\\u00f6rter';
+          err.textContent = val.length > CUSTOM_MSG_MAX_LEN ? 'Nachricht zu lang (max. ' + CUSTOM_MSG_MAX_LEN + ' Zeichen)' : 'Nachricht enth\\u00e4lt unerlaubte W\\u00f6rter';
           input.closest('.custom-message-row').parentElement.insertBefore(err, input.closest('.custom-message-row').nextSibling);
           hasError = true;
         }
@@ -1299,7 +1308,7 @@ function getClientScripts(): string {
         if (result.success) {
           statusEl.className = 'custom-messages-status success';
           statusEl.textContent = 'Gespeichert!';
-          setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'custom-messages-status'; }, 3000);
+          setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'custom-messages-status'; }, STATUS_RESET_MS);
         } else {
           statusEl.className = 'custom-messages-status error';
           statusEl.textContent = result.error || 'Fehler beim Speichern';

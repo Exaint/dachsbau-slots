@@ -17,14 +17,13 @@ export interface PurchaseData {
 }
 
 // ============================================
-// Spin Bundle Purchases
+// Generic Purchase Tracking (shared logic)
 // ============================================
 
-export async function getSpinBundlePurchases(username: string, env: Env): Promise<PurchaseData> {
+async function getPurchases(kvPrefix: string, username: string, env: Env): Promise<PurchaseData> {
   try {
-    // Always use fresh week calculation for limit checks (no cache)
     const currentWeekStart = calculateWeekStart();
-    const value = await env.SLOTS_KV.get(kvKey('bundle_purchases:', username));
+    const value = await env.SLOTS_KV.get(kvKey(kvPrefix, username));
     if (!value) return { count: 0, weekStart: currentWeekStart };
     const data: PurchaseData = JSON.parse(value);
 
@@ -34,27 +33,33 @@ export async function getSpinBundlePurchases(username: string, env: Env): Promis
 
     return data;
   } catch (error) {
-    logError('getSpinBundlePurchases', error, { username });
+    logError(`getPurchases[${kvPrefix}]`, error, { username });
     return { count: 0, weekStart: calculateWeekStart() };
   }
 }
 
-// Atomic increment with retry mechanism
-export async function incrementSpinBundlePurchases(username: string, env: Env, maxRetries: number = MAX_RETRIES): Promise<void> {
-  const key = kvKey('bundle_purchases:', username);
+async function incrementPurchases(
+  kvPrefix: string,
+  d1ItemType: string,
+  username: string,
+  env: Env,
+  maxRetries: number = MAX_RETRIES
+): Promise<void> {
+  const key = kvKey(kvPrefix, username);
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const data = await getSpinBundlePurchases(username, env);
+      const data = await getPurchases(kvPrefix, username, env);
       const expectedCount = data.count + 1;
       data.count = expectedCount;
       await env.SLOTS_KV.put(key, JSON.stringify(data));
 
       // Verify the write succeeded
-      const verifyData = await getSpinBundlePurchases(username, env);
+      const verifyData = await getPurchases(kvPrefix, username, env);
       if (verifyData.count === expectedCount) {
         if (D1_ENABLED && DUAL_WRITE && env.DB) {
-          upsertPurchaseLimit(username, 'bundle', expectedCount, data.weekStart, env).catch(err => logError('incrementSpinBundle.d1', err, { username }));
+          upsertPurchaseLimit(username, d1ItemType, expectedCount, data.weekStart, env)
+            .catch(err => logError(`incrementPurchases[${d1ItemType}].d1`, err, { username }));
         }
         return;
       }
@@ -64,62 +69,28 @@ export async function incrementSpinBundlePurchases(username: string, env: Env, m
         await exponentialBackoff(attempt);
       }
     } catch (error) {
-      logError('incrementSpinBundlePurchases', error, { username, attempt: attempt + 1 });
+      logError(`incrementPurchases[${d1ItemType}]`, error, { username, attempt: attempt + 1 });
       if (attempt === maxRetries - 1) return;
     }
   }
 }
 
 // ============================================
-// Dachs Boost Purchases
+// Public API (stable exports)
 // ============================================
 
-export async function getDachsBoostPurchases(username: string, env: Env): Promise<PurchaseData> {
-  try {
-    // Always use fresh week calculation for limit checks (no cache)
-    const currentWeekStart = calculateWeekStart();
-    const value = await env.SLOTS_KV.get(kvKey('dachsboost_purchases:', username));
-    if (!value) return { count: 0, weekStart: currentWeekStart };
-    const data: PurchaseData = JSON.parse(value);
-
-    if (data.weekStart !== currentWeekStart) {
-      return { count: 0, weekStart: currentWeekStart };
-    }
-
-    return data;
-  } catch (error) {
-    logError('getDachsBoostPurchases', error, { username });
-    return { count: 0, weekStart: calculateWeekStart() };
-  }
+export function getSpinBundlePurchases(username: string, env: Env): Promise<PurchaseData> {
+  return getPurchases('bundle_purchases:', username, env);
 }
 
-// Atomic increment with retry mechanism
-export async function incrementDachsBoostPurchases(username: string, env: Env, maxRetries: number = MAX_RETRIES): Promise<void> {
-  const key = kvKey('dachsboost_purchases:', username);
+export function incrementSpinBundlePurchases(username: string, env: Env, maxRetries?: number): Promise<void> {
+  return incrementPurchases('bundle_purchases:', 'bundle', username, env, maxRetries);
+}
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const data = await getDachsBoostPurchases(username, env);
-      const expectedCount = data.count + 1;
-      data.count = expectedCount;
-      await env.SLOTS_KV.put(key, JSON.stringify(data));
+export function getDachsBoostPurchases(username: string, env: Env): Promise<PurchaseData> {
+  return getPurchases('dachsboost_purchases:', username, env);
+}
 
-      // Verify the write succeeded
-      const verifyData = await getDachsBoostPurchases(username, env);
-      if (verifyData.count === expectedCount) {
-        if (D1_ENABLED && DUAL_WRITE && env.DB) {
-          upsertPurchaseLimit(username, 'dachsboost', expectedCount, data.weekStart, env).catch(err => logError('incrementDachsBoost.d1', err, { username }));
-        }
-        return;
-      }
-
-      // Verification failed, retry with backoff
-      if (attempt < maxRetries - 1) {
-        await exponentialBackoff(attempt);
-      }
-    } catch (error) {
-      logError('incrementDachsBoostPurchases', error, { username, attempt: attempt + 1 });
-      if (attempt === maxRetries - 1) return;
-    }
-  }
+export function incrementDachsBoostPurchases(username: string, env: Env, maxRetries?: number): Promise<void> {
+  return incrementPurchases('dachsboost_purchases:', 'dachsboost', username, env, maxRetries);
 }

@@ -14,7 +14,7 @@
  * - Use getPlayerAchievements() to read all achievements for a player
  */
 
-import type { Env, Achievement } from '../types/index.d.ts';
+import type { Env, Achievement } from '../types/index.js';
 import { ACHIEVEMENTS, ACHIEVEMENTS_REWARDS_ENABLED, getAchievementById } from '../constants/achievements.js';
 import { logError, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, executeD1Write } from './d1.js';

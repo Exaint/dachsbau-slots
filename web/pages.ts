@@ -19,7 +19,7 @@
  * - ./pages/errors.ts - Not found and error pages
  */
 
-import type { Env, LoggedInUser } from '../types/index.d.ts';
+import type { Env, LoggedInUser } from '../types/index.js';
 import { hasAcceptedDisclaimer } from '../database.js';
 import { logError } from '../utils.js';
 

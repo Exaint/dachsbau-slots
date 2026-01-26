@@ -40,17 +40,7 @@ import { getLeaderboard as getD1Leaderboard, D1_ENABLED } from '../database/d1.j
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, LEADERBOARD_LIMIT } from '../constants.js';
 import { logError, isAdmin, sanitizeUsername, checkRateLimit } from '../utils.js';
 import { RATE_LIMIT_SEARCH, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';
-import type { Env, Achievement } from '../types/index.js';
-
-interface LoggedInUser {
-  username: string;
-  displayName?: string;
-}
-
-interface LeaderboardPlayer {
-  username: string;
-  balance: number;
-}
+import type { Env, Achievement, LoggedInUser, LeaderboardPlayer } from '../types/index.js';
 
 interface AchievementProgress {
   current: number;
@@ -70,14 +60,7 @@ interface AchievementWithStatus {
   progress: AchievementProgress | null;
 }
 
-interface RefundableItem {
-  name: string;
-  price: number;
-  type: 'prestige' | 'unlock';
-  rank?: string;
-  unlockKey?: string;
-  blockedBy: string[];
-}
+import type { RefundableItem } from '../constants/refund.js';
 
 interface AdminRequestBody {
   username?: string;

@@ -5,7 +5,7 @@
  * Can be run incrementally and safely re-run.
  */
 
-import type { Env } from '../types/index.d.ts';
+import type { Env } from '../types/index.js';
 import { logError } from '../utils.js';
 import { batchMigrateAchievements, rebuildAchievementStats, STAT_COLUMN_MAP } from './d1-achievements.js';
 

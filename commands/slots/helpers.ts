@@ -18,7 +18,7 @@ import {
   URLS,
   ACHIEVEMENTS
 } from '../../constants.js';
-import { logError, kvKey } from '../../utils.js';
+import { logError, logInfo, kvKey } from '../../utils.js';
 import { D1_ENABLED, DUAL_WRITE, updateStreakCounts } from '../../database/d1.js';
 import {
   hasUnlock,
@@ -205,9 +205,8 @@ export async function trackSlotAchievements(
       const tripleSymbol = displayGrid[0];
       try {
         const unlockedAchievements = await markTripleCollected(username, tripleSymbol, env);
-        // Log successful triple tracking for debugging
         if (unlockedAchievements.length > 0) {
-          console.log(`[TRIPLE] ${username}: ${tripleSymbol}${tripleSymbol}${tripleSymbol} - unlocked: ${unlockedAchievements.map(a => a.achievement.id).join(', ')}`);
+          logInfo('trackSlotAchievements', 'Triple achievement unlocked', { username, tripleSymbol, unlocked: unlockedAchievements.map(a => a.achievement.id) });
         }
       } catch (tripleError) {
         logError('trackSlotAchievements.triple', tripleError, { username, tripleSymbol });

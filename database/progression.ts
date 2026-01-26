@@ -9,60 +9,8 @@ import { getCurrentMonth, getCurrentDate, logError, kvKey, exponentialBackoff } 
 import { D1_ENABLED, DUAL_WRITE, STATS_READ_PRIMARY, upsertUser, updateStreakMultiplier as updateStreakMultiplierD1 } from './d1.js';
 import { addUnlockD1, removeUnlockD1, updateMonthlyLoginD1, incrementStatD1, updateBiggestWinD1, updateMaxStatD1, getFullPlayerStatsD1 } from './d1-achievements.js';
 import { updateAchievementStat, updateAchievementStatBatch, setMaxAchievementStat } from './achievements.js';
-import type { Env, MonthlyLoginData, StreakData } from '../types/index.js';
-
-// ============================================
-// Types
-// ============================================
-
-export interface PlayerStats {
-  // Core stats
-  totalSpins: number;
-  wins: number;
-  biggestWin: number;
-  totalWon: number;
-  totalLost: number;
-  // Loss tracking
-  losses: number;
-  biggestLoss: number;
-  maxLossStreak: number;
-  // Item/Buff usage
-  chaosSpins: number;
-  reverseChaosSpins: number;
-  wheelSpins: number;
-  mysteryBoxes: number;
-  peekTokens: number;
-  insuranceTriggers: number;
-  wildCardsUsed: number;
-  guaranteedPairsUsed: number;
-  freeSpinsUsed: number;
-  diamondMines: number;
-  // Duel extended
-  duelsPlayed: number;
-  duelsWon: number;
-  duelsLost: number;
-  maxDuelStreak: number;
-  totalDuelWinnings: number;
-  // Transfer extended
-  totalTransferred: number;
-  transfersReceived: number;
-  transfersSentCount: number;
-  // Time/Activity
-  playDays: number;
-  firstSpinAt: number;
-  maxDailyStreak: number;
-  // Spin types
-  allInSpins: number;
-  highBetSpins: number;
-  // Dachs tracking
-  totalDachsSeen: number;
-  // Hourly jackpot
-  hourlyJackpots: number;
-  // Shop
-  shopPurchases: number;
-  // Daily
-  dailysClaimed: number;
-}
+import type { Env, MonthlyLoginData, StreakData, PlayerStats } from '../types/index.js';
+export type { PlayerStats };
 
 // ============================================
 // Constants

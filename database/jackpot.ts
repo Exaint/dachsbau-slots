@@ -21,6 +21,10 @@ const GERMAN_TIME_FORMATTER = new Intl.DateTimeFormat('de-DE', {
  * Check if a player hits the hourly jackpot (lucky second mechanism)
  * Each hour has one "lucky second" derived from the current date/hour.
  * The first player to spin during that second wins the jackpot.
+ *
+ * Uses write-then-verify pattern to prevent duplicate claims:
+ * Instead of check→claim (TOCTOU), we claim with a unique ID then verify
+ * our claim won, leveraging KV's read-after-write consistency.
  */
 export async function checkAndClaimHourlyJackpot(env: Env): Promise<boolean> {
   const now = new Date();
@@ -43,12 +47,16 @@ export async function checkAndClaimHourlyJackpot(env: Env): Promise<boolean> {
 
   if (currentSecond !== luckySecond) return false;
 
-  // Check if already claimed this hour (German time)
+  // Check if already claimed this hour (fast-path rejection)
   const key = `jackpot:${currentDay}-${currentMonth}-${currentHour}`;
   const claimed = await env.SLOTS_KV.get(key);
   if (claimed) return false;
 
-  // Claim jackpot (expires after 1 hour)
-  await env.SLOTS_KV.put(key, 'claimed', { expirationTtl: JACKPOT_CLAIM_TTL });
-  return true;
+  // Race-safe claim: write unique ID then verify our claim won
+  const claimId = crypto.randomUUID();
+  await env.SLOTS_KV.put(key, claimId, { expirationTtl: JACKPOT_CLAIM_TTL });
+
+  // Verify our claim is the stored value (last-writer-wins + read-after-write consistency)
+  const verify = await env.SLOTS_KV.get(key);
+  return verify === claimId;
 }

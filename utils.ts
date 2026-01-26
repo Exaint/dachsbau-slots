@@ -1,15 +1,6 @@
 import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS, MS_PER_HOUR, MS_PER_MINUTE, RESPONSE_HEADERS, MAX_RETRIES, MAX_BALANCE } from './constants.js';
 import { ADMINS } from './config.js';
-
-// Environment type for KV operations
-interface Env {
-  SLOTS_KV: KVNamespace;
-}
-
-interface ValidateTargetResult {
-  error: 'missing' | 'invalid' | null;
-  cleanTarget: string | null;
-}
+import type { Env, ValidateTargetResult } from './types/index.js';
 
 interface AdminWithTargetResult {
   valid: boolean;
@@ -471,7 +462,6 @@ const PROFANITY_PATTERNS: RegExp[] = [
   /bloody\s*hell/i,
   /stfu/i,
   /gtfo/i,
-  /kys/i,
   // Sexuell explizit
   /p[o0]rn[o0]?/i,
   /t[i1]tt[e3]n/i,
@@ -587,5 +577,6 @@ export {
   containsProfanity
 };
 
-// Type exports
-export type { Env, ValidateTargetResult, AdminWithTargetResult };
+// Type exports (Env and ValidateTargetResult re-exported from types/index)
+export type { Env, ValidateTargetResult };
+export type { AdminWithTargetResult };

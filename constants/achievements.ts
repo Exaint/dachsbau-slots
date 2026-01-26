@@ -18,15 +18,8 @@
  * - special: Rare/hidden achievements
  */
 
-export interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  reward: number;
-  hidden: boolean;
-  requirement?: number;
-}
+import type { Achievement } from '../types/index.js';
+export type { Achievement };
 
 // Master switch for reward payouts (false = tracked but no DT added)
 export const ACHIEVEMENTS_REWARDS_ENABLED = false;

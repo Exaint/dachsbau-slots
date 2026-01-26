@@ -2,20 +2,8 @@
  * Shop Constants - Items, limits, and prerequisite mappings
  */
 
-export interface ShopItem {
-  name: string;
-  price: number;
-  type: string;
-  symbol: string;
-  unlockKey?: string;
-  rank?: string;
-  requires?: string;
-  requiresRank?: string;
-  weeklyLimit?: boolean;
-  buffKey?: string;
-  duration?: number;
-  uses?: number;
-}
+import type { ShopItem } from '../types/index.js';
+export type { ShopItem };
 
 export const SHOP_ITEMS: Record<number, ShopItem> = {
   1: { name: 'Peek Token', price: 75, type: 'peek', symbol: '👁️' },

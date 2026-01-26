@@ -101,6 +101,8 @@ export interface BuffWithStack {
 export interface BuffWithUsesResult {
   /** Whether buff is active */
   active: boolean;
+  /** Remaining uses (convenience accessor) */
+  uses: number;
   /** Buff data if active */
   data: BuffUsesData | null;
 }
@@ -119,18 +121,54 @@ export interface BuffWithStackResult {
 // User Types
 // ============================================================================
 
-/** Player statistics stored in KV */
+/** Player statistics (full extended stats) */
 export interface PlayerStats {
-  /** Total number of spins */
+  // Core stats
   totalSpins: number;
-  /** Total wins */
   wins: number;
-  /** Largest single win */
   biggestWin: number;
-  /** Total amount won */
   totalWon: number;
-  /** Total amount lost */
   totalLost: number;
+  // Loss tracking
+  losses: number;
+  biggestLoss: number;
+  maxLossStreak: number;
+  // Item/Buff usage
+  chaosSpins: number;
+  reverseChaosSpins: number;
+  wheelSpins: number;
+  mysteryBoxes: number;
+  peekTokens: number;
+  insuranceTriggers: number;
+  wildCardsUsed: number;
+  guaranteedPairsUsed: number;
+  freeSpinsUsed: number;
+  diamondMines: number;
+  // Duel extended
+  duelsPlayed: number;
+  duelsWon: number;
+  duelsLost: number;
+  maxDuelStreak: number;
+  totalDuelWinnings: number;
+  // Transfer extended
+  totalTransferred: number;
+  transfersReceived: number;
+  transfersSentCount: number;
+  // Time/Activity
+  playDays: number;
+  firstSpinAt: number;
+  maxDailyStreak: number;
+  // Spin types
+  allInSpins: number;
+  highBetSpins: number;
+  // Dachs tracking
+  totalDachsSeen: number;
+  // Hourly jackpot
+  hourlyJackpots: number;
+  // Shop
+  shopPurchases: number;
+  // Daily
+  dailysClaimed: number;
 }
 
 /** Monthly login data */
@@ -241,6 +279,27 @@ export interface DuelChallenge {
   amount: number;
   /** Timestamp of creation */
   createdAt: number;
+}
+
+/** Duel history entry from D1 */
+export interface DuelHistoryEntry {
+  id: number;
+  challenger: string;
+  target: string;
+  amount: number;
+  challengerGrid: string[];
+  targetGrid: string[];
+  challengerScore: number;
+  targetScore: number;
+  winner: string | null;
+  pot: number;
+  createdAt: number;
+}
+
+/** Leaderboard entry (username + balance) */
+export interface LeaderboardPlayer {
+  username: string;
+  balance: number;
 }
 
 // ============================================================================

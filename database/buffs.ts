@@ -23,33 +23,8 @@
 import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES, KV_ACTIVE } from '../constants.js';
 import { exponentialBackoff, logError, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, upsertItem, deleteItem } from './d1.js';
-import type { Env } from '../types/index.js';
-
-// ============================================
-// Types
-// ============================================
-
-export interface BuffUsesData {
-  expireAt: number;
-  uses: number;
-}
-
-export interface BuffStackData {
-  expireAt: number;
-  stack: number;
-}
-
-export interface BuffWithUsesResult {
-  active: boolean;
-  uses: number;
-  data: BuffUsesData | null;
-}
-
-export interface BuffWithStackResult {
-  active: boolean;
-  stack: number;
-  data: BuffStackData | null;
-}
+import type { Env, BuffUsesData, BuffStackData, BuffWithUsesResult, BuffWithStackResult } from '../types/index.js';
+export type { BuffUsesData, BuffStackData, BuffWithUsesResult, BuffWithStackResult };
 
 // ============================================
 // Buffs (timed)

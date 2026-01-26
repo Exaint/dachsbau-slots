@@ -3,7 +3,7 @@
  * Routes are handled by modules in ./routes/
  */
 
-import type { Env, LoggedInUser } from './types/index.d.ts';
+import type { Env, LoggedInUser } from './types/index.js';
 import { RESPONSE_HEADERS } from './constants.js';
 import { sanitizeUsername, logError } from './utils.js';
 

@@ -2,7 +2,7 @@
  * Global Statistics Page Handler and Renderer
  */
 
-import type { Env, LoggedInUser } from '../../types/index.d.ts';
+import type { Env, LoggedInUser } from '../../types/index.js';
 import { getAchievementStats } from '../../database.js';
 import { getHomePageStats } from '../../database/d1.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES } from '../../constants.js';

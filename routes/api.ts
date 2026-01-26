@@ -6,13 +6,8 @@ import { getUserFromRequest } from '../web/twitch.js';
 import { handleShopBuyAPI } from './shop.js';
 import { setDisclaimerAccepted, hasUnlock, getCustomMessages, setCustomMessages } from '../database.js';
 import { checkRateLimit, containsProfanity, isAdmin, jsonErrorResponse, jsonSuccessResponse } from '../utils.js';
-import { RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS } from '../constants/config.js';
-import type { Env } from '../types/index.js';
-
-interface LoggedInUser {
-  username: string;
-  displayName?: string;
-}
+import { RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS, CUSTOM_MESSAGE_MAX_LENGTH, CUSTOM_MESSAGES_MAX_COUNT } from '../constants/config.js';
+import type { Env, LoggedInUser } from '../types/index.js';
 
 /**
  * Validate CSRF protection for POST requests
@@ -131,9 +126,8 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
       return jsonErrorResponse('win und loss müssen Arrays sein');
     }
 
-    // Max 5 per type
-    if (win.length > 5 || loss.length > 5) {
-      return jsonErrorResponse('Maximal 5 Nachrichten pro Typ');
+    if (win.length > CUSTOM_MESSAGES_MAX_COUNT || loss.length > CUSTOM_MESSAGES_MAX_COUNT) {
+      return jsonErrorResponse(`Maximal ${CUSTOM_MESSAGES_MAX_COUNT} Nachrichten pro Typ`);
     }
 
     // Validate each message
@@ -144,8 +138,8 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
       if (typeof msg !== 'string') continue;
       const trimmed = msg.trim();
       if (!trimmed) continue;
-      if (trimmed.length > 50) {
-        return jsonErrorResponse(`Nachricht zu lang (max. 50 Zeichen): "${trimmed.slice(0, 20)}..."`);
+      if (trimmed.length > CUSTOM_MESSAGE_MAX_LENGTH) {
+        return jsonErrorResponse(`Nachricht zu lang (max. ${CUSTOM_MESSAGE_MAX_LENGTH} Zeichen): "${trimmed.slice(0, 20)}..."`);
       }
       if (containsProfanity(trimmed)) {
         return jsonErrorResponse('Nachricht enthält unerlaubte Wörter');
@@ -157,8 +151,8 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
       if (typeof msg !== 'string') continue;
       const trimmed = msg.trim();
       if (!trimmed) continue;
-      if (trimmed.length > 50) {
-        return jsonErrorResponse(`Nachricht zu lang (max. 50 Zeichen): "${trimmed.slice(0, 20)}..."`);
+      if (trimmed.length > CUSTOM_MESSAGE_MAX_LENGTH) {
+        return jsonErrorResponse(`Nachricht zu lang (max. ${CUSTOM_MESSAGE_MAX_LENGTH} Zeichen): "${trimmed.slice(0, 20)}..."`);
       }
       if (containsProfanity(trimmed)) {
         return jsonErrorResponse('Nachricht enthält unerlaubte Wörter');

@@ -2,30 +2,22 @@
  * Shop Page Renderer
  */
 
-import type { Env, LoggedInUser } from '../../types/index.d.ts';
+import type { Env, LoggedInUser, ShopItem } from '../../types/index.js';
 import { getBalance, getPrestigeRank, hasUnlock } from '../../database.js';
 import { SHOP_ITEMS } from '../../constants.js';
 import { isWebPurchasable } from '../../routes/shop.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { baseTemplate } from './template.js';
 
-interface ShopItem {
+interface ShopItemWithId extends ShopItem {
   id: number;
-  name: string;
-  price: number;
-  type: string;
-  unlockKey?: string;
-  rank?: string;
-  requires?: string;
-  requiresRank?: string;
-  weeklyLimit?: boolean;
 }
 
 interface ShopCategory {
   title: string;
   icon: string;
   desc: string;
-  items: ShopItem[];
+  items: ShopItemWithId[];
 }
 
 // Item descriptions for shop
@@ -155,7 +147,7 @@ export async function renderShopPage(env: Env, user: LoggedInUser | null = null)
 
   Object.entries(SHOP_ITEMS).forEach(([id, item]) => {
     const numId = parseInt(id, 10);
-    const itemData: ShopItem = { id: numId, ...item };
+    const itemData: ShopItemWithId = { id: numId, ...item };
 
     if (item.type === 'boost') {
       categories.boosts.items.push(itemData);

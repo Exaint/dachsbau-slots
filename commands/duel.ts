@@ -28,7 +28,7 @@
  * 4. On decline/timeout: Challenge expires
  */
 
-import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
+import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SCORE_TRIPLE_OFFSET, DUEL_SCORE_PAIR_OFFSET, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
 import { getBalance, adjustBalance, checkAndUnlockAchievement, checkBalanceAchievements, updatePlayerStatBatch } from '../database.js';
 import type { PlayerStats } from '../database/progression.js';
 import { createDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
@@ -132,7 +132,7 @@ function calculateDuelScore(grid: string[]): DuelScore {
   // Check for triple
   if (grid[0] === grid[1] && grid[1] === grid[2]) {
     return {
-      score: 3000000 + symbolSum, // Triple beats everything
+      score: DUEL_SCORE_TRIPLE_OFFSET + symbolSum, // Triple beats everything
       isTriple: true,
       isPair: false,
       symbolSum,
@@ -144,7 +144,7 @@ function calculateDuelScore(grid: string[]): DuelScore {
   if (grid[0] === grid[1] || grid[1] === grid[2]) {
     const pairSymbol = grid[0] === grid[1] ? grid[0] : grid[1];
     return {
-      score: 2000000 + symbolSum, // Pair beats no-match
+      score: DUEL_SCORE_PAIR_OFFSET + symbolSum, // Pair beats no-match
       isTriple: false,
       isPair: true,
       symbolSum,

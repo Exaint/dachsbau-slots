@@ -125,7 +125,7 @@ export async function checkSecurityConstraints(username: string, env: Env): Prom
 /**
  * Handle slot subcommands (amount parameter variations)
  */
-export async function handleSlotSubcommands(cleanUsername: string, lower: string, url: URL, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
+export async function handleSlotSubcommands(cleanUsername: string, lower: string, url: URL, env: Env): Promise<Response | null> {
   // Detect !slots buy mistake
   if (lower === 'buy') {
     const itemNumber = url.searchParams.get('target');
@@ -240,7 +240,7 @@ export async function handleSlotSubcommands(cleanUsername: string, lower: string
     const target = url.searchParams.get('target');
     const amount = url.searchParams.get('giveamount');
     const args = [target, amount].filter(Boolean) as string[];
-    return new Response(await handleDuel(cleanUsername, args, env, ctx), { headers: RESPONSE_HEADERS });
+    return new Response(await handleDuel(cleanUsername, args, env), { headers: RESPONSE_HEADERS });
   }
   if (lower === 'duelaccept') {
     return new Response(await handleDuelAccept(cleanUsername, env), { headers: RESPONSE_HEADERS });
@@ -276,7 +276,7 @@ export async function handleSlotAction(cleanUsername: string, amountParam: strin
 
   if (lower) {
     // Try subcommands first
-    const subcommandResponse = await handleSlotSubcommands(cleanUsername, lower, url, env, ctx);
+    const subcommandResponse = await handleSlotSubcommands(cleanUsername, lower, url, env);
     if (subcommandResponse) return subcommandResponse;
   }
 

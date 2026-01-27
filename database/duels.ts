@@ -25,6 +25,7 @@
 import { DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, KV_TRUE } from '../constants.js';
 import { logError, kvKey } from '../utils.js';
 import { D1_ENABLED } from './d1.js';
+import { sendChatMessage } from '../web/twitch.js';
 import type { Env, DuelChallenge } from '../types/index.js';
 
 // ============================================
@@ -90,6 +91,14 @@ export async function createDuel(challenger: string, target: string, amount: num
       // Reverse lookup for strongly-consistent target queries (KV.list is eventually consistent)
       env.SLOTS_KV.put(kvKey('duel_target:', lowerTarget), challenger.toLowerCase(), {
         expirationTtl: DUEL_TIMEOUT_SECONDS + 10
+      }),
+      // Notify key for cron-based timeout notification
+      env.SLOTS_KV.put(kvKey('duel_notify:', challenger.toLowerCase()), JSON.stringify({
+        target: lowerTarget,
+        amount,
+        notifyAfter: Date.now() + (DUEL_TIMEOUT_SECONDS + 2) * 1000
+      }), {
+        expirationTtl: DUEL_TIMEOUT_SECONDS + 120
       })
     ]);
     return true;
@@ -189,7 +198,10 @@ export async function deleteDuel(challenger: string, env: Env): Promise<boolean>
     const key = kvKey('duel:', challenger);
     // Read duel first to get target for reverse lookup cleanup
     const value = await env.SLOTS_KV.get(key);
-    const deletePromises: Promise<unknown>[] = [env.SLOTS_KV.delete(key)];
+    const deletePromises: Promise<unknown>[] = [
+      env.SLOTS_KV.delete(key),
+      env.SLOTS_KV.delete(kvKey('duel_notify:', challenger.toLowerCase()))
+    ];
     if (value) {
       try {
         const data: DuelData = JSON.parse(value);
@@ -260,10 +272,11 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
       return { success: false, reason: 'already_claimed' };
     }
 
-    // Delete the duel and reverse lookup
+    // Delete the duel, reverse lookup, and notify key
     await Promise.all([
       env.SLOTS_KV.delete(key),
-      env.SLOTS_KV.delete(kvKey('duel_target:', data.target))
+      env.SLOTS_KV.delete(kvKey('duel_target:', data.target)),
+      env.SLOTS_KV.delete(kvKey('duel_notify:', challenger.toLowerCase()))
     ]);
 
     // Verify deletion succeeded (secondary race guard)
@@ -485,5 +498,52 @@ export async function getDuelHistory(username: string, limit: number, env: Env):
   } catch (error) {
     logError('getDuelHistory', error, { username });
     return [];
+  }
+}
+
+// ============================================
+// Duel Timeout Notifications (Cron)
+// ============================================
+
+interface DuelNotifyData {
+  target: string;
+  amount: number;
+  notifyAfter: number;
+}
+
+/**
+ * Process expired duel notifications (called by cron every minute).
+ * Scans duel_notify:* keys, sends chat message for expired duels.
+ */
+export async function processDuelTimeoutNotifications(env: Env): Promise<void> {
+  try {
+    const list = await env.SLOTS_KV.list({ prefix: 'duel_notify:' });
+    const now = Date.now();
+
+    for (const key of list.keys) {
+      try {
+        const value = await env.SLOTS_KV.get(key.name);
+        if (!value) continue;
+
+        const data: DuelNotifyData = JSON.parse(value);
+        if (now < data.notifyAfter) continue; // Not yet expired
+
+        // Extract challenger from key name (format: duel_notify:{challenger})
+        const challenger = key.name.replace('duel_notify:', '');
+
+        // Send timeout notification
+        await sendChatMessage(
+          `⏰ @${challenger} Dein Duell gegen @${data.target} (${data.amount} DachsTaler) ist abgelaufen — keine Antwort erhalten.`,
+          env
+        );
+
+        // Clean up notify key
+        await env.SLOTS_KV.delete(key.name);
+      } catch (error) {
+        logError('processDuelTimeoutNotifications.entry', error, { key: key.name });
+      }
+    }
+  } catch (error) {
+    logError('processDuelTimeoutNotifications', error);
   }
 }

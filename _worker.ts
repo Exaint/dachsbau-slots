@@ -17,8 +17,13 @@ import { handleShortUrls, handleStaticAssets } from './routes/static.js';
 import { handleAuthRoutes } from './routes/auth.js';
 import { validateCsrf, handleApiRoutes } from './routes/api.js';
 import { handleSlotAction, handleLegacyActions } from './routes/commands.js';
+import { processDuelTimeoutNotifications } from './database/duels.js';
 
 export default {
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(processDuelTimeoutNotifications(env));
+  },
+
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);

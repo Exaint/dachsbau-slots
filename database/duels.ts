@@ -26,6 +26,7 @@ import { DUEL_TIMEOUT_SECONDS, DUEL_COOLDOWN_SECONDS, KV_TRUE } from '../constan
 import { logError, kvKey } from '../utils.js';
 import { D1_ENABLED } from './d1.js';
 import { sendChatMessage } from '../web/twitch.js';
+import { scheduleDuelAlarm, cancelDuelAlarm } from './duel-alarm.js';
 import type { Env, DuelChallenge } from '../types/index.js';
 
 // ============================================
@@ -92,14 +93,16 @@ export async function createDuel(challenger: string, target: string, amount: num
       env.SLOTS_KV.put(kvKey('duel_target:', lowerTarget), challenger.toLowerCase(), {
         expirationTtl: DUEL_TIMEOUT_SECONDS + 10
       }),
-      // Notify key for cron-based timeout notification
+      // Notify key for cron-based timeout notification (fallback)
       env.SLOTS_KV.put(kvKey('duel_notify:', challenger.toLowerCase()), JSON.stringify({
         target: lowerTarget,
         amount,
         notifyAfter: Date.now() + (DUEL_TIMEOUT_SECONDS + 2) * 1000
       }), {
         expirationTtl: DUEL_TIMEOUT_SECONDS + 120
-      })
+      }),
+      // Durable Object alarm for precise timeout notification
+      scheduleDuelAlarm(challenger, lowerTarget, amount, env)
     ]);
     return true;
   } catch (error) {
@@ -200,7 +203,9 @@ export async function deleteDuel(challenger: string, env: Env): Promise<boolean>
     const value = await env.SLOTS_KV.get(key);
     const deletePromises: Promise<unknown>[] = [
       env.SLOTS_KV.delete(key),
-      env.SLOTS_KV.delete(kvKey('duel_notify:', challenger.toLowerCase()))
+      env.SLOTS_KV.delete(kvKey('duel_notify:', challenger.toLowerCase())),
+      // Cancel Durable Object alarm
+      cancelDuelAlarm(challenger, env)
     ];
     if (value) {
       try {
@@ -272,11 +277,12 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
       return { success: false, reason: 'already_claimed' };
     }
 
-    // Delete the duel, reverse lookup, and notify key
+    // Delete the duel, reverse lookup, notify key, and cancel DO alarm
     await Promise.all([
       env.SLOTS_KV.delete(key),
       env.SLOTS_KV.delete(kvKey('duel_target:', data.target)),
-      env.SLOTS_KV.delete(kvKey('duel_notify:', challenger.toLowerCase()))
+      env.SLOTS_KV.delete(kvKey('duel_notify:', challenger.toLowerCase())),
+      cancelDuelAlarm(challenger, env)
     ]);
 
     // Verify deletion succeeded (secondary race guard)

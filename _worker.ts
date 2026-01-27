@@ -19,6 +19,9 @@ import { validateCsrf, handleApiRoutes } from './routes/api.js';
 import { handleSlotAction, handleLegacyActions } from './routes/commands.js';
 import { processDuelTimeoutNotifications } from './database/duels.js';
 
+// Durable Object export (must be exported from entry point)
+export { DuelTimeoutAlarm } from './database/duel-alarm.js';
+
 export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(processDuelTimeoutNotifications(env));

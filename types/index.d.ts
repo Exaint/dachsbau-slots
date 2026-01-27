@@ -330,6 +330,8 @@ export interface Env {
   SLOTS_KV: KVNamespace;
   /** D1 database for persistent data */
   DB: D1Database;
+  /** Durable Object namespace for duel timeout alarms */
+  DUEL_ALARM: DurableObjectNamespace;
   /** Twitch OAuth client ID */
   TWITCH_CLIENT_ID?: string;
   /** Twitch OAuth client secret */

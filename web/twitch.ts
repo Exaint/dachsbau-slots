@@ -757,33 +757,254 @@ function createLogoutResponse(origin: string): Response {
   });
 }
 
+// ==================== BOT ACCOUNT ====================
+
+/**
+ * Get bot access token (for sending chat messages as bot)
+ * The bot account must have authorized the app via /auth/bot
+ */
+async function getBotToken(env: Env): Promise<string | null> {
+  try {
+    const tokenData = await env.SLOTS_KV.get('twitch:bot_token', { type: 'json' }) as { accessToken: string; refreshToken: string; expiresAt: number } | null;
+    if (!tokenData) {
+      return null;
+    }
+
+    // Check if token is expired or expiring soon
+    if (tokenData.expiresAt && Date.now() > tokenData.expiresAt - TOKEN_REFRESH_THRESHOLD_MS) {
+      return await refreshBotToken(tokenData.refreshToken, env);
+    }
+
+    return tokenData.accessToken;
+  } catch (error) {
+    logError('getBotToken', error);
+    return null;
+  }
+}
+
+/**
+ * Refresh bot token
+ */
+async function refreshBotToken(refreshToken: string, env: Env): Promise<string | null> {
+  try {
+    const response = await fetch(TWITCH_OAUTH, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        client_id: env.TWITCH_CLIENT_ID!,
+        client_secret: env.TWITCH_CLIENT_SECRET!,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Bot token refresh failed: ${response.status}`);
+    }
+
+    const data = await response.json() as TwitchTokenResponse;
+
+    await env.SLOTS_KV.put('twitch:bot_token', JSON.stringify({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt: Date.now() + (data.expires_in * 1000)
+    }));
+
+    return data.access_token;
+  } catch (error) {
+    logError('refreshBotToken', error);
+    return null;
+  }
+}
+
+/**
+ * Get bot user ID (cached)
+ */
+async function getBotId(env: Env): Promise<string | null> {
+  try {
+    const cached = await env.SLOTS_KV.get('twitch:bot_id');
+    if (cached) return cached;
+    return null; // Set during bot OAuth callback
+  } catch (error) {
+    logError('getBotId', error);
+    return null;
+  }
+}
+
+/**
+ * Generate OAuth authorization URL for bot account
+ */
+async function getBotAuthorizationUrl(env: Env, origin: string): Promise<string> {
+  const state = generateOAuthState();
+
+  await env.SLOTS_KV.put(`oauth_state:bot:${state}`, 'valid', { expirationTtl: OAUTH_STATE_TTL_SECONDS });
+
+  const params = new URLSearchParams({
+    client_id: env.TWITCH_CLIENT_ID!,
+    redirect_uri: `${origin}/auth/bot/callback`,
+    response_type: 'code',
+    scope: 'user:write:chat',
+    state
+  });
+
+  return `https://id.twitch.tv/oauth2/authorize?${params}`;
+}
+
+/**
+ * Handle bot OAuth callback
+ * Stores bot token and user ID
+ */
+async function handleBotOAuthCallback(url: URL, env: Env): Promise<Response> {
+  const code = url.searchParams.get('code');
+  const error = url.searchParams.get('error');
+  const state = url.searchParams.get('state');
+
+  if (error) {
+    return new Response(`Bot-Autorisierung fehlgeschlagen: ${error}`, { status: 400 });
+  }
+
+  if (!code) {
+    return new Response('Missing authorization code', { status: 400 });
+  }
+
+  if (!state) {
+    return new Response('Missing state parameter', { status: 400 });
+  }
+
+  const stateKey = `oauth_state:bot:${state}`;
+  const storedState = await env.SLOTS_KV.get(stateKey);
+  if (!storedState) {
+    return new Response('Invalid or expired state parameter', { status: 400 });
+  }
+
+  await env.SLOTS_KV.delete(stateKey);
+
+  try {
+    // Exchange code for tokens
+    const tokenResponse = await fetch(TWITCH_OAUTH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: env.TWITCH_CLIENT_ID!,
+        client_secret: env.TWITCH_CLIENT_SECRET!,
+        code: code,
+        grant_type: 'authorization_code',
+        redirect_uri: `${url.origin}/auth/bot/callback`
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      throw new Error(`Token exchange failed: ${tokenResponse.status} - ${errorText}`);
+    }
+
+    const tokens = await tokenResponse.json() as TwitchTokenResponse;
+
+    // Get bot user info to store the bot's user ID
+    const userResponse = await fetch(`${TWITCH_API}/users`, {
+      headers: {
+        'Authorization': `Bearer ${tokens.access_token}`,
+        'Client-Id': env.TWITCH_CLIENT_ID!
+      }
+    });
+
+    if (!userResponse.ok) {
+      throw new Error(`Bot user fetch failed: ${userResponse.status}`);
+    }
+
+    const userData = await userResponse.json() as TwitchUserResponse;
+    if (!userData.data || userData.data.length === 0) {
+      throw new Error('No bot user data returned');
+    }
+
+    const botUser = userData.data[0];
+
+    // Store bot token and ID
+    await Promise.all([
+      env.SLOTS_KV.put('twitch:bot_token', JSON.stringify({
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresAt: Date.now() + (tokens.expires_in * 1000)
+      })),
+      env.SLOTS_KV.put('twitch:bot_id', botUser.id),
+      env.SLOTS_KV.put('twitch:bot_login', botUser.login)
+    ]);
+
+    return new Response(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Bot-Autorisierung erfolgreich</title>
+        <style>
+          body { font-family: system-ui; background: #1a1a2e; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+          .container { text-align: center; padding: 40px; }
+          h1 { color: #FFD700; }
+          a { color: #00D9FF; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>🤖 Bot-Autorisierung erfolgreich!</h1>
+          <p>Bot-Account <strong>${botUser.display_name}</strong> (${botUser.login}) ist jetzt autorisiert.</p>
+          <p>Duel-Timeout-Nachrichten werden als <strong>${botUser.display_name}</strong> gesendet.</p>
+          <p><a href="/?page=home">Zurück zur Website</a></p>
+        </div>
+      </body>
+      </html>
+    `, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' }
+    });
+  } catch (error) {
+    logError('handleBotOAuthCallback', error);
+    return new Response(`Bot-Autorisierung fehlgeschlagen: ${(error as Error).message}`, { status: 500 });
+  }
+}
+
 /**
  * Send a chat message to the broadcaster's channel via Twitch Helix API.
- * Requires broadcaster token with user:write:chat scope.
- * Returns true if sent successfully, false otherwise.
+ * Uses bot token if available (message appears from bot), falls back to broadcaster token.
+ * Requires user:write:chat scope on the sending account.
  */
 async function sendChatMessage(message: string, env: Env): Promise<boolean> {
   try {
-    const [broadcasterToken, broadcasterId] = await Promise.all([
-      getBroadcasterToken(env),
-      getBroadcasterId(env)
+    const broadcasterId = await getBroadcasterId(env);
+    if (!broadcasterId) {
+      logError('sendChatMessage', new Error('Missing broadcaster ID'));
+      return false;
+    }
+
+    // Try bot token first (message appears from bot account)
+    const [botToken, botId] = await Promise.all([
+      getBotToken(env),
+      getBotId(env)
     ]);
 
-    if (!broadcasterToken || !broadcasterId) {
-      logError('sendChatMessage', new Error('Missing broadcaster token or ID'));
+    let senderToken: string | null = botToken;
+    let senderId: string = botId || broadcasterId;
+
+    // Fall back to broadcaster token if no bot token
+    if (!senderToken || !botId) {
+      senderToken = await getBroadcasterToken(env);
+      senderId = broadcasterId;
+    }
+
+    if (!senderToken) {
+      logError('sendChatMessage', new Error('No bot or broadcaster token available'));
       return false;
     }
 
     const response = await fetch(`${TWITCH_API}/chat/messages`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${broadcasterToken}`,
+        'Authorization': `Bearer ${senderToken}`,
         'Client-Id': env.TWITCH_CLIENT_ID!,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         broadcaster_id: broadcasterId,
-        sender_id: broadcasterId,
+        sender_id: senderId,
         message
       })
     });
@@ -813,5 +1034,8 @@ export {
   getUserFromRequest,
   getUserLoginUrl,
   handleUserOAuthCallback,
-  createLogoutResponse
+  createLogoutResponse,
+  // Bot authentication
+  getBotAuthorizationUrl,
+  handleBotOAuthCallback
 };

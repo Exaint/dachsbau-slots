@@ -21,7 +21,17 @@ database_name = "dachsbau-slots-db"
 database_id = "f0129de7-504a-4287-bad2-4b499a341942"
 migrations_dir = "migrations"
 
-# Cron Trigger - Duel timeout notifications (every minute)
+# Durable Object - Precise duel timeout alarm (fires exactly after 62s)
+[durable_objects]
+bindings = [
+  { name = "DUEL_ALARM", class_name = "DuelTimeoutAlarm" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["DuelTimeoutAlarm"]
+
+# Cron Trigger - Duel timeout notifications fallback (every minute)
 [triggers]
 crons = ["* * * * *"]
 

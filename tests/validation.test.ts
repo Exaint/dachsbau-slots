@@ -124,7 +124,7 @@ describe('checkRateLimit', () => {
   }
 
   function createMockEnv(mockKV: any) {
-    return { SLOTS_KV: mockKV, DB: {} as D1Database };
+    return { SLOTS_KV: mockKV, DB: {} as D1Database, DUEL_ALARM: {} as DurableObjectNamespace };
   }
 
   it('erlaubt Anfragen unter dem Limit', async () => {

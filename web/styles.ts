@@ -283,7 +283,7 @@ body {
 }
 
 [data-theme="light"] .btn.btn-search {
-  background: #ffffff;
+  background: var(--bg-tertiary);
   border-color: var(--border);
   color: var(--text-secondary);
 }
@@ -2376,16 +2376,15 @@ a.duel-player.opponent:hover {
 .nav-bar {
   display: flex;
   gap: 4px;
-  flex: 1;
-  justify-content: center;
+  align-items: center;
   min-width: 0;
 }
 
 .nav-item {
-  padding: 8px 12px;
+  padding: 8px 14px;
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 500;
   white-space: nowrap;
   border-radius: var(--radius-md);

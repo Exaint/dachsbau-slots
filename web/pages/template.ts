@@ -106,7 +106,7 @@ export function baseTemplate(title: string, content: string, activePage: string 
   <header class="header">
     <div class="header-content">
       <a href="?page=home" class="logo">
-        <img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Slots.png" alt="Logo" class="logo-img">
+        <img src="https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev/Gamba_logo_neu.png" alt="Logo" class="logo-img">
         <span class="logo-text">Dachsbau Slots</span>
       </a>
       <nav class="nav-bar" aria-label="Hauptnavigation">

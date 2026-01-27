@@ -1787,11 +1787,7 @@ a.duel-player.opponent:hover {
 }
 
 .leaderboard-item:nth-child(odd) {
-  background: var(--bg-card);
-}
-
-.leaderboard-item:nth-child(even) {
-  background: var(--bg-secondary);
+  background: rgba(145, 71, 255, 0.07);
 }
 
 .leaderboard-item:hover {

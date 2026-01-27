@@ -488,7 +488,7 @@ async function getAuthorizationUrl(env: Env, origin: string): Promise<string> {
     client_id: env.TWITCH_CLIENT_ID!,
     redirect_uri: `${origin}/auth/callback`,
     response_type: 'code',
-    scope: 'moderation:read channel:read:vips',
+    scope: 'moderation:read channel:read:vips user:write:chat',
     state
   });
 
@@ -757,6 +757,50 @@ function createLogoutResponse(origin: string): Response {
   });
 }
 
+/**
+ * Send a chat message to the broadcaster's channel via Twitch Helix API.
+ * Requires broadcaster token with user:write:chat scope.
+ * Returns true if sent successfully, false otherwise.
+ */
+async function sendChatMessage(message: string, env: Env): Promise<boolean> {
+  try {
+    const [broadcasterToken, broadcasterId] = await Promise.all([
+      getBroadcasterToken(env),
+      getBroadcasterId(env)
+    ]);
+
+    if (!broadcasterToken || !broadcasterId) {
+      logError('sendChatMessage', new Error('Missing broadcaster token or ID'));
+      return false;
+    }
+
+    const response = await fetch(`${TWITCH_API}/chat/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${broadcasterToken}`,
+        'Client-Id': env.TWITCH_CLIENT_ID!,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        broadcaster_id: broadcasterId,
+        sender_id: broadcasterId,
+        message
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logError('sendChatMessage', new Error(`Twitch API ${response.status}: ${errorText}`));
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    logError('sendChatMessage', error);
+    return false;
+  }
+}
+
 export {
   getTwitchUser,
   getUserRole,
@@ -764,6 +808,7 @@ export {
   getTwitchProfileData,
   handleOAuthCallback,
   getAuthorizationUrl,
+  sendChatMessage,
   // User authentication
   getUserFromRequest,
   getUserLoginUrl,

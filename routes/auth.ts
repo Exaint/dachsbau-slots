@@ -2,7 +2,7 @@
  * Auth Routes - Login, logout, OAuth callbacks
  */
 
-import { getUserLoginUrl, handleUserOAuthCallback, createLogoutResponse, handleOAuthCallback } from '../web/twitch.js';
+import { getUserLoginUrl, handleUserOAuthCallback, createLogoutResponse, handleOAuthCallback, getAuthorizationUrl } from '../web/twitch.js';
 import type { Env } from '../types/index.js';
 
 /**
@@ -13,6 +13,12 @@ export async function handleAuthRoutes(pathname: string, url: URL, env: Env): Pr
   if (pathname === '/auth/login') {
     const loginUrl = await getUserLoginUrl(env, url.origin);
     return Response.redirect(loginUrl, 302);
+  }
+
+  // Broadcaster authorization - redirect to Twitch OAuth (for mod/VIP roles + chat)
+  if (pathname === '/auth/broadcaster') {
+    const authUrl = await getAuthorizationUrl(env, url.origin);
+    return Response.redirect(authUrl, 302);
   }
 
   // User logout - clear session cookie

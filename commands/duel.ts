@@ -31,7 +31,8 @@
 import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SCORE_TRIPLE_OFFSET, DUEL_SCORE_PAIR_OFFSET, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
 import { getBalance, deductBalance, creditBalance, checkAndUnlockAchievement, checkBalanceAchievements, updatePlayerStatBatch } from '../database.js';
 import type { PlayerStats } from '../database/progression.js';
-import { createDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
+import { createDuel, getDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
+import { sendChatMessage } from '../web/twitch.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
 import type { Env } from '../types/index.js';
 
@@ -163,13 +164,46 @@ function calculateDuelScore(grid: string[]): DuelScore {
 }
 
 // ============================================
+// Timeout Notification
+// ============================================
+
+/**
+ * Schedule a chat notification if the duel expires without being accepted/declined.
+ * Runs via ctx.waitUntil — waits DUEL_TIMEOUT_SECONDS + 2s buffer, then checks
+ * if the duel still exists (= expired). If so, sends a Twitch chat message.
+ */
+function scheduleDuelTimeoutNotification(challenger: string, target: string, amount: number, env: Env): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setTimeout(async () => {
+      try {
+        // Check if the duel is still pending (not accepted/declined)
+        const duel = await getDuel(challenger, env);
+        if (duel && duel.target === target.toLowerCase()) {
+          // Duel still exists → it expired (getDuel auto-cleans expired duels,
+          // but the TTL in KV might not have kicked in yet). Either way, notify.
+          await deleteDuel(challenger, env);
+          await sendChatMessage(
+            `⏰ @${challenger} Dein Duell gegen @${target} (${amount} DachsTaler) ist abgelaufen — keine Antwort erhalten.`,
+            env
+          );
+        }
+        // If duel is null → already accepted/declined/expired, no notification needed
+      } catch (error) {
+        logError('scheduleDuelTimeoutNotification', error, { challenger, target });
+      }
+      resolve();
+    }, (DUEL_TIMEOUT_SECONDS + 2) * 1000);
+  });
+}
+
+// ============================================
 // Command Handlers
 // ============================================
 
 /**
  * Handle !duel @target amount command
  */
-async function handleDuel(username: string, args: string[], env: Env): Promise<string> {
+async function handleDuel(username: string, args: string[], env: Env, ctx?: ExecutionContext): Promise<string> {
   try {
     // Parse arguments
     if (!args || args.length < 2) {
@@ -234,6 +268,11 @@ async function handleDuel(username: string, args: string[], env: Env): Promise<s
 
     // Set cooldown for challenger
     await setDuelCooldown(username, env);
+
+    // Schedule timeout notification (runs in background after response is sent)
+    if (ctx) {
+      ctx.waitUntil(scheduleDuelTimeoutNotification(username, targetArg, amountArg, env));
+    }
 
     return `⚔️ @${username} fordert @${targetArg} zu einem Duell heraus! Einsatz: ${amountArg} DachsTaler | @${targetArg} schreibe !slots duelaccept oder !slots dueldecline (${DUEL_TIMEOUT_SECONDS}s)`;
   } catch (error) {

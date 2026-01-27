@@ -31,6 +31,11 @@ bindings = [
 tag = "v1"
 new_classes = ["DuelTimeoutAlarm"]
 
+# R2 Bucket Binding
+[[r2_buckets]]
+binding = "ASSETS_BUCKET"
+bucket_name = "dachsbau-slots-assets"
+
 # Cron Trigger - Duel timeout notifications fallback (every minute)
 [triggers]
 crons = ["* * * * *"]

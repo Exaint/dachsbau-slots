@@ -342,6 +342,8 @@ export interface Env {
   BOT_SECRET?: string;
   /** Secret for Twitch EventSub webhook signature verification */
   EVENTSUB_SECRET?: string;
+  /** R2 bucket for static assets */
+  ASSETS_BUCKET: R2Bucket;
 }
 
 // ============================================================================

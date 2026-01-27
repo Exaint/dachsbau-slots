@@ -1558,6 +1558,7 @@ a.duel-player.opponent:hover {
   font-size: 0.875rem;
   color: var(--text-secondary);
   transition: transform 0.3s ease;
+  transform: rotate(0deg);
 }
 
 .category.collapsed .category-header .collapse-icon {

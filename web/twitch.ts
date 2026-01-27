@@ -845,7 +845,7 @@ async function getBotAuthorizationUrl(env: Env, origin: string): Promise<string>
     client_id: env.TWITCH_CLIENT_ID!,
     redirect_uri: `${origin}/auth/bot/callback`,
     response_type: 'code',
-    scope: 'user:write:chat user:bot',
+    scope: 'user:write:chat user:bot user:read:chat',
     state
   });
 

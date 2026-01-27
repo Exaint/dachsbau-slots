@@ -1,5 +1,5 @@
 import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS, MS_PER_HOUR, MS_PER_MINUTE, RESPONSE_HEADERS, MAX_RETRIES, MAX_BALANCE } from './constants.js';
-import { ADMINS } from './config.js';
+import { ADMINS, BOT_ACCOUNTS } from './config.js';
 import type { Env, ValidateTargetResult } from './types/index.js';
 
 interface AdminWithTargetResult {
@@ -74,6 +74,11 @@ function getWeightedSymbol(): string {
 // OPTIMIZED: ADMINS is now a Set, uses .has() for O(1) lookup
 function isAdmin(username: string): boolean {
   return ADMINS.has(username.toLowerCase());
+}
+
+// Helper function to check if user is a bot account
+function isBot(username: string): boolean {
+  return BOT_ACCOUNTS.has(username.toLowerCase());
 }
 
 // Helper function to get admin list as array (for display purposes)
@@ -579,6 +584,7 @@ export {
   secureRandomInt,
   getWeightedSymbol,
   isAdmin,
+  isBot,
   getAdminList,
   sanitizeUsername,
   validateAndCleanTarget,

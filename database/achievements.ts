@@ -16,7 +16,7 @@
 
 import type { Env, Achievement } from '../types/index.js';
 import { ACHIEVEMENTS, ACHIEVEMENTS_REWARDS_ENABLED, getAchievementById } from '../constants/achievements.js';
-import { logError, kvKey } from '../utils.js';
+import { logError, kvKey, isBot } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, executeD1Write } from './d1.js';
 import { unlockAchievementD1, lockAchievementD1, incrementStatD1, updateMaxStatD1, updatePlayerStatsD1, recordTripleHitD1 } from './d1-achievements.js';
 
@@ -158,6 +158,23 @@ type AchievementKey = keyof typeof ACHIEVEMENTS;
  * Includes automatic migration of legacy stats from stats:{username}
  */
 async function getPlayerAchievements(username: string, env: Env): Promise<PlayerAchievementData> {
+  // Bots bekommen keine Achievements — bestehende Daten aufräumen
+  if (isBot(username)) {
+    const existing = await env.SLOTS_KV.get(kvKey('achievements:', username));
+    if (existing) {
+      await env.SLOTS_KV.delete(kvKey('achievements:', username));
+      if (D1_ENABLED && env.DB) {
+        env.DB.prepare('DELETE FROM player_achievements WHERE username = ?')
+          .bind(username.toLowerCase()).run().catch(err => logError('cleanBotAchievements.d1', err, { username }));
+      }
+    }
+    return {
+      unlockedAt: {},
+      stats: { ...DEFAULT_STATS, triplesCollected: { ...DEFAULT_STATS.triplesCollected } },
+      pendingRewards: 0
+    };
+  }
+
   try {
     const value = await env.SLOTS_KV.get(kvKey('achievements:', username));
 
@@ -777,6 +794,7 @@ async function decrementAchievementCounter(_achievementId: string, env: Env): Pr
  * Returns the reward amount if newly unlocked and REWARDS_ENABLED, otherwise 0
  */
 async function unlockAchievement(username: string, achievementId: string, env: Env, existingData: PlayerAchievementData | null = null): Promise<UnlockResult> {
+  if (isBot(username)) return { unlocked: false, reward: 0, achievement: null };
   try {
     const achievement = getAchievementById(achievementId);
     if (!achievement) {
@@ -829,6 +847,7 @@ async function unlockAchievement(username: string, achievementId: string, env: E
  * Returns array of newly unlocked achievements
  */
 async function updateAchievementStat(username: string, statKey: string, increment: number, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
+  if (isBot(username)) return [];
   try {
     const data = existingData || await getPlayerAchievements(username, env);
     const oldValue = (data.stats[statKey as keyof PlayerStats] as number) || 0;
@@ -877,6 +896,7 @@ async function updateAchievementStat(username: string, statKey: string, incremen
  * Batch update multiple achievement stats in a single read-modify-write cycle
  */
 async function updateAchievementStatBatch(username: string, updates: Array<[string, number]>, env: Env, existingData?: PlayerAchievementData): Promise<void> {
+  if (isBot(username)) return;
   try {
     const data = existingData || await getPlayerAchievements(username, env);
 
@@ -914,6 +934,7 @@ async function updateAchievementStatBatch(username: string, updates: Array<[stri
  * Used for stats like maxLossStreak, maxDuelStreak where we track the maximum
  */
 async function setMaxAchievementStat(username: string, statKey: string, newValue: number, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
+  if (isBot(username)) return [];
   try {
     const data = existingData || await getPlayerAchievements(username, env);
     const currentValue = (data.stats[statKey as keyof PlayerStats] as number) || 0;
@@ -954,6 +975,7 @@ async function setMaxAchievementStat(username: string, statKey: string, newValue
  * Also records to D1 for detailed tracking with timestamps and counters
  */
 async function markTripleCollected(username: string, symbol: string, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
+  if (isBot(username)) return [];
   try {
     const data = existingData || await getPlayerAchievements(username, env);
     const symbolKey = getTripleKey(symbol);
@@ -1072,6 +1094,7 @@ async function checkAndUnlockAchievement(username: string, achievementId: string
  * Check balance milestones and unlock if reached
  */
 async function checkBalanceAchievements(username: string, newBalance: number, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
+  if (isBot(username)) return [];
   try {
     const data = existingData || await getPlayerAchievements(username, env);
     const unlockedAchievements: UnlockedAchievement[] = [];
@@ -1133,6 +1156,7 @@ async function checkBalanceAchievements(username: string, newBalance: number, en
  * Check big win achievements
  */
 async function checkBigWinAchievements(username: string, winAmount: number, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
+  if (isBot(username)) return [];
   try {
     const data = existingData || await getPlayerAchievements(username, env);
     const unlockedAchievements: UnlockedAchievement[] = [];

@@ -9,7 +9,7 @@ import type { DuelStats } from '../../database/duels.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getTwitchProfileData } from '../twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, DUEL_SCORE_TRIPLE_OFFSET, DUEL_SCORE_PAIR_OFFSET, CUSTOM_MESSAGE_MAX_LENGTH, CUSTOM_MESSAGES_MAX_COUNT } from '../../constants.js';
-import { isAdmin } from '../../utils.js';
+import { isAdmin, isBot } from '../../utils.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { CATEGORY_ICONS, CATEGORY_NAMES, PRESTIGE_RANK_NAMES, ROLE_BADGES, ADMIN_ROLE_OVERRIDES } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
@@ -173,6 +173,7 @@ export function renderProfilePage(data: ProfileData): string {
 
   // Check if logged-in user is admin
   const showAdminPanel = loggedInUser && isAdmin(loggedInUser.username);
+  const isBotProfile = isBot(username);
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
   const totalCount = achievements.length;
@@ -199,8 +200,15 @@ export function renderProfilePage(data: ProfileData): string {
 
   const lastActiveText = formatLastActive(lastActive);
 
-  // Stats display
-  const statsHtml = `
+  // Stats display (Bots: nur DachsTaler)
+  const statsHtml = isBotProfile ? `
+    <div class="profile-stats">
+      <div class="stat-box">
+        <div class="stat-value">${formatNumber(balance)}</div>
+        <div class="stat-label">DachsTaler</div>
+      </div>
+    </div>
+  ` : `
     <div class="profile-stats">
       <div class="stat-box">
         <div class="stat-value">${formatNumber(balance)}</div>
@@ -584,8 +592,8 @@ export function renderProfilePage(data: ProfileData): string {
           <div class="profile-badges">
             ${roleBadgesHtml}
             ${rank && PRESTIGE_RANK_NAMES[rank] ? `<span class="profile-prestige-badge" style="--prestige-color: ${PRESTIGE_RANK_NAMES[rank].color}">Prestige Rang: ${rank} ${PRESTIGE_RANK_NAMES[rank].name}</span>` : ''}
-            <span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}</span>
-            <span class="profile-duel-hint">Duelle ${duelOptOut ? 'aktivieren' : 'deaktivieren'}: <code>!slots duelopt ${duelOptOut ? 'in' : 'out'}</code></span>
+            ${!isBotProfile ? `<span class="profile-duel-status ${duelOptOut ? 'opted-out' : 'opted-in'}">⚔️ ${duelOptOut ? 'Duelle deaktiviert' : 'Offen für Duelle'}</span>
+            <span class="profile-duel-hint">Duelle ${duelOptOut ? 'aktivieren' : 'deaktivieren'}: <code>!slots duelopt ${duelOptOut ? 'in' : 'out'}</code></span>` : ''}
             ${selfBanned ? `<span class="profile-selfban-status banned">🚫 Selbst-gesperrt</span>` : ''}
           </div>
           ${lastActiveText ? `<div class="profile-last-active">🕐 Zuletzt aktiv: ${lastActiveText}</div>` : ''}
@@ -594,7 +602,7 @@ export function renderProfilePage(data: ProfileData): string {
       ${statsHtml}
       ${customMessagesHtml}
       ${duelHistoryHtml}
-      <div class="achievement-summary">
+      ${!isBotProfile ? `<div class="achievement-summary">
         <div class="achievement-count">
           <span class="achievement-count-label">🏆 Achievements</span>
           <span class="achievement-count-value"><strong>${unlockedCount}</strong> / ${totalCount}</span>
@@ -603,10 +611,10 @@ export function renderProfilePage(data: ProfileData): string {
         <div class="progress-bar achievement-progress-bar">
           <div class="progress-fill" style="width: ${progressPercent}%"></div>
         </div>
-      </div>
+      </div>` : ''}
     </div>
     ${adminPanelHtml}
-    <div class="achievement-controls">
+    ${!isBotProfile ? `<div class="achievement-controls">
       <div class="achievement-filter" role="group" aria-label="Achievement Filter">
         <span class="filter-label" id="filter-label">Filter:</span>
         <button class="filter-btn active" data-filter="all" aria-pressed="true">Alle</button>
@@ -626,7 +634,7 @@ export function renderProfilePage(data: ProfileData): string {
     </div>
     <div class="categories">
       ${categoriesHtml}
-    </div>
+    </div>` : ''}
   `;
 
   return baseTemplate(`${username}'s Profil`, content, 'profile', loggedInUser);

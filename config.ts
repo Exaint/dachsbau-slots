@@ -18,6 +18,26 @@ const ADMINS: Set<string> = new Set([
 ]);
 
 // --------------------------------------------
+// BOT ACCOUNTS
+// --------------------------------------------
+// Twitch Bot-Accounts die keine Achievements
+// verdienen und eingeschränkte Profile haben.
+// --------------------------------------------
+const BOT_ACCOUNTS: Set<string> = new Set([
+  'dachsbauslots',
+  'dachsbauarbeiter',
+  'fossabot',
+  'streamelements',
+  'djdachsbau',
+  'eliboldbot',
+  'nightbot',
+  'susgeebot',
+  'sery_bot',
+  'wapplatm',
+  'hexe_bot'
+]);
+
+// --------------------------------------------
 // CONFIG VALIDATION
 // --------------------------------------------
 // Validates configuration at module load time.
@@ -42,6 +62,20 @@ function validateConfig(): void {
     }
   }
 
+  // Validate BOT_ACCOUNTS
+  if (!(BOT_ACCOUNTS instanceof Set)) {
+    errors.push('BOT_ACCOUNTS must be a Set');
+  } else {
+    for (const bot of BOT_ACCOUNTS) {
+      if (typeof bot !== 'string' || bot.length < 3) {
+        errors.push(`Invalid bot username: ${bot}`);
+      }
+      if (bot !== bot.toLowerCase()) {
+        errors.push(`Bot username must be lowercase: ${bot}`);
+      }
+    }
+  }
+
   if (errors.length > 0) {
     throw new Error(`Config validation failed:\n  - ${errors.join('\n  - ')}`);
   }
@@ -54,5 +88,6 @@ validateConfig();
 // EXPORTS
 // --------------------------------------------
 export {
-  ADMINS
+  ADMINS,
+  BOT_ACCOUNTS
 };

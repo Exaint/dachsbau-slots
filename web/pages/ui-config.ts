@@ -3,6 +3,7 @@
  */
 
 import { ACHIEVEMENT_CATEGORIES } from '../../constants.js';
+import { BOT_ACCOUNTS } from '../../config.js';
 
 // R2 base URL for assets
 export const R2_BASE = 'https://pub-2d28b359704a4690be75021ee4a502d3.r2.dev';
@@ -90,18 +91,14 @@ export const ROLE_BADGES: Record<string, RoleBadge> = {
 };
 
 // Admin/special user badge overrides (role badges shown on profile)
+// Bot-Einträge werden automatisch aus BOT_ACCOUNTS (config.ts) generiert
+const botOverrides: Record<string, string[]> = {};
+for (const botName of BOT_ACCOUNTS) {
+  botOverrides[botName] = ['bot'];
+}
+
 export const ADMIN_ROLE_OVERRIDES: Record<string, string[]> = {
   'exaint_': ['leadmod', 'admin'],
   'frechhdachs': ['broadcaster', 'admin'],
-  'dachsbauslots': ['bot'],
-  'dachsbauarbeiter': ['bot'],
-  'fossabot': ['bot'],
-  'streamelements': ['bot'],
-  'djdachsbau': ['bot'],
-  'eliboldbot': ['bot'],
-  'nightbot': ['bot'],
-  'susgeebot': ['bot'],
-  'sery_bot': ['bot'],
-  'wapplatm': ['bot'],
-  'hexe_bot': ['bot']
+  ...botOverrides
 };

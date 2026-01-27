@@ -2375,16 +2375,18 @@ a.duel-player.opponent:hover {
 /* Navigation Bar (inline in header) */
 .nav-bar {
   display: flex;
-  gap: 4px;
+  gap: 2px;
+  flex: 1;
+  justify-content: center;
   align-items: center;
   min-width: 0;
 }
 
 .nav-item {
-  padding: 8px 14px;
+  padding: 8px 10px;
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 500;
   white-space: nowrap;
   border-radius: var(--radius-md);

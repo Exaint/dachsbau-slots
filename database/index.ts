@@ -147,3 +147,9 @@ export {
   getPlayerTriplesD1,
   getTripleStatsD1
 } from './d1-achievements.js';
+
+// D1 Atomic operations (for critical transactions)
+export {
+  atomicTransfer,
+  type AtomicTransferResult
+} from './d1.js';

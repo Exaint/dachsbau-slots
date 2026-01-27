@@ -16,7 +16,7 @@ import type { Env } from '../types/index.js';
 // ============================================
 
 // Set to true to enable D1 (after database is created and migrated)
-export const D1_ENABLED = true;
+export let D1_ENABLED = true;
 
 // Set to true to write to both D1 and KV during migration
 export const DUAL_WRITE = true;
@@ -27,6 +27,54 @@ export const STATS_READ_PRIMARY: 'kv' | 'd1' = 'd1';
 // Retry configuration for D1 writes
 const D1_WRITE_RETRIES = 2;
 const D1_RETRY_DELAY_MS = 50;
+
+// Circuit breaker configuration for D1 failures
+const D1_CIRCUIT_BREAKER_THRESHOLD = 5;  // Errors before tripping
+const D1_CIRCUIT_BREAKER_RESET_MS = 60000;  // Reset after 60 seconds
+let D1_CIRCUIT_BREAKER_COUNT = 0;
+let D1_CIRCUIT_BREAKER_TRIPPED_AT = 0;
+
+/**
+ * Check if D1 circuit breaker is open (too many failures)
+ * Auto-resets after D1_CIRCUIT_BREAKER_RESET_MS
+ */
+export function isD1CircuitBreakerOpen(): boolean {
+  if (D1_CIRCUIT_BREAKER_COUNT === 0) return false;
+  
+  // Check if reset window has passed
+  if (Date.now() - D1_CIRCUIT_BREAKER_TRIPPED_AT > D1_CIRCUIT_BREAKER_RESET_MS) {
+    D1_CIRCUIT_BREAKER_COUNT = 0;
+    return false;
+  }
+  
+  return D1_CIRCUIT_BREAKER_COUNT >= D1_CIRCUIT_BREAKER_THRESHOLD;
+}
+
+/**
+ * Record a D1 failure for circuit breaker tracking
+ */
+function recordD1Failure(): void {
+  D1_CIRCUIT_BREAKER_COUNT++;
+  if (D1_CIRCUIT_BREAKER_COUNT === 1) {
+    D1_CIRCUIT_BREAKER_TRIPPED_AT = Date.now();
+  }
+  
+  // When circuit breaker trips, disable D1 and fall back to KV
+  if (isD1CircuitBreakerOpen()) {
+    D1_ENABLED = false;
+    logError('d1.circuitBreaker', new Error('D1 circuit breaker tripped - falling back to KV'), {
+      failures: D1_CIRCUIT_BREAKER_COUNT
+    });
+  }
+}
+
+/**
+ * Reset circuit breaker (called when D1 becomes healthy again)
+ */
+function resetD1CircuitBreaker(): void {
+  D1_CIRCUIT_BREAKER_COUNT = 0;
+  D1_ENABLED = true;
+}
 
 /**
  * Execute a D1 write operation with retry logic.
@@ -41,7 +89,12 @@ export function executeD1Write(
   const executeWithRetry = async (attempt: number = 0): Promise<void> => {
     try {
       await operation();
+      // Success - reset circuit breaker
+      if (D1_CIRCUIT_BREAKER_COUNT > 0) {
+        resetD1CircuitBreaker();
+      }
     } catch (error) {
+      recordD1Failure();
       if (attempt < D1_WRITE_RETRIES) {
         await new Promise(r => setTimeout(r, D1_RETRY_DELAY_MS * (attempt + 1)));
         return executeWithRetry(attempt + 1);
@@ -691,6 +744,101 @@ export async function batchMigrateUsers(users: BatchMigrateUser[], env: Env): Pr
   }
 
   return { success, failed };
+}
+
+/**
+ * Atomically transfer balance from one user to another.
+ * Both deduction and credit happen in a single D1 transaction.
+ * No partial transfers possible.
+ * 
+ * Returns:
+ * - { success: true, senderNewBalance, receiverNewBalance } on success
+ * - { success: false, error: 'insufficient_balance' } if sender lacks funds
+ * - { success: false, error: 'd1_unavailable' } if D1 fails
+ * - { success: false, error: 'receiver_not_found' } if receiver doesn't exist
+ */
+export interface AtomicTransferResult {
+  success: boolean;
+  senderNewBalance?: number;
+  receiverNewBalance?: number;
+  error?: string;
+}
+
+export async function atomicTransfer(
+  senderUsername: string,
+  receiverUsername: string,
+  amount: number,
+  env: Env
+): Promise<AtomicTransferResult> {
+  if (!D1_ENABLED || !env.DB) {
+    return { success: false, error: 'd1_unavailable' };
+  }
+
+  try {
+    const now = Date.now();
+    const sender = senderUsername.toLowerCase();
+    const receiver = receiverUsername.toLowerCase();
+
+    // IMPORTANT: Two-phase approach to prevent money creation.
+    // A single batch would credit the receiver even when the sender's
+    // UPDATE matches 0 rows (insufficient balance), because a 0-row
+    // UPDATE is not a SQL error and does not abort the transaction.
+
+    // Phase 1: Atomically deduct from sender
+    const deductResult = await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE users SET balance = balance - ?, updated_at = ? WHERE username = ? AND balance >= ?'
+      ).bind(amount, now, sender, amount),
+      env.DB.prepare(
+        'SELECT balance FROM users WHERE username = ?'
+      ).bind(sender)
+    ]);
+
+    const deductionOk = deductResult[0].meta?.changes && deductResult[0].meta.changes > 0;
+    if (!deductionOk) {
+      return { success: false, error: 'insufficient_balance' };
+    }
+
+    const senderRow = deductResult[1].results?.[0] as { balance?: number };
+    const senderNewBalance = senderRow?.balance ?? 0;
+
+    // Phase 2: Credit receiver (sender already deducted)
+    try {
+      const creditResult = await env.DB.batch([
+        env.DB.prepare(`
+          INSERT INTO users (username, balance, created_at, updated_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(username) DO UPDATE SET balance = balance + ?, updated_at = ?
+        `).bind(receiver, amount, now, now, amount, now),
+        env.DB.prepare(
+          'SELECT balance FROM users WHERE username = ?'
+        ).bind(receiver)
+      ]);
+
+      const receiverRow = creditResult[1].results?.[0] as { balance?: number };
+      const receiverNewBalance = receiverRow?.balance ?? 0;
+
+      return {
+        success: true,
+        senderNewBalance,
+        receiverNewBalance
+      };
+    } catch (creditError) {
+      // CRITICAL: Sender was deducted but credit failed — rollback sender
+      logError('atomicTransfer.creditFailed', creditError, { sender, receiver, amount });
+      try {
+        await env.DB.prepare(
+          'UPDATE users SET balance = balance + ?, updated_at = ? WHERE username = ?'
+        ).bind(amount, Date.now(), sender).run();
+      } catch (rollbackError) {
+        logError('atomicTransfer.rollback.CRITICAL', rollbackError, { sender, receiver, amount });
+      }
+      return { success: false, error: 'd1_unavailable' };
+    }
+  } catch (error) {
+    logError('atomicTransfer', error, { sender: senderUsername, receiver: receiverUsername, amount });
+    return { success: false, error: 'd1_unavailable' };
+  }
 }
 
 /**

@@ -15,14 +15,13 @@ import {
   DAILY_BOOST_AMOUNT,
   URLS,
   BUFF_SYMBOLS_WITH_NAMES,
-  MAX_RETRIES,
   KV_ACTIVE,
-  ACHIEVEMENTS
+  ACHIEVEMENTS,
+  MAX_BALANCE
 } from '../constants.js';
-import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight, checkRateLimit, secureRandom } from '../utils.js';
+import { sanitizeUsername, validateAmount, isLeaderboardBlocked, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight, checkRateLimit, secureRandom, safeJsonParse } from '../utils.js';
 import {
   getBalance,
-  deductBalance,
   creditBalance,
   getFreeSpins,
   getStats,
@@ -40,7 +39,8 @@ import {
   hasAcceptedDisclaimer,
   checkAndUnlockAchievement,
   checkBalanceAchievements,
-  updatePlayerStat
+  updatePlayerStat,
+  atomicTransfer
 } from '../database.js';
 import { D1_ENABLED, getLeaderboard as getLeaderboardD1 } from '../database/d1.js';
 import type { Env } from '../types/index.js';
@@ -427,85 +427,27 @@ async function handleTransfer(username: string, target: string, amount: string, 
       return new Response(`@${username} ❌ @${cleanTarget} hat noch nie gespielt! Der Empfänger muss zuerst !slots spielen, um einen Account zu erstellen.`, { headers: RESPONSE_HEADERS });
     }
 
-    // Atomic transfer with lock mechanism to prevent double-spend race conditions
-    // Uses write-first pattern: write lock → verify ownership (eliminates check-then-acquire race window)
-    // Stale lock detection: locks older than 15s are considered abandoned and can be overridden
-    const lockKey = `transfer_lock:${lowerUsername}`;
-    const maxRetries = MAX_RETRIES;
-    const STALE_LOCK_MS = 15_000; // 15 seconds
+    // Atomic D1 transfer: both deduction and credit in single transaction
+    // Eliminates all TOCTOU windows and race conditions
+    const result = await atomicTransfer(lowerUsername, cleanTarget, parsedAmount, env);
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const lockValue = `${Date.now()}:${secureRandom()}`;
-
-      // Check for existing lock - only wait if it's fresh (not stale)
-      const existingLock = await env.SLOTS_KV.get(lockKey);
-      if (existingLock) {
-        const lockTimestamp = parseInt(existingLock.split(':')[0], 10);
-        if (!isNaN(lockTimestamp) && (Date.now() - lockTimestamp) < STALE_LOCK_MS) {
-          // Fresh lock from another request - wait and retry
-          if (attempt < maxRetries - 1) {
-            await exponentialBackoff(attempt);
-            continue;
-          }
-          return new Response(`@${username} ❌ Transfer wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
-        }
-        // Stale lock - override it
+    if (!result.success) {
+      if (result.error === 'insufficient_balance') {
+        const balance = await getBalance(username, env);
+        return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${balance}.`, { headers: RESPONSE_HEADERS });
       }
-
-      // Write-first: acquire lock optimistically (KV minimum TTL is 60 seconds)
-      await env.SLOTS_KV.put(lockKey, lockValue, { expirationTtl: 60 });
-
-      try {
-        // Verify we got the lock (handles concurrent write race)
-        const verifyLock = await env.SLOTS_KV.get(lockKey);
-        if (verifyLock !== lockValue) {
-          // Another request won the lock race
-          if (attempt < maxRetries - 1) {
-            await exponentialBackoff(attempt);
-            continue;
-          }
-          return new Response(`@${username} ❌ Transfer wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
-        }
-
-        // Atomic D1 deduction from sender (WHERE balance >= amount)
-        const senderDeduct = await deductBalance(username, parsedAmount, env);
-        if (!senderDeduct.success) {
-          await env.SLOTS_KV.delete(lockKey);
-          return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderDeduct.newBalance}.`, { headers: RESPONSE_HEADERS });
-        }
-        const newSenderBalance = senderDeduct.newBalance;
-
-        // Atomic D1 credit to receiver (clamped at MAX_BALANCE)
-        const receiverBalanceBefore = await getBalance(cleanTarget, env);
-        const newReceiverBalance = await creditBalance(cleanTarget, parsedAmount, env);
-
-        // Check if transfer was capped at MAX_BALANCE
-        const actualReceived = newReceiverBalance - receiverBalanceBefore;
-        const wasCapped = actualReceived < parsedAmount;
-
-        // Release lock
-        await env.SLOTS_KV.delete(lockKey);
-
-        // Track achievements
-        await Promise.all([
-          trackTransferAchievements(username, parsedAmount, env),
-          trackTransferReceived(cleanTarget, actualReceived, env),
-          checkBalanceAchievements(cleanTarget, newReceiverBalance, env)
-        ]);
-
-        if (wasCapped) {
-          return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! ⚠️ ${parsedAmount - actualReceived} DachsTaler wurden nicht gutgeschrieben (Max-Balance erreicht) | Dein Kontostand: ${newSenderBalance} 💸`, { headers: RESPONSE_HEADERS });
-        }
-
-        return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${newSenderBalance} | @${cleanTarget}'s Kontostand: ${newReceiverBalance} 💸`, { headers: RESPONSE_HEADERS });
-      } catch (error) {
-        // Ensure lock is released on error
-        await env.SLOTS_KV.delete(lockKey);
-        throw error;
-      }
+      // D1 unavailable or other error
+      return new Response(`@${username} ❌ Transfer fehlgeschlagen. Bitte versuche es erneut.`, { headers: RESPONSE_HEADERS });
     }
 
-    return new Response(`@${username} ❌ Transfer fehlgeschlagen, bitte versuche es erneut.`, { headers: RESPONSE_HEADERS });
+    // Transfer succeeded - track achievements
+    await Promise.all([
+      trackTransferAchievements(username, parsedAmount, env),
+      trackTransferReceived(cleanTarget, parsedAmount, env),
+      checkBalanceAchievements(cleanTarget, result.receiverNewBalance!, env)
+    ]);
+
+    return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${result.senderNewBalance} | @${cleanTarget}'s Kontostand: ${result.receiverNewBalance} 💸`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     logError('handleTransfer', error, { username, target, amount });
     return new Response(`@${username} ❌ Fehler beim Transfer.`, { headers: RESPONSE_HEADERS });
@@ -517,15 +459,11 @@ async function handleLeaderboard(env: Env): Promise<Response> {
     // Try to get cached leaderboard
     const cached = await env.SLOTS_KV.get('leaderboard:cache');
     if (cached) {
-      try {
-        const cachedData = JSON.parse(cached) as { timestamp: number; message: string };
-        // Validate cache structure and check if still valid
-        if (cachedData.timestamp && cachedData.message &&
-            Date.now() - cachedData.timestamp < LEADERBOARD_CACHE_TTL * 1000) {
-          return new Response(cachedData.message, { headers: RESPONSE_HEADERS });
-        }
-      } catch {
-        // Invalid cache, continue to rebuild
+      const cachedData = safeJsonParse(cached) as { timestamp: number; message: string } | null;
+      // Validate cache structure and check if still valid
+      if (cachedData && cachedData.timestamp && cachedData.message &&
+          Date.now() - cachedData.timestamp < LEADERBOARD_CACHE_TTL * 1000) {
+        return new Response(cachedData.message, { headers: RESPONSE_HEADERS });
       }
     }
 
@@ -569,7 +507,8 @@ async function handleLeaderboard(env: Env): Promise<Response> {
           // Only include users who have accepted the disclaimer
           if (balances[j] && disclaimerStatuses[j]) {
             const balance = parseInt(balances[j]!, 10);
-            if (!isNaN(balance) && balance > 0) {
+            // Validate balance is a proper number, positive, and within max range
+            if (!isNaN(balance) && balance > 0 && balance <= MAX_BALANCE) {
               users.push({
                 username: usernames[j],
                 balance

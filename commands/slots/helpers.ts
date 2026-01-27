@@ -18,7 +18,7 @@ import {
   URLS,
   ACHIEVEMENTS
 } from '../../constants.js';
-import { logError, logInfo, kvKey } from '../../utils.js';
+import { logError, logInfo, kvKey, logAuditTrail } from '../../utils.js';
 import { D1_ENABLED, DUAL_WRITE, updateStreakCounts } from '../../database/d1.js';
 import {
   hasUnlock,
@@ -199,9 +199,25 @@ export async function trackSlotAchievements(
       await checkAndUnlockAchievement(username, achievementId, env, achievementData);
     }
 
-    // Big win achievements
+    // Big win achievements + audit trail
     if (result.points > 0) {
       await checkBigWinAchievements(username, result.points, env, achievementData);
+      
+      // Audit log for big wins (for fraud detection)
+      const BIG_WIN_THRESHOLD = 5000;
+      if (result.points >= BIG_WIN_THRESHOLD) {
+        await logAuditTrail(username, 'big_win', {
+          amount: result.points,
+          grid: displayGrid,
+          spinCost: extendedData.spinCost,
+          buffsActive: [
+            isFreeSpinUsed && 'free_spin',
+            insuranceUsed && 'insurance',
+            hasWildCardToken && 'wild_card',
+            hourlyJackpotWon && 'hourly_jackpot'
+          ].filter(Boolean)
+        }, env);
+      }
     }
 
     // Triple tracking - use displayGrid (what the user sees)

@@ -161,10 +161,13 @@ async function handleRemoveBuff(username: string, target: string, shopNumber: st
     const cleanTarget = check.cleanTarget!;
 
     const itemId = parseInt(shopNumber, 10);
+    if (isNaN(itemId) || itemId < 1 || itemId > SHOP_ITEM_MAX) {
+      return new Response(`@${username} ❌ Ungültige Shopnummer! Nutze 1-${SHOP_ITEM_MAX}.`, { headers: RESPONSE_HEADERS });
+    }
     const item = SHOP_ITEMS[itemId] as ShopItem & { symbol?: string; buffKey?: string } | undefined;
 
     if (!item) {
-      return new Response(`@${username} ❌ Ungültige Shopnummer! Nutze 1-${SHOP_ITEM_MAX}.`, { headers: RESPONSE_HEADERS });
+      return new Response(`@${username} ❌ Shopnummer ${itemId} existiert nicht!`, { headers: RESPONSE_HEADERS });
     }
 
     if (item.type === 'boost') {

@@ -11,7 +11,7 @@ import { BROADCASTER_LOGIN } from '../constants.js';
 // Cache TTLs
 const AVATAR_CACHE_TTL = 86400; // 24 hours
 const ROLES_CACHE_TTL = 3600;   // 1 hour
-const TOKEN_CACHE_TTL = 3600;   // 1 hour (tokens last longer but we refresh early)
+const TOKEN_CACHE_TTL = 1800;   // 30 min (rotate frequently to limit compromise window)
 
 // User session constants
 const USER_SESSION_COOKIE = 'dachsbau_session';

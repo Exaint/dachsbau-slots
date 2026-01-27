@@ -5,7 +5,7 @@
  */
 
 import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE, COOLDOWN_TTL_SECONDS, KV_TRUE, KV_ACCEPTED } from '../constants.js';
-import { logError, kvKey } from '../utils.js';
+import { logError, logWarn, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, updateBalance as updateBalanceD1, upsertUser, upsertItem, atomicDeductBalance as atomicDeductBalanceD1, atomicAdjustBalance as atomicAdjustBalanceD1 } from './d1.js';
 import type { Env, CustomMessages } from '../types/index.js';
 
@@ -107,6 +107,7 @@ export async function deductBalance(username: string, amount: number, env: Env):
   }
 
   // KV fallback (TOCTOU-prone, but D1 is unavailable)
+  logWarn('deductBalance', 'D1 unavailable, using TOCTOU-prone KV fallback', { username, amount });
   const current = await getBalance(username, env);
   if (current < amount) {
     return { success: false, newBalance: current };
@@ -137,7 +138,8 @@ export async function creditBalance(username: string, amount: number, env: Env):
     }
   }
 
-  // KV fallback
+  // KV fallback (TOCTOU-prone)
+  logWarn('creditBalance', 'D1 unavailable, KV fallback', { username, amount });
   const current = await getBalance(username, env);
   const newBalance = Math.min(current + amount, MAX_BALANCE);
   await setBalance(username, newBalance, env);

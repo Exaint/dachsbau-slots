@@ -236,7 +236,9 @@ function calculateBuffTTL(expireAt: number, minTTL = BUFF_TTL_BUFFER_SECONDS): n
 
 // OPTIMIZED: Helper for exponential backoff delay (avoids code duplication)
 function exponentialBackoff(attempt: number, baseMs = EXPONENTIAL_BACKOFF_BASE_MS): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, baseMs * Math.pow(2, attempt)));
+  const delay = baseMs * Math.pow(2, attempt);
+  const jitter = Math.floor(delay * 0.5 * Math.random());
+  return new Promise(resolve => setTimeout(resolve, delay + jitter));
 }
 
 /**
@@ -549,6 +551,29 @@ async function checkRateLimit(identifier: string, limit: number, windowSeconds: 
   return newCount <= limit;
 }
 
+// Helper for audit logging (fired off asynchronously)
+async function logAuditTrail(
+  username: string,
+  eventType: string,
+  details: Record<string, unknown>,
+  env: Env
+): Promise<void> {
+  try {
+    const timestamp = Date.now();
+    const key = `audit:${eventType}:${timestamp}:${username.toLowerCase()}`;
+    const value = JSON.stringify({
+      username: username.toLowerCase(),
+      eventType,
+      timestamp,
+      ...details
+    });
+    // Audit logs kept for 30 days
+    await env.SLOTS_KV.put(key, value, { expirationTtl: 86400 * 30 });
+  } catch (error) {
+    logError('logAuditTrail', error, { username, eventType });
+  }
+}
+
 export {
   secureRandom,
   secureRandomInt,
@@ -584,9 +609,6 @@ export {
   atomicKvUpdate,
   checkRateLimit,
   containsProfanity,
-  stripInvisibleChars
+  stripInvisibleChars,
+  logAuditTrail
 };
-
-// Type exports (Env and ValidateTargetResult re-exported from types/index)
-export type { Env, ValidateTargetResult };
-export type { AdminWithTargetResult };

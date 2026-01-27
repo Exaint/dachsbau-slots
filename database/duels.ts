@@ -233,8 +233,8 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
         return { success: false, reason: 'error', debugInfo: `invalid_data:t=${typeof data.target},a=${typeof data.amount},c=${typeof data.createdAt}` };
       }
     } catch (parseError) {
-      logError('acceptDuel', parseError, { challenger, value: value.substring(0, 100) });
-      return { success: false, reason: 'error', debugInfo: `parse_error:${value.substring(0, 50)}` };
+      logError('acceptDuel', parseError, { challenger, dataLength: value.length });
+      return { success: false, reason: 'error', debugInfo: `parse_error:len=${value.length}` };
     }
 
     // Check if expired
@@ -249,13 +249,16 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
     // Unique claim key per duel (prevents stale claim locks from previous duels)
     const claimKey = `${key}:claim:${data.createdAt}`;
 
-    // Check if another request is already claiming this specific duel
-    const alreadyClaimed = await env.SLOTS_KV.get(claimKey);
-    if (alreadyClaimed) return { success: false, reason: 'already_claimed' };
+    // Write-first-verify: write a unique claim value, then verify we won the race
+    // This eliminates the TOCTOU window of check-then-set
+    const claimValue = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    await env.SLOTS_KV.put(claimKey, claimValue, { expirationTtl: 60 });
 
-    // Set claim-lock with short TTL (prevents parallel double-accept)
-    // Note: KV minimum TTL is 60 seconds
-    await env.SLOTS_KV.put(claimKey, '1', { expirationTtl: 60 });
+    // Verify our claim won (KV is strongly consistent for GET-after-PUT on same key)
+    const storedClaim = await env.SLOTS_KV.get(claimKey);
+    if (storedClaim !== claimValue) {
+      return { success: false, reason: 'already_claimed' };
+    }
 
     // Delete the duel and reverse lookup
     await Promise.all([
@@ -263,11 +266,11 @@ export async function acceptDuel(challenger: string, env: Env): Promise<AcceptDu
       env.SLOTS_KV.delete(kvKey('duel_target:', data.target))
     ]);
 
-    // Verify deletion succeeded
+    // Verify deletion succeeded (secondary race guard)
     const verify = await env.SLOTS_KV.get(key);
     if (verify !== null) {
-      await env.SLOTS_KV.delete(claimKey);
-      return { success: false, reason: 'race_condition' }; // Another request accepted it first
+      env.SLOTS_KV.delete(claimKey).catch(() => {});
+      return { success: false, reason: 'race_condition' };
     }
 
     // Cleanup claim lock (fire-and-forget, TTL handles cleanup anyway)

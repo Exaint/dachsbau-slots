@@ -50,6 +50,9 @@ export class DuelTimeoutAlarm extends DurableObject<Env> {
       const data = await this.ctx.storage.get<DuelAlarmData>('duelData');
       if (!data) return; // Already cancelled or processed
 
+      // Delete cron fallback key BEFORE sending to prevent duplicate from cron
+      await this.env.SLOTS_KV.delete(`duel_notify:${data.challenger.toLowerCase()}`);
+
       await sendChatMessage(
         `⏰ @${data.challenger} Dein Duell gegen @${data.target} (${data.amount} DachsTaler) ist abgelaufen — keine Antwort erhalten.`,
         this.env
@@ -57,7 +60,7 @@ export class DuelTimeoutAlarm extends DurableObject<Env> {
     } catch (error) {
       logError('DuelTimeoutAlarm.alarm', error);
     } finally {
-      // Always clean up storage
+      // Always clean up DO storage
       await this.ctx.storage.deleteAll();
     }
   }

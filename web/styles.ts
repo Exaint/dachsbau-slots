@@ -3144,10 +3144,11 @@ a.duel-player.opponent:hover {
 .collapse-icon {
   font-size: 0.9rem;
   transition: transform 0.3s ease;
+  transform: rotate(-90deg);
 }
 
 .collapsible-section.expanded .collapse-icon {
-  transform: rotate(180deg);
+  transform: rotate(0deg);
 }
 
 .collapsible-content {
@@ -4699,10 +4700,11 @@ a.duel-player.opponent:hover {
   font-size: 0.8rem;
   color: var(--text-muted);
   transition: transform 0.3s ease;
+  transform: rotate(-90deg);
 }
 
 .info-accordion[open] .accordion-header::after {
-  transform: rotate(180deg);
+  transform: rotate(0deg);
 }
 
 .info-accordion .accordion-header:hover {

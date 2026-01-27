@@ -366,7 +366,14 @@ export function renderProfilePage(data: ProfileData): string {
     const catTotal = achs.length;
     const catClass = `category-${category.toLowerCase()}`;
 
-    const achievementsHtml = achs.map(ach => {
+    // Versteckte (nicht freigeschaltete) Achievements ans Ende sortieren
+    const sortedAchs = [...achs].sort((a, b) => {
+      const aHidden = a.hidden && !a.unlocked ? 1 : 0;
+      const bHidden = b.hidden && !b.unlocked ? 1 : 0;
+      return aHidden - bHidden;
+    });
+
+    const achievementsHtml = sortedAchs.map(ach => {
       // Skip hidden achievements that aren't unlocked
       if (ach.hidden && !ach.unlocked) {
         return `

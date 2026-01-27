@@ -254,22 +254,6 @@ export async function renderShopPage(env: Env, user: LoggedInUser | null = null)
 
       ${userBalanceHtml}
 
-      <!-- Inhaltsverzeichnis -->
-      <nav class="info-toc shop-toc" aria-label="Shop-Navigation">
-        <div class="toc-grid">
-          <a href="#kaufanleitung" class="toc-item" onclick="scrollToShopSection(event, 'kaufanleitung')">📋 Kaufanleitung</a>
-          <a href="#boosts" class="toc-item" onclick="scrollToShopSection(event, 'boosts')">🎰 Symbol-Boosts</a>
-          <a href="#instant" class="toc-item" onclick="scrollToShopSection(event, 'instant')">⚡ Sofort-Items</a>
-          <a href="#timed" class="toc-item" onclick="scrollToShopSection(event, 'timed')">⏰ Timed Buffs</a>
-          <a href="#unlocks" class="toc-item" onclick="scrollToShopSection(event, 'unlocks')">🔓 Freischaltungen</a>
-          <a href="#prestige" class="toc-item" onclick="scrollToShopSection(event, 'prestige')">👑 Prestige-Ränge</a>
-        </div>
-        <div class="shop-collapse-controls">
-          <button class="btn-collapse-all" onclick="expandAllShopCategories()">Alle ausklappen</button>
-          <button class="btn-collapse-all" onclick="collapseAllShopCategories()">Alle einklappen</button>
-        </div>
-      </nav>
-
       <!-- Kaufanleitung (einklappbar) -->
       <section id="kaufanleitung" class="collapsible-section">
         <h2 class="collapsible-header" onclick="toggleSection(this)">
@@ -327,6 +311,21 @@ export async function renderShopPage(env: Env, user: LoggedInUser | null = null)
         </div>
         </div>
       </section>
+
+      <!-- Inhaltsverzeichnis -->
+      <nav class="info-toc shop-toc" aria-label="Shop-Navigation">
+        <div class="toc-grid">
+          <a href="#boosts" class="toc-item" onclick="scrollToShopSection(event, 'boosts')">🎰 Symbol-Boosts</a>
+          <a href="#instant" class="toc-item" onclick="scrollToShopSection(event, 'instant')">⚡ Sofort-Items</a>
+          <a href="#timed" class="toc-item" onclick="scrollToShopSection(event, 'timed')">⏰ Timed Buffs</a>
+          <a href="#unlocks" class="toc-item" onclick="scrollToShopSection(event, 'unlocks')">🔓 Freischaltungen</a>
+          <a href="#prestige" class="toc-item" onclick="scrollToShopSection(event, 'prestige')">👑 Prestige-Ränge</a>
+        </div>
+        <div class="shop-collapse-controls">
+          <button class="btn-collapse-all" onclick="expandAllShopCategories()">Alle ausklappen</button>
+          <button class="btn-collapse-all" onclick="collapseAllShopCategories()">Alle einklappen</button>
+        </div>
+      </nav>
 
       <div id="boosts">${renderCategory(categories.boosts, '💡 <strong>Pro-Tipp:</strong> Kombiniere Boosts mit hohen Multipliers für massive Gewinne!<br><strong>Beispiel:</strong> 🦡 Dachs-Boost + <code>!slots 100</code> = bis zu 300.000 DT möglich! (15.000 × 2 × 10)')}</div>
 

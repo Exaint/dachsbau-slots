@@ -488,7 +488,7 @@ async function getAuthorizationUrl(env: Env, origin: string): Promise<string> {
     client_id: env.TWITCH_CLIENT_ID!,
     redirect_uri: `${origin}/auth/callback`,
     response_type: 'code',
-    scope: 'moderation:read channel:read:vips user:write:chat',
+    scope: 'moderation:read channel:read:vips user:write:chat channel:bot',
     state
   });
 
@@ -1022,6 +1022,88 @@ async function sendChatMessage(message: string, env: Env): Promise<boolean> {
   }
 }
 
+// ==================== EVENTSUB ====================
+
+interface EventSubSubscription {
+  id: string;
+  type: string;
+  status: string;
+  condition: Record<string, string>;
+  transport: { method: string; callback: string };
+}
+
+/**
+ * List existing EventSub subscriptions for this app
+ */
+async function listEventSubSubscriptions(env: Env): Promise<EventSubSubscription[]> {
+  const appToken = await getAppAccessToken(env);
+  if (!appToken) {
+    throw new Error('Failed to get app access token');
+  }
+
+  const response = await fetch(`${TWITCH_API}/eventsub/subscriptions`, {
+    headers: {
+      'Authorization': `Bearer ${appToken}`,
+      'Client-Id': env.TWITCH_CLIENT_ID!
+    }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`List subscriptions failed: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json() as { data: EventSubSubscription[] };
+  return data.data;
+}
+
+/**
+ * Create EventSub subscription for channel.chat.message
+ * Required for bot badge: bot must listen for chat messages via webhook
+ */
+async function createEventSubSubscription(env: Env, origin: string): Promise<EventSubSubscription | null> {
+  const [appToken, broadcasterId, botId] = await Promise.all([
+    getAppAccessToken(env),
+    getBroadcasterId(env),
+    getBotId(env)
+  ]);
+
+  if (!appToken) throw new Error('Failed to get app access token');
+  if (!broadcasterId) throw new Error('Broadcaster ID not found — authorize via /auth/broadcaster first');
+  if (!botId) throw new Error('Bot ID not found — authorize via /auth/bot first');
+  if (!env.EVENTSUB_SECRET) throw new Error('EVENTSUB_SECRET not configured');
+
+  const response = await fetch(`${TWITCH_API}/eventsub/subscriptions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${appToken}`,
+      'Client-Id': env.TWITCH_CLIENT_ID!,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      type: 'channel.chat.message',
+      version: '1',
+      condition: {
+        broadcaster_user_id: broadcasterId,
+        user_id: botId
+      },
+      transport: {
+        method: 'webhook',
+        callback: `${origin}/eventsub`,
+        secret: env.EVENTSUB_SECRET
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Create subscription failed: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json() as { data: EventSubSubscription[] };
+  return data.data[0] || null;
+}
+
 export {
   getTwitchUser,
   getUserRole,
@@ -1037,5 +1119,8 @@ export {
   createLogoutResponse,
   // Bot authentication
   getBotAuthorizationUrl,
-  handleBotOAuthCallback
+  handleBotOAuthCallback,
+  // EventSub
+  listEventSubSubscriptions,
+  createEventSubSubscription
 };

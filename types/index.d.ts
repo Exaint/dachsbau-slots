@@ -340,6 +340,8 @@ export interface Env {
   JWT_SECRET?: string;
   /** Shared secret for bot command authentication (Fossabot → Worker) */
   BOT_SECRET?: string;
+  /** Secret for Twitch EventSub webhook signature verification */
+  EVENTSUB_SECRET?: string;
 }
 
 // ============================================================================

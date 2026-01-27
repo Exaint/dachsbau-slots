@@ -18,6 +18,7 @@ import { handleAuthRoutes } from './routes/auth.js';
 import { validateCsrf, handleApiRoutes } from './routes/api.js';
 import { handleSlotAction, handleLegacyActions } from './routes/commands.js';
 import { processDuelTimeoutNotifications } from './database/duels.js';
+import { handleEventSubWebhook, handleSetupBotBadge } from './routes/eventsub.js';
 
 // Durable Object export (must be exported from entry point)
 export { DuelTimeoutAlarm } from './database/duel-alarm.js';
@@ -48,6 +49,16 @@ export default {
       // Auth routes (login, logout, callbacks)
       const authResponse = await handleAuthRoutes(pathname, url, env);
       if (authResponse) return authResponse;
+
+      // EventSub webhook (before CSRF — Twitch sends POST without Origin header)
+      if (pathname === '/eventsub' && request.method === 'POST') {
+        return handleEventSubWebhook(request, env);
+      }
+
+      // Bot badge setup (admin endpoint, GET with secret)
+      if (pathname === '/api/setup-bot-badge') {
+        return handleSetupBotBadge(url, env);
+      }
 
       // CSRF protection for POST API endpoints
       const csrfError = validateCsrf(request, url);

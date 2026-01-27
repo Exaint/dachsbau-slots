@@ -37,6 +37,8 @@
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "vitest.config.ts",
+    "tests/mocks"
   ]
 }

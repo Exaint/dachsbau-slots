@@ -81,11 +81,27 @@ export const ROLE_BADGES: Record<string, RoleBadge> = {
     icon: 'https://static-cdn.jtvnw.net/badges/v1/d97c37bd-a6f5-4c38-8f57-4e4bef88af34/1',
     label: 'Dachsbau-Slots Admin',
     color: '#9147ff'
+  },
+  bot: {
+    icon: 'https://assets.help.twitch.tv/article/img/000002722-19.png',
+    label: 'Bot',
+    color: '#00c8af'
   }
 };
 
 // Admin/special user badge overrides (role badges shown on profile)
 export const ADMIN_ROLE_OVERRIDES: Record<string, string[]> = {
   'exaint_': ['leadmod', 'admin'],
-  'frechhdachs': ['broadcaster', 'admin']
+  'frechhdachs': ['broadcaster', 'admin'],
+  'dachsbauslots': ['bot'],
+  'dachsbauarbeiter': ['bot'],
+  'fossabot': ['bot'],
+  'streamelements': ['bot'],
+  'djdachsbau': ['bot'],
+  'eliboldbot': ['bot'],
+  'nightbot': ['bot'],
+  'susgeebot': ['bot'],
+  'sery_bot': ['bot'],
+  'wapplatm': ['bot'],
+  'hexe_bot': ['bot']
 };

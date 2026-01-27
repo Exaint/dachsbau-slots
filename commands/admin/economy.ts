@@ -47,6 +47,28 @@ async function handleGive(username: string, target: string, amount: string, env:
   }
 }
 
+async function handleRemove(username: string, target: string, amount: string, env: Env): Promise<Response> {
+  try {
+    const check = requireAdminWithTarget(username, target, 'Nutze: !slots remove @user [Betrag]');
+    if (!check.valid) return check.response!;
+
+    const parsedAmount = validateAmount(amount, 1, MAX_BALANCE);
+    if (!parsedAmount) {
+      return createErrorResponse(username, `Ungültiger Betrag! (1-${MAX_BALANCE})`);
+    }
+
+    const currentBalance = await getBalance(check.cleanTarget!, env);
+    const newBalance = Math.max(currentBalance - parsedAmount, 0);
+    await setBalance(check.cleanTarget!, newBalance, env);
+    logAudit('remove', username, check.cleanTarget!, { amount: parsedAmount, newBalance });
+
+    return new Response(`@${username} ✅ ${parsedAmount} DachsTaler von @${check.cleanTarget} abgezogen! Neuer Kontostand: ${newBalance} 🦡💰`, { headers: RESPONSE_HEADERS });
+  } catch (error) {
+    logError('handleRemove', error, { username, target, amount });
+    return createErrorResponse(username, 'Fehler beim Abziehen.');
+  }
+}
+
 async function handleSetBalance(username: string, target: string, amount: string, env: Env): Promise<Response> {
   try {
     const check = requireAdminWithTarget(username, target, 'Nutze: !slots setbalance @user [Betrag]');
@@ -438,6 +460,7 @@ async function handleGiveWinMulti(username: string, target: string, env: Env): P
 
 export {
   handleGive,
+  handleRemove,
   handleSetBalance,
   handleGiveBuff,
   handleRemoveBuff,

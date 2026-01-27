@@ -24,6 +24,8 @@ import {
   hasUnlock,
   consumeWinMultiplier,
   consumeBoost,
+  getPlayerAchievements,
+  savePlayerAchievements,
   updateAchievementStatBatch,
   markTripleCollected,
   recordDachsHit,
@@ -34,6 +36,7 @@ import {
   updatePlayerStat,
   updatePlayerStatBatch
 } from '../../database.js';
+import type { PlayerAchievementData } from '../../database.js';
 import type { Env, WinResult, SpinAmountResult, StreakBonusResult, StreakData, PreloadedBuffs } from '../../types/index.js';
 import type { PlayerStats } from '../../database/progression.js';
 
@@ -97,6 +100,9 @@ export async function trackSlotAchievements(
   extendedData: ExtendedData = {}
 ): Promise<void> {
   try {
+    // Load achievement data ONCE (instead of 8-15 times per spin)
+    const achievementData = await getPlayerAchievements(username, env);
+
     // Core stats: achievement-blob only (stats-KV already handled by updateStats() in slots.ts)
     const dachsCount = originalGrid.filter(s => s === '🦡').length;
     const coreStats: [string, number][] = [['totalSpins', 1]];
@@ -106,7 +112,7 @@ export async function trackSlotAchievements(
     } else {
       coreStats.push(['losses', 1]);
     }
-    await updateAchievementStatBatch(username, coreStats, env);
+    await updateAchievementStatBatch(username, coreStats, env, achievementData);
 
     // Extended stats: unified (achievement-blob + stats-KV + D1)
     const extendedStats: [keyof PlayerStats, number][] = [];
@@ -123,11 +129,11 @@ export async function trackSlotAchievements(
     }
 
     if (extendedStats.length > 0 || maxUpdates.length > 0) {
-      await updatePlayerStatBatch(username, extendedStats, maxUpdates.length > 0 ? maxUpdates : null, env);
+      await updatePlayerStatBatch(username, extendedStats, maxUpdates.length > 0 ? maxUpdates : null, env, achievementData);
     }
 
     // PlayDays tracking (check if player already played today)
-    await trackPlayDay(username, env);
+    await trackPlayDay(username, env, achievementData);
 
     // Collect all one-time achievements to unlock
     const achievementsToUnlock: string[] = [];
@@ -188,14 +194,14 @@ export async function trackSlotAchievements(
       achievementsToUnlock.push(ACHIEVEMENTS.PERFECT_TIMING.id);
     }
 
-    // Unlock all collected achievements sequentially (share same data object)
+    // Unlock all collected achievements (shared data object, no intermediate saves)
     for (const achievementId of achievementsToUnlock) {
-      await checkAndUnlockAchievement(username, achievementId, env);
+      await checkAndUnlockAchievement(username, achievementId, env, achievementData);
     }
 
-    // These functions load their own data, run after unlocks
+    // Big win achievements
     if (result.points > 0) {
-      await checkBigWinAchievements(username, result.points, env);
+      await checkBigWinAchievements(username, result.points, env, achievementData);
     }
 
     // Triple tracking - use displayGrid (what the user sees)
@@ -204,7 +210,7 @@ export async function trackSlotAchievements(
         displayGrid[0] === displayGrid[1] && displayGrid[1] === displayGrid[2] && displayGrid[0] !== '🃏') {
       const tripleSymbol = displayGrid[0];
       try {
-        const unlockedAchievements = await markTripleCollected(username, tripleSymbol, env);
+        const unlockedAchievements = await markTripleCollected(username, tripleSymbol, env, achievementData);
         if (unlockedAchievements.length > 0) {
           logInfo('trackSlotAchievements', 'Triple achievement unlocked', { username, tripleSymbol, unlocked: unlockedAchievements.map(a => a.achievement.id) });
         }
@@ -214,7 +220,10 @@ export async function trackSlotAchievements(
     }
 
     // Balance achievements
-    await checkBalanceAchievements(username, newBalance, env);
+    await checkBalanceAchievements(username, newBalance, env, achievementData);
+
+    // Save achievement data ONCE (instead of 8-13 times per spin)
+    await savePlayerAchievements(username, achievementData, env);
   } catch (error) {
     // Silently fail - achievements should never break the game
     logError('trackSlotAchievements', error, { username });
@@ -225,14 +234,14 @@ export async function trackSlotAchievements(
  * Track unique play days for playDays achievement stat
  * Uses a KV key with today's date to avoid double-counting
  */
-async function trackPlayDay(username: string, env: Env): Promise<void> {
+async function trackPlayDay(username: string, env: Env, existingAchievementData?: PlayerAchievementData): Promise<void> {
   try {
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const key = kvKey('playDay:', `${username}:${today}`);
     const existing = await env.SLOTS_KV.get(key);
     if (!existing) {
       await env.SLOTS_KV.put(key, '1', { expirationTtl: 86400 * 2 }); // 2 day TTL
-      await updatePlayerStat(username, 'playDays', 1, env);
+      await updatePlayerStat(username, 'playDays', 1, env, existingAchievementData);
     }
   } catch (error) {
     logError('trackPlayDay', error, { username });

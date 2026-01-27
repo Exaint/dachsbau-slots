@@ -6,7 +6,7 @@
 
 import { MAX_BALANCE, DAILY_TTL_SECONDS, STARTING_BALANCE, COOLDOWN_TTL_SECONDS, KV_TRUE, KV_ACCEPTED } from '../constants.js';
 import { logError, kvKey } from '../utils.js';
-import { D1_ENABLED, DUAL_WRITE, updateBalance as updateBalanceD1, upsertUser, upsertItem } from './d1.js';
+import { D1_ENABLED, DUAL_WRITE, updateBalance as updateBalanceD1, upsertUser, upsertItem, atomicDeductBalance as atomicDeductBalanceD1, atomicAdjustBalance as atomicAdjustBalanceD1 } from './d1.js';
 import type { Env, CustomMessages } from '../types/index.js';
 
 export interface SelfBanData {
@@ -85,6 +85,63 @@ export async function adjustBalance(username: string, delta: number, env: Env): 
     logError('adjustBalance', error, { username, delta });
     return 0;
   }
+}
+
+/**
+ * Atomically deduct balance. D1-first with KV sync, falls back to KV-only.
+ *
+ * Uses SQL WHERE balance >= amount for race-condition-free deduction.
+ * Returns { success, newBalance } — success=false if insufficient balance.
+ * On D1 unavailable, falls back to KV read-modify-write (TOCTOU-prone but functional).
+ */
+export async function deductBalance(username: string, amount: number, env: Env): Promise<{ success: boolean; newBalance: number }> {
+  // Try D1 atomic first
+  if (D1_ENABLED && env.DB) {
+    const result = await atomicDeductBalanceD1(username, amount, env);
+    if (result.error !== 'd1_unavailable' && result.error !== 'user_not_found') {
+      // D1 responded authoritatively — sync KV with D1 balance
+      await env.SLOTS_KV.put(kvKey('user:', username), result.newBalance.toString());
+      return { success: result.success, newBalance: result.newBalance };
+    }
+    // D1 unavailable or user not in D1 — fall through to KV
+  }
+
+  // KV fallback (TOCTOU-prone, but D1 is unavailable)
+  const current = await getBalance(username, env);
+  if (current < amount) {
+    return { success: false, newBalance: current };
+  }
+  const newBalance = Math.max(0, current - amount);
+  await env.SLOTS_KV.put(kvKey('user:', username), newBalance.toString());
+  return { success: true, newBalance };
+}
+
+/**
+ * Atomically credit (add to) balance. D1-first with KV sync, falls back to KV-only.
+ *
+ * Uses SQL UPDATE SET balance = MIN(balance + delta, MAX_BALANCE) for atomic addition.
+ * Returns the new balance after credit.
+ * On D1 unavailable, falls back to KV read-modify-write.
+ */
+export async function creditBalance(username: string, amount: number, env: Env): Promise<number> {
+  // Try D1 atomic first
+  if (D1_ENABLED && env.DB) {
+    const result = await atomicAdjustBalanceD1(username, amount, MAX_BALANCE, env);
+    if (result.success) {
+      // Sync KV with authoritative D1 balance
+      await env.SLOTS_KV.put(kvKey('user:', username), result.newBalance.toString());
+      return result.newBalance;
+    }
+    if (result.error !== 'd1_unavailable' && result.error !== 'user_not_found') {
+      // Unknown error — fall through to KV
+    }
+  }
+
+  // KV fallback
+  const current = await getBalance(username, env);
+  const newBalance = Math.min(current + amount, MAX_BALANCE);
+  await setBalance(username, newBalance, env);
+  return newBalance;
 }
 
 // Daily Functions

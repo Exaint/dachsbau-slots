@@ -17,6 +17,7 @@ export {
 // Economy commands
 export {
   handleGive,
+  handleRemove,
   handleSetBalance,
   handleGiveBuff,
   handleRemoveBuff,

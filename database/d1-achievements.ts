@@ -495,6 +495,62 @@ export async function updateMaxStatD1(username: string, statKey: string, newValu
 }
 
 /**
+ * Batch increment + max-update stats in a single D1 round-trip
+ * Combines multiple incrementStatD1/updateMaxStatD1 calls into one env.DB.batch()
+ */
+export async function batchIncrementStatsD1(
+  username: string,
+  increments: [string, number][],
+  maxUpdates: [string, number][],
+  env: Env
+): Promise<boolean> {
+  if (!D1_ENABLED || !env.DB) return false;
+  if (increments.length === 0 && maxUpdates.length === 0) return true;
+
+  try {
+    const now = Date.now();
+    const lowerUsername = username.toLowerCase();
+    const statements: D1PreparedStatement[] = [];
+
+    for (const [statKey, increment] of increments) {
+      const column = STAT_COLUMN_MAP[statKey];
+      if (!column) continue;
+      statements.push(
+        env.DB.prepare(`
+          INSERT INTO player_stats (username, ${column}, created_at, updated_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(username) DO UPDATE SET
+            ${column} = ${column} + ?,
+            updated_at = ?
+        `).bind(lowerUsername, increment, now, now, increment, now)
+      );
+    }
+
+    for (const [statKey, newValue] of maxUpdates) {
+      const column = STAT_COLUMN_MAP[statKey];
+      if (!column) continue;
+      statements.push(
+        env.DB.prepare(`
+          INSERT INTO player_stats (username, ${column}, created_at, updated_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(username) DO UPDATE SET
+            ${column} = MAX(${column}, ?),
+            updated_at = ?
+        `).bind(lowerUsername, newValue, now, now, newValue, now)
+      );
+    }
+
+    if (statements.length > 0) {
+      await env.DB.batch(statements);
+    }
+    return true;
+  } catch (error) {
+    logError('d1.batchIncrementStats', error, { username, increments: increments.map(i => i[0]), maxUpdates: maxUpdates.map(m => m[0]) });
+    return false;
+  }
+}
+
+/**
  * Read all player stats from D1 as camelCase Record
  * Returns null if D1 is disabled, player not found, or on error
  */

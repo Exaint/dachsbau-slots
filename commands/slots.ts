@@ -21,7 +21,6 @@
 
 import {
   RESPONSE_HEADERS,
-  MAX_BALANCE,
   COOLDOWN_SECONDS,
   BASE_SPIN_COST,
   DACHS_BASE_CHANCE,
@@ -36,10 +35,12 @@ import {
   FREE_SPIN_COST_THRESHOLD,
   HOURLY_JACKPOT_AMOUNT
 } from '../constants.js';
-import { logError, logWarn, getCurrentDate, getGermanDateFromTimestamp, kvKey, calculateBuffTTL, secureRandomInt, stripInvisibleChars } from '../utils.js';
+import { logError, getCurrentDate, getGermanDateFromTimestamp, kvKey, calculateBuffTTL, secureRandomInt, stripInvisibleChars } from '../utils.js';
 import {
   getBalance,
   setBalance,
+  deductBalance,
+  creditBalance,
   getLastSpin,
   setLastSpin,
   hasAcceptedDisclaimer,
@@ -334,15 +335,19 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
     // OPTIMIZED: Insurance check (pre-loaded insuranceCount and prestigeRank)
     if (!isFreeSpinUsed && result.points === 0 && !result.freeSpins && insuranceCount > 0) {
       const refund = Math.floor(spinCost * INSURANCE_REFUND_RATE);
-      const uncappedBalance = currentBalance - spinCost + refund;
-      const newBalanceWithRefund = Math.max(0, Math.min(uncappedBalance, MAX_BALANCE));
-      // Log if balance was capped (edge case: extremely high balance)
-      if (uncappedBalance > MAX_BALANCE) {
-        logWarn('handleSlot', 'Insurance refund capped at MAX_BALANCE', { username, uncappedBalance, capped: MAX_BALANCE });
+      // Atomic D1 balance operation: deduct net loss (spinCost - refund) atomically
+      const netInsuranceLoss = spinCost - refund;
+      const deductResult = await deductBalance(username, netInsuranceLoss, env);
+      let newBalanceWithRefund: number;
+      if (deductResult.success) {
+        newBalanceWithRefund = deductResult.newBalance;
+      } else {
+        // Insufficient balance edge case — spin already consumed, set to 0
+        await setBalance(username, 0, env);
+        newBalanceWithRefund = 0;
       }
 
       await Promise.all([
-        setBalance(username, newBalanceWithRefund, env),
         updateStats(username, false, result.points, spinCost, env),
         decrementInsuranceCount(username, env)
       ]);
@@ -356,30 +361,41 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       return new Response(`@${username} ${rankSymbol}[ ${grid.join(' ')} ] ${result.message} 🛡️ ║ Insurance +${refund} (${insuranceCount - 1} übrig) ║ Kontostand: ${newBalanceWithRefund} DachsTaler`, { headers: RESPONSE_HEADERS });
     }
 
-    // Final balance calculation
+    // Atomic D1 balance operation: apply net delta (winnings + bonuses - cost) atomically
     const totalBonuses = streakBonus + comboBonus;
-    const newBalance = Math.max(0, Math.min(currentBalance - spinCost + result.points + totalBonuses, MAX_BALANCE));
+    const effectiveSpinCost = isFreeSpinUsed ? 0 : spinCost;
+    const netDelta = result.points + totalBonuses - effectiveSpinCost;
+    let newBalance: number;
+    if (netDelta > 0) {
+      newBalance = await creditBalance(username, netDelta, env);
+    } else if (netDelta < 0) {
+      const deductResult = await deductBalance(username, Math.abs(netDelta), env);
+      if (deductResult.success) {
+        newBalance = deductResult.newBalance;
+      } else {
+        // Insufficient balance edge case — spin already consumed, set to 0
+        await setBalance(username, 0, env);
+        newBalance = 0;
+      }
+    } else {
+      // Break even — no balance change needed, read current
+      newBalance = await getBalance(username, env);
+    }
 
     // OPTIMIZED: Final updates (prestigeRank already pre-loaded)
-    const finalUpdates = [
-      setBalance(username, newBalance, env),
+    await Promise.all([
       updateStats(username, result.points > 0, Math.max(0, result.points - spinCost), spinCost, env),
       setLastSpin(username, now, env),
-      setLastActive(username, env),
-      getFreeSpins(username, env)
-    ];
+      setLastActive(username, env)
+    ]);
 
-    const results = await Promise.all(finalUpdates);
     const rank = prestigeRank; // Pre-loaded
-    const remainingFreeSpins = results[4] as FreeSpinEntry[]; // Index shifted due to setLastActive
 
+    // OPTIMIZED: Compute remaining free spins from initial read instead of re-reading KV
     let remainingCount = 0;
-    try {
-      if (Array.isArray(remainingFreeSpins)) {
-        remainingCount = remainingFreeSpins.reduce((sum, fs) => sum + (fs.count || 0), 0);
-      }
-    } catch (error) {
-      logError('handleSlot.getRemainingFreeSpins', error, { username });
+    if (Array.isArray(availableFreeSpins)) {
+      remainingCount = availableFreeSpins.reduce((sum, fs) => sum + (fs.count || 0), 0);
+      if (isFreeSpinUsed) remainingCount = Math.max(0, remainingCount - 1);
     }
 
     // OPTIMIZED: Low Balance Warning (lastDaily and hasDailyBoost pre-loaded)

@@ -19,7 +19,6 @@
  */
 import {
   RESPONSE_HEADERS,
-  MAX_BALANCE,
   SHOP_ITEMS,
   SHOP_ITEM_MAX,
   PREREQUISITE_NAMES,
@@ -56,7 +55,8 @@ import {
 import { getWeightedSymbol, secureRandom, secureRandomInt, logError, safeJsonParse } from '../utils.js';
 import {
   getBalance,
-  setBalance,
+  deductBalance,
+  creditBalance,
   hasUnlock,
   setUnlock,
   getPrestigeRank,
@@ -195,32 +195,14 @@ async function handlePrestigeItem(
   item: ShopItem,
   itemId: number,
   balance: number,
-  currentRank: string | null,
   env: Env
 ): Promise<Response> {
-  const currentIndex = currentRank ? PRESTIGE_RANKS.indexOf(currentRank) : -1;
-  const newIndex = PRESTIGE_RANKS.indexOf(item.rank!);
-
-  if (currentIndex >= newIndex) {
-    return new Response(`@${username} ❌ Du hast bereits ${currentRank} oder höher!`, { headers: RESPONSE_HEADERS });
-  }
-
-  if (item.requiresRank) {
-    const requiredIndex = PRESTIGE_RANKS.indexOf(item.requiresRank);
-    if (currentIndex < requiredIndex) {
-      return new Response(`@${username} ❌ Du musst zuerst den ${item.requiresRank} Rang kaufen!`, { headers: RESPONSE_HEADERS });
-    }
-  }
-
-  await Promise.all([
-    setPrestigeRank(username, item.rank!, env),
-    setBalance(username, balance - item.price, env)
-  ]);
+  await setPrestigeRank(username, item.rank!, env);
 
   // Achievement tracking
   await trackShopAchievements(username, itemId, item, null, env);
 
-  return new Response(`@${username} ✅ ${item.name} gekauft! Dein Rang: ${item.rank} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+  return new Response(`@${username} ✅ ${item.name} gekauft! Dein Rang: ${item.rank} | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
 async function handleUnlockItem(
@@ -228,32 +210,19 @@ async function handleUnlockItem(
   item: ShopItem,
   itemId: number,
   balance: number,
-  hasPrerequisite: boolean | undefined,
-  hasExistingUnlock: boolean,
   env: Env
 ): Promise<Response> {
-  if (item.requires && !hasPrerequisite) {
-    return new Response(`@${username} ❌ Du musst zuerst ${PREREQUISITE_NAMES[item.requires]} freischalten!`, { headers: RESPONSE_HEADERS });
-  }
-
-  if (hasExistingUnlock) {
-    return new Response(`@${username} ❌ Du hast ${item.name} bereits freigeschaltet!`, { headers: RESPONSE_HEADERS });
-  }
-
-  await Promise.all([
-    setUnlock(username, item.unlockKey!, env),
-    setBalance(username, balance - item.price, env)
-  ]);
+  await setUnlock(username, item.unlockKey!, env);
 
   // Achievement tracking
   await trackShopAchievements(username, itemId, item, null, env);
 
   // Custom Messages unlock: include profile link
   if (item.unlockKey === 'custom_message') {
-    return new Response(`@${username} ✅ Custom Messages freigeschaltet! Richte sie ein: https://dachsbau-slots.exaint.workers.dev/?page=profile&user=${encodeURIComponent(username)} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ Custom Messages freigeschaltet! Richte sie ein: https://dachsbau-slots.exaint.workers.dev/?page=profile&user=${encodeURIComponent(username)} | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
-  return new Response(`@${username} ✅ ${item.name} freigeschaltet! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+  return new Response(`@${username} ✅ ${item.name} freigeschaltet! | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
 async function handleTimedItem(
@@ -263,23 +232,21 @@ async function handleTimedItem(
   balance: number,
   env: Env
 ): Promise<Response> {
-  await setBalance(username, balance - item.price, env);
-
   if (item.uses) {
     await activateBuffWithUses(username, item.buffKey!, item.duration!, item.uses, env);
-    return new Response(`@${username} ✅ ${item.name} aktiviert für ${item.uses} Spins! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ ${item.name} aktiviert für ${item.uses} Spins! | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
   if (item.buffKey === 'rage_mode') {
     await activateBuffWithStack(username, item.buffKey, item.duration!, env);
     const minutes = Math.floor(item.duration! / SECONDS_PER_MINUTE);
-    return new Response(`@${username} ✅ ${item.name} aktiviert für ${minutes} Minuten! Verluste geben +5% Gewinn-Chance (bis 50%)! 🔥 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ ${item.name} aktiviert für ${minutes} Minuten! Verluste geben +5% Gewinn-Chance (bis 50%)! 🔥 | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
   await activateBuff(username, item.buffKey!, item.duration!, env);
   const minutes = Math.floor(item.duration! / SECONDS_PER_MINUTE);
   const hours = item.duration! >= SECONDS_PER_HOUR ? Math.floor(item.duration! / SECONDS_PER_HOUR) + 'h' : minutes + ' Minuten';
-  return new Response(`@${username} ✅ ${item.name} aktiviert für ${hours}! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+  return new Response(`@${username} ✅ ${item.name} aktiviert für ${hours}! | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
 async function handleBoostItem(
@@ -289,92 +256,59 @@ async function handleBoostItem(
   balance: number,
   env: Env
 ): Promise<Response> {
-  const lowerUsername = username.toLowerCase();
-
-  // Weekly limit check for Dachs-Boost
   if (item.weeklyLimit) {
-    const boostKey = `boost:${lowerUsername}:${item.symbol}`;
-    const [existingBoost, purchases] = await Promise.all([
-      env.SLOTS_KV.get(boostKey),
-      getDachsBoostPurchases(username, env)
-    ]);
-
-    if (existingBoost === KV_ACTIVE) {
-      return new Response(`@${username} ❌ Du hast bereits einen aktiven ${item.name}! Nutze ihn erst, bevor du einen neuen kaufst.`, { headers: RESPONSE_HEADERS });
-    }
-
-    if (purchases.count >= WEEKLY_DACHS_BOOST_LIMIT) {
-      return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal ${WEEKLY_DACHS_BOOST_LIMIT} Dachs-Boost pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
-    }
-
     await Promise.all([
-      setBalance(username, balance - item.price, env),
       addBoost(username, item.symbol!, env),
       incrementDachsBoostPurchases(username, env)
     ]);
 
-    return new Response(`@${username} ✅ ${item.name} aktiviert! Dein nächster Gewinn mit ${item.symbol} wird verdoppelt! | Kontostand: ${balance - item.price} 🦡 | Du kannst diese Woche keinen weiteren Dachs-Boost kaufen`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ ${item.name} aktiviert! Dein nächster Gewinn mit ${item.symbol} wird verdoppelt! | Kontostand: ${balance} 🦡 | Du kannst diese Woche keinen weiteren Dachs-Boost kaufen`, { headers: RESPONSE_HEADERS });
   }
 
-  await Promise.all([
-    setBalance(username, balance - item.price, env),
-    addBoost(username, item.symbol!, env)
-  ]);
-  return new Response(`@${username} ✅ ${item.name} aktiviert! Dein nächster Gewinn mit ${item.symbol} wird verdoppelt! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+  await addBoost(username, item.symbol!, env);
+  return new Response(`@${username} ✅ ${item.name} aktiviert! Dein nächster Gewinn mit ${item.symbol} wird verdoppelt! | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
 async function handleInsuranceItem(
   username: string,
-  item: ShopItem,
+  _item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
 ): Promise<Response> {
-  await Promise.all([
-    setBalance(username, balance - item.price, env),
-    addInsurance(username, 5, env)
-  ]);
-  return new Response(`@${username} ✅ Insurance Pack erhalten! Die nächsten 5 Verluste geben 50% des Einsatzes zurück! 🛡️ | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+  await addInsurance(username, 5, env);
+  return new Response(`@${username} ✅ Insurance Pack erhalten! Die nächsten 5 Verluste geben 50% des Einsatzes zurück! 🛡️ | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
 async function handleWinMultiItem(
   username: string,
-  item: ShopItem,
+  _item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
 ): Promise<Response> {
-  await Promise.all([
-    setBalance(username, balance - item.price, env),
-    addWinMultiplier(username, env)
-  ]);
-  return new Response(`@${username} ✅ Win Multiplier aktiviert! Dein nächster Gewinn wird x2! ⚡ | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+  await addWinMultiplier(username, env);
+  return new Response(`@${username} ✅ Win Multiplier aktiviert! Dein nächster Gewinn wird x2! ⚡ | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
 async function handleBundleItem(
   username: string,
-  item: ShopItem,
+  _item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
 ): Promise<Response> {
-  const purchases = await getSpinBundlePurchases(username, env);
-  if (purchases.count >= WEEKLY_SPIN_BUNDLE_LIMIT) {
-    return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal ${WEEKLY_SPIN_BUNDLE_LIMIT} Spin Bundles pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
-  }
-
   await Promise.all([
-    setBalance(username, balance - item.price, env),
     addFreeSpinsWithMultiplier(username, SPIN_BUNDLE_COUNT, SPIN_BUNDLE_MULTIPLIER, env),
     incrementSpinBundlePurchases(username, env)
   ]);
 
-  return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DachsTaler) gutgeschrieben! | Kontostand: ${balance - item.price} 🦡 | Du kannst diese Woche kein weiteres Spin Bundle kaufen`, { headers: RESPONSE_HEADERS });
+  return new Response(`@${username} ✅ Spin Bundle erhalten! ${SPIN_BUNDLE_COUNT} Free Spins (${SPIN_BUNDLE_MULTIPLIER * 10} DachsTaler) gutgeschrieben! | Kontostand: ${balance} 🦡 | Du kannst diese Woche kein weiteres Spin Bundle kaufen`, { headers: RESPONSE_HEADERS });
 }
 
 async function handlePeekItem(
   username: string,
-  item: ShopItem,
+  _item: ShopItem,
   _itemId: number,
   balance: number,
   env: Env
@@ -389,8 +323,6 @@ async function handlePeekItem(
     env.SLOTS_KV.get(`buff:${lowerUsername}:dachs_locator`),
     env.SLOTS_KV.get(`buff:${lowerUsername}:rage_mode`)
   ]);
-
-  await setBalance(username, balance - item.price, env);
 
   // Calculate Dachs chance with all buffs
   let peekDachsChance = DACHS_BASE_CHANCE;
@@ -445,7 +377,7 @@ async function handlePeekItem(
   const willWin = peekResult.points > 0 || (peekResult.freeSpins && peekResult.freeSpins > 0);
   const buffText = activeBuffs.length > 0 ? ` (${activeBuffs.join('')} aktiv!)` : '';
 
-  return new Response(`@${username} 🔮 Peek Token! Dein nächster Spin wird ${willWin ? '✅ GEWINNEN' : '❌ VERLIEREN'}! 🔮${buffText} | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+  return new Response(`@${username} 🔮 Peek Token! Dein nächster Spin wird ${willWin ? '✅ GEWINNEN' : '❌ VERLIEREN'}! 🔮${buffText} | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
 }
 
 // Instant items have sub-handlers for different item IDs
@@ -456,21 +388,30 @@ async function handleInstantItem(
   balance: number,
   env: Env
 ): Promise<Response> {
-  // Chaos Spin (ID 11)
+  // Chaos Spin (ID 11) - result can be negative
   if (itemId === 11) {
     const result = secureRandomInt(CHAOS_SPIN_MIN, CHAOS_SPIN_MAX);
-    const newBalance = Math.min(balance - item.price + result, MAX_BALANCE);
-    await setBalance(username, Math.max(0, newBalance), env);
+    let newBalance: number;
+    if (result > 0) {
+      newBalance = await creditBalance(username, result, env);
+    } else if (result < 0) {
+      const deductResult = await deductBalance(username, Math.abs(result), env);
+      newBalance = deductResult.newBalance;
+    } else {
+      newBalance = balance;
+    }
     // Achievement tracking
     await trackShopAchievements(username, itemId, item, { chaosResult: result }, env);
-    return new Response(`@${username} 🎲 Chaos Spin! ${result >= 0 ? '+' : ''}${result} DachsTaler! | Kontostand: ${Math.max(0, newBalance)}`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} 🎲 Chaos Spin! ${result >= 0 ? '+' : ''}${result} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   }
 
-  // Glücksrad (ID 12)
+  // Glücksrad (ID 12) - prize >= 0
   if (itemId === 12) {
     const wheel = spinWheel();
-    const newBalance = Math.max(0, Math.min(balance - item.price + wheel.prize, MAX_BALANCE));
-    await setBalance(username, newBalance, env);
+    let newBalance = balance;
+    if (wheel.prize > 0) {
+      newBalance = await creditBalance(username, wheel.prize, env);
+    }
     // Achievement tracking (wheelJackpot = 5x Dachs)
     const isWheelJackpot = wheel.prize === WHEEL_JACKPOT_PRIZE;
     await trackShopAchievements(username, itemId, item, { wheelJackpot: isWheelJackpot }, env);
@@ -478,10 +419,7 @@ async function handleInstantItem(
     return new Response(`@${username} 🎡 [ ${wheel.result} ] ${wheel.message} ${netResult >= 0 ? '+' : ''}${netResult} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
   }
 
-  // All other instant items: deduct price first
-  await setBalance(username, balance - item.price, env);
-
-  // Mystery Box (ID 16)
+  // Mystery Box (ID 16) - price already deducted
   if (itemId === 16) {
     const response = await handleMysteryBox(username, item, balance, env);
     // Track achievement only if mystery box succeeded (doesn't contain error message)
@@ -489,11 +427,10 @@ async function handleInstantItem(
     return response;
   }
 
-  // Reverse Chaos (ID 31)
+  // Reverse Chaos (ID 31) - result always positive
   if (itemId === 31) {
     const result = secureRandomInt(REVERSE_CHAOS_MIN, REVERSE_CHAOS_MAX);
-    const newBalance = Math.max(0, Math.min(balance - item.price + result, MAX_BALANCE));
-    await setBalance(username, newBalance, env);
+    const newBalance = await creditBalance(username, result, env);
     // Achievement tracking
     await trackShopAchievements(username, itemId, item, null, env);
     return new Response(`@${username} 🎲 Reverse Chaos! +${result} DachsTaler! | Kontostand: ${newBalance}`, { headers: RESPONSE_HEADERS });
@@ -505,7 +442,7 @@ async function handleInstantItem(
     await addFreeSpinsWithMultiplier(username, freeSpinsAmount, 1, env);
     // Achievement tracking
     await trackShopAchievements(username, itemId, item, null, env);
-    return new Response(`@${username} 💎 Diamond Mine! Du hast ${freeSpinsAmount} Free Spins gefunden! 💎 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} 💎 Diamond Mine! Du hast ${freeSpinsAmount} Free Spins gefunden! 💎 | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
   // Guaranteed Pair (ID 37)
@@ -513,7 +450,7 @@ async function handleInstantItem(
     await activateGuaranteedPair(username, env);
     // Achievement tracking
     await trackShopAchievements(username, itemId, item, null, env);
-    return new Response(`@${username} ✅ Guaranteed Pair aktiviert! Dein nächster Spin hat garantiert mindestens ein Pair! 🎯 | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ Guaranteed Pair aktiviert! Dein nächster Spin hat garantiert mindestens ein Pair! 🎯 | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
   // Wild Card (ID 38)
@@ -521,16 +458,15 @@ async function handleInstantItem(
     await activateWildCard(username, env);
     // Achievement tracking
     await trackShopAchievements(username, itemId, item, null, env);
-    return new Response(`@${username} ✅ Wild Card aktiviert! Dein nächster Spin enthält ein 🃏 Wild Symbol! | Kontostand: ${balance - item.price} 🦡`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ Wild Card aktiviert! Dein nächster Spin enthält ein 🃏 Wild Symbol! | Kontostand: ${balance} 🦡`, { headers: RESPONSE_HEADERS });
   }
 
   // Fallback for unknown instant items
-  return new Response(`@${username} ✅ ${item.name} gekauft! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
+  return new Response(`@${username} ✅ ${item.name} gekauft! | Kontostand: ${balance}`, { headers: RESPONSE_HEADERS });
 }
 
 // Mystery Box has complex logic with rollback and timeout protection
 const MYSTERY_BOX_TIMEOUT_MS = 10000; // 10s to handle cold starts
-const MYSTERY_BOX_ROLLBACK_RETRIES = 3;
 
 async function handleMysteryBox(username: string, item: ShopItem, balance: number, env: Env): Promise<Response> {
   const mysteryItemId = MYSTERY_BOX_ITEMS[secureRandomInt(0, MYSTERY_BOX_ITEMS.length - 1)];
@@ -562,33 +498,14 @@ async function handleMysteryBox(username: string, item: ShopItem, balance: numbe
 
     await Promise.race([activationPromise, timeoutPromise]);
   } catch (activationError) {
-    // Rollback: Refund balance with retry mechanism
+    // Rollback: Atomic refund via creditBalance
     logError('MysteryBox.activation', activationError, { username, mysteryItemId, mysteryItemName: mysteryResult.name });
 
-    let rollbackSuccess = false;
-    for (let attempt = 0; attempt < MYSTERY_BOX_ROLLBACK_RETRIES; attempt++) {
-      try {
-        await setBalance(username, balance, env);
-        // Verify rollback succeeded
-        const verifyBalance = await getBalance(username, env);
-        if (verifyBalance === balance) {
-          rollbackSuccess = true;
-          break;
-        }
-        logError('MysteryBox.rollback.verify', new Error('Balance mismatch after rollback'), {
-          username, expected: balance, actual: verifyBalance, attempt
-        });
-      } catch (rollbackError) {
-        logError('MysteryBox.rollback.attempt', rollbackError, { username, attempt, originalBalance: balance });
-        if (attempt < MYSTERY_BOX_ROLLBACK_RETRIES - 1) {
-          await new Promise(r => setTimeout(r, 100 * (attempt + 1))); // Exponential backoff
-        }
-      }
-    }
-
-    if (!rollbackSuccess) {
-      logError('MysteryBox.rollback.CRITICAL', new Error('All rollback attempts failed'), {
-        username, originalBalance: balance, itemPrice: item.price
+    try {
+      await creditBalance(username, item.price, env);
+    } catch (rollbackError) {
+      logError('MysteryBox.rollback.CRITICAL', rollbackError, {
+        username, itemPrice: item.price
       });
       return new Response(`@${username} ❌ Mystery Box Fehler! Bitte kontaktiere einen Admin für Erstattung.`, { headers: RESPONSE_HEADERS });
     }
@@ -596,7 +513,7 @@ async function handleMysteryBox(username: string, item: ShopItem, balance: numbe
     return new Response(`@${username} ❌ Mystery Box Fehler! Dein Einsatz wurde zurückerstattet.`, { headers: RESPONSE_HEADERS });
   }
 
-  return new Response(`@${username} 📦 Mystery Box! Du hast gewonnen: ${mysteryResult.name} (Wert: ${mysteryResult.price})! Item wurde aktiviert! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
+  return new Response(`@${username} 📦 Mystery Box! Du hast gewonnen: ${mysteryResult.name} (Wert: ${mysteryResult.price})! Item wurde aktiviert! | Kontostand: ${balance}`, { headers: RESPONSE_HEADERS });
 }
 
 // ============================================================================
@@ -658,9 +575,7 @@ async function buyShopItem(username: string, itemId: number, env: Env): Promise<
 
     // OPTIMIZED: Load balance and prerequisites in parallel based on item type
     let balance: number;
-    let hasPrerequisite: boolean | undefined;
     let currentRank: string | null = null;
-    let hasExistingUnlock: boolean = false;
 
     if (item.type === 'prestige') {
       [balance, currentRank] = await Promise.all([
@@ -674,11 +589,15 @@ async function buyShopItem(username: string, itemId: number, env: Env): Promise<
 
       const results = await Promise.all(promises);
       balance = results[0] as number;
-      if (item.requires) {
-        hasPrerequisite = results[1] as boolean;
-        hasExistingUnlock = results[2] as boolean;
-      } else {
-        hasExistingUnlock = results[1] as boolean;
+      const hasPrerequisite = item.requires ? results[1] as boolean : undefined;
+      const hasExistingUnlock = item.requires ? results[2] as boolean : results[1] as boolean;
+
+      // Pre-purchase validation for unlock items
+      if (item.requires && !hasPrerequisite) {
+        return new Response(`@${username} ❌ Du musst zuerst ${PREREQUISITE_NAMES[item.requires]} freischalten!`, { headers: RESPONSE_HEADERS });
+      }
+      if (hasExistingUnlock) {
+        return new Response(`@${username} ❌ Du hast ${item.name} bereits freigeschaltet!`, { headers: RESPONSE_HEADERS });
       }
     } else {
       balance = await getBalance(username, env);
@@ -689,14 +608,59 @@ async function buyShopItem(username: string, itemId: number, env: Env): Promise<
       return new Response(`@${username} ❌ Nicht genug DachsTaler! ${item.name} kostet ${item.price}, du hast ${balance}.`, { headers: RESPONSE_HEADERS });
     }
 
-    // Delegate to type-specific handlers
-    // Note: prestige and unlock handlers track achievements internally after successful purchase
+    // Pre-purchase validation for prestige items
     if (item.type === 'prestige') {
-      return await handlePrestigeItem(username, item, itemId, balance, currentRank, env);
+      const currentIndex = currentRank ? PRESTIGE_RANKS.indexOf(currentRank) : -1;
+      const newIndex = PRESTIGE_RANKS.indexOf(item.rank!);
+      if (currentIndex >= newIndex) {
+        return new Response(`@${username} ❌ Du hast bereits ${currentRank} oder höher!`, { headers: RESPONSE_HEADERS });
+      }
+      if (item.requiresRank) {
+        const requiredIndex = PRESTIGE_RANKS.indexOf(item.requiresRank);
+        if (currentIndex < requiredIndex) {
+          return new Response(`@${username} ❌ Du musst zuerst den ${item.requiresRank} Rang kaufen!`, { headers: RESPONSE_HEADERS });
+        }
+      }
+    }
+
+    // Pre-purchase validation for boost with weekly limit
+    if (item.type === 'boost' && item.weeklyLimit) {
+      const lowerUsername = username.toLowerCase();
+      const boostKey = `boost:${lowerUsername}:${item.symbol}`;
+      const [existingBoost, purchases] = await Promise.all([
+        env.SLOTS_KV.get(boostKey),
+        getDachsBoostPurchases(username, env)
+      ]);
+      if (existingBoost === KV_ACTIVE) {
+        return new Response(`@${username} ❌ Du hast bereits einen aktiven ${item.name}! Nutze ihn erst, bevor du einen neuen kaufst.`, { headers: RESPONSE_HEADERS });
+      }
+      if (purchases.count >= WEEKLY_DACHS_BOOST_LIMIT) {
+        return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal ${WEEKLY_DACHS_BOOST_LIMIT} Dachs-Boost pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
+      }
+    }
+
+    // Pre-purchase validation for bundle with weekly limit
+    if (item.type === 'bundle') {
+      const purchases = await getSpinBundlePurchases(username, env);
+      if (purchases.count >= WEEKLY_SPIN_BUNDLE_LIMIT) {
+        return new Response(`@${username} ❌ Wöchentliches Limit erreicht! Du kannst maximal ${WEEKLY_SPIN_BUNDLE_LIMIT} Spin Bundles pro Woche kaufen. Nächster Reset: Montag 00:00 UTC`, { headers: RESPONSE_HEADERS });
+      }
+    }
+
+    // ATOMIC DEDUCTION: D1-first with KV fallback (eliminates TOCTOU window)
+    const deductResult = await deductBalance(username, item.price, env);
+    if (!deductResult.success) {
+      return new Response(`@${username} ❌ Nicht genug DachsTaler! ${item.name} kostet ${item.price}, du hast ${deductResult.newBalance}.`, { headers: RESPONSE_HEADERS });
+    }
+    balance = deductResult.newBalance;
+
+    // Delegate to type-specific handlers (balance is POST-deduction)
+    if (item.type === 'prestige') {
+      return await handlePrestigeItem(username, item, itemId, balance, env);
     }
 
     if (item.type === 'unlock') {
-      return await handleUnlockItem(username, item, itemId, balance, hasPrerequisite, hasExistingUnlock, env);
+      return await handleUnlockItem(username, item, itemId, balance, env);
     }
 
     // Use handler map for remaining types
@@ -712,7 +676,7 @@ async function buyShopItem(username: string, itemId: number, env: Env): Promise<
     }
 
     // Fallback for unknown types
-    return new Response(`@${username} ✅ ${item.name} gekauft! | Kontostand: ${balance - item.price}`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${username} ✅ ${item.name} gekauft! | Kontostand: ${balance}`, { headers: RESPONSE_HEADERS });
   } catch (error) {
     logError('buyShopItem', error, { username, itemId });
     return new Response(`@${username} ❌ Fehler beim Item-Kauf.`, { headers: RESPONSE_HEADERS });

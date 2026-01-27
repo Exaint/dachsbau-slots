@@ -2,8 +2,8 @@
  * Items - Guaranteed Pair, Wild Card, Free Spins
  */
 
-import { MAX_RETRIES, KV_ACTIVE } from '../constants.js';
-import { exponentialBackoff, logError, kvKey } from '../utils.js';
+import { KV_ACTIVE } from '../constants.js';
+import { logError, kvKey } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, upsertItem, deleteItem } from './d1.js';
 import type { Env, FreeSpinEntry } from '../types/index.js';
 
@@ -151,83 +151,61 @@ export async function addFreeSpinsWithMultiplier(username: string, count: number
   }
 }
 
-// Atomic free spin consumption with retry mechanism (prevents race conditions)
-export async function consumeFreeSpinWithMultiplier(username: string, env: Env, maxRetries: number = MAX_RETRIES): Promise<FreeSpinConsumeResult> {
-  const key = kvKey('freespins:', username);
+// Spin cooldown prevents concurrent per-user operations, so simple GET→PUT/DELETE is safe
+export async function consumeFreeSpinWithMultiplier(username: string, env: Env): Promise<FreeSpinConsumeResult> {
+  try {
+    const key = kvKey('freespins:', username);
+    const value = await env.SLOTS_KV.get(key);
+    if (!value || value === 'null' || value === 'undefined') {
+      return { used: false, multiplier: 0 };
+    }
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      // Read current state
-      const value = await env.SLOTS_KV.get(key);
-      if (!value || value === 'null' || value === 'undefined') {
-        return { used: false, multiplier: 0 };
-      }
+    const freeSpins: FreeSpinEntry[] = JSON.parse(value);
+    if (!Array.isArray(freeSpins) || freeSpins.length === 0) {
+      return { used: false, multiplier: 0 };
+    }
 
-      const freeSpins: FreeSpinEntry[] = JSON.parse(value);
-      if (!Array.isArray(freeSpins) || freeSpins.length === 0) {
-        return { used: false, multiplier: 0 };
-      }
+    const lowestEntry = freeSpins[0];
+    if (!lowestEntry || typeof lowestEntry !== 'object') {
+      logError('consumeFreeSpinWithMultiplier.invalidEntry', new Error('Invalid lowest entry'), { username, lowestEntry });
+      return { used: false, multiplier: 0 };
+    }
 
-      const lowestEntry = freeSpins[0];
-      if (!lowestEntry || typeof lowestEntry !== 'object') {
-        logError('consumeFreeSpinWithMultiplier.invalidEntry', new Error('Invalid lowest entry'), { username, lowestEntry });
-        return { used: false, multiplier: 0 };
-      }
+    if (typeof lowestEntry.count !== 'number' || typeof lowestEntry.multiplier !== 'number') {
+      logError('consumeFreeSpinWithMultiplier.invalidTypes', new Error('Invalid entry types'), { username, lowestEntry });
+      return { used: false, multiplier: 0 };
+    }
 
-      if (typeof lowestEntry.count !== 'number' || typeof lowestEntry.multiplier !== 'number') {
-        logError('consumeFreeSpinWithMultiplier.invalidTypes', new Error('Invalid entry types'), { username, lowestEntry });
-        return { used: false, multiplier: 0 };
-      }
+    if (lowestEntry.multiplier <= 0 || lowestEntry.count <= 0) {
+      logError('consumeFreeSpinWithMultiplier.invalidValues', new Error('Invalid entry values'), { username, lowestEntry });
+      return { used: false, multiplier: 0 };
+    }
 
-      if (lowestEntry.multiplier <= 0 || lowestEntry.count <= 0) {
-        logError('consumeFreeSpinWithMultiplier.invalidValues', new Error('Invalid entry values'), { username, lowestEntry });
-        return { used: false, multiplier: 0 };
-      }
+    const multiplierToReturn = lowestEntry.multiplier;
+    const updatedFreeSpins: FreeSpinEntry[] = freeSpins.map(entry => ({ ...entry }));
+    updatedFreeSpins[0].count--;
 
-      // Prepare update - OPTIMIZED: Use deep copy instead of redundant JSON.parse
-      const multiplierToReturn = lowestEntry.multiplier;
-      const updatedFreeSpins: FreeSpinEntry[] = freeSpins.map(entry => ({ ...entry }));
-      updatedFreeSpins[0].count--;
+    if (updatedFreeSpins[0].count <= 0) {
+      updatedFreeSpins.shift();
+    }
 
-      if (updatedFreeSpins[0].count <= 0) {
-        updatedFreeSpins.shift();
-      }
+    if (updatedFreeSpins.length === 0) {
+      await env.SLOTS_KV.delete(key);
+    } else {
+      await env.SLOTS_KV.put(key, JSON.stringify(updatedFreeSpins));
+    }
 
-      // Write with metadata for optimistic lock verification
-      const metadata = { lastUpdate: Date.now(), attempt };
-      await env.SLOTS_KV.put(key, JSON.stringify(updatedFreeSpins), { metadata });
-
-      // Verify the write succeeded
-      const verifyValue = await env.SLOTS_KV.get(key);
-      const verifySpins: FreeSpinEntry[] = verifyValue ? JSON.parse(verifyValue) : [];
-
-      // Check if our update was applied (count should match)
-      const expectedCount = updatedFreeSpins.length > 0 ? updatedFreeSpins[0]?.count : -1;
-      const actualCount = verifySpins.length > 0 ? verifySpins[0]?.count : -1;
-
-      if (verifySpins.length === updatedFreeSpins.length &&
-          (updatedFreeSpins.length === 0 || expectedCount === actualCount)) {
-        if (D1_ENABLED && DUAL_WRITE && env.DB) {
-          if (updatedFreeSpins.length === 0) {
-            deleteItem(username, 'freespins', env).catch(err => logError('consumeFreeSpin.d1', err, { username }));
-          } else {
-            upsertItem(username, 'freespins', JSON.stringify(updatedFreeSpins), env).catch(err => logError('consumeFreeSpin.d1', err, { username }));
-          }
-        }
-        return { used: true, multiplier: multiplierToReturn };
-      }
-
-      // Verification failed, retry with backoff
-      if (attempt < maxRetries - 1) {
-        await exponentialBackoff(attempt);
-      }
-    } catch (error) {
-      logError('consumeFreeSpinWithMultiplier', error, { username, attempt: attempt + 1 });
-      if (attempt === maxRetries - 1) {
-        return { used: false, multiplier: 0 };
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      if (updatedFreeSpins.length === 0) {
+        deleteItem(username, 'freespins', env).catch(err => logError('consumeFreeSpin.d1', err, { username }));
+      } else {
+        upsertItem(username, 'freespins', JSON.stringify(updatedFreeSpins), env).catch(err => logError('consumeFreeSpin.d1', err, { username }));
       }
     }
-  }
 
-  return { used: false, multiplier: 0 };
+    return { used: true, multiplier: multiplierToReturn };
+  } catch (error) {
+    logError('consumeFreeSpinWithMultiplier', error, { username });
+    return { used: false, multiplier: 0 };
+  }
 }

@@ -800,11 +800,13 @@ async function unlockAchievement(username: string, achievementId: string, env: E
       data.pendingRewards = (data.pendingRewards || 0) + reward;
     }
 
-    // Save player achievements and invalidate stats cache
-    await Promise.all([
-      savePlayerAchievements(username, data, env),
-      env.SLOTS_KV.delete(STATS_CACHE_KEY)
-    ]);
+    // Only save when we own the data (no external caller managing persistence)
+    if (!existingData) {
+      await Promise.all([
+        savePlayerAchievements(username, data, env),
+        env.SLOTS_KV.delete(STATS_CACHE_KEY)
+      ]);
+    }
 
     // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
@@ -826,9 +828,9 @@ async function unlockAchievement(username: string, achievementId: string, env: E
  * Update a stat and check for related achievements
  * Returns array of newly unlocked achievements
  */
-async function updateAchievementStat(username: string, statKey: string, increment: number, env: Env): Promise<UnlockedAchievement[]> {
+async function updateAchievementStat(username: string, statKey: string, increment: number, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
   try {
-    const data = await getPlayerAchievements(username, env);
+    const data = existingData || await getPlayerAchievements(username, env);
     const oldValue = (data.stats[statKey as keyof PlayerStats] as number) || 0;
     const newValue = oldValue + increment;
     (data.stats[statKey as keyof PlayerStats] as number) = newValue;
@@ -855,7 +857,9 @@ async function updateAchievementStat(username: string, statKey: string, incremen
       }
     }
 
-    await savePlayerAchievements(username, data, env);
+    if (!existingData) {
+      await savePlayerAchievements(username, data, env);
+    }
 
     // DUAL_WRITE: Fire-and-forget D1 write
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
@@ -872,9 +876,9 @@ async function updateAchievementStat(username: string, statKey: string, incremen
 /**
  * Batch update multiple achievement stats in a single read-modify-write cycle
  */
-async function updateAchievementStatBatch(username: string, updates: Array<[string, number]>, env: Env): Promise<void> {
+async function updateAchievementStatBatch(username: string, updates: Array<[string, number]>, env: Env, existingData?: PlayerAchievementData): Promise<void> {
   try {
-    const data = await getPlayerAchievements(username, env);
+    const data = existingData || await getPlayerAchievements(username, env);
 
     for (const [statKey, increment] of updates) {
       const newValue = ((data.stats[statKey as keyof PlayerStats] as number) || 0) + increment;
@@ -891,7 +895,9 @@ async function updateAchievementStatBatch(username: string, updates: Array<[stri
       }
     }
 
-    await savePlayerAchievements(username, data, env);
+    if (!existingData) {
+      await savePlayerAchievements(username, data, env);
+    }
 
     // DUAL_WRITE: Fire-and-forget D1 writes
     if (D1_ENABLED && DUAL_WRITE && env.DB) {
@@ -907,9 +913,9 @@ async function updateAchievementStatBatch(username: string, updates: Array<[stri
  * Set a max-value achievement stat (only updates if new value is higher)
  * Used for stats like maxLossStreak, maxDuelStreak where we track the maximum
  */
-async function setMaxAchievementStat(username: string, statKey: string, newValue: number, env: Env): Promise<UnlockedAchievement[]> {
+async function setMaxAchievementStat(username: string, statKey: string, newValue: number, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
   try {
-    const data = await getPlayerAchievements(username, env);
+    const data = existingData || await getPlayerAchievements(username, env);
     const currentValue = (data.stats[statKey as keyof PlayerStats] as number) || 0;
 
     if (newValue <= currentValue) return [];
@@ -929,7 +935,9 @@ async function setMaxAchievementStat(username: string, statKey: string, newValue
       }
     }
 
-    await savePlayerAchievements(username, data, env);
+    if (!existingData) {
+      await savePlayerAchievements(username, data, env);
+    }
 
     // D1 dual-write (fire-and-forget)
     updateMaxStatD1(username, statKey, newValue, env).catch(() => {});
@@ -945,9 +953,9 @@ async function setMaxAchievementStat(username: string, statKey: string, newValue
  * Mark a triple as collected and check for collection achievements
  * Also records to D1 for detailed tracking with timestamps and counters
  */
-async function markTripleCollected(username: string, symbol: string, env: Env): Promise<UnlockedAchievement[]> {
+async function markTripleCollected(username: string, symbol: string, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
   try {
-    const data = await getPlayerAchievements(username, env);
+    const data = existingData || await getPlayerAchievements(username, env);
     const symbolKey = getTripleKey(symbol);
 
     if (!symbolKey) {
@@ -1024,7 +1032,9 @@ async function markTripleCollected(username: string, symbol: string, env: Env): 
     }
 
     // Save to KV (this also updates D1 player_stats via savePlayerAchievements)
-    await savePlayerAchievements(username, data, env);
+    if (!existingData) {
+      await savePlayerAchievements(username, data, env);
+    }
 
     return unlockedAchievements;
   } catch (error) {
@@ -1054,16 +1064,16 @@ function recordDachsHit(username: string, count: number, env: Env): void {
  * Check and unlock a one-time achievement (e.g., FIRST_SPIN, FIRST_WIN)
  * Returns unlock result
  */
-async function checkAndUnlockAchievement(username: string, achievementId: string, env: Env): Promise<UnlockResult> {
-  return unlockAchievement(username, achievementId, env);
+async function checkAndUnlockAchievement(username: string, achievementId: string, env: Env, existingData?: PlayerAchievementData): Promise<UnlockResult> {
+  return unlockAchievement(username, achievementId, env, existingData || null);
 }
 
 /**
  * Check balance milestones and unlock if reached
  */
-async function checkBalanceAchievements(username: string, newBalance: number, env: Env): Promise<UnlockedAchievement[]> {
+async function checkBalanceAchievements(username: string, newBalance: number, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
   try {
-    const data = await getPlayerAchievements(username, env);
+    const data = existingData || await getPlayerAchievements(username, env);
     const unlockedAchievements: UnlockedAchievement[] = [];
 
     const balanceAchievements = [
@@ -1102,10 +1112,14 @@ async function checkBalanceAchievements(username: string, newBalance: number, en
     }
 
     if (unlockedAchievements.length > 0) {
-      await Promise.all([
-        savePlayerAchievements(username, data, env),
-        ...counterPromises
-      ]);
+      if (!existingData) {
+        await Promise.all([
+          savePlayerAchievements(username, data, env),
+          ...counterPromises
+        ]);
+      } else if (counterPromises.length > 0) {
+        await Promise.all(counterPromises);
+      }
     }
 
     return unlockedAchievements;
@@ -1118,9 +1132,9 @@ async function checkBalanceAchievements(username: string, newBalance: number, en
 /**
  * Check big win achievements
  */
-async function checkBigWinAchievements(username: string, winAmount: number, env: Env): Promise<UnlockedAchievement[]> {
+async function checkBigWinAchievements(username: string, winAmount: number, env: Env, existingData?: PlayerAchievementData): Promise<UnlockedAchievement[]> {
   try {
-    const data = await getPlayerAchievements(username, env);
+    const data = existingData || await getPlayerAchievements(username, env);
     const unlockedAchievements: UnlockedAchievement[] = [];
 
     // Update biggest win stat
@@ -1152,10 +1166,14 @@ async function checkBigWinAchievements(username: string, winAmount: number, env:
     }
 
     if (unlockedAchievements.length > 0 || winAmount > (data.stats.biggestWin || 0)) {
-      await Promise.all([
-        savePlayerAchievements(username, data, env),
-        ...counterPromises
-      ]);
+      if (!existingData) {
+        await Promise.all([
+          savePlayerAchievements(username, data, env),
+          ...counterPromises
+        ]);
+      } else if (counterPromises.length > 0) {
+        await Promise.all(counterPromises);
+      }
     }
 
     return unlockedAchievements;
@@ -1520,6 +1538,7 @@ async function syncAllPlayerAchievementStats(env: Env): Promise<SyncResults> {
   return results;
 }
 
+export type { PlayerAchievementData };
 export {
   getPlayerAchievements,
   savePlayerAchievements,

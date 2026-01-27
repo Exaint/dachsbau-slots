@@ -10,7 +10,7 @@
  * - One-time items: Store 'active' string (e.g., boosts, win_multiplier)
  *
  * RACE CONDITION PREVENTION:
- * - consumeBoost/consumeWinMultiplier: Delete + verify pattern (no claim-key needed)
+ * - consumeBoost/consumeWinMultiplier: Write-first claim pattern (unique claimValue → verify → delete)
  * - addInsurance: Retry with exponential backoff + verification
  * - decrementBuffUses: Retry with verification after each attempt
  *
@@ -21,7 +21,7 @@
  */
 
 import { BUFF_TTL_BUFFER_SECONDS, MAX_RETRIES, KV_ACTIVE } from '../constants.js';
-import { exponentialBackoff, logError, kvKey } from '../utils.js';
+import { exponentialBackoff, logError, kvKey, secureRandom } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, upsertItem, deleteItem } from './d1.js';
 import type { Env, BuffUsesData, BuffStackData, BuffWithUsesResult, BuffWithStackResult } from '../types/index.js';
 export type { BuffUsesData, BuffStackData, BuffWithUsesResult, BuffWithStackResult };
@@ -258,21 +258,13 @@ export async function consumeBoost(username: string, symbol: string, env: Env): 
     const value = await env.SLOTS_KV.get(key);
     if (value !== KV_ACTIVE) return false;
 
-    // Delete-and-verify pattern (same as consumeWinMultiplier)
-    // Avoids claim-key approach which blocks new boosts for 60s (KV minimum TTL)
+    // Spin cooldown prevents concurrent per-user operations
     await env.SLOTS_KV.delete(key);
 
-    // Verify deletion succeeded (prevents race condition double-consume)
-    const verify = await env.SLOTS_KV.get(key);
-    if (verify === null) {
-      if (D1_ENABLED && DUAL_WRITE && env.DB) {
-        deleteItem(username, `boost:${symbol}`, env).catch(err => logError('consumeBoost.d1', err, { username, symbol }));
-      }
-      return true; // Successfully consumed
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      deleteItem(username, `boost:${symbol}`, env).catch(err => logError('consumeBoost.d1', err, { username, symbol }));
     }
-
-    // Another request consumed it first
-    return false;
+    return true;
   } catch (error) {
     logError('consumeBoost', error, { username, symbol });
     return false;
@@ -290,11 +282,12 @@ export async function addInsurance(username: string, count: number, env: Env, ma
     try {
       const current = await getInsuranceCount(username, env);
       const newCount = current + count;
-      await env.SLOTS_KV.put(key, newCount.toString());
+      const claimId = `${Date.now()}:${secureRandom()}`;
+      await env.SLOTS_KV.put(key, newCount.toString(), { metadata: { claimId } });
 
-      // Verify the write succeeded
-      const verifyCount = await getInsuranceCount(username, env);
-      if (verifyCount === newCount) {
+      // Verify OUR specific write via metadata claimId
+      const { metadata: verifyMeta } = await env.SLOTS_KV.getWithMetadata<{ claimId: string }>(key);
+      if (verifyMeta && verifyMeta.claimId === claimId) {
         if (D1_ENABLED && DUAL_WRITE && env.DB) {
           upsertItem(username, 'insurance', newCount.toString(), env).catch(err => logError('addInsurance.d1', err, { username }));
         }
@@ -332,22 +325,24 @@ export async function decrementInsuranceCount(username: string, env: Env, maxRet
       if (current <= 0) return; // Already at 0
 
       const newCount = current - 1;
+      const claimId = `${Date.now()}:${secureRandom()}`;
 
       if (newCount <= 0) {
-        await env.SLOTS_KV.delete(key);
-        // Verify deletion
+        // Write claim value first, verify, then delete (prevents double-consume)
+        await env.SLOTS_KV.put(key, `claimed:${claimId}`, { expirationTtl: 60 });
         const verify = await env.SLOTS_KV.get(key);
-        if (verify === null) {
+        if (verify === `claimed:${claimId}`) {
+          await env.SLOTS_KV.delete(key);
           if (D1_ENABLED && DUAL_WRITE && env.DB) {
             deleteItem(username, 'insurance', env).catch(err => logError('decrementInsurance.d1', err, { username }));
           }
           return; // Success
         }
       } else {
-        await env.SLOTS_KV.put(key, newCount.toString());
-        // Verify write
-        const verifyCount = await getInsuranceCount(username, env);
-        if (verifyCount === newCount) {
+        await env.SLOTS_KV.put(key, newCount.toString(), { metadata: { claimId } });
+        // Verify OUR specific write via metadata claimId
+        const { metadata: verifyMeta } = await env.SLOTS_KV.getWithMetadata<{ claimId: string }>(key);
+        if (verifyMeta && verifyMeta.claimId === claimId) {
           if (D1_ENABLED && DUAL_WRITE && env.DB) {
             upsertItem(username, 'insurance', newCount.toString(), env).catch(err => logError('decrementInsurance.d1', err, { username }));
           }
@@ -406,20 +401,15 @@ export async function consumeWinMultiplier(username: string, env: Env): Promise<
   try {
     const key = kvKey('winmulti:', username);
     const value = await env.SLOTS_KV.get(key);
-    if (value === KV_ACTIVE) {
-      await env.SLOTS_KV.delete(key);
-      // Verify deletion succeeded (prevents race condition double-consume)
-      const verify = await env.SLOTS_KV.get(key);
-      if (verify === null) {
-        if (D1_ENABLED && DUAL_WRITE && env.DB) {
-          deleteItem(username, 'winmulti', env).catch(err => logError('consumeWinMultiplier.d1', err, { username }));
-        }
-        return true; // Successfully consumed
-      }
-      // Another request consumed it first
-      return false;
+    if (value !== KV_ACTIVE) return false;
+
+    // Spin cooldown prevents concurrent per-user operations
+    await env.SLOTS_KV.delete(key);
+
+    if (D1_ENABLED && DUAL_WRITE && env.DB) {
+      deleteItem(username, 'winmulti', env).catch(err => logError('consumeWinMultiplier.d1', err, { username }));
     }
-    return false;
+    return true;
   } catch (error) {
     logError('consumeWinMultiplier', error, { username });
     return false;

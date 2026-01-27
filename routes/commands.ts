@@ -19,6 +19,7 @@ import {
 // Admin commands
 import {
   handleGive,
+  handleRemove,
   handleBan,
   handleUnban,
   handleReset,
@@ -84,6 +85,7 @@ const ADMIN_COMMANDS_TARGET: Record<string, (username: string, target: string, e
 // Admin commands that take (username, target, amount, env)
 const ADMIN_COMMANDS_AMOUNT: Record<string, (username: string, target: string, amount: string, env: Env) => Promise<Response>> = {
   give: handleGive,
+  remove: handleRemove,
   setbalance: handleSetBalance,
   givebuff: handleGiveBuff,
   removebuff: handleRemoveBuff,

@@ -481,6 +481,115 @@ export async function claimSpinSlot(
 }
 
 // ============================================
+// Atomic Balance Operations
+// ============================================
+
+export interface AtomicBalanceResult {
+  success: boolean;
+  newBalance: number;
+  error?: 'insufficient_balance' | 'user_not_found' | 'd1_unavailable';
+}
+
+/**
+ * Atomically deduct balance from a user.
+ * Uses SQL WHERE clause to guarantee sufficient balance (no TOCTOU window).
+ *
+ * How it works:
+ * - UPDATE WHERE balance >= amount → deduction only if sufficient
+ * - SELECT in same batch → read new balance atomically
+ * - changes = 0 → insufficient balance or user not found
+ *
+ * On D1 error, returns d1_unavailable to trigger KV fallback.
+ */
+export async function atomicDeductBalance(
+  username: string,
+  amount: number,
+  env: Env
+): Promise<AtomicBalanceResult> {
+  if (!D1_ENABLED || !env.DB) {
+    return { success: false, newBalance: 0, error: 'd1_unavailable' };
+  }
+
+  try {
+    const now = Date.now();
+    const lowerUsername = username.toLowerCase();
+
+    const results = await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE users SET balance = balance - ?, updated_at = ? WHERE username = ? AND balance >= ?'
+      ).bind(amount, now, lowerUsername, amount),
+      env.DB.prepare(
+        'SELECT balance FROM users WHERE username = ?'
+      ).bind(lowerUsername)
+    ]);
+
+    const updateMeta = results[0].meta;
+    const selectRows = results[1].results as { balance: number }[] | undefined;
+
+    if (!updateMeta || updateMeta.changes === 0) {
+      if (!selectRows || selectRows.length === 0) {
+        return { success: false, newBalance: 0, error: 'user_not_found' };
+      }
+      return { success: false, newBalance: selectRows[0].balance, error: 'insufficient_balance' };
+    }
+
+    const newBalance = selectRows?.[0]?.balance ?? 0;
+    return { success: true, newBalance };
+  } catch (error) {
+    logError('d1.atomicDeductBalance', error, { username, amount });
+    return { success: false, newBalance: 0, error: 'd1_unavailable' };
+  }
+}
+
+/**
+ * Atomically adjust balance by a delta (positive or negative).
+ * Clamps result to [0, maxBalance].
+ *
+ * Use for credits/additions where no minimum balance check is needed.
+ * On D1 error, returns d1_unavailable to trigger KV fallback.
+ */
+export async function atomicAdjustBalance(
+  username: string,
+  delta: number,
+  maxBalance: number,
+  env: Env
+): Promise<AtomicBalanceResult> {
+  if (!D1_ENABLED || !env.DB) {
+    return { success: false, newBalance: 0, error: 'd1_unavailable' };
+  }
+
+  try {
+    const now = Date.now();
+    const lowerUsername = username.toLowerCase();
+
+    const results = await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE users SET balance = MAX(0, MIN(balance + ?, ?)), updated_at = ? WHERE username = ?'
+      ).bind(delta, maxBalance, now, lowerUsername),
+      env.DB.prepare(
+        'SELECT balance FROM users WHERE username = ?'
+      ).bind(lowerUsername)
+    ]);
+
+    const updateMeta = results[0].meta;
+    const selectRows = results[1].results as { balance: number }[] | undefined;
+
+    if (!updateMeta || updateMeta.changes === 0) {
+      if (!selectRows || selectRows.length === 0) {
+        return { success: false, newBalance: 0, error: 'user_not_found' };
+      }
+      return { success: false, newBalance: selectRows[0].balance, error: 'user_not_found' };
+    }
+
+    const newBalance = selectRows?.[0]?.balance ?? 0;
+    return { success: true, newBalance };
+  } catch (error) {
+    logError('d1.atomicAdjustBalance', error, { username, delta });
+    return { success: false, newBalance: 0, error: 'd1_unavailable' };
+  }
+}
+
+// ============================================
 // Migration Helpers
 // ============================================
 

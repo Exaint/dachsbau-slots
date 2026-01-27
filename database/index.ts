@@ -20,6 +20,8 @@ export {
   getBalance,
   setBalance,
   adjustBalance,
+  deductBalance,
+  creditBalance,
   getLastDaily,
   setLastDaily,
   getLastSpin,
@@ -113,6 +115,7 @@ export {
 } from './duels.js';
 
 // Achievements
+export type { PlayerAchievementData } from './achievements.js';
 export {
   getPlayerAchievements,
   savePlayerAchievements,

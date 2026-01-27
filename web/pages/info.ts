@@ -289,6 +289,10 @@ export function renderInfoPage(user: LoggedInUser | null = null): string {
               <span>DachsTaler an Spieler geben</span>
             </div>
             <div class="command-item">
+              <code>!slots remove @user [Betrag]</code>
+              <span>DachsTaler von Spieler abziehen</span>
+            </div>
+            <div class="command-item">
               <code>!slots setbalance @user [Betrag]</code>
               <span>Kontostand direkt setzen</span>
             </div>

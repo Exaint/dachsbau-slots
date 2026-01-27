@@ -29,7 +29,7 @@
  */
 
 import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SCORE_TRIPLE_OFFSET, DUEL_SCORE_PAIR_OFFSET, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
-import { getBalance, adjustBalance, checkAndUnlockAchievement, checkBalanceAchievements, updatePlayerStatBatch } from '../database.js';
+import { getBalance, deductBalance, creditBalance, checkAndUnlockAchievement, checkBalanceAchievements, updatePlayerStatBatch } from '../database.js';
 import type { PlayerStats } from '../database/progression.js';
 import { createDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
 import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
@@ -300,25 +300,14 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
     const pot = duel.amount * 2;
     let resultMessage: string;
 
-    // Final balance verification before modification
-    const [finalChallengerBalance, finalTargetBalance] = await Promise.all([
-      getBalance(duel.challenger, env),
-      getBalance(username, env)
-    ]);
-
-    if (finalChallengerBalance < duel.amount) {
-      return `@${username} ❌ Duell abgebrochen - @${duel.challenger} hat während des Duells nicht mehr genug DachsTaler.`;
-    }
-    if (finalTargetBalance < duel.amount) {
-      return `@${username} ❌ Duell abgebrochen - Du hast während des Duells nicht mehr genug DachsTaler.`;
-    }
-
+    // Balance verified atomically by deductBalance below (no redundant pre-read needed)
     if (challengerScore.score > targetScore.score) {
-      // Challenger wins - use adjustBalance (delta-based) to minimize TOCTOU window
-      const [winnerBalanceC] = await Promise.all([
-        adjustBalance(duel.challenger, +duel.amount, env),
-        adjustBalance(username, -duel.amount, env)
-      ]);
+      // Challenger wins - atomic D1 operations: deduct loser first, then credit winner
+      const loserDeduct = await deductBalance(username, duel.amount, env);
+      if (!loserDeduct.success) {
+        return `@${username} ❌ Duell abgebrochen - Nicht genug DachsTaler.`;
+      }
+      const winnerBalanceC = await creditBalance(duel.challenger, duel.amount, env);
       resultMessage = `🏆 @${duel.challenger} GEWINNT ${pot} DachsTaler!`;
       // Achievement tracking (must await, otherwise worker terminates before completion)
       await Promise.all([
@@ -327,11 +316,12 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
         checkBalanceAchievements(duel.challenger, winnerBalanceC, env)
       ]);
     } else if (targetScore.score > challengerScore.score) {
-      // Target wins - use adjustBalance (delta-based) to minimize TOCTOU window
-      const [, winnerBalanceT] = await Promise.all([
-        adjustBalance(duel.challenger, -duel.amount, env),
-        adjustBalance(username, +duel.amount, env)
-      ]);
+      // Target wins - atomic D1 operations: deduct loser first, then credit winner
+      const challengerDeduct = await deductBalance(duel.challenger, duel.amount, env);
+      if (!challengerDeduct.success) {
+        return `@${username} ❌ Duell abgebrochen - @${duel.challenger} hat nicht genug DachsTaler.`;
+      }
+      const winnerBalanceT = await creditBalance(username, duel.amount, env);
       resultMessage = `🏆 @${username} GEWINNT ${pot} DachsTaler!`;
       // Achievement tracking (must await, otherwise worker terminates before completion)
       await Promise.all([

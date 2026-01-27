@@ -4,7 +4,6 @@
 
 import {
   RESPONSE_HEADERS,
-  MAX_BALANCE,
   MIN_TRANSFER,
   MAX_TRANSFER,
   LEADERBOARD_CACHE_TTL,
@@ -23,7 +22,8 @@ import {
 import { sanitizeUsername, validateAmount, isLeaderboardBlocked, exponentialBackoff, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight, checkRateLimit, secureRandom } from '../utils.js';
 import {
   getBalance,
-  setBalance,
+  deductBalance,
+  creditBalance,
   getFreeSpins,
   getStats,
   hasUnlock,
@@ -211,11 +211,21 @@ async function handleDaily(username: string, env: Env): Promise<Response> {
       return new Response(`@${username} ⏰ Zu viele Anfragen, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
     }
 
-    const [hasAccepted, hasBoost, lastDaily, currentBalance, monthlyLogin] = await Promise.all([
+    // Write-first daily claim lock to prevent double-claim race condition
+    const todayGerman = getCurrentDate();
+    const dailyClaimKey = `daily_claim:${username}:${todayGerman}`;
+    const claimValue = `${Date.now()}:${secureRandom()}`;
+    await env.SLOTS_KV.put(dailyClaimKey, claimValue, { expirationTtl: 86400 });
+    const verifyClaim = await env.SLOTS_KV.get(dailyClaimKey);
+    if (verifyClaim !== claimValue) {
+      // Another concurrent request won the race
+      return new Response(`@${username} ⏰ Daily Bonus wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
+    }
+
+    const [hasAccepted, hasBoost, lastDaily, monthlyLogin] = await Promise.all([
       hasAcceptedDisclaimer(username, env),
       hasUnlock(username, 'daily_boost', env),
       getLastDaily(username, env),
-      getBalance(username, env),
       getMonthlyLogin(username, env)
     ]);
 
@@ -227,9 +237,8 @@ async function handleDaily(username: string, env: Env): Promise<Response> {
     const dailyAmount = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
     const now = Date.now();
 
-    // Check if daily was already claimed today (German timezone reset at midnight)
-    const todayGerman = getCurrentDate();
-    const daysInMonth = getDaysInCurrentMonth(); // Cache once at start
+    // Secondary guard: check if daily was already claimed today (German timezone)
+    const daysInMonth = getDaysInCurrentMonth();
 
     if (lastDaily) {
       const lastDailyGerman = getGermanDateFromTimestamp(lastDaily);
@@ -246,11 +255,11 @@ async function handleDaily(username: string, env: Env): Promise<Response> {
     const milestoneBonus = MONTHLY_LOGIN_REWARDS[newMonthlyLogin.days.length] || 0;
     const isNewMilestone = milestoneBonus > 0 && !newMonthlyLogin.claimedMilestones.includes(newMonthlyLogin.days.length);
 
+    // Atomic D1 balance operation: credit daily bonus atomically
     const totalBonus = dailyAmount + (isNewMilestone ? milestoneBonus : 0);
-    const newBalance = Math.min(currentBalance + totalBonus, MAX_BALANCE);
+    const newBalance = await creditBalance(username, totalBonus, env);
 
     await Promise.all([
-      setBalance(username, newBalance, env),
       setLastDaily(username, now, env),
       isNewMilestone ? markMilestoneClaimed(username, newMonthlyLogin.days.length, env, newMonthlyLogin) : Promise.resolve()
     ]);
@@ -458,40 +467,21 @@ async function handleTransfer(username: string, target: string, amount: string, 
           return new Response(`@${username} ❌ Transfer wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
         }
 
-        // Now perform the transfer atomically
-        const senderBalance = await getBalance(username, env);
-
-        if (senderBalance < parsedAmount) {
+        // Atomic D1 deduction from sender (WHERE balance >= amount)
+        const senderDeduct = await deductBalance(username, parsedAmount, env);
+        if (!senderDeduct.success) {
           await env.SLOTS_KV.delete(lockKey);
-          return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderBalance}.`, { headers: RESPONSE_HEADERS });
+          return new Response(`@${username} ❌ Nicht genug DachsTaler! Du hast ${senderDeduct.newBalance}.`, { headers: RESPONSE_HEADERS });
         }
+        const newSenderBalance = senderDeduct.newBalance;
 
-        const newSenderBalance = senderBalance - parsedAmount;
+        // Atomic D1 credit to receiver (clamped at MAX_BALANCE)
+        const receiverBalanceBefore = await getBalance(cleanTarget, env);
+        const newReceiverBalance = await creditBalance(cleanTarget, parsedAmount, env);
 
-        // Deduct from sender first
-        await setBalance(username, newSenderBalance, env);
-
-        // Verify sender balance was correctly deducted
-        const verifySender = await getBalance(username, env);
-        if (verifySender !== newSenderBalance) {
-          // Race condition - restore and retry
-          await env.SLOTS_KV.delete(lockKey);
-          if (attempt < maxRetries - 1) {
-            await exponentialBackoff(attempt);
-            continue;
-          }
-          return new Response(`@${username} ❌ Transfer fehlgeschlagen, bitte versuche es erneut.`, { headers: RESPONSE_HEADERS });
-        }
-
-        // Now credit receiver (after sender is confirmed deducted)
-        const receiverBalance = await getBalance(cleanTarget, env);
-        const newReceiverBalance = Math.min(receiverBalance + parsedAmount, MAX_BALANCE);
-
-        // Warn if amount was capped
-        const actualReceived = newReceiverBalance - receiverBalance;
+        // Check if transfer was capped at MAX_BALANCE
+        const actualReceived = newReceiverBalance - receiverBalanceBefore;
         const wasCapped = actualReceived < parsedAmount;
-
-        await setBalance(cleanTarget, newReceiverBalance, env);
 
         // Release lock
         await env.SLOTS_KV.delete(lockKey);

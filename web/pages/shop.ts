@@ -249,7 +249,7 @@ export async function renderShopPage(env: Env, user: LoggedInUser | null = null)
   const content = `
     <div class="content-page">
       <h1 class="page-title">🛒 Shop</h1>
-      <p class="page-subtitle">Kaufe Items mit <code>!shop buy [Nummer]</code> im Twitch Chat</p>
+      <p class="page-subtitle">Kaufe Items mit <code>!shop buy [Nummer]</code> im Twitch Chat oder über den <span style="display:inline-block;padding:4px 12px;background:var(--accent);color:white;border-radius:var(--radius-sm);font-size:0.85rem;font-weight:600;">Kaufen</span> Button</p>
 
       ${userBalanceHtml}
 

@@ -3,10 +3,10 @@
 - Nur auf GitHub pushen (`git push origin main`)
 - GitHub Actions übernimmt das Deployment automatisch
 
-# Git Push / Deploy Regeln
-- NIEMALS `git push` oder `wrangler deploy` ausführen, es sei denn der User sagt EXPLIZIT "push" oder "deploy"
-- Commits erstellen ist OK, aber NICHT pushen ohne Erlaubnis
-- Im Zweifel: FRAGEN, nicht einfach pushen
+# Git Commit / Push / Deploy Regeln
+- NIEMALS `git commit`, `git push` oder `wrangler deploy` ausführen, es sei denn der User sagt EXPLIZIT "commit", "push" oder "deploy"
+- Jeder einzelne Commit und Push braucht EXPLIZITE Erlaubnis — ein "ok" gilt nur für genau diese eine Aktion, KEINE Generalerlaubnis
+- Im Zweifel: FRAGEN, nicht einfach committen oder pushen
 
 # Commit Style
 - Alle Commit-Messages auf DEUTSCH schreiben

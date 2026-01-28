@@ -10,7 +10,7 @@ import { sanitizeUsername, logError, stripInvisibleChars } from './utils.js';
 // Web pages and API
 import { handleWebPage } from './web/pages.js';
 import { handleApi } from './routes/data.js';
-import { getUserFromRequest } from './web/twitch.js';
+import { getUserFromRequest, sendChatMessage } from './web/twitch.js';
 
 // Route handlers
 import { handleShortUrls, handleStaticAssets } from './routes/static.js';
@@ -129,16 +129,29 @@ export default {
       // Handle slot action (includes subcommands)
       if (action === 'slot') {
         const response = await handleSlotAction(cleanUsername, amountRaw, url, env, ctx);
-
-        // Append random invisible char to prevent Twitch duplicate message filter
         const body = await response.text();
+
+        // Nachricht über DachsbauSlots Bot senden statt über Fossabot
+        const sent = await sendChatMessage(body, env);
+        if (sent) {
+          // Leere Antwort → Fossabot postet nichts
+          return new Response('', { headers: RESPONSE_HEADERS });
+        }
+
+        // Fallback: Fossabot postet falls Bot-Nachricht fehlschlägt
         const dedupChar = String.fromCodePoint(0xE0001 + Math.floor(Math.random() * 95));
         return new Response(body + dedupChar, { status: response.status, headers: RESPONSE_HEADERS });
       }
 
-      // Handle legacy action-based commands
+      // Handle legacy action-based commands (shop, transfer)
       const legacyResponse = await handleLegacyActions(action, cleanUsername, url, env);
-      if (legacyResponse) return legacyResponse;
+      if (legacyResponse) {
+        const legacyBody = await legacyResponse.text();
+        const legacySent = await sendChatMessage(legacyBody, env);
+        if (legacySent) return new Response('', { headers: RESPONSE_HEADERS });
+        const dedupChar = String.fromCodePoint(0xE0001 + Math.floor(Math.random() * 95));
+        return new Response(legacyBody + dedupChar, { status: legacyResponse.status, headers: RESPONSE_HEADERS });
+      }
 
       return new Response('Invalid action', { headers: RESPONSE_HEADERS });
     } catch (error) {

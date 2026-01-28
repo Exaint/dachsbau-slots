@@ -126,13 +126,15 @@ export async function checkSecurityConstraints(username: string, env: Env): Prom
  * Handle slot subcommands (amount parameter variations)
  */
 export async function handleSlotSubcommands(cleanUsername: string, lower: string, url: URL, env: Env): Promise<Response | null> {
-  // Detect !slots buy mistake
+  // !slots buy XX → weiterleiten an Shop-Kauf
   if (lower === 'buy') {
     const itemNumber = url.searchParams.get('target');
     if (itemNumber && !isNaN(parseInt(itemNumber, 10))) {
-      return new Response(`@${cleanUsername} ❓ Meintest du !shop buy ${itemNumber}?`, { headers: RESPONSE_HEADERS });
+      const securityError = await checkSecurityConstraints(cleanUsername, env);
+      if (securityError) return securityError;
+      return await handleShop(cleanUsername, `buy ${itemNumber}`, env);
     }
-    return new Response(`@${cleanUsername} ❓ Meintest du !shop buy [Nummer]? (z.B. !shop buy 1)`, { headers: RESPONSE_HEADERS });
+    return new Response(`@${cleanUsername} ❌ Nutze: !slots buy [Nummer] (z.B. !slots buy 1)`, { headers: RESPONSE_HEADERS });
   }
 
   // Admin: response time test (KV + D1)

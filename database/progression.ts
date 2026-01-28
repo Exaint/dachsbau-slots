@@ -7,7 +7,7 @@
 import { STREAK_MULTIPLIER_INCREMENT, STREAK_MULTIPLIER_MAX, KV_TRUE, MAX_RETRIES } from '../constants.js';
 import { getCurrentMonth, getCurrentDate, logError, kvKey, exponentialBackoff } from '../utils.js';
 import { D1_ENABLED, DUAL_WRITE, STATS_READ_PRIMARY, upsertUser, updateStreakMultiplier as updateStreakMultiplierD1 } from './d1.js';
-import { addUnlockD1, removeUnlockD1, updateMonthlyLoginD1, incrementStatD1, batchIncrementStatsD1, getFullPlayerStatsD1 } from './d1-achievements.js';
+import { addUnlockD1, removeUnlockD1, updateMonthlyLoginD1, batchIncrementStatsD1, getFullPlayerStatsD1 } from './d1-achievements.js';
 import { updateAchievementStat, updateAchievementStatBatch, setMaxAchievementStat } from './achievements.js';
 import type { PlayerAchievementData } from './achievements.js';
 import type { Env, MonthlyLoginData, StreakData, PlayerStats } from '../types/index.js';
@@ -45,16 +45,6 @@ const DEFAULT_STATS: PlayerStats = {
   dailysClaimed: 0
 };
 
-// Whitelist of valid stat keys for SQL safety (prevents SQL injection via statKey)
-const VALID_STAT_KEYS = new Set<string>(Object.keys(DEFAULT_STATS));
-
-// Convert camelCase to snake_case for D1 column names
-function statKeyToColumn(statKey: string): string {
-  if (!VALID_STAT_KEYS.has(statKey)) {
-    throw new Error(`Invalid stat key: ${statKey}`);
-  }
-  return statKey.replace(/([A-Z])/g, '_$1').toLowerCase();
-}
 
 // ============================================
 // Streak Multiplier
@@ -379,143 +369,6 @@ export async function updateStats(username: string, isWin: boolean, winAmount: n
   }
 }
 
-/**
- * Increment a specific stat by a given amount
- * Used for tracking item usage, special events, etc.
- */
-export async function incrementStat(username: string, statKey: keyof PlayerStats, amount: number, env: Env): Promise<void> {
-  try {
-    const stats = await getStats(username, env);
-    if (statKey in stats) {
-      stats[statKey] += amount;
-      await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
-
-      // DUAL_WRITE: Fire-and-forget D1 write
-      if (D1_ENABLED && DUAL_WRITE && env.DB) {
-        incrementStatD1(username, statKey, amount, env).catch(err => logError('incrementStat.d1', err, { username, statKey }));
-      }
-    }
-  } catch (error) {
-    logError('incrementStat', error, { username, statKey, amount });
-  }
-}
-
-/**
- * Set a specific stat to a value (for max values, timestamps, etc.)
- */
-export async function setStat(username: string, statKey: keyof PlayerStats, value: number, env: Env): Promise<void> {
-  try {
-    const stats = await getStats(username, env);
-    if (statKey in stats) {
-      const delta = value - stats[statKey];
-      stats[statKey] = value;
-      await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
-
-      // DUAL_WRITE: Fire-and-forget D1 write
-      if (D1_ENABLED && DUAL_WRITE && env.DB) {
-        incrementStatD1(username, statKey, delta, env).catch(err => logError('setStat.d1', err, { username, statKey }));
-      }
-    }
-  } catch (error) {
-    logError('setStat', error, { username, statKey, value });
-  }
-}
-
-/**
- * Batch increment multiple stats in a single read-modify-write cycle
- * Prevents race conditions from parallel incrementStat calls on the same key
- */
-export async function incrementStats(username: string, updates: [keyof PlayerStats, number][], env: Env): Promise<void> {
-  try {
-    if (!updates || updates.length === 0) return;
-    const stats = await getStats(username, env);
-    const d1Updates: [string, number][] = [];
-
-    for (const [statKey, amount] of updates) {
-      if (statKey in stats) {
-        stats[statKey] += amount;
-        d1Updates.push([statKey, amount]);
-      }
-    }
-
-    await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
-
-    // DUAL_WRITE: Single batched D1 round-trip
-    if (D1_ENABLED && DUAL_WRITE && env.DB && d1Updates.length > 0) {
-      batchIncrementStatsD1(username, d1Updates, [], env)
-        .catch(err => logError('incrementStats.d1', err, { username }));
-    }
-  } catch (error) {
-    logError('incrementStats', error, { username, updates: updates.map(u => u[0]) });
-  }
-}
-
-/**
- * Batch increment stats + update max stat in a single read-modify-write
- */
-export async function batchUpdateStats(
-  username: string,
-  increments: [keyof PlayerStats, number][] | null,
-  maxUpdates: [keyof PlayerStats, number][] | null,
-  env: Env
-): Promise<void> {
-  try {
-    if ((!increments || increments.length === 0) && (!maxUpdates || maxUpdates.length === 0)) return;
-    const stats = await getStats(username, env);
-    const d1Increments: [string, number][] = [];
-    const d1MaxUpdates: [string, number][] = [];
-
-    for (const [statKey, amount] of (increments || [])) {
-      if (statKey in stats) {
-        stats[statKey] += amount;
-        d1Increments.push([statKey, amount]);
-      }
-    }
-
-    for (const [statKey, newValue] of (maxUpdates || [])) {
-      if (statKey in stats && newValue > stats[statKey]) {
-        stats[statKey] = newValue;
-        d1MaxUpdates.push([statKey, newValue]);
-      }
-    }
-
-    await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
-
-    // DUAL_WRITE: Single batched D1 round-trip
-    if (D1_ENABLED && DUAL_WRITE && env.DB && (d1Increments.length > 0 || d1MaxUpdates.length > 0)) {
-      batchIncrementStatsD1(username, d1Increments, d1MaxUpdates, env)
-        .catch(err => logError('batchUpdateStats.d1', err, { username }));
-    }
-  } catch (error) {
-    logError('batchUpdateStats', error, { username });
-  }
-}
-
-/**
- * Update max stat if new value is higher
- */
-export async function updateMaxStat(username: string, statKey: keyof PlayerStats, newValue: number, env: Env): Promise<void> {
-  try {
-    const stats = await getStats(username, env);
-    if (statKey in stats && newValue > stats[statKey]) {
-      stats[statKey] = newValue;
-      await env.SLOTS_KV.put(kvKey('stats:', username), JSON.stringify(stats));
-
-      // DUAL_WRITE: Fire-and-forget D1 write
-      if (D1_ENABLED && DUAL_WRITE && env.DB) {
-        // Use validated column name to prevent SQL injection
-        const column = statKeyToColumn(statKey);
-        env.DB.prepare(`
-          UPDATE player_stats SET ${column} = ?
-          WHERE username = ? AND ${column} < ?
-        `).bind(newValue, username.toLowerCase(), newValue).run()
-          .catch(err => logError('updateMaxStat.d1', err, { username, statKey }));
-      }
-    }
-  } catch (error) {
-    logError('updateMaxStat', error, { username, statKey, newValue });
-  }
-}
 
 // ============================================
 // Unified Stat Writers

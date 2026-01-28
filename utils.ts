@@ -1,4 +1,4 @@
-import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS, MS_PER_HOUR, MS_PER_MINUTE, RESPONSE_HEADERS, MAX_RETRIES, MAX_BALANCE } from './constants.js';
+import { CUMULATIVE_WEIGHTS, TOTAL_WEIGHT, BUFF_TTL_BUFFER_SECONDS, USERNAME_MIN_LENGTH, USERNAME_MAX_LENGTH, EXPONENTIAL_BACKOFF_BASE_MS, MS_PER_HOUR, MS_PER_MINUTE, RESPONSE_HEADERS } from './constants.js';
 import { ADMINS, BOT_ACCOUNTS } from './config.js';
 import type { Env, ValidateTargetResult } from './types/index.js';
 
@@ -8,17 +8,6 @@ interface AdminWithTargetResult {
   cleanTarget?: string;
 }
 
-interface AtomicKvOperationResult<T> {
-  newValue: string | null;
-  result: T;
-  options?: KVNamespacePutOptions;
-}
-
-interface AtomicKvUpdateResult<T> {
-  success: boolean;
-  result: T | null;
-  error?: Error;
-}
 
 // OPTIMIZED: Cached DateTimeFormat instances (avoid recreation per request)
 const GERMAN_DATE_FORMATTER = new Intl.DateTimeFormat('de-DE', {
@@ -142,10 +131,6 @@ function validateAmount(amount: string | number, min = 1, max = 100000): number 
   return parsed;
 }
 
-// Clamp balance to valid range [0, MAX_BALANCE]
-function clampBalance(value: number): number {
-  return Math.max(0, Math.min(value, MAX_BALANCE));
-}
 
 // Helper to build KV keys with consistent lowercase username
 function kvKey(prefix: string, username: string, ...parts: string[]): string {
@@ -246,42 +231,6 @@ function exponentialBackoff(attempt: number, baseMs = EXPONENTIAL_BACKOFF_BASE_M
   return new Promise(resolve => setTimeout(resolve, delay + jitter));
 }
 
-/**
- * Generic atomic KV operation with retry mechanism
- */
-async function atomicKvUpdate<T>(
-  env: Env,
-  key: string,
-  operation: (currentValue: string | null) => Promise<AtomicKvOperationResult<T>>,
-  verify: (expectedValue: string | null) => Promise<boolean>,
-  maxRetries = MAX_RETRIES
-): Promise<AtomicKvUpdateResult<T>> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const currentValue = await env.SLOTS_KV.get(key);
-      const { newValue, result, options } = await operation(currentValue);
-
-      if (newValue === null) {
-        await env.SLOTS_KV.delete(key);
-      } else {
-        await env.SLOTS_KV.put(key, newValue, options || {});
-      }
-
-      if (await verify(newValue)) {
-        return { success: true, result };
-      }
-
-      if (attempt < maxRetries - 1) {
-        await exponentialBackoff(attempt);
-      }
-    } catch (error) {
-      if (attempt === maxRetries - 1) {
-        return { success: false, result: null, error: error as Error };
-      }
-    }
-  }
-  return { success: false, result: null };
-}
 
 // Format remaining time in hours and minutes
 function formatTimeRemaining(ms: number): string {
@@ -345,15 +294,6 @@ function createErrorResponse(username: string, message: string): Response {
   return new Response(`@${username} ❌ ${message}`, { headers: RESPONSE_HEADERS });
 }
 
-// Create standardized success response
-function createSuccessResponse(username: string, message: string): Response {
-  return new Response(`@${username} ✅ ${message}`, { headers: RESPONSE_HEADERS });
-}
-
-// Create standardized info response
-function createInfoResponse(username: string, message: string): Response {
-  return new Response(`@${username} ℹ️ ${message}`, { headers: RESPONSE_HEADERS });
-}
 
 // JSON API Responses (for /api/ endpoints)
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -592,7 +532,6 @@ export {
   requireAdminWithTarget,
   safeJsonParse,
   validateAmount,
-  clampBalance,
   kvKey,
   getCurrentMonth,
   getCurrentDate,
@@ -608,11 +547,8 @@ export {
   logInfo,
   logAudit,
   createErrorResponse,
-  createSuccessResponse,
-  createInfoResponse,
   jsonErrorResponse,
   jsonSuccessResponse,
-  atomicKvUpdate,
   checkRateLimit,
   containsProfanity,
   stripInvisibleChars,

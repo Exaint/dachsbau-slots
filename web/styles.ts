@@ -3304,27 +3304,6 @@ a.duel-player.opponent:hover {
   margin-left: auto;
 }
 
-/* Purchase Feedback */
-.purchase-feedback {
-  display: none;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  margin-bottom: 16px;
-  font-weight: 500;
-  animation: fadeIn 0.3s ease;
-}
-
-.purchase-feedback.success {
-  background: rgba(0, 245, 147, 0.15);
-  color: var(--success);
-  border: 1px solid var(--success);
-}
-
-.purchase-feedback.error {
-  background: rgba(244, 67, 54, 0.15);
-  color: var(--error);
-  border: 1px solid var(--error);
-}
 
 /* Item-level error message (shown directly at the shop item) */
 .item-error {

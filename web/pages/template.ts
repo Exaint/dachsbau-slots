@@ -1017,7 +1017,6 @@ function getClientScripts(): string {
 
     // Shop purchase function
     async function buyItem(itemId, itemName, price) {
-      const feedback = document.getElementById('purchaseFeedback');
       const btn = event.target;
 
       // Disable button during purchase
@@ -1041,13 +1040,8 @@ function getClientScripts(): string {
             balanceEl.textContent = result.newBalance.toLocaleString('de-DE') + ' DT';
           }
 
-          // Show success message
-          if (feedback) {
-            feedback.className = 'purchase-feedback success';
-            feedback.textContent = '✓ ' + result.message;
-            feedback.style.display = 'block';
-            setTimeout(() => { feedback.style.display = 'none'; }, TOAST_DISPLAY_MS);
-          }
+          // Show success toast (fixed position, always visible)
+          showToast('✓ ' + result.message, 'success');
 
           // Update button to show purchased (for one-time items)
           const itemEl = document.querySelector('[data-item-id="' + itemId + '"]');

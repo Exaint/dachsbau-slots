@@ -121,7 +121,6 @@ export async function renderShopPage(env: Env, user: LoggedInUser | null = null)
         </div>
         <a href="?page=profile&user=${encodeURIComponent(user.username)}" class="btn btn-secondary">Mein Profil</a>
       </div>
-      <div id="purchaseFeedback" class="purchase-feedback"></div>
     `;
   } else {
     userBalanceHtml = `

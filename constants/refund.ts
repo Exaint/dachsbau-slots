@@ -17,32 +17,7 @@ export interface RefundableItem {
 }
 
 // Prestige ranks in order (lowest to highest)
-// Must be refunded in REVERSE order (highest first)
-export const PRESTIGE_CHAIN: string[] = ['🥉', '🥈', '🥇', '💎', '👑'];
-
-// Slot unlocks in order (lowest to highest)
-// Must be refunded in REVERSE order (highest first)
-export const SLOT_UNLOCK_CHAIN: string[] = ['slots_20', 'slots_30', 'slots_50', 'slots_100', 'slots_all'];
-
-// Map unlock keys to shop item IDs for price lookup
-export const UNLOCK_TO_SHOP_ID: Record<string, number> = {
-  'slots_20': 13,
-  'slots_30': 19,
-  'slots_50': 21,
-  'slots_100': 23,
-  'slots_all': 25,
-  'daily_boost': 27,
-  'custom_message': 28
-};
-
-// Map prestige ranks to shop item IDs for price lookup
-export const PRESTIGE_TO_SHOP_ID: Record<string, number> = {
-  '🥉': 17,  // Bronze
-  '🥈': 22,  // Silber
-  '🥇': 26,  // Gold
-  '💎': 29,  // Platin
-  '👑': 30   // Legendary
-};
+const PRESTIGE_CHAIN: string[] = ['🥉', '🥈', '🥇', '💎', '👑'];
 
 // All refundable items with metadata
 export const REFUNDABLE_ITEMS: Record<string, RefundableItem> = {
@@ -158,14 +133,6 @@ export const REFUNDABLE_ITEMS: Record<string, RefundableItem> = {
     blockedBy: []
   }
 };
-
-/**
- * Get refund price for an item
- */
-export function getRefundPrice(itemKey: string): number {
-  const item = REFUNDABLE_ITEMS[itemKey];
-  return item ? item.price : 0;
-}
 
 /**
  * Get the previous rank in the prestige chain

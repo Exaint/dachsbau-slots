@@ -89,11 +89,6 @@ export {
   getStreak,
   getStats,
   updateStats,
-  incrementStat,
-  incrementStats,
-  batchUpdateStats,
-  setStat,
-  updateMaxStat,
   updatePlayerStat,
   updatePlayerStatBatch
 } from './progression.js';

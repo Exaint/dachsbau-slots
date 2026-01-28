@@ -1207,6 +1207,9 @@ async function checkBigWinAchievements(username: string, winAmount: number, env:
   }
 }
 
+// NICHT ENTFERNEN: Werden benötigt wenn ACHIEVEMENTS_REWARDS_ENABLED aktiviert wird
+// um gesammelte Pending-Rewards an Spieler auszuzahlen.
+
 /**
  * Get total pending rewards for a player (rewards earned while REWARDS_ENABLED was false)
  */

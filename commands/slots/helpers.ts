@@ -324,7 +324,7 @@ export async function parseSpinAmount(
     return { error: `@${username} ❌ Minimum ist !slots ${BASE_SPIN_COST}! Du kannst verwenden: ${available} | Weitere Unlocks im Shop: ${URLS.UNLOCK}` };
   }
   if (customAmount > 100) {
-    return { error: `@${username} ❌ Maximum ist !slots 100! Für freie Beträge: !slots all freischalten 💡` };
+    return { error: `@${username} ❌ Standard-Einsätze: !slots 10, 20, 30, 50, 100. Für freie Beträge: Kauf !slots all für ${UNLOCK_PRICES.all} DachsTaler im Shop 💡` };
   }
   if (customAmount === BASE_SPIN_COST) {
     return { spinCost: BASE_SPIN_COST, multiplier: 1 };

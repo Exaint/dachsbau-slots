@@ -333,6 +333,10 @@ body {
   background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
 }
 
+[data-theme="light"] .info-accordion.highlight-section {
+  background: linear-gradient(135deg, var(--gradient-start), rgba(145, 71, 255, 0.08));
+}
+
 [data-theme="light"] .info-accordion.admin-section {
   background: linear-gradient(135deg, var(--gradient-start), rgba(220, 38, 38, 0.08));
 }
@@ -4710,6 +4714,16 @@ a.duel-player.opponent:hover {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Highlight Section (Schnellstart, Wichtig zu wissen) */
+.info-accordion.highlight-section {
+  border: 2px solid var(--primary);
+  background: linear-gradient(135deg, var(--bg-secondary), rgba(145, 71, 255, 0.05));
+}
+
+.info-accordion.highlight-section .accordion-header h2 {
+  color: var(--primary);
 }
 
 /* Admin Section */

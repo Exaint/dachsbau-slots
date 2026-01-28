@@ -33,7 +33,7 @@ export function renderInfoPage(user: LoggedInUser | null = null): string {
       </nav>
 
       <!-- Schnellstart -->
-      <details class="info-accordion">
+      <details class="info-accordion highlight-section">
         <summary class="accordion-header"><h2>🚀 Schnellstart</h2></summary>
         <section id="schnellstart" class="content-section accordion-content">
           <p class="section-intro">Neu hier? In 4 Schritten loslegen:</p>
@@ -63,7 +63,7 @@ export function renderInfoPage(user: LoggedInUser | null = null): string {
       </details>
 
       <!-- Wichtig zu wissen -->
-      <details class="info-accordion" open>
+      <details class="info-accordion highlight-section">
         <summary class="accordion-header"><h2>⚠️ Wichtig zu wissen</h2></summary>
         <section id="wichtig" class="content-section accordion-content">
           <p class="section-intro">Diese Infos solltest du kennen, bevor du loslegst!</p>

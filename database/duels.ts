@@ -539,7 +539,7 @@ export async function processDuelTimeoutNotifications(env: Env): Promise<void> {
 
         // Send timeout notification
         await sendChatMessage(
-          `⏰ @${challenger} Dein Duell gegen @${data.target} (${data.amount} DachsTaler) ist abgelaufen — keine Antwort erhalten.`,
+          `⏰ @${challenger} Dein Duell gegen @${data.target} (${data.amount} DachsTaler) ist abgelaufen — @${data.target} hat sich wie ein feiger Dachs im Dachsbau versteckt :c`,
           env
         );
 

@@ -54,7 +54,7 @@ export class DuelTimeoutAlarm extends DurableObject<Env> {
       await this.env.SLOTS_KV.delete(`duel_notify:${data.challenger.toLowerCase()}`);
 
       await sendChatMessage(
-        `⏰ @${data.challenger} Dein Duell gegen @${data.target} (${data.amount} DachsTaler) ist abgelaufen — keine Antwort erhalten.`,
+        `⏰ @${data.challenger} Dein Duell gegen @${data.target} (${data.amount} DachsTaler) ist abgelaufen — @${data.target} hat sich wie ein feiger Dachs im Dachsbau versteckt :c`,
         this.env
       );
     } catch (error) {

@@ -9,7 +9,7 @@ import type { DuelStats } from '../../database/duels.js';
 import { isLeaderboardHidden } from '../../database/core.js';
 import { getTwitchProfileData } from '../twitch.js';
 import { getAllAchievements, ACHIEVEMENT_CATEGORIES, getStatKeyForAchievement, DUEL_SCORE_TRIPLE_OFFSET, DUEL_SCORE_PAIR_OFFSET, CUSTOM_MESSAGE_MAX_LENGTH, CUSTOM_MESSAGES_MAX_COUNT } from '../../constants.js';
-import { isAdmin, isBot } from '../../utils.js';
+import { isAdmin, isBot, kvKey } from '../../utils.js';
 import { escapeHtml, formatNumber } from './utils.js';
 import { CATEGORY_ICONS, CATEGORY_NAMES, PRESTIGE_RANK_NAMES, ROLE_BADGES, ADMIN_ROLE_OVERRIDES } from './ui-config.js';
 import { baseTemplate, htmlResponse } from './template.js';
@@ -74,9 +74,9 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
   // Fetch remaining data in parallel with error fallback
   // achievementData.stats is accessed via dynamic keys for progress calculation
   type AchievementDataView = { unlockedAt: Record<string, number>; stats: { [key: string]: number }; pendingRewards: number };
-  let rank: string | null, stats: Partial<PlayerStats>, achievementData: AchievementDataView, lastActive: number | null, achievementStats: { totalPlayers: number; counts: Record<string, number> }, duelOptOut: boolean, selfBanned: boolean, leaderboardHidden: boolean, twitchData: TwitchData | null, hasCustomMsgUnlock: boolean, customMessages: CustomMessages | null, duelHistory: DuelHistoryEntry[], duelStats: DuelStats;
+  let rank: string | null, stats: Partial<PlayerStats>, achievementData: AchievementDataView, lastActive: number | null, achievementStats: { totalPlayers: number; counts: Record<string, number> }, duelOptOut: boolean, selfBanned: boolean, leaderboardHidden: boolean, twitchData: TwitchData | null, hasCustomMsgUnlock: boolean, customMessages: CustomMessages | null, duelHistory: DuelHistoryEntry[], duelStats: DuelStats, monthlyDays: number;
   try {
-    [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory, duelStats] = await Promise.all([
+    [rank, stats, achievementData, lastActive, achievementStats, duelOptOut, selfBanned, leaderboardHidden, twitchData, hasCustomMsgUnlock, customMessages, duelHistory, duelStats, monthlyDays] = await Promise.all([
       getPrestigeRank(username, env).catch(() => null),
       getStats(username, env).catch(() => ({})),
       getPlayerAchievements(username, env).catch(() => ({ unlockedAt: {}, stats: {}, pendingRewards: 0 })) as Promise<AchievementDataView>,
@@ -89,14 +89,18 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
       hasUnlock(username, 'custom_message', env).catch(() => false),
       getCustomMessages(username, env).catch(() => null),
       getDuelHistory(username, 10, env).catch(() => []),
-      getDuelStats(username, env).catch(() => ({ played: 0, won: 0, lost: 0, tied: 0 }))
+      getDuelStats(username, env).catch(() => ({ played: 0, won: 0, lost: 0, tied: 0 })),
+      // Monthly login days for daily_7/14/20 achievement progress
+      env.SLOTS_KV.get(kvKey('monthlylogin:', username), { type: 'json' })
+        .then((data) => (data as { days?: number[] } | null)?.days?.length || 0)
+        .catch(() => 0)
     ]);
   } catch {
     rank = null; stats = {}; achievementData = { unlockedAt: {}, stats: {}, pendingRewards: 0 };
     lastActive = null; achievementStats = { totalPlayers: 0, counts: {} };
     duelOptOut = false; selfBanned = false; leaderboardHidden = false; twitchData = null;
     hasCustomMsgUnlock = false; customMessages = null; duelHistory = [];
-    duelStats = { played: 0, won: 0, lost: 0, tied: 0 };
+    duelStats = { played: 0, won: 0, lost: 0, tied: 0 }; monthlyDays = 0;
   }
 
   const allAchievements = getAllAchievements();
@@ -110,13 +114,23 @@ export async function handleProfilePage(url: URL, env: Env, loggedInUser: Logged
     // Calculate progress
     let progress: { current: number; required: number; percent: number } | null = null;
     if (ach.requirement && !unlocked) {
-      const statKey = getStatKeyForAchievement(ach.id);
-      if (statKey && achievementData.stats[statKey] !== undefined) {
+      // Daily achievements (daily_7/14/20) use monthlyDays, not lifetime dailysClaimed
+      const isMonthlyDailyAchievement = ['daily_7', 'daily_14', 'daily_20'].includes(ach.id);
+      if (isMonthlyDailyAchievement) {
         progress = {
-          current: achievementData.stats[statKey],
+          current: monthlyDays,
           required: ach.requirement,
-          percent: Math.min(100, Math.round((achievementData.stats[statKey] / ach.requirement) * 100))
+          percent: Math.min(100, Math.round((monthlyDays / ach.requirement) * 100))
         };
+      } else {
+        const statKey = getStatKeyForAchievement(ach.id);
+        if (statKey && achievementData.stats[statKey] !== undefined) {
+          progress = {
+            current: achievementData.stats[statKey],
+            required: ach.requirement,
+            percent: Math.min(100, Math.round((achievementData.stats[statKey] / ach.requirement) * 100))
+          };
+        }
       }
     }
 

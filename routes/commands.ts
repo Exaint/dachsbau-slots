@@ -235,8 +235,8 @@ export async function handleSlotSubcommands(cleanUsername: string, lower: string
     return new Response(`@${cleanUsername} ✅ Disclaimer akzeptiert! Du startest mit 100 DachsTaler. Viel Spaß beim Spielen! 🦡🎰 Nutze !slots zum Spinnen!`, { headers: RESPONSE_HEADERS });
   }
 
-  // Duel commands
-  if (lower === 'duel') {
+  // Duel commands (duell = German alias)
+  if (lower === 'duel' || lower === 'duell') {
     const target = url.searchParams.get('target');
     const amount = url.searchParams.get('giveamount');
     const args = [target, amount].filter(Boolean) as string[];

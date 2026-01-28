@@ -138,7 +138,7 @@ export function renderInfoPage(user: LoggedInUser | null = null): string {
       </details>
 
       <!-- Commands -->
-      <details class="info-accordion" open>
+      <details class="info-accordion highlight-section">
         <summary class="accordion-header"><h2>📋 Commands</h2></summary>
         <section id="commands" class="content-section accordion-content">
           <details class="info-subsection" open>

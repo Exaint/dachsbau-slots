@@ -207,9 +207,9 @@ export function renderProfilePage(data: ProfileData): string {
     if (hours < 24) return `Vor ${hours} Stunde${hours !== 1 ? 'n' : ''}`;
     if (days < 7) return `Vor ${days} Tag${days !== 1 ? 'en' : ''}`;
 
-    // Format as date for older entries
+    // Format as date for older entries (Berlin timezone)
     const date = new Date(timestamp);
-    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Berlin' });
   };
 
   const lastActiveText = formatLastActive(lastActive);
@@ -313,11 +313,11 @@ export function renderProfilePage(data: ProfileData): string {
     </div>
   ` : '';
 
-  // Duel History HTML
+  // Duel History HTML (Berlin timezone)
   const formatDuelDate = (timestamp: number): string => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
-    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' });
   };
 
   // Extract symbol sum from duel score (removes triple/pair bonus)
@@ -436,9 +436,9 @@ export function renderProfilePage(data: ProfileData): string {
         ? `<div class="achievement-rarity ${rarityClass}">${ach.rarity.percent}% der Spieler</div>`
         : '';
 
-      // Format unlock date
+      // Format unlock date (Berlin timezone)
       const unlockedDateStr = ach.unlockedAt
-        ? new Date(ach.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        ? new Date(ach.unlockedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })
         : '';
 
       return `

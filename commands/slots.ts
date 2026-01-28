@@ -107,6 +107,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
 
     // STAGE 1: D1 atomic claim + essential reads (all parallel for fastest rejection)
     // NOTE: Free spins are only READ here (not consumed) to avoid losing them on security check failures
+    // OPTIMIZED: Peek grid pre-loaded here to avoid sequential KV read in generateGrid()
     const [
       spinClaim,
       selfBanData,
@@ -122,7 +123,9 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       hasLuckyCharm,
       hasDachsLocator,
       hasRageMode,
-      hasHappyHour
+      hasHappyHour,
+      // Pre-loaded peek grid (avoids sequential KV read in generateGrid)
+      preloadedPeek
     ] = await Promise.all([
       claimSpinSlot(lowerUsername, now, cooldownMs, env),
       isSelfBanned(username, env),
@@ -137,7 +140,8 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       isBuffActive(username, 'lucky_charm', env),
       getBuffWithUses(username, 'dachs_locator', env),
       getBuffWithStack(username, 'rage_mode', env),
-      isBuffActive(username, 'happy_hour', env)
+      isBuffActive(username, 'happy_hour', env),
+      env.SLOTS_KV.get(`peek:${lowerUsername}`)
     ]) as [
       SpinClaimResult,
       { timestamp: number; date: string } | null,
@@ -152,7 +156,8 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       boolean,
       BuffWithUsesResult,
       BuffWithStackResult,
-      boolean
+      boolean,
+      string | null
     ];
 
     // STAGE 2: Non-essential buffs (loaded in parallel with remaining logic)
@@ -238,8 +243,8 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
       dachsChance *= (1 + hasRageMode.stack / 100);
     }
 
-    // Generate grid
-    const grid = await generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamondRush, env);
+    // Generate grid (with pre-loaded peek for optimization)
+    const grid = await generateGrid(lowerUsername, dachsChance, hasStarMagnet, hasDiamondRush, env, preloadedPeek);
 
     // Save original grid for achievement tracking (before special items modify it)
     const originalGrid = [...grid];

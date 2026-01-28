@@ -18,12 +18,18 @@ export interface SelfBanData {
 export async function getBalance(username: string, env: Env): Promise<number> {
   try {
     const key = kvKey('user:', username);
-    const value = await env.SLOTS_KV.get(key);
+    const disclaimerKey = kvKey('disclaimer:', username);
+
+    // OPTIMIZED: Parallel KV reads - fetch both balance and disclaimer at once
+    // This saves ~10-20ms for new users by avoiding sequential reads
+    const [value, hasDisclaimer] = await Promise.all([
+      env.SLOTS_KV.get(key),
+      env.SLOTS_KV.get(disclaimerKey)
+    ]);
+
     if (value === null) {
       // New user: Only grant starting balance if disclaimer accepted
       // Legacy users already have balance in KV, so they bypass this check
-      const disclaimerKey = kvKey('disclaimer:', username);
-      const hasDisclaimer = await env.SLOTS_KV.get(disclaimerKey);
       if (hasDisclaimer === KV_ACCEPTED) {
         await setBalance(username, STARTING_BALANCE, env);
         return STARTING_BALANCE;

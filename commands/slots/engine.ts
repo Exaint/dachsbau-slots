@@ -26,20 +26,23 @@ import type { Env, WinResult } from '../../types/index.js';
 
 /**
  * Generate spin grid with optional buff effects
+ * OPTIMIZED: Accepts pre-loaded peek value to avoid sequential KV read
+ * @param preloadedPeek - Optional pre-loaded peek grid from Stage 1 parallel read
  */
 async function generateGrid(
   lowerUsername: string,
   dachsChance: number,
   hasStarMagnet: boolean,
   hasDiamondRush: boolean,
-  env: Env
+  env: Env,
+  preloadedPeek?: string | null
 ): Promise<string[]> {
-  // Check if user has a stored peek grid
-  const peekKey = `peek:${lowerUsername}`;
-  const storedPeek = await env.SLOTS_KV.get(peekKey);
+  // Check if user has a stored peek grid (pre-loaded or fallback to KV read)
+  const storedPeek = preloadedPeek !== undefined ? preloadedPeek : await env.SLOTS_KV.get(`peek:${lowerUsername}`);
 
   if (storedPeek) {
-    await env.SLOTS_KV.delete(peekKey);
+    // Delete peek key (consumed) - fire and forget
+    env.SLOTS_KV.delete(`peek:${lowerUsername}`).catch(() => {});
     const parsedPeek = safeJsonParse(storedPeek) as string[] | null;
     if (parsedPeek && Array.isArray(parsedPeek) && parsedPeek.length === GRID_SIZE) {
       return parsedPeek;

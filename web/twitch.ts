@@ -964,9 +964,10 @@ async function handleBotOAuthCallback(url: URL, env: Env): Promise<Response> {
 
 /**
  * Send a chat message to the broadcaster's channel via Twitch Helix API.
- * Uses App Access Token + sender_id for bot badge display.
- * Falls back to broadcaster token if app token or bot ID unavailable.
- * Requires channel:bot scope from broadcaster + user:bot scope from bot account.
+ * Token-Strategie (in Prioritätsreihenfolge):
+ * 1. App Access Token + Bot ID → Bot Badge auf Twitch
+ * 2. Bot User Token + Bot ID → Nachricht von Bot-Account (kein Badge)
+ * 3. Broadcaster Token → Nachricht vom Broadcaster
  */
 async function sendChatMessage(message: string, env: Env): Promise<boolean> {
   try {
@@ -976,47 +977,75 @@ async function sendChatMessage(message: string, env: Env): Promise<boolean> {
       return false;
     }
 
-    // App Access Token + Bot ID = Bot Badge auf Twitch
-    const [appToken, botId] = await Promise.all([
+    const [appToken, botToken, botId] = await Promise.all([
       getAppAccessToken(env),
+      getBotToken(env),
       getBotId(env)
     ]);
 
-    let senderToken: string | null = appToken;
-    let senderId: string = botId || broadcasterId;
+    // Token-Kandidaten: App Token (Badge) → Bot Token → Broadcaster Token
+    const candidates: Array<{ token: string; senderId: string; label: string }> = [];
 
-    // Fall back to broadcaster token if app token or bot ID unavailable
-    if (!senderToken || !botId) {
-      senderToken = await getBroadcasterToken(env);
-      senderId = broadcasterId;
+    if (appToken && botId) {
+      candidates.push({ token: appToken, senderId: botId, label: 'app' });
+    }
+    if (botToken && botId) {
+      candidates.push({ token: botToken, senderId: botId, label: 'bot' });
     }
 
-    if (!senderToken) {
-      logError('sendChatMessage', new Error('No app or broadcaster token available'));
+    for (const { token, senderId, label } of candidates) {
+      const response = await fetch(`${TWITCH_API}/chat/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Client-Id': env.TWITCH_CLIENT_ID!,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          broadcaster_id: broadcasterId,
+          sender_id: senderId,
+          message
+        })
+      });
+
+      if (response.ok) {
+        return true;
+      }
+
+      const errorText = await response.text();
+      logError('sendChatMessage', new Error(`[${label}] Twitch API ${response.status}: ${errorText}`));
+    }
+
+    // Broadcaster Token als letzter Fallback
+    const broadcasterToken = await getBroadcasterToken(env);
+    if (!broadcasterToken) {
+      logError('sendChatMessage', new Error('No token available'));
       return false;
     }
 
     const response = await fetch(`${TWITCH_API}/chat/messages`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${senderToken}`,
+        'Authorization': `Bearer ${broadcasterToken}`,
         'Client-Id': env.TWITCH_CLIENT_ID!,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         broadcaster_id: broadcasterId,
-        sender_id: senderId,
+        sender_id: broadcasterId,
         message
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      logError('sendChatMessage', new Error(`Twitch API ${response.status}: ${errorText}`));
+      logError('sendChatMessage', new Error(`[broadcaster] Twitch API ${response.status}: ${errorText}`));
       return false;
     }
 
     return true;
+
+    return false;
   } catch (error) {
     logError('sendChatMessage', error);
     return false;

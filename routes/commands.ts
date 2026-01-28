@@ -137,6 +137,19 @@ export async function handleSlotSubcommands(cleanUsername: string, lower: string
     return new Response(`@${cleanUsername} ❌ Nutze: !slots buy [Nummer] (z.B. !slots buy 1)`, { headers: RESPONSE_HEADERS });
   }
 
+  // !slots shop [buy XX] → Alias für !shop
+  if (lower === 'shop') {
+    const subCmd = url.searchParams.get('target'); // "buy" bei "!slots shop buy 5"
+    const itemNumber = url.searchParams.get('giveamount'); // "5" bei "!slots shop buy 5"
+    if (subCmd?.toLowerCase() === 'buy' && itemNumber) {
+      const securityError = await checkSecurityConstraints(cleanUsername, env);
+      if (securityError) return securityError;
+      return await handleShop(cleanUsername, `buy ${itemNumber}`, env);
+    }
+    // Ohne Parameter: Shop-Link anzeigen
+    return await handleShop(cleanUsername, undefined, env);
+  }
+
   // Admin: response time test (KV + D1)
   if (lower === 'ping' && isAdmin(cleanUsername)) {
     const start = Date.now();

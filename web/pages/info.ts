@@ -141,113 +141,123 @@ export function renderInfoPage(user: LoggedInUser | null = null): string {
       <details class="info-accordion" open>
         <summary class="accordion-header"><h2>📋 Commands</h2></summary>
         <section id="commands" class="content-section accordion-content">
-          <h3>Haupt-Commands</h3>
-        <div class="command-list">
-          <div class="command-item">
-            <code>!slots</code>
-            <span>Spin für 10 DachsTaler (30 Sek Cooldown)</span>
-          </div>
-          <div class="command-item">
-            <code>!slots [20/30/50/100]</code>
-            <span>Höhere Einsätze (benötigt Unlock)</span>
-          </div>
-          <div class="command-item">
-            <code>!slots [1-∞] / !slots all</code>
-            <span>Freie Beträge (benötigt !slots all Unlock)</span>
-          </div>
-          <div class="command-item">
-            <code>!slots daily</code>
-            <span>Täglicher Bonus (+50 DachsTaler)</span>
-          </div>
-          <div class="command-item">
-            <code>!slots balance</code>
-            <span>Kontostand & Free Spins anzeigen</span>
-          </div>
-          <div class="command-item">
-            <code>!slots buffs</code>
-            <span>Alle aktiven Buffs anzeigen</span>
-          </div>
-          <div class="command-item">
-            <code>!slots lb / rank / ranking</code>
-            <span>Top 5 Leaderboard</span>
-          </div>
-        </div>
+          <details class="info-subsection" open>
+            <summary class="subsection-header">🎰 Haupt-Commands</summary>
+            <div class="command-list">
+              <div class="command-item">
+                <code>!slots</code>
+                <span>Spin für 10 DachsTaler (30 Sek Cooldown)</span>
+              </div>
+              <div class="command-item">
+                <code>!slots [20/30/50/100]</code>
+                <span>Höhere Einsätze (benötigt Unlock)</span>
+              </div>
+              <div class="command-item">
+                <code>!slots [1-∞] / !slots all</code>
+                <span>Freie Beträge (benötigt !slots all Unlock)</span>
+              </div>
+              <div class="command-item">
+                <code>!slots daily</code>
+                <span>Täglicher Bonus (+50 DachsTaler)</span>
+              </div>
+              <div class="command-item">
+                <code>!slots balance</code>
+                <span>Kontostand & Free Spins anzeigen</span>
+              </div>
+              <div class="command-item">
+                <code>!slots buffs</code>
+                <span>Alle aktiven Buffs anzeigen</span>
+              </div>
+              <div class="command-item">
+                <code>!slots lb / rank / ranking</code>
+                <span>Top 5 Leaderboard</span>
+              </div>
+            </div>
+          </details>
 
-        <h3>Shop & Transfer</h3>
-        <div class="command-list">
-          <div class="command-item">
-            <code>!shop</code>
-            <span>Shop-Link anzeigen</span>
-          </div>
-          <div class="command-item">
-            <code>!shop buy [Nr]</code>
-            <span>Item kaufen (z.B. !shop buy 38)</span>
-          </div>
-          <div class="command-item">
-            <code>!transfer @user [Betrag]</code>
-            <span>DachsTaler senden (1-100.000)</span>
-          </div>
-        </div>
+          <details class="info-subsection">
+            <summary class="subsection-header">🛒 Shop & Transfer</summary>
+            <div class="command-list">
+              <div class="command-item">
+                <code>!shop</code>
+                <span>Shop-Link anzeigen</span>
+              </div>
+              <div class="command-item">
+                <code>!shop buy [Nr]</code>
+                <span>Item kaufen (z.B. !shop buy 38)</span>
+              </div>
+              <div class="command-item">
+                <code>!transfer @user [Betrag]</code>
+                <span>DachsTaler senden (1-100.000)</span>
+              </div>
+            </div>
+          </details>
 
-        <h3>Website & Erfolge</h3>
-        <div class="command-list">
-          <div class="command-item">
-            <code>!slots website / site / seite</code>
-            <span>Link zur Dachsbau Slots Website</span>
-          </div>
-          <div class="command-item">
-            <code>!slots erfolge / achievements</code>
-            <span>Link zu deinen Erfolgen</span>
-          </div>
-          <div class="command-item">
-            <code>!slots erfolge @user</code>
-            <span>Link zu Erfolgen eines anderen Spielers</span>
-          </div>
-        </div>
+          <details class="info-subsection">
+            <summary class="subsection-header">🌐 Website & Erfolge</summary>
+            <div class="command-list">
+              <div class="command-item">
+                <code>!slots website / site / seite</code>
+                <span>Link zur Dachsbau Slots Website</span>
+              </div>
+              <div class="command-item">
+                <code>!slots erfolge / achievements</code>
+                <span>Link zu deinen Erfolgen</span>
+              </div>
+              <div class="command-item">
+                <code>!slots erfolge @user</code>
+                <span>Link zu Erfolgen eines anderen Spielers</span>
+              </div>
+            </div>
+          </details>
 
-        <h3>Weitere Commands</h3>
-        <div class="command-list">
-          <div class="command-item">
-            <code>!slots stats</code>
-            <span>Persönliche Statistiken anzeigen</span>
-          </div>
-          <div class="command-item">
-            <code>!slots info / help / commands</code>
-            <span>Link zu dieser Seite</span>
-          </div>
-          <div class="command-item">
-            <code>!slots disclaimer</code>
-            <span>Glücksspiel-Warnung anzeigen</span>
-          </div>
-          <div class="command-item">
-            <code>!slots selfban</code>
-            <span>Selbstausschluss vom Spielen</span>
-          </div>
-        </div>
+          <details class="info-subsection">
+            <summary class="subsection-header">📊 Weitere Commands</summary>
+            <div class="command-list">
+              <div class="command-item">
+                <code>!slots stats</code>
+                <span>Persönliche Statistiken anzeigen</span>
+              </div>
+              <div class="command-item">
+                <code>!slots info / help / commands</code>
+                <span>Link zu dieser Seite</span>
+              </div>
+              <div class="command-item">
+                <code>!slots disclaimer</code>
+                <span>Glücksspiel-Warnung anzeigen</span>
+              </div>
+              <div class="command-item">
+                <code>!slots selfban</code>
+                <span>Selbstausschluss vom Spielen</span>
+              </div>
+            </div>
+          </details>
 
-        <h3>Duell-Commands</h3>
-        <div class="command-list">
-          <div class="command-item">
-            <code>!slots duel @user [Betrag]</code>
-            <span>Fordere jemanden zum Duell heraus</span>
-          </div>
-          <div class="command-item">
-            <code>!slots duelaccept</code>
-            <span>Nimm eine Herausforderung an</span>
-          </div>
-          <div class="command-item">
-            <code>!slots dueldecline</code>
-            <span>Lehne eine Herausforderung ab</span>
-          </div>
-          <div class="command-item">
-            <code>!slots duelopt out</code>
-            <span>Duelle deaktivieren</span>
-          </div>
-          <div class="command-item">
-            <code>!slots duelopt in</code>
-            <span>Duelle wieder aktivieren</span>
-          </div>
-          </div>
+          <details class="info-subsection">
+            <summary class="subsection-header">⚔️ Duell-Commands</summary>
+            <div class="command-list">
+              <div class="command-item">
+                <code>!slots duel @user [Betrag]</code>
+                <span>Fordere jemanden zum Duell heraus</span>
+              </div>
+              <div class="command-item">
+                <code>!slots duelaccept</code>
+                <span>Nimm eine Herausforderung an</span>
+              </div>
+              <div class="command-item">
+                <code>!slots dueldecline</code>
+                <span>Lehne eine Herausforderung ab</span>
+              </div>
+              <div class="command-item">
+                <code>!slots duelopt out</code>
+                <span>Duelle deaktivieren</span>
+              </div>
+              <div class="command-item">
+                <code>!slots duelopt in</code>
+                <span>Duelle wieder aktivieren</span>
+              </div>
+            </div>
+          </details>
         </section>
       </details>
 

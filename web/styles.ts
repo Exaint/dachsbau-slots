@@ -4749,6 +4749,53 @@ a.duel-player.opponent:hover {
   background: rgba(248, 113, 113, 0.1) !important;
 }
 
+/* Info Subsections (collapsible command categories) */
+.info-subsection {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.info-subsection .subsection-header {
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text);
+  transition: background 0.2s ease;
+}
+
+.info-subsection .subsection-header::-webkit-details-marker {
+  display: none;
+}
+
+.info-subsection .subsection-header::after {
+  content: '+';
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--primary);
+  transition: transform 0.2s ease;
+}
+
+.info-subsection[open] .subsection-header::after {
+  content: '−';
+}
+
+.info-subsection .subsection-header:hover {
+  background: var(--bg-secondary);
+}
+
+.info-subsection .command-list {
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  animation: accordionSlide 0.2s ease;
+}
+
 /* FAQ */
 .faq-item {
   background: var(--bg-tertiary);

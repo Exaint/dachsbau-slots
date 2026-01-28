@@ -964,8 +964,9 @@ async function handleBotOAuthCallback(url: URL, env: Env): Promise<Response> {
 
 /**
  * Send a chat message to the broadcaster's channel via Twitch Helix API.
- * Uses bot token if available (message appears from bot), falls back to broadcaster token.
- * Requires user:write:chat scope on the sending account.
+ * Uses App Access Token + sender_id for bot badge display.
+ * Falls back to broadcaster token if app token or bot ID unavailable.
+ * Requires channel:bot scope from broadcaster + user:bot scope from bot account.
  */
 async function sendChatMessage(message: string, env: Env): Promise<boolean> {
   try {
@@ -975,23 +976,23 @@ async function sendChatMessage(message: string, env: Env): Promise<boolean> {
       return false;
     }
 
-    // Try bot token first (message appears from bot account)
-    const [botToken, botId] = await Promise.all([
-      getBotToken(env),
+    // App Access Token + Bot ID = Bot Badge auf Twitch
+    const [appToken, botId] = await Promise.all([
+      getAppAccessToken(env),
       getBotId(env)
     ]);
 
-    let senderToken: string | null = botToken;
+    let senderToken: string | null = appToken;
     let senderId: string = botId || broadcasterId;
 
-    // Fall back to broadcaster token if no bot token
+    // Fall back to broadcaster token if app token or bot ID unavailable
     if (!senderToken || !botId) {
       senderToken = await getBroadcasterToken(env);
       senderId = broadcasterId;
     }
 
     if (!senderToken) {
-      logError('sendChatMessage', new Error('No bot or broadcaster token available'));
+      logError('sendChatMessage', new Error('No app or broadcaster token available'));
       return false;
     }
 

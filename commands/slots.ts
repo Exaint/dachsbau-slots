@@ -178,7 +178,7 @@ async function handleSlot(username: string, amountParam: string | undefined, _ur
     // D1 cooldown claim (checked FIRST for fastest race condition rejection)
     // Ran in parallel with KV reads above — no additional latency
     if (!spinClaim.claimed) {
-      const RACE_CONDITION_WINDOW = 3000; // 3 seconds
+      const RACE_CONDITION_WINDOW = 1500; // 1.5 seconds (reduced from 3s for tighter race prevention)
       if (spinClaim.remainingMs && spinClaim.remainingMs > cooldownMs - RACE_CONDITION_WINDOW) {
         // Race condition: another request just claimed → return empty (Fossabot ignores empty responses)
         return new Response('', { headers: RESPONSE_HEADERS });

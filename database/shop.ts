@@ -94,3 +94,97 @@ export function getDachsBoostPurchases(username: string, env: Env): Promise<Purc
 export function incrementDachsBoostPurchases(username: string, env: Env, maxRetries?: number): Promise<void> {
   return incrementPurchases('dachsboost_purchases:', 'dachsboost', username, env, maxRetries);
 }
+
+// ============================================
+// Atomic Purchase Limit Operations (D1-based)
+// ============================================
+
+export interface AtomicPurchaseResult {
+  success: boolean;
+  newCount?: number;
+  error?: 'limit_reached' | 'd1_unavailable';
+}
+
+/**
+ * Atomically check and increment Dachs Boost purchases.
+ * Uses D1 atomic operation to prevent race conditions.
+ *
+ * SECURITY FIX: Prevents bypassing weekly limit through concurrent requests.
+ * Returns { success: false, error: 'limit_reached' } if limit would be exceeded.
+ */
+export async function atomicIncrementDachsBoostPurchases(
+  username: string,
+  weeklyLimit: number,
+  env: Env
+): Promise<AtomicPurchaseResult> {
+  return atomicIncrementPurchaseLimit(username, 'dachsboost', weeklyLimit, env);
+}
+
+/**
+ * Atomically check and increment Spin Bundle purchases.
+ * Uses D1 atomic operation to prevent race conditions.
+ */
+export async function atomicIncrementSpinBundlePurchases(
+  username: string,
+  weeklyLimit: number,
+  env: Env
+): Promise<AtomicPurchaseResult> {
+  return atomicIncrementPurchaseLimit(username, 'bundle', weeklyLimit, env);
+}
+
+/**
+ * Generic atomic purchase limit increment using D1.
+ * INSERT OR UPDATE with WHERE count < limit ensures atomicity.
+ */
+async function atomicIncrementPurchaseLimit(
+  username: string,
+  itemType: string,
+  weeklyLimit: number,
+  env: Env
+): Promise<AtomicPurchaseResult> {
+  if (!D1_ENABLED || !env.DB) {
+    return { success: false, error: 'd1_unavailable' };
+  }
+
+  try {
+    const currentWeekStart = calculateWeekStart();
+    const lowerUsername = username.toLowerCase();
+    const now = Date.now();
+
+    // Atomic upsert: only increment if count < limit AND same week
+    // If week changed, reset count to 1
+    const result = await env.DB.prepare(`
+      INSERT INTO purchase_limits (username, item_type, count, week_start, updated_at)
+      VALUES (?, ?, 1, ?, ?)
+      ON CONFLICT(username, item_type) DO UPDATE SET
+        count = CASE
+          WHEN week_start != ? THEN 1
+          WHEN count < ? THEN count + 1
+          ELSE count
+        END,
+        week_start = ?,
+        updated_at = ?
+      WHERE purchase_limits.week_start != ? OR purchase_limits.count < ?
+      RETURNING count
+    `).bind(
+      lowerUsername, itemType, currentWeekStart, now,
+      currentWeekStart, weeklyLimit, currentWeekStart, now,
+      currentWeekStart, weeklyLimit
+    ).first<{ count: number }>();
+
+    if (!result) {
+      // WHERE clause didn't match = limit already reached
+      return { success: false, error: 'limit_reached' };
+    }
+
+    // Sync to KV for reads
+    const kvPrefix = itemType === 'dachsboost' ? 'dachsboost_purchases:' : 'bundle_purchases:';
+    const kvData: PurchaseData = { count: result.count, weekStart: currentWeekStart };
+    env.SLOTS_KV.put(kvKey(kvPrefix, username), JSON.stringify(kvData)).catch(() => {});
+
+    return { success: true, newCount: result.count };
+  } catch (error) {
+    logError('atomicIncrementPurchaseLimit', error, { username, itemType });
+    return { success: false, error: 'd1_unavailable' };
+  }
+}

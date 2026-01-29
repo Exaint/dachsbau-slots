@@ -2,10 +2,10 @@
  * API Routes - Shop buy, disclaimer accept, etc.
  */
 
-import { getUserFromRequest } from '../web/twitch.js';
+import { getUserFromRequest, verifySessionIP } from '../web/twitch.js';
 import { handleShopBuyAPI } from './shop.js';
 import { setDisclaimerAccepted, hasUnlock, getCustomMessages, setCustomMessages } from '../database.js';
-import { checkRateLimit, containsProfanity, isAdmin, jsonErrorResponse, jsonSuccessResponse } from '../utils.js';
+import { checkRateLimit, containsProfanity, isAdmin, jsonErrorResponse, jsonSuccessResponse, stripInvisibleChars, checkIdempotencyKey, storeIdempotencyResponse, clearIdempotencyKey, logAuditTrail } from '../utils.js';
 import { RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS, CUSTOM_MESSAGE_MAX_LENGTH, CUSTOM_MESSAGES_MAX_COUNT } from '../constants/config.js';
 import type { Env, LoggedInUser } from '../types/index.js';
 
@@ -70,12 +70,50 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
     if (!loggedInUser) {
       return jsonErrorResponse('Nicht eingeloggt', 401);
     }
+    // IP-Binding check for sensitive operations (prevents session hijacking)
+    const ipValid = await verifySessionIP(request, loggedInUser, env);
+    if (!ipValid) {
+      return jsonErrorResponse('Session ungültig - bitte erneut einloggen', 401);
+    }
+    // Idempotency check (prevents double-purchases on network retry)
+    const idempotencyKey = request.headers.get('X-Idempotency-Key');
+    if (idempotencyKey) {
+      const idempResult = await checkIdempotencyKey(idempotencyKey, env);
+      if (idempResult.isDuplicate) {
+        if (idempResult.cachedResponse) {
+          // Return cached response from previous request
+          return new Response(idempResult.cachedResponse, {
+            headers: { 'Content-Type': 'application/json', 'X-Idempotent-Replayed': 'true' }
+          });
+        }
+        // Request still processing
+        return jsonErrorResponse('Anfrage wird noch verarbeitet', 409);
+      }
+    }
     // Rate-Limit per User
     const allowed = await checkRateLimit(`shop:${loggedInUser.username}`, RATE_LIMIT_SHOP, RATE_LIMIT_WINDOW_SECONDS, env);
     if (!allowed) {
+      if (idempotencyKey) await clearIdempotencyKey(idempotencyKey, env);
       return jsonErrorResponse('Zu viele Käufe, bitte warte kurz', 429);
     }
-    return await handleShopBuyAPI(request, env, loggedInUser);
+
+    try {
+      const response = await handleShopBuyAPI(request, env, loggedInUser);
+      // Store response for idempotency (only on success)
+      if (idempotencyKey && response.ok) {
+        const responseBody = await response.clone().text();
+        await storeIdempotencyResponse(idempotencyKey, JSON.parse(responseBody), env);
+
+        // Audit log for purchase
+        const bodyData = JSON.parse(responseBody) as { item?: string };
+        await logAuditTrail(loggedInUser.username, 'shop_purchase', { item: bodyData.item }, env);
+      }
+      return response;
+    } catch (error) {
+      // Clear idempotency on error to allow retry
+      if (idempotencyKey) await clearIdempotencyKey(idempotencyKey, env);
+      throw error;
+    }
   }
 
   // Accept disclaimer endpoint (requires logged-in user)
@@ -130,34 +168,36 @@ export async function handleApiRoutes(pathname: string, request: Request, url: U
       return jsonErrorResponse(`Maximal ${CUSTOM_MESSAGES_MAX_COUNT} Nachrichten pro Typ`);
     }
 
-    // Validate each message
+    // Validate and sanitize each message
     const cleanWin: string[] = [];
     const cleanLoss: string[] = [];
 
     for (const msg of win) {
       if (typeof msg !== 'string') continue;
-      const trimmed = msg.trim();
-      if (!trimmed) continue;
-      if (trimmed.length > CUSTOM_MESSAGE_MAX_LENGTH) {
-        return jsonErrorResponse(`Nachricht zu lang (max. ${CUSTOM_MESSAGE_MAX_LENGTH} Zeichen): "${trimmed.slice(0, 20)}..."`);
+      // Strip invisible Unicode chars before trimming (prevents bypass attacks)
+      const sanitized = stripInvisibleChars(msg).trim();
+      if (!sanitized) continue;
+      if (sanitized.length > CUSTOM_MESSAGE_MAX_LENGTH) {
+        return jsonErrorResponse(`Nachricht zu lang (max. ${CUSTOM_MESSAGE_MAX_LENGTH} Zeichen): "${sanitized.slice(0, 20)}..."`);
       }
-      if (containsProfanity(trimmed)) {
+      if (containsProfanity(sanitized)) {
         return jsonErrorResponse('Nachricht enthält unerlaubte Wörter');
       }
-      cleanWin.push(trimmed);
+      cleanWin.push(sanitized);
     }
 
     for (const msg of loss) {
       if (typeof msg !== 'string') continue;
-      const trimmed = msg.trim();
-      if (!trimmed) continue;
-      if (trimmed.length > CUSTOM_MESSAGE_MAX_LENGTH) {
-        return jsonErrorResponse(`Nachricht zu lang (max. ${CUSTOM_MESSAGE_MAX_LENGTH} Zeichen): "${trimmed.slice(0, 20)}..."`);
+      // Strip invisible Unicode chars before trimming (prevents bypass attacks)
+      const sanitized = stripInvisibleChars(msg).trim();
+      if (!sanitized) continue;
+      if (sanitized.length > CUSTOM_MESSAGE_MAX_LENGTH) {
+        return jsonErrorResponse(`Nachricht zu lang (max. ${CUSTOM_MESSAGE_MAX_LENGTH} Zeichen): "${sanitized.slice(0, 20)}..."`);
       }
-      if (containsProfanity(trimmed)) {
+      if (containsProfanity(sanitized)) {
         return jsonErrorResponse('Nachricht enthält unerlaubte Wörter');
       }
-      cleanLoss.push(trimmed);
+      cleanLoss.push(sanitized);
     }
 
     const messages = { win: cleanWin, loss: cleanLoss };

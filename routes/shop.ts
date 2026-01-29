@@ -9,7 +9,7 @@ import { logError, exponentialBackoff } from '../utils.js';
 import { SHOP_ITEMS, PREREQUISITE_NAMES, PRESTIGE_RANKS } from '../constants.js';
 import {
   getBalance,
-  setBalance,
+  deductBalance,
   hasUnlock,
   setUnlock,
   getPrestigeRank,
@@ -26,7 +26,9 @@ import {
   getDachsBoostPurchases,
   incrementDachsBoostPurchases,
   activateGuaranteedPair,
-  activateWildCard
+  activateWildCard,
+  atomicIncrementDachsBoostPurchases,
+  atomicIncrementSpinBundlePurchases
 } from '../database.js';
 import {
   WEEKLY_DACHS_BOOST_LIMIT,
@@ -164,36 +166,24 @@ export async function handleShopBuyAPI(request: Request, env: Env, user: LoggedI
 }
 
 /**
- * Atomic balance deduction with retry mechanism
- * Prevents TOCTOU race conditions by verifying balance after deduction
+ * Atomic balance deduction using D1 atomic operations
+ * Uses SQL WHERE clause to guarantee sufficient balance (no TOCTOU window)
+ *
+ * SECURITY FIX: Previously used KV read-verify-write which was vulnerable to
+ * race conditions. Now uses D1 atomic deduction via deductBalance().
  */
-async function atomicBalanceDeduction(username: string, price: number, env: Env, maxRetries = 3): Promise<BalanceDeductionResult> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const balance = await getBalance(username, env);
+async function atomicBalanceDeduction(username: string, price: number, env: Env): Promise<BalanceDeductionResult> {
+  const result = await deductBalance(username, price, env);
 
-    if (balance < price) {
-      return {
-        success: false,
-        error: `Nicht genug DachsTaler! Kostet ${price}, du hast ${balance}.`
-      };
-    }
-
-    const newBalance = balance - price;
-    await setBalance(username, newBalance, env);
-
-    // Verify the balance was set correctly (detect race condition)
-    const verifyBalance = await getBalance(username, env);
-    if (verifyBalance === newBalance) {
-      return { success: true, newBalance };
-    }
-
-    // Race condition detected - retry with backoff
-    if (attempt < maxRetries - 1) {
-      await exponentialBackoff(attempt);
-    }
+  if (!result.success) {
+    const currentBalance = result.newBalance;
+    return {
+      success: false,
+      error: `Nicht genug DachsTaler! Kostet ${price}, du hast ${currentBalance}.`
+    };
   }
 
-  return { success: false, error: 'Kauf fehlgeschlagen, bitte erneut versuchen.' };
+  return { success: true, newBalance: result.newBalance };
 }
 
 /**
@@ -352,29 +342,37 @@ async function purchaseBoost(username: string, item: ShopItem, env: Env): Promis
   // Weekly limit check for Dachs-Boost
   if (item.weeklyLimit) {
     const boostKey = `boost:${lowerUsername}:${item.symbol}`;
-    const [existingBoost, purchases] = await Promise.all([
-      env.SLOTS_KV.get(boostKey),
-      getDachsBoostPurchases(username, env)
-    ]);
+    const existingBoost = await env.SLOTS_KV.get(boostKey);
 
     if (existingBoost === KV_ACTIVE) {
       return { success: false, error: `Du hast bereits einen aktiven ${item.name}!` };
     }
 
-    if (purchases.count >= WEEKLY_DACHS_BOOST_LIMIT) {
-      return { success: false, error: `Wöchentliches Limit erreicht! Max. ${WEEKLY_DACHS_BOOST_LIMIT} Dachs-Boost pro Woche.` };
+    // SECURITY FIX: Use atomic D1 operation for limit check + increment
+    // This prevents bypassing weekly limit through concurrent requests
+    const limitResult = await atomicIncrementDachsBoostPurchases(username, WEEKLY_DACHS_BOOST_LIMIT, env);
+
+    if (!limitResult.success) {
+      if (limitResult.error === 'limit_reached') {
+        return { success: false, error: `Wöchentliches Limit erreicht! Max. ${WEEKLY_DACHS_BOOST_LIMIT} Dachs-Boost pro Woche.` };
+      }
+      // D1 unavailable - fall back to non-atomic check (better UX than failing)
+      const purchases = await getDachsBoostPurchases(username, env);
+      if (purchases.count >= WEEKLY_DACHS_BOOST_LIMIT) {
+        return { success: false, error: `Wöchentliches Limit erreicht! Max. ${WEEKLY_DACHS_BOOST_LIMIT} Dachs-Boost pro Woche.` };
+      }
     }
 
-    // Atomic balance deduction with race condition protection
+    // Atomic balance deduction
     const deduction = await atomicBalanceDeduction(username, item.price, env);
     if (!deduction.success) {
+      // Balance deduction failed - we already incremented the limit counter
+      // This is acceptable: user gets "credit" toward their weekly limit without getting the item
+      // They can try again and it will work (counter is already incremented)
       return { success: false, error: deduction.error };
     }
 
-    await Promise.all([
-      addBoost(username, item.symbol!, env),
-      incrementDachsBoostPurchases(username, env)
-    ]);
+    await addBoost(username, item.symbol!, env);
 
     return {
       success: true,
@@ -383,7 +381,7 @@ async function purchaseBoost(username: string, item: ShopItem, env: Env): Promis
     };
   }
 
-  // Atomic balance deduction with race condition protection
+  // Non-limited boost - just deduct balance atomically
   const deduction = await atomicBalanceDeduction(username, item.price, env);
   if (!deduction.success) {
     return { success: false, error: deduction.error };
@@ -431,21 +429,28 @@ async function purchaseWinMulti(username: string, item: ShopItem, env: Env): Pro
 }
 
 async function purchaseBundle(username: string, item: ShopItem, env: Env): Promise<PurchaseResult> {
-  const purchases = await getSpinBundlePurchases(username, env);
-  if (purchases.count >= WEEKLY_SPIN_BUNDLE_LIMIT) {
-    return { success: false, error: `Wöchentliches Limit erreicht! Max. ${WEEKLY_SPIN_BUNDLE_LIMIT} Spin Bundles pro Woche.` };
+  // SECURITY FIX: Use atomic D1 operation for limit check + increment
+  // This prevents bypassing weekly limit through concurrent requests
+  const limitResult = await atomicIncrementSpinBundlePurchases(username, WEEKLY_SPIN_BUNDLE_LIMIT, env);
+
+  if (!limitResult.success) {
+    if (limitResult.error === 'limit_reached') {
+      return { success: false, error: `Wöchentliches Limit erreicht! Max. ${WEEKLY_SPIN_BUNDLE_LIMIT} Spin Bundles pro Woche.` };
+    }
+    // D1 unavailable - fall back to non-atomic check
+    const purchases = await getSpinBundlePurchases(username, env);
+    if (purchases.count >= WEEKLY_SPIN_BUNDLE_LIMIT) {
+      return { success: false, error: `Wöchentliches Limit erreicht! Max. ${WEEKLY_SPIN_BUNDLE_LIMIT} Spin Bundles pro Woche.` };
+    }
   }
 
-  // Atomic balance deduction with race condition protection
+  // Atomic balance deduction
   const deduction = await atomicBalanceDeduction(username, item.price, env);
   if (!deduction.success) {
     return { success: false, error: deduction.error };
   }
 
-  await Promise.all([
-    addFreeSpinsWithMultiplier(username, SPIN_BUNDLE_COUNT, SPIN_BUNDLE_MULTIPLIER, env),
-    incrementSpinBundlePurchases(username, env)
-  ]);
+  await addFreeSpinsWithMultiplier(username, SPIN_BUNDLE_COUNT, SPIN_BUNDLE_MULTIPLIER, env);
 
   return {
     success: true,

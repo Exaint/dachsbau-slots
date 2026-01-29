@@ -61,6 +61,7 @@ interface SessionPayload {
   username: string;
   displayName: string;
   avatar: string;
+  ipHash?: string; // SHA-256 hash of client IP for session binding
   iat?: number;
   exp?: number;
 }
@@ -498,6 +499,65 @@ async function getAuthorizationUrl(env: Env, origin: string): Promise<string> {
 // ==================== USER AUTHENTICATION ====================
 
 /**
+ * Get client IP from request (Cloudflare provides this in CF-Connecting-IP header)
+ */
+function getClientIP(request: Request): string {
+  return request.headers.get('CF-Connecting-IP') ||
+         request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
+         'unknown';
+}
+
+/**
+ * Hash IP address for session binding (SHA-256)
+ * We store hashed IPs for privacy - we only need to compare, not store the actual IP
+ */
+async function hashIP(ip: string): Promise<string> {
+  const data = new TextEncoder().encode(ip);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Verify that current request IP matches session IP (for sensitive operations)
+ * Returns true if IP matches or if no IP binding was set
+ */
+async function verifySessionIP(request: Request, user: LoggedInUser, env: Env): Promise<boolean> {
+  try {
+    const cookieHeader = request.headers.get('Cookie') || '';
+    const cookies = Object.fromEntries(
+      cookieHeader.split(';').map(c => {
+        const [key, ...val] = c.trim().split('=');
+        return [key, val.join('=')];
+      })
+    );
+
+    const token = cookies[USER_SESSION_COOKIE];
+    if (!token) return false;
+
+    // Decode payload to get stored IP hash (without full verification - already verified in getUserFromRequest)
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+
+    const payload = JSON.parse(base64UrlDecode(parts[1])) as SessionPayload;
+
+    // If no IP hash stored (old session), allow but log
+    if (!payload.ipHash) {
+      return true;
+    }
+
+    // Compare current IP hash with stored hash
+    const currentIP = getClientIP(request);
+    const currentIPHash = await hashIP(currentIP);
+
+    return payload.ipHash === currentIPHash;
+  } catch (error) {
+    logError('verifySessionIP', error);
+    return false;
+  }
+}
+
+/**
  * Base64URL encode (JWT-safe)
  */
 function base64UrlEncode(str: string): string {
@@ -644,8 +704,9 @@ async function getUserLoginUrl(env: Env, origin: string): Promise<string> {
 
 /**
  * Handle user OAuth callback
+ * @param request - The HTTP request (needed for IP binding)
  */
-async function handleUserOAuthCallback(url: URL, env: Env): Promise<Response> {
+async function handleUserOAuthCallback(url: URL, env: Env, request: Request): Promise<Response> {
   const code = url.searchParams.get('code');
   const error = url.searchParams.get('error');
   const state = url.searchParams.get('state');
@@ -717,12 +778,17 @@ async function handleUserOAuthCallback(url: URL, env: Env): Promise<Response> {
 
     const user = userData.data[0];
 
-    // Create JWT session
+    // Get client IP hash for session binding
+    const clientIP = getClientIP(request);
+    const ipHash = await hashIP(clientIP);
+
+    // Create JWT session with IP binding
     const session = await createSessionToken({
       twitchId: user.id,
       username: user.login,
       displayName: user.display_name,
-      avatar: user.profile_image_url
+      avatar: user.profile_image_url,
+      ipHash
     }, env);
 
     // Redirect to home with session cookie
@@ -1147,6 +1213,7 @@ export {
   getUserLoginUrl,
   handleUserOAuthCallback,
   createLogoutResponse,
+  verifySessionIP, // For sensitive operations (shop, transfers)
   // Bot authentication
   getBotAuthorizationUrl,
   handleBotOAuthCallback,

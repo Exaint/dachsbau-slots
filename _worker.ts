@@ -5,7 +5,7 @@
 
 import type { Env, LoggedInUser } from './types/index.js';
 import { RESPONSE_HEADERS } from './constants.js';
-import { sanitizeUsername, logError, stripInvisibleChars } from './utils.js';
+import { sanitizeUsername, logError, stripInvisibleChars, timingSafeEqual, validateEnvironment, logEnvValidation, setRequestId, clearRequestId } from './utils.js';
 
 // Web pages and API
 import { handleWebPage } from './web/pages.js';
@@ -23,13 +23,31 @@ import { handleEventSubWebhook, handleSetupBotBadge } from './routes/eventsub.js
 // Durable Object export (must be exported from entry point)
 export { DuelTimeoutAlarm } from './database/duel-alarm.js';
 
+// Environment validation flag (runs once per isolate)
+let envValidated = false;
+
 export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(processDuelTimeoutNotifications(env));
   },
 
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Set request ID for tracing (use client-provided or generate new)
+    const requestId = setRequestId(request.headers.get('X-Request-ID') || undefined);
+
     try {
+      // Validate environment on first request (logs warnings for missing optional vars)
+      if (!envValidated) {
+        const validationResult = validateEnvironment(env);
+        logEnvValidation(validationResult);
+        envValidated = true;
+
+        // Fail fast if critical bindings are missing
+        if (!validationResult.valid) {
+          return new Response('Server configuration error', { status: 500, headers: { ...RESPONSE_HEADERS, 'X-Request-ID': requestId } });
+        }
+      }
+
       const url = new URL(request.url);
 
       if (!env.SLOTS_KV) {
@@ -47,7 +65,7 @@ export default {
       if (assetResponse) return assetResponse;
 
       // Auth routes (login, logout, callbacks)
-      const authResponse = await handleAuthRoutes(pathname, url, env);
+      const authResponse = await handleAuthRoutes(pathname, url, env, request);
       if (authResponse) return authResponse;
 
       // EventSub webhook (before CSRF — Twitch sends POST without Origin header)
@@ -94,9 +112,10 @@ export default {
 
       // Twitch bot commands - verify shared secret if configured
       // Fossabot URL format: ?action=slot&user=$(user)&key=SECRET
+      // SECURITY FIX: Use timing-safe comparison to prevent timing attacks
       if (env.BOT_SECRET) {
-        const providedKey = url.searchParams.get('key');
-        if (providedKey !== env.BOT_SECRET) {
+        const providedKey = url.searchParams.get('key') || '';
+        if (!timingSafeEqual(providedKey, env.BOT_SECRET)) {
           return new Response('Unauthorized', { status: 403, headers: RESPONSE_HEADERS });
         }
       }
@@ -153,10 +172,14 @@ export default {
         return new Response(legacyBody + dedupChar, { status: legacyResponse.status, headers: RESPONSE_HEADERS });
       }
 
-      return new Response('Invalid action', { headers: RESPONSE_HEADERS });
+      return new Response('Invalid action', { headers: { ...RESPONSE_HEADERS, 'X-Request-ID': requestId } });
     } catch (error) {
       logError('Worker', error);
-      return new Response('Ein Fehler ist aufgetreten. Bitte versuche es später erneut.', { headers: RESPONSE_HEADERS });
+      return new Response('Ein Fehler ist aufgetreten. Bitte versuche es später erneut.', {
+        headers: { ...RESPONSE_HEADERS, 'X-Request-ID': requestId }
+      });
+    } finally {
+      clearRequestId();
     }
   }
 };

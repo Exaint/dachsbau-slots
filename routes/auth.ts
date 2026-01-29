@@ -7,8 +7,9 @@ import type { Env } from '../types/index.js';
 
 /**
  * Handle authentication routes
+ * @param request - HTTP request (needed for IP binding on login)
  */
-export async function handleAuthRoutes(pathname: string, url: URL, env: Env): Promise<Response | null> {
+export async function handleAuthRoutes(pathname: string, url: URL, env: Env, request?: Request): Promise<Response | null> {
   // User login - redirect to Twitch OAuth
   if (pathname === '/auth/login') {
     const loginUrl = await getUserLoginUrl(env, url.origin);
@@ -39,7 +40,10 @@ export async function handleAuthRoutes(pathname: string, url: URL, env: Env): Pr
 
   // User OAuth callback (separate from broadcaster)
   if (pathname === '/auth/user/callback') {
-    return await handleUserOAuthCallback(url, env);
+    if (!request) {
+      return new Response('Missing request object', { status: 500 });
+    }
+    return await handleUserOAuthCallback(url, env, request);
   }
 
   // Broadcaster OAuth callback (for mod/VIP roles)

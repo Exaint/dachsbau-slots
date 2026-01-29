@@ -28,11 +28,11 @@
  * 4. On decline/timeout: Challenge expires
  */
 
-import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SCORE_TRIPLE_OFFSET, DUEL_SCORE_PAIR_OFFSET, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS } from '../constants.js';
+import { DUEL_MIN_AMOUNT, DUEL_TIMEOUT_SECONDS, DUEL_SCORE_TRIPLE_OFFSET, DUEL_SCORE_PAIR_OFFSET, DUEL_SYMBOL_VALUES, DACHS_BASE_CHANCE, GRID_SIZE, ACHIEVEMENTS, MAX_BALANCE } from '../constants.js';
 import { getBalance, deductBalance, creditBalance, checkAndUnlockAchievement, checkBalanceAchievements, updatePlayerStatBatch } from '../database.js';
 import type { PlayerStats } from '../database/progression.js';
 import { createDuel, findDuelForTarget, deleteDuel, acceptDuel, hasActiveDuel, setDuelOptOut, isDuelOptedOut, getDuelCooldown, setDuelCooldown, logDuel } from '../database/duels.js';
-import { getWeightedSymbol, secureRandom, logError } from '../utils.js';
+import { getWeightedSymbol, secureRandom, logError, sanitizeUsername, logAuditTrail } from '../utils.js';
 import type { Env } from '../types/index.js';
 
 // ============================================
@@ -176,12 +176,13 @@ async function handleDuel(username: string, args: string[], env: Env): Promise<s
       return `@${username} Verwendung: !duel @ziel betrag (min. ${DUEL_MIN_AMOUNT})`;
     }
 
-    const targetArg = args[0].replace('@', '').toLowerCase();
-    const amountArg = parseInt(args[1], 10);
+    // SECURITY FIX: Use sanitizeUsername instead of simple replace
+    // This validates length, allowed characters, and normalizes the input
+    const targetArg = sanitizeUsername(args[0].replace('@', ''));
 
     // Validate target
-    if (!targetArg || targetArg.length === 0) {
-      return `@${username} Bitte gib einen Gegner an: !duel @ziel betrag`;
+    if (!targetArg) {
+      return `@${username} ❌ Ungültiger Username! Bitte gib einen gültigen Gegner an.`;
     }
 
     const lowerUsername = username.toLowerCase();
@@ -192,8 +193,11 @@ async function handleDuel(username: string, args: string[], env: Env): Promise<s
     }
 
     // Validate amount
-    if (isNaN(amountArg) || amountArg < DUEL_MIN_AMOUNT) {
-      return `@${username} Mindesteinsatz: ${DUEL_MIN_AMOUNT} DachsTaler`;
+    const amountArg = parseInt(args[1], 10);
+
+    // SECURITY FIX: Add upper bound check to prevent integer overflow issues
+    if (isNaN(amountArg) || amountArg < DUEL_MIN_AMOUNT || amountArg > MAX_BALANCE) {
+      return `@${username} Einsatz muss zwischen ${DUEL_MIN_AMOUNT} und ${MAX_BALANCE.toLocaleString()} DachsTaler liegen.`;
     }
 
     // Check for existing active duel
@@ -343,17 +347,28 @@ async function handleDuelAccept(username: string, env: Env): Promise<string> {
     const winner = challengerScore.score > targetScore.score ? duel.challenger
       : targetScore.score > challengerScore.score ? username
       : null;
-    await logDuel({
-      challenger: duel.challenger,
-      target: username,
-      amount: duel.amount,
-      challengerGrid,
-      targetGrid,
-      challengerScore: challengerScore.score,
-      targetScore: targetScore.score,
-      winner,
-      pot
-    }, env);
+    await Promise.all([
+      logDuel({
+        challenger: duel.challenger,
+        target: username,
+        amount: duel.amount,
+        challengerGrid,
+        targetGrid,
+        challengerScore: challengerScore.score,
+        targetScore: targetScore.score,
+        winner,
+        pot
+      }, env),
+      // Audit trail for duel (financial transaction)
+      logAuditTrail(duel.challenger, 'duel', {
+        target: username,
+        amount: duel.amount,
+        winner,
+        pot,
+        challengerScore: challengerScore.score,
+        targetScore: targetScore.score
+      }, env)
+    ]);
 
     // Build response
     const challengerGridStr = challengerGrid.join(' ');

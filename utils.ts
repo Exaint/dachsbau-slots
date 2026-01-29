@@ -29,6 +29,80 @@ function stripInvisibleChars(input: string): string {
   return input.replace(INVISIBLE_CHARS_REGEX, '').replace(NORMALIZE_SPACES_REGEX, ' ').trim();
 }
 
+// ============================================================================
+// Environment Validation
+// ============================================================================
+
+interface EnvValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Validate required and optional environment variables
+ * Call once on first request to detect configuration issues early
+ */
+function validateEnvironment(env: Env): EnvValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Required bindings (Worker won't function without these)
+  if (!env.SLOTS_KV) {
+    errors.push('SLOTS_KV binding is required');
+  }
+
+  // Optional but recommended for full functionality
+  if (!env.DB) {
+    warnings.push('DB binding not configured - D1 features disabled (atomic operations, duels)');
+  }
+
+  if (!env.DUEL_ALARM) {
+    warnings.push('DUEL_ALARM binding not configured - duel timeout notifications disabled');
+  }
+
+  // Twitch integration
+  if (!env.TWITCH_CLIENT_ID || !env.TWITCH_CLIENT_SECRET) {
+    warnings.push('TWITCH_CLIENT_ID/TWITCH_CLIENT_SECRET not configured - Twitch features disabled');
+  }
+
+  // Security-critical secrets
+  if (!env.JWT_SECRET) {
+    warnings.push('JWT_SECRET not configured - user sessions disabled');
+  } else if (env.JWT_SECRET.length < 32) {
+    warnings.push('JWT_SECRET should be at least 32 characters for security');
+  }
+
+  if (!env.BOT_SECRET) {
+    warnings.push('BOT_SECRET not configured - bot commands unprotected');
+  }
+
+  if (!env.EVENTSUB_SECRET) {
+    warnings.push('EVENTSUB_SECRET not configured - EventSub webhooks disabled');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings
+  };
+}
+
+/**
+ * Log validation results (call once at startup/first request)
+ */
+function logEnvValidation(result: EnvValidationResult): void {
+  if (result.errors.length > 0) {
+    console.error('[ENV] Configuration errors:', result.errors.join('; '));
+  }
+  if (result.warnings.length > 0) {
+    console.warn('[ENV] Configuration warnings:', result.warnings.join('; '));
+  }
+  if (result.valid && result.warnings.length === 0) {
+    console.log('[ENV] All environment variables configured correctly');
+  }
+}
+
 // Cryptographically secure random number generator (0 to 1, like Math.random but secure)
 function secureRandom(): number {
   const buffer = new Uint32Array(1);
@@ -47,6 +121,32 @@ function secureRandomInt(min: number, max: number): number {
     crypto.getRandomValues(buffer);
   } while (buffer[0] >= limit);
   return (buffer[0] % range) + min;
+}
+
+/**
+ * Timing-safe string comparison to prevent timing attacks.
+ * Always compares the full length of the expected string to prevent
+ * attackers from deducing the secret byte-by-byte through response timing.
+ *
+ * SECURITY FIX: Standard string comparison (===) leaks information about
+ * how many characters matched before the first mismatch.
+ */
+function timingSafeEqual(provided: string, expected: string): boolean {
+  // Always compare against expected length to prevent length-based timing attacks
+  const expectedLength = expected.length;
+
+  // If lengths differ, still do full comparison to prevent length timing leak
+  // XOR with a dummy string of the correct length
+  let result = provided.length === expectedLength ? 0 : 1;
+
+  // Compare each character using XOR - takes constant time regardless of matches
+  for (let i = 0; i < expectedLength; i++) {
+    const providedChar = i < provided.length ? provided.charCodeAt(i) : 0;
+    const expectedChar = expected.charCodeAt(i);
+    result |= providedChar ^ expectedChar;
+  }
+
+  return result === 0;
 }
 
 // OPTIMIZED: Function to get weighted random symbol using pre-computed cumulative weights
@@ -242,50 +342,101 @@ function formatTimeRemaining(ms: number): string {
   return `${minutes}m`;
 }
 
-// Structured error logging with context
-function logError(context: string, error: unknown, extra: Record<string, unknown> = {}): void {
-  const logEntry = {
-    level: 'error',
+// ============================================================================
+// Structured Logging System
+// ============================================================================
+
+/** Log levels in order of severity */
+type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'audit';
+
+/**
+ * Generate a unique request ID for tracing
+ * Format: timestamp-random (e.g., "1706500000000-a1b2c3d4")
+ */
+function generateRequestId(): string {
+  const timestamp = Date.now();
+  const random = Array.from(crypto.getRandomValues(new Uint8Array(4)))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `${timestamp}-${random}`;
+}
+
+// Current request ID (set per request, cleared after)
+let currentRequestId: string | null = null;
+
+/**
+ * Set request ID for current request (call at start of request handler)
+ */
+function setRequestId(requestId?: string): string {
+  currentRequestId = requestId || generateRequestId();
+  return currentRequestId;
+}
+
+/**
+ * Get current request ID (for adding to log entries)
+ */
+function getRequestId(): string | null {
+  return currentRequestId;
+}
+
+/**
+ * Clear request ID (call at end of request handler)
+ */
+function clearRequestId(): void {
+  currentRequestId = null;
+}
+
+/**
+ * Create structured log entry with consistent format
+ */
+function createLogEntry(
+  level: LogLevel,
+  context: string,
+  message: string,
+  extra: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    level,
     context,
-    message: error instanceof Error ? error.message : String(error),
+    message,
     timestamp: new Date().toISOString(),
+    requestId: currentRequestId,
     ...extra
   };
+}
+
+// Structured error logging with context and stack trace
+function logError(context: string, error: unknown, extra: Record<string, unknown> = {}): void {
+  const logEntry = createLogEntry('error', context, error instanceof Error ? error.message : String(error), {
+    stack: error instanceof Error ? error.stack : undefined,
+    ...extra
+  });
   console.error(JSON.stringify(logEntry));
 }
 
 function logWarn(context: string, message: string, extra: Record<string, unknown> = {}): void {
-  const logEntry = {
-    level: 'warn',
-    context,
-    message,
-    timestamp: new Date().toISOString(),
-    ...extra
-  };
+  const logEntry = createLogEntry('warn', context, message, extra);
   console.warn(JSON.stringify(logEntry));
 }
 
 function logInfo(context: string, message: string, extra: Record<string, unknown> = {}): void {
-  const logEntry = {
-    level: 'info',
-    context,
-    message,
-    timestamp: new Date().toISOString(),
-    ...extra
-  };
+  const logEntry = createLogEntry('info', context, message, extra);
   console.log(JSON.stringify(logEntry));
+}
+
+function logDebug(context: string, message: string, extra: Record<string, unknown> = {}): void {
+  // Debug logs can be filtered in production by checking LOG_LEVEL env var
+  const logEntry = createLogEntry('debug', context, message, extra);
+  console.debug(JSON.stringify(logEntry));
 }
 
 // Audit log for admin actions
 function logAudit(action: string, admin: string, target: string, extra: Record<string, unknown> = {}): void {
-  const logEntry = {
-    level: 'audit',
-    action,
+  const logEntry = createLogEntry('audit', action, `${admin} → ${target}`, {
     admin,
     target,
-    timestamp: new Date().toISOString(),
     ...extra
-  };
+  });
   console.log(JSON.stringify(logEntry));
 }
 
@@ -471,16 +622,137 @@ const PROFANITY_PATTERNS: RegExp[] = [
   /göt/i,
 ];
 
+/**
+ * Homoglyph mapping for Unicode lookalike characters
+ * Maps visually similar characters (Cyrillic, Greek, special chars) to ASCII equivalents
+ */
+const HOMOGLYPH_MAP: Record<string, string> = {
+  // Cyrillic lookalikes
+  'а': 'a', 'А': 'a', 'е': 'e', 'Е': 'e', 'о': 'o', 'О': 'o',
+  'р': 'p', 'Р': 'p', 'с': 'c', 'С': 'c', 'х': 'x', 'Х': 'x',
+  'у': 'y', 'У': 'y', 'і': 'i', 'І': 'i', 'ї': 'i', 'Ї': 'i',
+  'ј': 'j', 'Ј': 'j', 'ѕ': 's', 'Ѕ': 's', 'һ': 'h', 'Һ': 'h',
+  'ӏ': 'l', 'Ӏ': 'l', 'ԁ': 'd', 'Ԁ': 'd', 'ԛ': 'q', 'Ԛ': 'q',
+  'ԝ': 'w', 'Ԝ': 'w', 'ԟ': 'k', 'ⅰ': 'i', 'ⅱ': 'ii', 'ⅲ': 'iii',
+  // Greek lookalikes
+  'α': 'a', 'Α': 'a', 'β': 'b', 'Β': 'b', 'ε': 'e', 'Ε': 'e',
+  'η': 'n', 'Η': 'h', 'ι': 'i', 'Ι': 'i', 'κ': 'k', 'Κ': 'k',
+  'ν': 'v', 'Ν': 'n', 'ο': 'o', 'Ο': 'o', 'ρ': 'p', 'Ρ': 'p',
+  'τ': 't', 'Τ': 't', 'υ': 'u', 'Υ': 'y', 'χ': 'x', 'Χ': 'x',
+  // Special Unicode characters
+  'ℓ': 'l', '∪': 'u', '⊂': 'c', '∩': 'n', '℮': 'e',
+  'ⓐ': 'a', 'ⓑ': 'b', 'ⓒ': 'c', 'ⓓ': 'd', 'ⓔ': 'e', 'ⓕ': 'f',
+  'ⓖ': 'g', 'ⓗ': 'h', 'ⓘ': 'i', 'ⓙ': 'j', 'ⓚ': 'k', 'ⓛ': 'l',
+  'ⓜ': 'm', 'ⓝ': 'n', 'ⓞ': 'o', 'ⓟ': 'p', 'ⓠ': 'q', 'ⓡ': 'r',
+  'ⓢ': 's', 'ⓣ': 't', 'ⓤ': 'u', 'ⓥ': 'v', 'ⓦ': 'w', 'ⓧ': 'x',
+  'ⓨ': 'y', 'ⓩ': 'z',
+  // Fullwidth characters
+  'ａ': 'a', 'ｂ': 'b', 'ｃ': 'c', 'ｄ': 'd', 'ｅ': 'e', 'ｆ': 'f',
+  'ｇ': 'g', 'ｈ': 'h', 'ｉ': 'i', 'ｊ': 'j', 'ｋ': 'k', 'ｌ': 'l',
+  'ｍ': 'm', 'ｎ': 'n', 'ｏ': 'o', 'ｐ': 'p', 'ｑ': 'q', 'ｒ': 'r',
+  'ｓ': 's', 'ｔ': 't', 'ｕ': 'u', 'ｖ': 'v', 'ｗ': 'w', 'ｘ': 'x',
+  'ｙ': 'y', 'ｚ': 'z',
+  // Common substitution characters
+  'ł': 'l', 'Ł': 'l', 'ø': 'o', 'Ø': 'o', 'æ': 'ae', 'Æ': 'ae',
+  'œ': 'oe', 'Œ': 'oe', 'ß': 'ss', 'ñ': 'n', 'Ñ': 'n',
+  // Zero-width and invisible chars (removed)
+  '\u200B': '', '\u200C': '', '\u200D': '', '\uFEFF': '', '\u034F': '',
+  '\u2060': '', '\u2061': '', '\u2062': '', '\u2063': '', '\u2064': '',
+};
+
+/**
+ * Normalize text by replacing homoglyphs with ASCII equivalents
+ */
+function normalizeHomoglyphs(text: string): string {
+  let result = '';
+  for (const char of text) {
+    result += HOMOGLYPH_MAP[char] ?? char;
+  }
+  return result;
+}
+
 function containsProfanity(text: unknown): boolean {
   if (!text || typeof text !== 'string') return false;
-  const normalized = text.toLowerCase()
+
+  // Step 1: Normalize homoglyphs (Cyrillic, Greek, special Unicode)
+  const homoglyphNormalized = normalizeHomoglyphs(text);
+
+  // Step 2: Normalize leetspeak substitutions
+  const normalized = homoglyphNormalized.toLowerCase()
     .replace(/[0]/g, 'o')
     .replace(/[1!|]/g, 'i')
     .replace(/[3]/g, 'e')
     .replace(/[4@]/g, 'a')
     .replace(/[$5]/g, 's')
     .replace(/[7]/g, 't');
-  return PROFANITY_PATTERNS.some(pattern => pattern.test(normalized) || pattern.test(text));
+
+  // Test against patterns with original, homoglyph-normalized, and fully normalized versions
+  return PROFANITY_PATTERNS.some(pattern =>
+    pattern.test(text) ||
+    pattern.test(homoglyphNormalized) ||
+    pattern.test(normalized)
+  );
+}
+
+// ============================================================================
+// Idempotency Key System
+// ============================================================================
+
+interface IdempotencyResult {
+  /** Whether this is a duplicate request */
+  isDuplicate: boolean;
+  /** Cached response if duplicate (JSON string) */
+  cachedResponse?: string;
+}
+
+/**
+ * Check if request is a duplicate using idempotency key
+ * Returns cached response if duplicate, otherwise marks key as in-progress
+ * @param idempotencyKey - Unique key from client (e.g., X-Idempotency-Key header)
+ * @param ttlSeconds - How long to remember the key (default: 300 = 5 minutes)
+ */
+async function checkIdempotencyKey(idempotencyKey: string, env: Env, ttlSeconds = 300): Promise<IdempotencyResult> {
+  if (!idempotencyKey) {
+    return { isDuplicate: false };
+  }
+
+  const kvKey = `idem:${idempotencyKey}`;
+  const existing = await env.SLOTS_KV.get(kvKey);
+
+  if (existing) {
+    // Key exists - this is a duplicate request
+    // Format: "pending" (in progress) or JSON response (completed)
+    if (existing === 'pending') {
+      // Another request is still processing - treat as duplicate to prevent double-processing
+      return { isDuplicate: true };
+    }
+    return { isDuplicate: true, cachedResponse: existing };
+  }
+
+  // Mark as in-progress
+  await env.SLOTS_KV.put(kvKey, 'pending', { expirationTtl: ttlSeconds });
+  return { isDuplicate: false };
+}
+
+/**
+ * Store the response for an idempotency key (call after successful operation)
+ * @param idempotencyKey - The idempotency key
+ * @param response - JSON-serializable response to cache
+ * @param ttlSeconds - How long to keep the response cached
+ */
+async function storeIdempotencyResponse(idempotencyKey: string, response: unknown, env: Env, ttlSeconds = 300): Promise<void> {
+  if (!idempotencyKey) return;
+  const kvKey = `idem:${idempotencyKey}`;
+  await env.SLOTS_KV.put(kvKey, JSON.stringify(response), { expirationTtl: ttlSeconds });
+}
+
+/**
+ * Clear idempotency key on error (allows retry)
+ */
+async function clearIdempotencyKey(idempotencyKey: string, env: Env): Promise<void> {
+  if (!idempotencyKey) return;
+  const kvKey = `idem:${idempotencyKey}`;
+  await env.SLOTS_KV.delete(kvKey);
 }
 
 // Rate-Limit Check via KV Counter mit TTL
@@ -545,12 +817,23 @@ export {
   logError,
   logWarn,
   logInfo,
+  logDebug,
   logAudit,
+  setRequestId,
+  getRequestId,
+  clearRequestId,
+  generateRequestId,
   createErrorResponse,
   jsonErrorResponse,
   jsonSuccessResponse,
   checkRateLimit,
   containsProfanity,
   stripInvisibleChars,
-  logAuditTrail
+  logAuditTrail,
+  timingSafeEqual,
+  validateEnvironment,
+  logEnvValidation,
+  checkIdempotencyKey,
+  storeIdempotencyResponse,
+  clearIdempotencyKey
 };

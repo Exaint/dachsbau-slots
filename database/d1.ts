@@ -31,34 +31,109 @@ const D1_RETRY_DELAY_MS = 50;
 // Circuit breaker configuration for D1 failures
 const D1_CIRCUIT_BREAKER_THRESHOLD = 5;  // Errors before tripping
 const D1_CIRCUIT_BREAKER_RESET_MS = 60000;  // Reset after 60 seconds
+const D1_CIRCUIT_BREAKER_KV_KEY = 'circuit_breaker:d1';
+
+// In-memory cache for circuit breaker (request-scoped fast path)
 let D1_CIRCUIT_BREAKER_COUNT = 0;
 let D1_CIRCUIT_BREAKER_TRIPPED_AT = 0;
+
+interface CircuitBreakerState {
+  count: number;
+  trippedAt: number;
+}
+
+/**
+ * Get circuit breaker state from KV (distributed across all workers)
+ * Falls back to in-memory state if KV unavailable
+ *
+ * SECURITY FIX: Previously used module-level globals which didn't sync
+ * across worker instances. Now uses KV for distributed state.
+ */
+async function getCircuitBreakerState(env: Env): Promise<CircuitBreakerState> {
+  try {
+    const data = await env.SLOTS_KV.get(D1_CIRCUIT_BREAKER_KV_KEY, 'json');
+    if (data && typeof data === 'object') {
+      const state = data as CircuitBreakerState;
+      // Sync to in-memory cache for fast path
+      D1_CIRCUIT_BREAKER_COUNT = state.count;
+      D1_CIRCUIT_BREAKER_TRIPPED_AT = state.trippedAt;
+      return state;
+    }
+  } catch {
+    // KV unavailable, use in-memory state
+  }
+  return { count: D1_CIRCUIT_BREAKER_COUNT, trippedAt: D1_CIRCUIT_BREAKER_TRIPPED_AT };
+}
+
+/**
+ * Save circuit breaker state to KV
+ */
+async function saveCircuitBreakerState(state: CircuitBreakerState, env: Env): Promise<void> {
+  // Update in-memory cache
+  D1_CIRCUIT_BREAKER_COUNT = state.count;
+  D1_CIRCUIT_BREAKER_TRIPPED_AT = state.trippedAt;
+
+  // Persist to KV (fire-and-forget, expiring after reset window + buffer)
+  const ttl = Math.ceil(D1_CIRCUIT_BREAKER_RESET_MS / 1000) + 120;
+  env.SLOTS_KV.put(D1_CIRCUIT_BREAKER_KV_KEY, JSON.stringify(state), {
+    expirationTtl: ttl
+  }).catch(() => {});
+}
 
 /**
  * Check if D1 circuit breaker is open (too many failures)
  * Auto-resets after D1_CIRCUIT_BREAKER_RESET_MS
+ *
+ * Uses in-memory fast path, synced with KV on state changes
  */
 export function isD1CircuitBreakerOpen(): boolean {
   if (D1_CIRCUIT_BREAKER_COUNT === 0) return false;
-  
+
   // Check if reset window has passed
   if (Date.now() - D1_CIRCUIT_BREAKER_TRIPPED_AT > D1_CIRCUIT_BREAKER_RESET_MS) {
     D1_CIRCUIT_BREAKER_COUNT = 0;
     return false;
   }
-  
+
   return D1_CIRCUIT_BREAKER_COUNT >= D1_CIRCUIT_BREAKER_THRESHOLD;
 }
 
 /**
- * Record a D1 failure for circuit breaker tracking
+ * Async version that checks KV for distributed state
  */
-function recordD1Failure(): void {
+export async function isD1CircuitBreakerOpenAsync(env: Env): Promise<boolean> {
+  const state = await getCircuitBreakerState(env);
+
+  if (state.count === 0) return false;
+
+  // Check if reset window has passed
+  if (Date.now() - state.trippedAt > D1_CIRCUIT_BREAKER_RESET_MS) {
+    // Reset in KV
+    await saveCircuitBreakerState({ count: 0, trippedAt: 0 }, env);
+    return false;
+  }
+
+  return state.count >= D1_CIRCUIT_BREAKER_THRESHOLD;
+}
+
+/**
+ * Record a D1 failure for circuit breaker tracking
+ * Now updates both in-memory and KV state
+ */
+function recordD1Failure(env?: Env): void {
   D1_CIRCUIT_BREAKER_COUNT++;
   if (D1_CIRCUIT_BREAKER_COUNT === 1) {
     D1_CIRCUIT_BREAKER_TRIPPED_AT = Date.now();
   }
-  
+
+  // Persist to KV if env available
+  if (env) {
+    saveCircuitBreakerState({
+      count: D1_CIRCUIT_BREAKER_COUNT,
+      trippedAt: D1_CIRCUIT_BREAKER_TRIPPED_AT
+    }, env).catch(() => {});
+  }
+
   // When circuit breaker trips, disable D1 and fall back to KV
   if (isD1CircuitBreakerOpen()) {
     D1_ENABLED = false;
@@ -71,9 +146,14 @@ function recordD1Failure(): void {
 /**
  * Reset circuit breaker (called when D1 becomes healthy again)
  */
-function resetD1CircuitBreaker(): void {
+function resetD1CircuitBreaker(env?: Env): void {
   D1_CIRCUIT_BREAKER_COUNT = 0;
   D1_ENABLED = true;
+
+  // Persist reset to KV
+  if (env) {
+    saveCircuitBreakerState({ count: 0, trippedAt: 0 }, env).catch(() => {});
+  }
 }
 
 /**
@@ -81,20 +161,24 @@ function resetD1CircuitBreaker(): void {
  * Fire-and-forget pattern with automatic retries on failure.
  * @param operation - The D1 operation to execute (async function)
  * @param context - Context for logging (operation name, params)
+ * @param env - Optional environment for KV-based circuit breaker state
+ *
+ * SECURITY FIX: Now propagates env to circuit breaker for distributed state
  */
 export function executeD1Write(
   operation: () => Promise<unknown>,
-  context: { name: string; params?: Record<string, unknown> }
+  context: { name: string; params?: Record<string, unknown> },
+  env?: Env
 ): void {
   const executeWithRetry = async (attempt: number = 0): Promise<void> => {
     try {
       await operation();
-      // Success - reset circuit breaker
+      // Success - reset circuit breaker (distributed via KV)
       if (D1_CIRCUIT_BREAKER_COUNT > 0) {
-        resetD1CircuitBreaker();
+        resetD1CircuitBreaker(env);
       }
     } catch (error) {
-      recordD1Failure();
+      recordD1Failure(env);
       if (attempt < D1_WRITE_RETRIES) {
         await new Promise(r => setTimeout(r, D1_RETRY_DELAY_MS * (attempt + 1)));
         return executeWithRetry(attempt + 1);
@@ -530,6 +614,69 @@ export async function claimSpinSlot(
   } catch (error) {
     logError('d1.claimSpinSlot', error, { username });
     return { claimed: true }; // graceful degradation: allow (KV is backup)
+  }
+}
+
+// ============================================
+// Atomic Daily Bonus Claim
+// ============================================
+
+export interface DailyClaimResult {
+  claimed: boolean;
+  alreadyClaimed?: boolean;
+  error?: 'd1_unavailable';
+}
+
+/**
+ * Atomically claim daily bonus for a user.
+ * Uses D1 INSERT with ON CONFLICT to prevent race conditions.
+ *
+ * SECURITY FIX: Replaces KV put-then-verify pattern which had eventual
+ * consistency issues allowing double-claims in rare cases.
+ *
+ * How it works:
+ * - INSERT into daily_claims with date → succeeds if not claimed today
+ * - ON CONFLICT DO NOTHING → if already claimed, insert fails silently
+ * - Check changes to determine if claim succeeded
+ *
+ * Requires daily_claims table:
+ * CREATE TABLE IF NOT EXISTS daily_claims (
+ *   username TEXT NOT NULL,
+ *   claim_date TEXT NOT NULL,
+ *   claimed_at INTEGER NOT NULL,
+ *   PRIMARY KEY (username, claim_date)
+ * );
+ */
+export async function claimDailyBonus(
+  username: string,
+  claimDate: string,
+  env: Env
+): Promise<DailyClaimResult> {
+  if (!D1_ENABLED || !env.DB) {
+    return { claimed: false, error: 'd1_unavailable' };
+  }
+
+  try {
+    const lowerUsername = username.toLowerCase();
+    const now = Date.now();
+
+    // Atomic claim: INSERT OR IGNORE
+    // If row already exists for this user+date, insert does nothing (0 changes)
+    const result = await env.DB.prepare(`
+      INSERT INTO daily_claims (username, claim_date, claimed_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(username, claim_date) DO NOTHING
+    `).bind(lowerUsername, claimDate, now).run();
+
+    if (result.meta.changes > 0) {
+      return { claimed: true };
+    }
+
+    // No changes = already claimed today
+    return { claimed: false, alreadyClaimed: true };
+  } catch (error) {
+    logError('d1.claimDailyBonus', error, { username, claimDate });
+    return { claimed: false, error: 'd1_unavailable' };
   }
 }
 

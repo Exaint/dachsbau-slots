@@ -98,7 +98,10 @@ export {
   getSpinBundlePurchases,
   incrementSpinBundlePurchases,
   getDachsBoostPurchases,
-  incrementDachsBoostPurchases
+  incrementDachsBoostPurchases,
+  atomicIncrementDachsBoostPurchases,
+  atomicIncrementSpinBundlePurchases,
+  type AtomicPurchaseResult
 } from './shop.js';
 
 // Duels
@@ -146,5 +149,8 @@ export {
 // D1 Atomic operations (for critical transactions)
 export {
   atomicTransfer,
-  type AtomicTransferResult
+  claimDailyBonus,
+  isD1CircuitBreakerOpenAsync,
+  type AtomicTransferResult,
+  type DailyClaimResult
 } from './d1.js';

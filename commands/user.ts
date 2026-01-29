@@ -19,7 +19,7 @@ import {
   ACHIEVEMENTS,
   MAX_BALANCE
 } from '../constants.js';
-import { sanitizeUsername, validateAmount, isLeaderboardBlocked, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight, checkRateLimit, secureRandom, safeJsonParse } from '../utils.js';
+import { sanitizeUsername, validateAmount, isLeaderboardBlocked, formatTimeRemaining, logError, getCurrentDate, getGermanDateFromTimestamp, getMsUntilGermanMidnight, checkRateLimit, secureRandom, safeJsonParse, logAuditTrail } from '../utils.js';
 import {
   getBalance,
   creditBalance,
@@ -40,7 +40,8 @@ import {
   checkAndUnlockAchievement,
   checkBalanceAchievements,
   updatePlayerStat,
-  atomicTransfer
+  atomicTransfer,
+  claimDailyBonus
 } from '../database.js';
 import { D1_ENABLED, getLeaderboard as getLeaderboardD1 } from '../database/d1.js';
 import type { Env } from '../types/index.js';
@@ -211,15 +212,29 @@ async function handleDaily(username: string, env: Env): Promise<Response> {
       return new Response(`@${username} ⏰ Zu viele Anfragen, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
     }
 
-    // Write-first daily claim lock to prevent double-claim race condition
     const todayGerman = getCurrentDate();
-    const dailyClaimKey = `daily_claim:${username}:${todayGerman}`;
-    const claimValue = `${Date.now()}:${secureRandom()}`;
-    await env.SLOTS_KV.put(dailyClaimKey, claimValue, { expirationTtl: 86400 });
-    const verifyClaim = await env.SLOTS_KV.get(dailyClaimKey);
-    if (verifyClaim !== claimValue) {
-      // Another concurrent request won the race
-      return new Response(`@${username} ⏰ Daily Bonus wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
+
+    // SECURITY FIX: Use D1 atomic claim instead of KV put-verify pattern
+    // This prevents race conditions from eventual consistency issues
+    const claimResult = await claimDailyBonus(username, todayGerman, env);
+
+    if (!claimResult.claimed && claimResult.alreadyClaimed) {
+      // Already claimed today
+      const monthlyLogin = await getMonthlyLogin(username, env);
+      const daysInMonth = getDaysInCurrentMonth();
+      const remainingMs = getMsUntilGermanMidnight();
+      return new Response(`@${username} ⏰ Daily Bonus bereits abgeholt! Nächster Bonus in ${formatTimeRemaining(remainingMs)} | Login-Tage: ${monthlyLogin.days.length}/${daysInMonth} 📅`, { headers: RESPONSE_HEADERS });
+    }
+
+    // D1 unavailable - fall back to KV-based claim (legacy behavior)
+    if (!claimResult.claimed && claimResult.error === 'd1_unavailable') {
+      const dailyClaimKey = `daily_claim:${username}:${todayGerman}`;
+      const claimValue = `${Date.now()}:${secureRandom()}`;
+      await env.SLOTS_KV.put(dailyClaimKey, claimValue, { expirationTtl: 86400 });
+      const verifyClaim = await env.SLOTS_KV.get(dailyClaimKey);
+      if (verifyClaim !== claimValue) {
+        return new Response(`@${username} ⏰ Daily Bonus wird gerade verarbeitet, bitte warte kurz.`, { headers: RESPONSE_HEADERS });
+      }
     }
 
     const [hasAccepted, hasBoost, lastDaily, monthlyLogin] = await Promise.all([
@@ -237,10 +252,10 @@ async function handleDaily(username: string, env: Env): Promise<Response> {
     const dailyAmount = hasBoost ? DAILY_BOOST_AMOUNT : DAILY_AMOUNT;
     const now = Date.now();
 
-    // Secondary guard: check if daily was already claimed today (German timezone)
+    // Secondary guard: check KV if D1 was unavailable (German timezone)
     const daysInMonth = getDaysInCurrentMonth();
 
-    if (lastDaily) {
+    if (claimResult.error === 'd1_unavailable' && lastDaily) {
       const lastDailyGerman = getGermanDateFromTimestamp(lastDaily);
 
       if (todayGerman === lastDailyGerman) {
@@ -440,11 +455,18 @@ async function handleTransfer(username: string, target: string, amount: string, 
       return new Response(`@${username} ❌ Transfer fehlgeschlagen. Bitte versuche es erneut.`, { headers: RESPONSE_HEADERS });
     }
 
-    // Transfer succeeded - track achievements
+    // Transfer succeeded - track achievements and audit log
     await Promise.all([
       trackTransferAchievements(username, parsedAmount, env),
       trackTransferReceived(cleanTarget, parsedAmount, env),
-      checkBalanceAchievements(cleanTarget, result.receiverNewBalance!, env)
+      checkBalanceAchievements(cleanTarget, result.receiverNewBalance!, env),
+      // Audit log for transfer (financial transaction)
+      logAuditTrail(username, 'transfer', {
+        target: cleanTarget,
+        amount: parsedAmount,
+        senderNewBalance: result.senderNewBalance,
+        receiverNewBalance: result.receiverNewBalance
+      }, env)
     ]);
 
     return new Response(`@${username} ✅ ${parsedAmount} DachsTaler an @${cleanTarget} gesendet! Dein Kontostand: ${result.senderNewBalance} | @${cleanTarget}'s Kontostand: ${result.receiverNewBalance} 💸`, { headers: RESPONSE_HEADERS });
